@@ -1,0 +1,11 @@
+{
+  "name": "@conexa/types",
+  "version": "3.0.0",
+  "description": "Conexa V3 - Shared TypeScript Types and Interfaces",
+  "main": "index.ts",
+  "private": true,
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

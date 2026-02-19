@@ -1,0 +1,44 @@
+{
+  "name": "conexa-v3",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Plataforma SaaS educacional multi-tenant para gestão pedagógica e documental da Educação Infantil",
+  "author": "COCRIS - Associação Beneficente Coração de Cristo",
+  "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "dev:api": "pnpm --filter @conexa/api dev",
+    "dev:web": "pnpm --filter @conexa/web dev",
+    "dev:site": "pnpm --filter @conexa/site dev",
+    "build": "pnpm --recursive --filter './apps/*' build",
+    "build:api": "pnpm --filter @conexa/api build",
+    "build:web": "pnpm --filter @conexa/web build",
+    "build:site": "pnpm --filter @conexa/site build",
+    "lint": "pnpm --recursive lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "pnpm --recursive clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @conexa/database generate",
+    "db:migrate:dev": "pnpm --filter @conexa/database migrate:dev",
+    "db:migrate:deploy": "pnpm --filter @conexa/database migrate:deploy",
+    "db:studio": "pnpm --filter @conexa/database studio",
+    "db:seed": "pnpm --filter @conexa/database seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:build": "docker-compose build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.1"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@conexa/utils",
+  "version": "3.0.0",
+  "description": "Conexa V3 - Shared Utility Functions",
+  "main": "index.ts",
+  "private": true,
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

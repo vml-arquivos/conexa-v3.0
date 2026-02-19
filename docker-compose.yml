@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    container_name: conexa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: conexa
+      POSTGRES_PASSWORD: conexa_dev_password
+      POSTGRES_DB: conexa_v3
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U conexa']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (opcional)
+  redis:
+    image: redis:7-alpine
+    container_name: conexa-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: conexa-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://conexa:conexa_dev_password@postgres:5432/conexa_v3?sslmode=disable
+      DIRECT_URL: postgresql://conexa:conexa_dev_password@postgres:5432/conexa_v3?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      JWT_REFRESH_SECRET: dev_refresh_secret_change_in_production
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+      - /app/dist
+    command: pnpm dev
+
+  # Frontend Web
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: development
+    container_name: conexa-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    command: pnpm dev
+
+  # Site Institucional
+  site:
+    build:
+      context: ./apps/site
+      dockerfile: Dockerfile
+      target: development
+    container_name: conexa-site
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://conexa:conexa_dev_password@postgres:5432/conexa_v3?sslmode=disable
+    ports:
+      - '5174:5174'
+    volumes:
+      - ./apps/site:/app
+      - /app/node_modules
+    command: pnpm dev
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: conexa-network

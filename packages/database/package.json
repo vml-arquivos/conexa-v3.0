@@ -1,0 +1,23 @@
+{
+  "name": "@conexa/database",
+  "version": "3.0.0",
+  "description": "Conexa V3 - Database Schema and Migrations (Prisma)",
+  "main": "index.ts",
+  "private": true,
+  "scripts": {
+    "generate": "prisma generate --schema=./prisma/schema.prisma",
+    "migrate:dev": "prisma migrate dev --schema=./prisma/schema.prisma",
+    "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "studio": "prisma studio --schema=./prisma/schema.prisma",
+    "seed": "ts-node prisma/seed.ts",
+    "validate": "prisma validate --schema=./prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}
