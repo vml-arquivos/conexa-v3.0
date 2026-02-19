@@ -1,0 +1,117 @@
+.
+├── apps
+│   ├── api
+│   │   ├── data
+│   │   ├── docs
+│   │   ├── ops
+│   │   ├── scripts
+│   │   ├── src
+│   │   ├── test
+│   │   ├── AUDIT_REPORT_FINAL.md
+│   │   ├── AUTH_GUIDE.md
+│   │   ├── CHANGELOG.md
+│   │   ├── CHANGELOG_v1.2.md
+│   │   ├── COOLIFY_SETUP_GUIDE.md
+│   │   ├── CORRECTIONS_REPORT_TASK6.1.md
+│   │   ├── DEPLOY_P0_GUIDE.md
+│   │   ├── DIARY_EVENT_EXAMPLES.sh
+│   │   ├── DIARY_EVENT_GUIDE.md
+│   │   ├── Dockerfile
+│   │   ├── ETAPA1_E_2_DIAGNOSTICO_COMPLETO.md
+│   │   ├── HARDENING_REPORT_TASK6.1.1.md
+│   │   ├── IMPORT_GUIDE.md
+│   │   ├── MANIFEST.md
+│   │   ├── MIGRATION_CHECKLIST.md
+│   │   ├── MIGRATION_FINAL_REPORT.md
+│   │   ├── MIGRATION_SETUP.md
+│   │   ├── MIGRATION_SETUP_FIXED.md
+│   │   ├── MISSION7_REPORT.md
+│   │   ├── PARSER_IMPLEMENTATION.md
+│   │   ├── PLANNING_GUIDE.md
+│   │   ├── PLANNING_GUIDE_V2.md
+│   │   ├── POST_MORTEM_PRISMA_SUPABASE.md
+│   │   ├── README.md
+│   │   ├── RESUMO_PARSER.md
+│   │   ├── SPRINT1_EVIDENCIAS.md
+│   │   ├── SUPABASE_MIGRATION_SUCCESS.md
+│   │   ├── TIMEZONE_STANDARD.md
+│   │   ├── entrypoint.sh
+│   │   ├── eslint.config.mjs
+│   │   ├── jest.config.js
+│   │   ├── nest-cli.json
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   ├── test-container.sh
+│   │   ├── tsconfig.build.json
+│   │   └── tsconfig.json
+│   ├── site
+│   │   ├── client
+│   │   ├── drizzle
+│   │   ├── patches
+│   │   ├── server
+│   │   ├── shared
+│   │   ├── DEPLOY_GUIDE.md
+│   │   ├── ENV_CONFIG.md
+│   │   ├── cocris-real-content.md
+│   │   ├── cocris-real-structure.md
+│   │   ├── components.json
+│   │   ├── drizzle.config.ts
+│   │   ├── nixpacks.json
+│   │   ├── package.json
+│   │   ├── pnpm-lock.yaml
+│   │   ├── seed-units.mjs
+│   │   ├── todo.md
+│   │   ├── tsconfig.json
+│   │   ├── vite.config.ts
+│   │   └── vitest.config.ts
+│   └── web
+│       ├── public
+│       ├── src
+│       ├── DEPLOY.md
+│       ├── Dockerfile
+│       ├── FRONTEND_IMPLEMENTATION_REPORT.md
+│       ├── README.md
+│       ├── eslint.config.js
+│       ├── index.html
+│       ├── nginx.conf
+│       ├── package-lock.json
+│       ├── package.json
+│       ├── pnpm-lock.yaml
+│       ├── postcss.config.js
+│       ├── tailwind.config.js
+│       ├── tsconfig.app.json
+│       ├── tsconfig.json
+│       ├── tsconfig.node.json
+│       └── vite.config.ts
+├── docs
+│   ├── ANALISE_ESTRUTURA_PROJETOS.md
+│   ├── DEPLOY.md
+│   ├── DIAGNOSTICO_REPOSITORIOS.md
+│   ├── ESCOPO_MESTRE_RESUMO.md
+│   ├── RELATORIO_MIGRACAO_V3.md
+│   └── SEQUENCIA_PEDAGOGICA_RESUMO.md
+├── packages
+│   ├── config
+│   ├── database
+│   │   ├── prisma
+│   │   ├── index.ts
+│   │   └── package.json
+│   ├── types
+│   │   ├── index.ts
+│   │   └── package.json
+│   ├── ui
+│   │   ├── src
+│   │   ├── index.ts
+│   │   └── package.json
+│   └── utils
+│       ├── index.ts
+│       └── package.json
+├── CONTRIBUTING.md
+├── ESTRUTURA_REPOSITORIO.txt
+├── LICENSE
+├── README.md
+├── docker-compose.yml
+├── package.json
+└── pnpm-workspace.yaml
+
+26 directories, 88 files
