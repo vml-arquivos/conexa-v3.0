@@ -25,6 +25,8 @@ import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
 import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
 import { ClassroomsModule } from './classrooms/classrooms.module';
 import { AtendimentoPaisModule } from './atendimento-pais/atendimento-pais.module';
+import { ChildrenModule } from './children/children.module';
+import { FornecedoresModule } from './fornecedores/fornecedores.module';
 
 @Module({
   imports: [
@@ -53,6 +55,8 @@ import { AtendimentoPaisModule } from './atendimento-pais/atendimento-pais.modul
     IaAssistivaModule,
     ClassroomsModule,
     AtendimentoPaisModule,
+    ChildrenModule,
+    FornecedoresModule,
   ],
   controllers: [AppController],
   providers: [

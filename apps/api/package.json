@@ -1,12 +1,12 @@
 {
   "name": "@conexa/api",
-  "version": "3.0.0",
-  "description": "Conexa V3 - Backend API (NestJS)",
+  "version": "1.0.0",
+  "description": "_Gerado por MANUZ, IA Engenheira de Software Sênior._",
   "main": "index.js",
   "scripts": {
     "build": "nest build && node scripts/copy-data-to-dist.js",
     "start": "nest start",
-    "dev": "nest start --watch",
+    "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",

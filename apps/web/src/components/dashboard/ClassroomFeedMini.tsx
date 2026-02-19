@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { Skeleton } from '../ui/skeleton';
 import { getDiaryEvents, type DiaryEvent } from '../../api/diary';
-import { Clock, User, Tag } from 'lucide-react';
+import { Clock, User, Tag, Utensils, Moon, MessageSquare, AlertCircle } from 'lucide-react';
 
 interface ClassroomFeedMiniProps {
   classroomId: string;
@@ -20,12 +22,10 @@ export function ClassroomFeedMini({ classroomId }: ClassroomFeedMiniProps) {
     try {
       setLoading(true);
       const allEvents = await getDiaryEvents();
-      // Filtrar por classroomId e ordenar por data (mais recentes primeiro)
-      // Nota: O backend idealmente deveria filtrar, mas faremos no front para o MVP
       const filtered = allEvents
         .filter(e => e.classroomId === classroomId)
         .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
-        .slice(0, 5); // Apenas os 5 últimos
+        .slice(0, 5);
       
       setEvents(filtered);
     } catch (error) {
@@ -35,47 +35,67 @@ export function ClassroomFeedMini({ classroomId }: ClassroomFeedMiniProps) {
     }
   };
 
+  const getEventIcon = (type: string) => {
+    switch (type) {
+      case 'ALIMENTACAO': return <Utensils className="h-3.5 w-3.5 text-orange-500" />;
+      case 'SONO': return <Moon className="h-3.5 w-3.5 text-blue-500" />;
+      case 'OBSERVACAO': return <MessageSquare className="h-3.5 w-3.5 text-primary" />;
+      case 'OCORRENCIA': return <AlertCircle className="h-3.5 w-3.5 text-green-500" />;
+      default: return <Tag className="h-3.5 w-3.5 text-muted-foreground" />;
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Atividades Recentes</CardTitle>
+    <Card className="shadow-sm border-primary/5">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Clock className="h-5 w-5 text-primary" />
+          Atividades Recentes
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {[1, 2, 3].map(i => (
-              <div key={i} className="animate-pulse flex space-x-4">
-                <div className="rounded-full bg-gray-200 h-10 w-10"></div>
-                <div className="flex-1 space-y-2 py-1">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              <div key={i} className="flex gap-3">
+                <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
                 </div>
               </div>
             ))}
           </div>
         ) : events.length === 0 ? (
-          <p className="text-center text-muted-foreground py-4">Nenhuma atividade registrada hoje.</p>
+          <div className="text-center py-8 space-y-2">
+            <Tag className="h-8 w-8 text-muted-foreground/20 mx-auto" />
+            <p className="text-xs text-muted-foreground">Nenhuma atividade registrada hoje.</p>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {events.map(event => (
-              <div key={event.id} className="flex gap-3 border-b pb-3 last:border-0">
-                <div className="mt-1">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Tag className="h-4 w-4 text-primary" />
+              <div key={event.id} className="flex gap-3 relative group">
+                <div className="mt-1 shrink-0">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border border-border group-hover:border-primary/30 transition-colors">
+                    {getEventIcon(event.type)}
                   </div>
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <h4 className="text-sm font-semibold">{event.title}</h4>
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="text-xs font-bold truncate">{event.title}</h4>
+                    <span className="text-[9px] font-mono text-muted-foreground whitespace-nowrap bg-muted px-1.5 py-0.5 rounded">
                       {new Date(event.createdAt || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{event.description}</p>
-                  <div className="flex items-center gap-1 mt-2">
-                    <User className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-[10px] font-medium text-muted-foreground">ID Aluno: {event.childId.substring(0, 8)}...</span>
+                  <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{event.description}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <User className="h-2.5 w-2.5 text-muted-foreground/60" />
+                    <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-tighter">
+                      Aluno: {event.childId.substring(0, 8)}
+                    </span>
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1 ml-auto uppercase font-bold tracking-tighter">
+                      {event.type}
+                    </Badge>
                   </div>
                 </div>
               </div>

@@ -1,26 +1,20 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { useToast } from '../../hooks/use-toast';
-import { MessageSquare, Send } from 'lucide-react';
+import { Textarea } from '../ui/textarea';
+import { toast } from 'sonner';
+import { MessageSquare, Send, Loader2 } from 'lucide-react';
 import { createDiaryEvent } from '../../api/diary';
 import { getPedagogicalToday } from '../../utils/pedagogicalDate';
-
-import { getErrorMessage } from '../../utils/errorMessage';
-interface StudentRef {
-  id: string;
-  name?: string;
-}
 
 interface QuickObservationInputProps {
   planningId: string;
   curriculumEntryId: string;
   classroomId: string;
-  students: StudentRef[];
+  students: any[];
 }
 
 export function QuickObservationInput({ planningId, curriculumEntryId, classroomId, students }: QuickObservationInputProps) {
-  const { toast } = useToast();
   const [selectedStudent, setSelectedStudent] = useState<string>('');
   const [observation, setObservation] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,16 +35,13 @@ export function QuickObservationInput({ planningId, curriculumEntryId, classroom
         curriculumEntryId
       });
 
-      toast({
-        title: "Observação Salva",
+      toast.success("Observação Salva", {
         description: "A observação foi registrada no diário do aluno.",
       });
       setObservation('');
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Erro ao Salvar",
-        description: getErrorMessage(error, "Falha ao registrar observação."),
+    } catch (error: any) {
+      toast.error("Erro ao Salvar", {
+        description: error.message || "Falha ao registrar observação.",
       });
     } finally {
       setLoading(false);
@@ -58,8 +49,8 @@ export function QuickObservationInput({ planningId, curriculumEntryId, classroom
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="shadow-sm border-primary/5">
+      <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-lg">
           <MessageSquare className="h-5 w-5 text-primary" />
           Observação Rápida
@@ -67,9 +58,9 @@ export function QuickObservationInput({ planningId, curriculumEntryId, classroom
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium">Aluno</label>
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aluno</label>
           <select 
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             value={selectedStudent}
             onChange={(e) => setSelectedStudent(e.target.value)}
           >
@@ -81,21 +72,25 @@ export function QuickObservationInput({ planningId, curriculumEntryId, classroom
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium">Observação</label>
-          <textarea 
-            className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="Digite aqui a observação do dia..."
+          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Observação</label>
+          <Textarea 
+            className="min-h-[100px] resize-none"
+            placeholder="Digite aqui a observação do dia para este aluno..."
             value={observation}
             onChange={(e) => setObservation(e.target.value)}
           />
         </div>
 
         <Button 
-          className="w-full gap-2" 
+          className="w-full gap-2 font-semibold" 
           onClick={handleSendObservation}
           disabled={loading || !selectedStudent || !observation.trim()}
         >
-          <Send className="h-4 w-4" />
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
           Salvar Observação
         </Button>
       </CardContent>

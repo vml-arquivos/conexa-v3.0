@@ -264,7 +264,6 @@ model Mantenedora {
   auditLogs            AuditLog[]
   pedidosCompra        PedidoCompra[]
   solicitacoesCorrecao SolicitacaoCorrecao[]
-  fornecedores         Fornecedor[]
   arquivos             Arquivo[]
   coordenacoesReuniao  CoordenacaoReuniao[]
   formacoes            Formacao[]
@@ -1198,7 +1197,6 @@ model PedidoCompra {
   id            String @id @default(cuid())
   mantenedoraId String
   unitId        String
-  fornecedorId  String?
 
   /// Mês/ano de referência (ex.: 2026-03)
   mesReferencia String @db.VarChar(7)
@@ -1221,7 +1219,6 @@ model PedidoCompra {
   /// Relações
   mantenedora Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  fornecedor  Fornecedor?        @relation(fields: [fornecedorId], references: [id])
   itens       ItemPedidoCompra[]
 
   @@index([mantenedoraId])
@@ -1677,35 +1674,4 @@ model SyncMutation {
   @@index([usuarioId])
   @@index([status])
   @@index([criadoEm])
-}
-
-// ============================================================================
-// FORNECEDORES
-// ============================================================================
-
-model Fornecedor {
-  id                String   @id @default(cuid())
-  razaoSocial       String
-  nomeFantasia      String?
-  cnpj              String
-  inscricaoEstadual String?
-  email             String?
-  telefone          String?
-  celular           String?
-  endereco          String?
-  cidade            String?
-  estado            String?
-  cep               String?
-  contato           String?
-  observacoes       String?
-  ativo             Boolean  @default(true)
-  mantenedoraId     String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  mantenedora Mantenedora    @relation(fields: [mantenedoraId], references: [id])
-  pedidos     PedidoCompra[]
-
-  @@index([mantenedoraId])
-  @@index([cnpj])
 }

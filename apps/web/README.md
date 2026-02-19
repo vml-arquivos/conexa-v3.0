@@ -1,21 +1,25 @@
 # Font-Conexa-V2
 
-Frontend do sistema Conexa V2 desenvolvido com React, Vite e TypeScript.
+Frontend premium do sistema Conexa V2 desenvolvido com React, Vite, TypeScript e Shadcn/UI.
 
 ---
 
-## Tecnologias
+## 🚀 Tecnologias
 
 - **React 19.2.4** - Framework UI
 - **Vite 7.3.1** - Build tool
 - **TypeScript 5.9.3** - Type safety
+- **Tailwind CSS 3.4.19** - Styling
+- **Shadcn/UI** - Componentes de UI Premium
+- **Radix UI** - Primitivos acessíveis
+- **Lucide React** - Ícones
+- **Sonner** - Notificações (Toasts)
 - **React Router DOM 7.13.0** - Roteamento
 - **Axios 1.13.4** - HTTP client
-- **Tailwind CSS 3.4.19** - Styling
 
 ---
 
-## Desenvolvimento
+## 🛠️ Desenvolvimento
 
 ### Instalação de Dependências
 
@@ -37,15 +41,9 @@ Acesse: http://localhost:5173
 npm run build
 ```
 
-### Preview do Build
-
-```bash
-npm run preview
-```
-
 ---
 
-## Deploy no Coolify
+## 🌐 Deploy no Coolify
 
 ### Configuração
 
@@ -64,83 +62,41 @@ dist
 VITE_API_BASE_URL=https://apiconexa.casadf.com.br
 ```
 
-**Domínio:**
+**Domínio Oficial:**
 ```
-https://democonexa.casadf.com.br
+https://demo.conexa.casadev.com.br
 ```
-
-Para mais detalhes, consulte [DEPLOY.md](./DEPLOY.md).
 
 ---
 
-## Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
 ```
 src/
 ├── api/                    # Camada de API
-│   ├── http.ts            # Axios instance com interceptors
-│   ├── auth.ts            # Autenticação
-│   ├── plannings.ts       # Planejamentos
-│   ├── diary.ts           # Diário
-│   ├── matrices.ts        # Matrizes curriculares
-│   └── reports.ts         # Relatórios
-├── app/                    # Core da aplicação
-│   ├── AuthProvider.tsx   # Context de autenticação
-│   ├── ProtectedRoute.tsx # Guard de rotas
-│   └── router.tsx         # Configuração de rotas
+├── app/                    # Core da aplicação (Auth, Router, Guards)
 ├── components/
-│   └── layout/            # Layout SaaS
-│       ├── AppLayout.tsx  # Layout principal
-│       ├── Sidebar.tsx    # Menu lateral
-│       └── Topbar.tsx     # Barra superior
-└── pages/                  # Páginas
-    ├── LoginPage.tsx      # Login
-    ├── DashboardPage.tsx  # Dashboard
-    ├── PlanningsPage.tsx  # Planejamentos
-    ├── DiaryPage.tsx      # Diário
-    ├── MatricesPage.tsx   # Matrizes
-    └── ReportsPage.tsx    # Relatórios
+│   ├── dashboard/         # Componentes específicos do Dashboard
+│   ├── layout/            # Layout SaaS (Sidebar, Topbar)
+│   └── ui/                # Componentes Shadcn/UI & PageShell
+├── hooks/                  # Custom hooks (useToast, etc)
+├── lib/                    # Utilitários (cn, etc)
+├── pages/                  # Páginas da aplicação
+└── utils/                  # Helpers (pedagogicalDate, etc)
 ```
 
 ---
 
-## Rotas
+## 🛡️ Segurança & Regras
 
-### Públicas
-- `/login` - Página de login
+### Trava Pedagógica
+O sistema possui uma **Trava Pedagógica** no Dashboard do Professor que impede registros caso não haja um planejamento ativo (`EM_EXECUCAO`) ou uma entrada curricular programada para a data atual.
 
-### Protegidas (requer autenticação)
-- `/app/dashboard` - Dashboard
-- `/app/plannings` - Planejamentos
-- `/app/diary` - Diário
-- `/app/matrices` - Matrizes Curriculares
-- `/app/reports` - Relatórios
+### RBAC (Role-Based Access Control)
+Acesso restrito por perfis. A rota `/app/professor` é protegida pelo `RoleProtectedRoute` e exige a role `PROFESSOR`.
 
 ---
 
-## API Endpoints
-
-### Autenticação
-- `POST /auth/login` - Login
-- `GET /example/protected` - Dados do usuário
-
-### Planejamentos
-- `GET /plannings` - Listar planejamentos
-
-### Diário
-- `GET /diary-events` - Listar eventos
-- `POST /diary-events` - Criar evento
-
-### Matrizes
-- `GET /curriculum-matrices` - Listar matrizes
-
-### Relatórios
-- `GET /reports/diary/by-classroom` - Relatório por turma
-- `GET /reports/diary/by-period` - Relatório por período
-- `GET /reports/diary/unplanned` - Relatório não planejado
-
----
-
-## Licença
+## 📝 Licença
 
 Proprietary - Todos os direitos reservados
