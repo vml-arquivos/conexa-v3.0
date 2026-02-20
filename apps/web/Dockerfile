@@ -10,8 +10,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copiar package files
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
 
 # Copiar código fonte
 COPY . .
