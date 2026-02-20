@@ -1,20 +1,26 @@
 # ============================================================================
-# CONEXA V3.0 - FRONTEND DOCKERFILE
+# CONEXA V3.0 - FRONTEND DOCKERFILE (MONOREPO)
 # ============================================================================
-# Build: React 19 + Vite + TailwindCSS
+# Build: React 19 + Vite + TailwindCSS + pnpm workspaces
 # Runtime: Nginx Alpine
 # ============================================================================
 
 # ---------- Build stage ----------
 FROM node:20-alpine AS builder
+
+# Instalar pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 WORKDIR /app
 
-# Copiar package files
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# Copiar arquivos de workspace da raiz
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copiar código fonte
-COPY . .
+# Copiar todos os packages (dependências internas do monorepo)
+COPY packages/ ./packages/
+
+# Copiar o app web
+COPY apps/web/ ./apps/web/
 
 # Build args para variáveis de ambiente
 ARG VITE_API_URL
@@ -44,17 +50,20 @@ ENV VITE_DEFAULT_LANGUAGE=${VITE_DEFAULT_LANGUAGE}
 ENV VITE_STORAGE_PREFIX=${VITE_STORAGE_PREFIX}
 ENV VITE_API_TIMEOUT=${VITE_API_TIMEOUT}
 
-# Build do frontend
-RUN npm run build
+# Instalar TODAS as deps do workspace com pnpm
+RUN pnpm install --frozen-lockfile
+
+# Build apenas o app web usando pnpm filter
+RUN pnpm --filter @conexa/web build
 
 # ---------- Runtime stage ----------
 FROM nginx:alpine
 
 # Copiar configuração customizada do nginx
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copiar build do frontend
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
