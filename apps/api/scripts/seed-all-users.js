@@ -22,18 +22,23 @@ async function main() {
 
   // 2. Criar Unidade
   const unit = await prisma.unit.upsert({
-    where: { cnpj: '00000000000191' },
+    where: { id: 'unit-piloto-001' },
     update: {},
     create: {
-      cnpj: '00000000000191',
-      nome: 'Unidade Piloto',
-      endereco: 'Brasília, DF',
-      telefone: '(61) 3333-4444',
-      email: 'piloto@cocris.org.br',
+      id: 'unit-piloto-001',
       mantenedoraId: mantenedora.id,
+      name: 'Unidade Piloto',
+      code: 'PILOTO',
+      address: 'Brasília, DF',
+      city: 'Brasília',
+      state: 'DF',
+      email: 'piloto@cocris.org.br',
+      phone: '(61) 3333-4444',
+      capacity: 100,
+      ageGroupsServed: '0-5',
     },
   });
-  console.log('✅ Unidade:', unit.nome);
+  console.log('✅ Unidade:', unit.name);
 
   // 3. Criar Turmas
   const turmaA = await prisma.classroom.upsert({
