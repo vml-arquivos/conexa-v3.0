@@ -66,3 +66,13 @@ temp/
 .vercel
 .netlify
 .railway
+
+# SECURITY: Never commit sensitive data
+VARIAVEIS_PRODUCAO.md
+*PRODUCAO*.md
+*CREDENTIALS*.md
+*SECRETS*.md
+*.key
+*.pem
+*.p12
+*.pfx
