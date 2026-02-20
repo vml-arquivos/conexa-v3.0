@@ -34,11 +34,19 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Coolify healthcheck usa wget (no seu log): instalar wget.
-# Também manter curl + openssl/ca-certs para TLS e Prisma.
+# Instalar dependências de runtime: wget, curl, openssl, ca-certificates
+# wget é usado pelo Coolify healthcheck
+# curl pode ser usado pela aplicação
+# openssl e ca-certificates são necessários para Prisma e HTTPS
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends wget curl openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    openssl \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && wget --version \
+  && curl --version
 
 # Copia o node_modules já "podado" do builder (contém Prisma Client gerado)
 COPY --from=builder /app/node_modules ./node_modules
@@ -51,10 +59,11 @@ COPY --from=builder /app/datasets ./datasets
 COPY package.json package-lock.json ./
 
 COPY entrypoint.sh ./entrypoint.sh
-
 RUN chmod +x ./entrypoint.sh
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+
+# Healthcheck explícito para Coolify
+HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 EXPOSE 3000
 CMD ["./entrypoint.sh"]
