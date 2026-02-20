@@ -44,9 +44,7 @@ RUN apt-get update -y \
     curl \
     openssl \
     ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && wget --version \
-  && curl --version
+  && rm -rf /var/lib/apt/lists/*
 
 # Copia o node_modules já "podado" do builder (contém Prisma Client gerado)
 COPY --from=builder /app/node_modules ./node_modules
@@ -60,10 +58,6 @@ COPY package.json package-lock.json ./
 
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
-
-# Healthcheck explícito para Coolify
-HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 EXPOSE 3000
 CMD ["./entrypoint.sh"]
