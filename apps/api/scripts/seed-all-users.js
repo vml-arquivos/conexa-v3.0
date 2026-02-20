@@ -11,15 +11,14 @@ async function main() {
     where: { cnpj: '00000000000191' },
     update: {},
     create: {
+      name: 'Associação COCRIS',
       cnpj: '00000000000191',
-      razaoSocial: 'Associação COCRIS',
-      nomeFantasia: 'COCRIS',
       email: 'contato@cocris.org.br',
-      telefone: '(61) 3333-4444',
-      endereco: 'Brasília, DF',
+      phone: '(61) 3333-4444',
+      address: 'Brasília, DF',
     },
   });
-  console.log('✅ Mantenedora:', mantenedora.nomeFantasia);
+  console.log('✅ Mantenedora:', mantenedora.name);
 
   // 2. Criar Unidade
   const unit = await prisma.unit.upsert({
