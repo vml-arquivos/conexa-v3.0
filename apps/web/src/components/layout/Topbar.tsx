@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Calendar, LogOut, User, Users } from 'lucide-react';
 
 export function Topbar() {
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as any;
   
   // Informações pedagógicas para a Topbar
   const today = getPedagogicalToday();

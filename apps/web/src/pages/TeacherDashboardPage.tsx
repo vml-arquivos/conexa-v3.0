@@ -17,7 +17,7 @@ import { BookOpen, Users, CheckCircle, Info } from 'lucide-react';
 type DashboardState = 'loading' | 'blocked' | 'ready';
 
 export default function TeacherDashboardPage() {
-  const { user } = useAuth();
+  const { user } = useAuth() as any;
   const [state, setState] = useState<DashboardState>('loading');
   const [planning, setPlanning] = useState<Planning | null>(null);
   const [entry, setEntry] = useState<CurriculumEntry | null>(null);
