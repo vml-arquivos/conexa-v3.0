@@ -1,0 +1,170 @@
+[
+  {
+    "codigo": "P003",
+    "nome": "Canetão Hidrográfico - Caixa 12 cores",
+    "unidade": "Caixa",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 0.0
+  },
+  {
+    "codigo": "P007",
+    "nome": "EVA - Placa 40x60cm",
+    "unidade": "Unidade",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 0.0
+  },
+  {
+    "codigo": "P002",
+    "nome": "Papel Sulfite A4 - Resma 500 folhas",
+    "unidade": "Resma",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 0.0
+  },
+  {
+    "codigo": "P010",
+    "nome": "Tinta Guache - Caixa 6 cores",
+    "unidade": "Caixa",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 22.0
+  },
+  {
+    "codigo": "P011",
+    "nome": "Pincel Escolar Nº 12",
+    "unidade": "Unidade",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 4.5
+  },
+  {
+    "codigo": "P012",
+    "nome": "Massinha de Modelar - Caixa 12 cores",
+    "unidade": "Caixa",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 15.0
+  },
+  {
+    "codigo": "P013",
+    "nome": "Papel Cartão Colorido - Pacote 50 folhas",
+    "unidade": "Pacote",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 28.0
+  },
+  {
+    "codigo": "P014",
+    "nome": "Cola Branca - 1kg",
+    "unidade": "Frasco",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 12.5
+  },
+  {
+    "codigo": "P015",
+    "nome": "Tesoura sem Ponta",
+    "unidade": "Unidade",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 8.0
+  },
+  {
+    "codigo": "P016",
+    "nome": "Lápis de Cor - Caixa 12 cores",
+    "unidade": "Caixa",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 12.0
+  },
+  {
+    "codigo": "P017",
+    "nome": "Giz de Cera - Caixa 12 cores",
+    "unidade": "Caixa",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 9.5
+  },
+  {
+    "codigo": "P018",
+    "nome": "Papel Crepom - Pacote 10 folhas",
+    "unidade": "Pacote",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 8.0
+  },
+  {
+    "codigo": "P019",
+    "nome": "Papel Laminado - Pacote 10 folhas",
+    "unidade": "Pacote",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 12.0
+  },
+  {
+    "codigo": "P020",
+    "nome": "Fita Crepe - Rolo 50m",
+    "unidade": "Rolo",
+    "categoria": "PEDAGOGICO",
+    "valor_referencia": 7.5
+  },
+  {
+    "codigo": "HIG-001",
+    "nome": "Papel Higiênico - Rolo 30m",
+    "unidade": "Rolo",
+    "categoria": "HIGIENE",
+    "valor_referencia": 2.5
+  },
+  {
+    "codigo": "HIG-002",
+    "nome": "Sabonete Líquido - 500ml",
+    "unidade": "Frasco",
+    "categoria": "HIGIENE",
+    "valor_referencia": 8.9
+  },
+  {
+    "codigo": "HIG-003",
+    "nome": "Álcool em Gel 70% - 500ml",
+    "unidade": "Frasco",
+    "categoria": "HIGIENE",
+    "valor_referencia": 12.0
+  },
+  {
+    "codigo": "HIG-004",
+    "nome": "Toalha de Papel - Pacote 1000 folhas",
+    "unidade": "Pacote",
+    "categoria": "HIGIENE",
+    "valor_referencia": 15.5
+  },
+  {
+    "codigo": "HIG-005",
+    "nome": "Lenço Umedecido - Pacote 100 unidades",
+    "unidade": "Pacote",
+    "categoria": "HIGIENE",
+    "valor_referencia": 9.9
+  },
+  {
+    "codigo": "HIG-006",
+    "nome": "Fralda Descartável Tamanho M",
+    "unidade": "Pacote",
+    "categoria": "HIGIENE",
+    "valor_referencia": 45.0
+  },
+  {
+    "codigo": "HIG-007",
+    "nome": "Fralda Descartável Tamanho G",
+    "unidade": "Pacote",
+    "categoria": "HIGIENE",
+    "valor_referencia": 48.0
+  },
+  {
+    "codigo": "HIG-008",
+    "nome": "Pomada para Assaduras - 90g",
+    "unidade": "Tubo",
+    "categoria": "HIGIENE",
+    "valor_referencia": 18.5
+  },
+  {
+    "codigo": "HIG-009",
+    "nome": "Detergente Neutro - 500ml",
+    "unidade": "Frasco",
+    "categoria": "HIGIENE",
+    "valor_referencia": 3.2
+  },
+  {
+    "codigo": "HIG-010",
+    "nome": "Desinfetante - 2L",
+    "unidade": "Frasco",
+    "categoria": "HIGIENE",
+    "valor_referencia": 8.5
+  }
+]

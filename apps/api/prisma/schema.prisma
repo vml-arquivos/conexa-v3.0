@@ -987,6 +987,7 @@ model MaterialRequest {
   unit          Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   classroom     Classroom?  @relation(fields: [classroomId], references: [id], onDelete: SetNull)
   createdByUser User?       @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  items         MaterialRequestItem[]
 
   @@unique([unitId, code])
   @@index([mantenedoraId])
@@ -1674,4 +1675,49 @@ model SyncMutation {
   @@index([usuarioId])
   @@index([status])
   @@index([criadoEm])
+}
+
+// ============================================================================
+// 24. CATÁLOGO DE MATERIAIS
+// ============================================================================
+
+/// Catálogo de materiais disponíveis para requisição
+model Material {
+  id             String   @id @default(cuid())
+  code           String   @unique @db.VarChar(50)
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  category       String   @db.VarChar(50) // PEDAGOGICO, HIGIENE
+  unit           String   @db.VarChar(50) // UN, Caixa, Pacote, Rolo, etc
+  referencePrice Float?   @default(0.0)
+  isActive       Boolean  @default(true)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  requestItems   MaterialRequestItem[]
+  
+  @@index([category])
+  @@index([isActive])
+}
+
+/// Itens de uma requisição de materiais
+model MaterialRequestItem {
+  id           String   @id @default(cuid())
+  requestId    String
+  request      MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id])
+  
+  quantity     Int
+  unitPrice    Float?
+  totalPrice   Float?
+  observations String?  @db.Text
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([requestId])
+  @@index([materialId])
 }
