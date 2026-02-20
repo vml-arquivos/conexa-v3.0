@@ -9,7 +9,7 @@
 
 **Onde configurar**: Coolify → Aplicação Backend → Environment Variables
 
-**Variáveis necessárias** (16):
+**Variáveis necessárias** (14):
 
 ```bash
 # DATABASE

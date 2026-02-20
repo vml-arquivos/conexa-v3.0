@@ -11,9 +11,10 @@ export class JwtRefreshStrategy extends PassportStrategy(
   'jwt-refresh',
 ) {
   constructor(private readonly configService: ConfigService) {
-    const secret = configService.get<string>('JWT_REFRESH_SECRET');
+    // Use JWT_REFRESH_SECRET if available, otherwise fallback to JWT_SECRET
+    const secret = configService.get<string>('JWT_REFRESH_SECRET') || configService.get<string>('JWT_SECRET');
     if (!secret) {
-      throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
+      throw new Error('JWT_SECRET is not defined in environment variables');
     }
     super({
       jwtFromRequest: ExtractJwt.fromBodyField('refreshToken'),
