@@ -47,6 +47,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/datasets ./datasets
 COPY package.json package-lock.json ./
 
 COPY entrypoint.sh ./entrypoint.sh

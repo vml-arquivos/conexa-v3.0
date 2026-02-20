@@ -1,0 +1,1094 @@
+[
+  {
+    "codigo": "BERÇARIO_I",
+    "nome": "BERÇARIO I",
+    "professora": "NONATA",
+    "total_alunos": 8,
+    "alunos": [
+      {
+        "nome": "AYLLA LOPES",
+        "sexo": "F",
+        "nascimento": "2025-06-29",
+        "idade_meses": 8
+      },
+      {
+        "nome": "EDUARDO ALVES LIMA",
+        "sexo": "M",
+        "nascimento": "2025-08-28",
+        "idade_meses": 6
+      },
+      {
+        "nome": "IVINA MARIA CUNHA DE OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2025-05-22",
+        "idade_meses": 9
+      },
+      {
+        "nome": "HENRY SOARES MONTEIRO",
+        "sexo": "M",
+        "nascimento": "2025-07-07",
+        "idade_meses": 7
+      },
+      {
+        "nome": "MARIA JULIA RIBEIRO DRUMON DE SOUSA",
+        "sexo": "F",
+        "nascimento": "2025-08-02",
+        "idade_meses": 6
+      },
+      {
+        "nome": "MIGUEL HENRIQUE FERREIRA SOUZA",
+        "sexo": "M",
+        "nascimento": "2025-05-01",
+        "idade_meses": 9
+      },
+      {
+        "nome": "MAITE SOPHIA PASSOS DA SILVA",
+        "sexo": "M",
+        "nascimento": "2025-04-01",
+        "idade_meses": 10
+      },
+      {
+        "nome": "PEDRO RODRIGUES OLIVEIRA DE ALBUQUERQUE",
+        "sexo": "M",
+        "nascimento": "2025-04-03",
+        "idade_meses": 10
+      }
+    ]
+  },
+  {
+    "codigo": "BERÇARIO_II_A",
+    "nome": "BERÇARIO II A",
+    "professora": "ELISANGELA",
+    "total_alunos": 16,
+    "alunos": [
+      {
+        "nome": "ANA LIZ SANTANA ARAUJO",
+        "sexo": "M",
+        "nascimento": "2024-07-19",
+        "idade_meses": 19
+      },
+      {
+        "nome": "ANTHONY BATISTA PEREIRA BRITO",
+        "sexo": "M",
+        "nascimento": "2024-06-12",
+        "idade_meses": 20
+      },
+      {
+        "nome": "AUGUSTO MACHADO DE SOUSA",
+        "sexo": "M",
+        "nascimento": "2024-09-25",
+        "idade_meses": 17
+      },
+      {
+        "nome": "AURORA BASTOS DE OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2024-05-23",
+        "idade_meses": 21
+      },
+      {
+        "nome": "AURORA RODRIGUES LOBATO",
+        "sexo": "F",
+        "nascimento": "2024-05-16",
+        "idade_meses": 21
+      },
+      {
+        "nome": "BRYAN HENRIQUE SANTOS DA SILVA",
+        "sexo": "M",
+        "nascimento": "2024-11-16",
+        "idade_meses": 15
+      },
+      {
+        "nome": "DAVI LUCCA DE OLIVEIRA VITAL",
+        "sexo": "M",
+        "nascimento": "2024-10-03",
+        "idade_meses": 16
+      },
+      {
+        "nome": "ISIS RIBEIRO FRANCO",
+        "sexo": "F",
+        "nascimento": "2024-05-06",
+        "idade_meses": 21
+      },
+      {
+        "nome": "JOSE BENICIO NASCIMENTO OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2024-10-22",
+        "idade_meses": 16
+      },
+      {
+        "nome": "JUAN HORTENCIO DE OLIVEIRA ROCHA",
+        "sexo": "M",
+        "nascimento": "2024-08-21",
+        "idade_meses": 18
+      },
+      {
+        "nome": "KATALEYA ELISABETH PALMERO CORRALES",
+        "sexo": "F",
+        "nascimento": "2024-07-07",
+        "idade_meses": 19
+      },
+      {
+        "nome": "MARIAH SILVA MORAIS",
+        "sexo": "F",
+        "nascimento": "2025-03-07",
+        "idade_meses": 11
+      },
+      {
+        "nome": "MIGUEL BATISTA DA SILVA",
+        "sexo": "M",
+        "nascimento": "2024-06-01",
+        "idade_meses": 20
+      },
+      {
+        "nome": "NOAH SOUSA PINHEIRO",
+        "sexo": "F",
+        "nascimento": "2024-07-20",
+        "idade_meses": 19
+      },
+      {
+        "nome": "RAVI LUCCA GONÇALO DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2024-04-19",
+        "idade_meses": 22
+      },
+      {
+        "nome": "SOFIA BELLA ALVES DOS SANTOS",
+        "sexo": "F",
+        "nascimento": "2024-07-24",
+        "idade_meses": 19
+      }
+    ]
+  },
+  {
+    "codigo": "BERÇARIO_II_B",
+    "nome": "BERÇARIO II B",
+    "professora": "JESSICA",
+    "total_alunos": 15,
+    "alunos": [
+      {
+        "nome": "ADAN KHALIL GEMAQUE MARIA",
+        "sexo": "M",
+        "nascimento": "2024-05-09",
+        "idade_meses": 21
+      },
+      {
+        "nome": "AURORA OLIVEIRA DA SILVA",
+        "sexo": "M",
+        "nascimento": "2024-08-21",
+        "idade_meses": 18
+      },
+      {
+        "nome": "AYLA OLIVEIRA ARAÚJO",
+        "sexo": "F",
+        "nascimento": "2024-04-16",
+        "idade_meses": 22
+      },
+      {
+        "nome": "HADASSA POMPEU RANGEL",
+        "sexo": "F",
+        "nascimento": "2024-11-11",
+        "idade_meses": 15
+      },
+      {
+        "nome": "HEITOR MOURA CUSTÓDIO",
+        "sexo": "M",
+        "nascimento": "2024-08-01",
+        "idade_meses": 18
+      },
+      {
+        "nome": "ISABELLY PEREIRA DOS SANTOS NORONHA",
+        "sexo": "F",
+        "nascimento": "2025-02-09",
+        "idade_meses": 12
+      },
+      {
+        "nome": "JOAO HENRIQUE DA SILVA SANTIAGO",
+        "sexo": "M",
+        "nascimento": "2024-12-15",
+        "idade_meses": 14
+      },
+      {
+        "nome": "JOAQUIM VIANA DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2024-09-11",
+        "idade_meses": 17
+      },
+      {
+        "nome": "LEVY HENRIQUE RODRIGUES",
+        "sexo": "F",
+        "nascimento": "2024-10-06",
+        "idade_meses": 16
+      },
+      {
+        "nome": "MARIA EDUARDA SOARES",
+        "sexo": "F",
+        "nascimento": "2024-09-10",
+        "idade_meses": 17
+      },
+      {
+        "nome": "MARIA HELENA CORDEIRO DE SENA",
+        "sexo": "F",
+        "nascimento": "2024-08-26",
+        "idade_meses": 18
+      },
+      {
+        "nome": "MATTEO LUIZ SILVA GOMES",
+        "sexo": "M",
+        "nascimento": "2024-08-27",
+        "idade_meses": 18
+      },
+      {
+        "nome": "RAVIE MILLER FERREIRA RODRIGUES PEIXOTO LOPES",
+        "sexo": "M",
+        "nascimento": "2025-03-19",
+        "idade_meses": 11
+      },
+      {
+        "nome": "RAYLA DE LUCENA CRIZANTE",
+        "sexo": "F",
+        "nascimento": "2024-07-14",
+        "idade_meses": 19
+      },
+      {
+        "nome": "THEO JOSE MARTINS DE ANGELIM",
+        "sexo": "M",
+        "nascimento": "2025-02-17",
+        "idade_meses": 12
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_II_A",
+    "nome": "MATERNAL II A",
+    "professora": "RAQUEL",
+    "total_alunos": 24,
+    "alunos": [
+      {
+        "nome": "ANA JÚLIA RODRIGUES NUNES",
+        "sexo": "F",
+        "nascimento": "2022-10-07",
+        "idade_meses": 40
+      },
+      {
+        "nome": "ANTONELLA FATIMA PEREIRA SAMPAIO",
+        "sexo": "F",
+        "nascimento": "2023-02-21",
+        "idade_meses": 36
+      },
+      {
+        "nome": "ARTUR DE ARAUJO COSTA",
+        "sexo": "M",
+        "nascimento": "2022-09-14",
+        "idade_meses": 41
+      },
+      {
+        "nome": "AYLA VITORIA SILVA",
+        "sexo": "F",
+        "nascimento": "2023-01-16",
+        "idade_meses": 37
+      },
+      {
+        "nome": "AYUNNE RAFAELLE  FERREIRA BERNARDES DOS SANTOS",
+        "sexo": "F",
+        "nascimento": "2023-02-09",
+        "idade_meses": 36
+      },
+      {
+        "nome": "BERNARDO HENRIQUE SOUZA RIBEIRO",
+        "sexo": "M",
+        "nascimento": "2022-12-01",
+        "idade_meses": 38
+      },
+      {
+        "nome": "BRAYAN BRENO SANTOS MELO",
+        "sexo": "M",
+        "nascimento": "2022-06-09",
+        "idade_meses": 44
+      },
+      {
+        "nome": "DERICK DOS SANTOS SANTANA",
+        "sexo": "M",
+        "nascimento": "2023-01-16",
+        "idade_meses": 37
+      },
+      {
+        "nome": "ELOA THALITA BARBOSA FARIAS",
+        "sexo": "F",
+        "nascimento": "2022-11-11",
+        "idade_meses": 39
+      },
+      {
+        "nome": "ESTHER DA SILVA SANTOS",
+        "sexo": "F",
+        "nascimento": "2022-04-07",
+        "idade_meses": 46
+      },
+      {
+        "nome": "GABRIEL GUIMARÃES DE ANDRADE",
+        "sexo": "F",
+        "nascimento": "2023-02-20",
+        "idade_meses": 36
+      },
+      {
+        "nome": "GUSTAVO MAKS SANTOS SOUZA",
+        "sexo": "M",
+        "nascimento": "2022-07-28",
+        "idade_meses": 43
+      },
+      {
+        "nome": "HELENA BARBOSA SIRQUEIRA",
+        "sexo": "F",
+        "nascimento": "2023-01-04",
+        "idade_meses": 37
+      },
+      {
+        "nome": "ISABELLY CRISTINA ALMEIDA CHINELLI",
+        "sexo": "F",
+        "nascimento": "2022-10-31",
+        "idade_meses": 40
+      },
+      {
+        "nome": "JOSÉ LORENZO MARÇAL SAMPAIO",
+        "sexo": "M",
+        "nascimento": "2022-08-27",
+        "idade_meses": 42
+      },
+      {
+        "nome": "LARA LIMA DE OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2022-11-16",
+        "idade_meses": 39
+      },
+      {
+        "nome": "LOUISE VITORIA GONÇALVES SOUZA",
+        "sexo": "F",
+        "nascimento": "2023-03-04",
+        "idade_meses": 35
+      },
+      {
+        "nome": "MARCOS VENTURA RAMOS",
+        "sexo": "M",
+        "nascimento": "2022-06-03",
+        "idade_meses": 44
+      },
+      {
+        "nome": "MARIA ALICE ALVES BRAGA",
+        "sexo": "F",
+        "nascimento": "2022-07-18",
+        "idade_meses": 43
+      },
+      {
+        "nome": "MIGUEL ANTONIO SOUSA FARIAS",
+        "sexo": "M",
+        "nascimento": "2022-09-02",
+        "idade_meses": 41
+      },
+      {
+        "nome": "PEDRO LUCCA BORGES SILVA",
+        "sexo": "M",
+        "nascimento": "2022-08-24",
+        "idade_meses": 42
+      },
+      {
+        "nome": "RAPHAEL RAMOS FERREIRA DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-02-22",
+        "idade_meses": 36
+      },
+      {
+        "nome": "RAVI MAGNO ALENCAR DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2023-01-14",
+        "idade_meses": 37
+      },
+      {
+        "nome": "YASMIN ALMEIDA ANDRADE",
+        "sexo": "F",
+        "nascimento": "2023-03-24",
+        "idade_meses": 35
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_II_B",
+    "nome": "MATERNAL II B",
+    "professora": "ANGELICA",
+    "total_alunos": 24,
+    "alunos": [
+      {
+        "nome": "ALICIA DE SOUSA RIBEIRO",
+        "sexo": "F",
+        "nascimento": "2022-07-12",
+        "idade_meses": 43
+      },
+      {
+        "nome": "ANTONY POMPEU RANGEL",
+        "sexo": "M",
+        "nascimento": "2022-10-18",
+        "idade_meses": 40
+      },
+      {
+        "nome": "ARTHUR RAVI FERREIRA CARDOSO",
+        "sexo": "M",
+        "nascimento": "2022-04-14",
+        "idade_meses": 46
+      },
+      {
+        "nome": "BRENNY MIZAEL MOREIRA DA COSTA",
+        "sexo": "M",
+        "nascimento": "2023-01-11",
+        "idade_meses": 37
+      },
+      {
+        "nome": "BRYAN LUCCA ARAUJO DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2022-08-29",
+        "idade_meses": 42
+      },
+      {
+        "nome": "CAIO GOMES CARVALHO",
+        "sexo": "M",
+        "nascimento": "2022-06-18",
+        "idade_meses": 44
+      },
+      {
+        "nome": "ELOA DA SILVA SANTOS",
+        "sexo": "F",
+        "nascimento": "2022-04-07",
+        "idade_meses": 46
+      },
+      {
+        "nome": "EMANUELLY LORRANE ALMEIDA CHINELLI",
+        "sexo": "F",
+        "nascimento": "2022-10-31",
+        "idade_meses": 40
+      },
+      {
+        "nome": "GUSTAVO DOS SANTOS SOUZA",
+        "sexo": "M",
+        "nascimento": "2022-08-25",
+        "idade_meses": 42
+      },
+      {
+        "nome": "HADASSA ESTER LIMA DOS SANTOS",
+        "sexo": "F",
+        "nascimento": "2023-01-01",
+        "idade_meses": 37
+      },
+      {
+        "nome": "HEITOR ELIACAN FERREIRA LIMA",
+        "sexo": "M",
+        "nascimento": "2022-07-15",
+        "idade_meses": 43
+      },
+      {
+        "nome": "HILBERT SOUSA FROES",
+        "sexo": "M",
+        "nascimento": "2022-09-05",
+        "idade_meses": 41
+      },
+      {
+        "nome": "ISAAC GABRIEL GOMES DA SILVA ARAUJO",
+        "sexo": "M",
+        "nascimento": "2023-01-03",
+        "idade_meses": 37
+      },
+      {
+        "nome": "JOÃO MIGUEL PEREIRA LIMA",
+        "sexo": "M",
+        "nascimento": "2022-11-11",
+        "idade_meses": 39
+      },
+      {
+        "nome": "JOÃO VITOR DA FONSECA FERREIRA",
+        "sexo": "M",
+        "nascimento": "2022-04-30",
+        "idade_meses": 46
+      },
+      {
+        "nome": "JÚLIA VASCONCELOS SILVA",
+        "sexo": "F",
+        "nascimento": "2022-12-06",
+        "idade_meses": 38
+      },
+      {
+        "nome": "KHALEESI RAVENA SILVA DAS CHAGAS",
+        "sexo": "F",
+        "nascimento": "2022-08-25",
+        "idade_meses": 42
+      },
+      {
+        "nome": "MADALENA SOUZA ANDRADE",
+        "sexo": "F",
+        "nascimento": "2022-11-16",
+        "idade_meses": 39
+      },
+      {
+        "nome": "PEDRO HENRIQUE DE BRITO LIMA",
+        "sexo": "M",
+        "nascimento": "2023-01-07",
+        "idade_meses": 37
+      },
+      {
+        "nome": "RHAVI ALVES DE MELO",
+        "sexo": "M",
+        "nascimento": "2022-08-28",
+        "idade_meses": 42
+      },
+      {
+        "nome": "RICHARD HEITOR ARAUJO SANTOS",
+        "sexo": "M",
+        "nascimento": "2022-07-13",
+        "idade_meses": 43
+      },
+      {
+        "nome": "THÉO DE SOUSA LIMA",
+        "sexo": "M",
+        "nascimento": "2022-07-07",
+        "idade_meses": 43
+      },
+      {
+        "nome": "VICTOR HARIEL DOS SANTOS MARTINS",
+        "sexo": "M",
+        "nascimento": "2023-01-23",
+        "idade_meses": 37
+      },
+      {
+        "nome": "ZAYA RIBEIRO DE ALMEIDA",
+        "sexo": "F",
+        "nascimento": "2023-03-01",
+        "idade_meses": 35
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_II_C",
+    "nome": "MATERNAL II C",
+    "professora": "EVELLYN",
+    "total_alunos": 24,
+    "alunos": [
+      {
+        "nome": "ALANA EVELYN FERREIRA DE JESUS",
+        "sexo": "F",
+        "nascimento": "2022-07-13",
+        "idade_meses": 43
+      },
+      {
+        "nome": "ANNA HELENA RODRIGUES SOUSA",
+        "sexo": "F",
+        "nascimento": "2023-01-15",
+        "idade_meses": 37
+      },
+      {
+        "nome": "ANNA MELL LOPES BARBOSA",
+        "sexo": "F",
+        "nascimento": "2022-07-04",
+        "idade_meses": 43
+      },
+      {
+        "nome": "ANTHONY GAEL  SILVA GOMES",
+        "sexo": "M",
+        "nascimento": "2022-11-11",
+        "idade_meses": 39
+      },
+      {
+        "nome": "AURORA DIB PEREIRA BERNARDINO RODRIGUES",
+        "sexo": "F",
+        "nascimento": "2022-07-20",
+        "idade_meses": 43
+      },
+      {
+        "nome": "AYLLA ALMEIDA CAVALCANTI",
+        "sexo": "F",
+        "nascimento": "2022-10-08",
+        "idade_meses": 40
+      },
+      {
+        "nome": "CECILIA CABRAL DE FREITAS",
+        "sexo": "F",
+        "nascimento": "2022-06-16",
+        "idade_meses": 44
+      },
+      {
+        "nome": "CECILLYA MENDONÇA DA SILVA",
+        "sexo": "F",
+        "nascimento": "2022-06-23",
+        "idade_meses": 44
+      },
+      {
+        "nome": "ESTHER HADASSA SANTIAGO SOUZA",
+        "sexo": "F",
+        "nascimento": "2022-04-26",
+        "idade_meses": 46
+      },
+      {
+        "nome": "GABRIEL MATHEUS RIBEIRO DE MESQUITA",
+        "sexo": "M",
+        "nascimento": "2022-10-03",
+        "idade_meses": 40
+      },
+      {
+        "nome": "HEITOR GABRIEL DA COSTA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-07-27",
+        "idade_meses": 31
+      },
+      {
+        "nome": "",
+        "sexo": "F",
+        "nascimento": "2022-05-31",
+        "idade_meses": 45
+      },
+      {
+        "nome": "HENRIQUE LUIS DA SILVA FIGUEREDO",
+        "sexo": "M",
+        "nascimento": "2022-05-14",
+        "idade_meses": 45
+      },
+      {
+        "nome": "JADE TORRES DO AMARAL",
+        "sexo": "F",
+        "nascimento": "2022-08-08",
+        "idade_meses": 42
+      },
+      {
+        "nome": "JOÃO MIGUEL ALMEIDA DE SOUSA SILVA",
+        "sexo": "M",
+        "nascimento": "2022-08-22",
+        "idade_meses": 42
+      },
+      {
+        "nome": "JOHN KEVEN MARTINS OLIVEIRA  DE ASSIS",
+        "sexo": "M",
+        "nascimento": "2022-12-17",
+        "idade_meses": 38
+      },
+      {
+        "nome": "KAYRAN LORENZO DE FRANÇA",
+        "sexo": "M",
+        "nascimento": "2022-11-26",
+        "idade_meses": 39
+      },
+      {
+        "nome": "LARA  SOPHIA RODRIGUES ALVES",
+        "sexo": "F",
+        "nascimento": "2022-06-16",
+        "idade_meses": 44
+      },
+      {
+        "nome": "MARIA HELENA MENDES NERY",
+        "sexo": "F",
+        "nascimento": "2022-07-06",
+        "idade_meses": 43
+      },
+      {
+        "nome": "MATEUS VENTURA RAMOS",
+        "sexo": "M",
+        "nascimento": "2022-06-03",
+        "idade_meses": 44
+      },
+      {
+        "nome": "VICTOR HARIEL DOS SANTOS MARTINS",
+        "sexo": "F",
+        "nascimento": "2022-06-20",
+        "idade_meses": 44
+      },
+      {
+        "nome": "MIQUEIAS BARBOSA DE JESUS",
+        "sexo": "M",
+        "nascimento": "2022-12-06",
+        "idade_meses": 38
+      },
+      {
+        "nome": "RAVI JERONIMO LOPES",
+        "sexo": "M",
+        "nascimento": "2022-08-14",
+        "idade_meses": 42
+      },
+      {
+        "nome": "YSIS NERIS LOPES",
+        "sexo": "F",
+        "nascimento": "2022-10-28",
+        "idade_meses": 40
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_I_A",
+    "nome": "MATERNAL I A",
+    "professora": "LUCIENE",
+    "total_alunos": 23,
+    "alunos": [
+      {
+        "nome": "AGATHA VITORIA DOS SANTOS SALES",
+        "sexo": "F",
+        "nascimento": "2023-08-01",
+        "idade_meses": 30
+      },
+      {
+        "nome": "ALLYCIA ALVES DE OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2024-02-17",
+        "idade_meses": 24
+      },
+      {
+        "nome": "ANTHONY ADRIANO PAES PAULINO DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-05-14",
+        "idade_meses": 33
+      },
+      {
+        "nome": "ARTHUR CAVALHEIRO MIRANDA",
+        "sexo": "M",
+        "nascimento": "2023-05-26",
+        "idade_meses": 33
+      },
+      {
+        "nome": "ARTHUR MIGUEL FELIX DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-10-26",
+        "idade_meses": 28
+      },
+      {
+        "nome": "EDUARDO LIMA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-07-31",
+        "idade_meses": 31
+      },
+      {
+        "nome": "ELLENA SANTOS DE MELO LIMA",
+        "sexo": "F",
+        "nascimento": "2023-09-27",
+        "idade_meses": 29
+      },
+      {
+        "nome": "GABRIEL MARQUES DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-08-07",
+        "idade_meses": 30
+      },
+      {
+        "nome": "GAEL VINICIUS DA SILVA VAZ",
+        "sexo": "M",
+        "nascimento": "2024-02-03",
+        "idade_meses": 24
+      },
+      {
+        "nome": "HENRY LUCCA GOMES DE SOUZA",
+        "sexo": "M",
+        "nascimento": "2023-10-18",
+        "idade_meses": 28
+      },
+      {
+        "nome": "ISIS OLIVEIRA MARTINS DE SOUZA",
+        "sexo": "F",
+        "nascimento": "2023-07-19",
+        "idade_meses": 31
+      },
+      {
+        "nome": "JOAO MIGUEL SANTOS MENDES",
+        "sexo": "M",
+        "nascimento": "2024-03-29",
+        "idade_meses": 23
+      },
+      {
+        "nome": "JOSÉ HENRIQUE CARNEIRO DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2023-09-06",
+        "idade_meses": 29
+      },
+      {
+        "nome": "LUNA VIEIRA DE SOUSA",
+        "sexo": "F",
+        "nascimento": "2024-01-15",
+        "idade_meses": 25
+      },
+      {
+        "nome": "JOSUE KALLEBY PINHEIRO DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-05-23",
+        "idade_meses": 33
+      },
+      {
+        "nome": "KAYQUE SANTANA",
+        "sexo": "M",
+        "nascimento": "2024-02-10",
+        "idade_meses": 24
+      },
+      {
+        "nome": "LARA VICENTE DOS SANTOS",
+        "sexo": "F",
+        "nascimento": "2023-05-23",
+        "idade_meses": 33
+      },
+      {
+        "nome": "LUISA GIOVANNA LEONIS SIQUEIRA DA SILVA",
+        "sexo": "F",
+        "nascimento": "2024-03-15",
+        "idade_meses": 23
+      },
+      {
+        "nome": "MANUELLA VITORIA DE SOUZA HIAPINO",
+        "sexo": "F",
+        "nascimento": "2023-05-06",
+        "idade_meses": 33
+      },
+      {
+        "nome": "RANIEL LOURENZO LINS ALVES",
+        "sexo": "M",
+        "nascimento": "2023-04-24",
+        "idade_meses": 34
+      },
+      {
+        "nome": "RAVI LORENZO RODRIGUES OLIVEIRA",
+        "sexo": "M",
+        "nascimento": "2023-05-16",
+        "idade_meses": 33
+      },
+      {
+        "nome": "SAYMON SILVA BORGES",
+        "sexo": "M",
+        "nascimento": "2023-07-17",
+        "idade_meses": 31
+      },
+      {
+        "nome": "VALENTINA DOS SANTOS SOARES",
+        "sexo": "F",
+        "nascimento": "2023-05-10",
+        "idade_meses": 33
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_I_B",
+    "nome": "MATERNAL I B",
+    "professora": "ANA",
+    "total_alunos": 22,
+    "alunos": [
+      {
+        "nome": "ADRYAN LUCCA MORENO DE JESUS",
+        "sexo": "M",
+        "nascimento": "2023-05-07",
+        "idade_meses": 33
+      },
+      {
+        "nome": "AKILI REIS SILVA",
+        "sexo": "M",
+        "nascimento": "2024-03-29",
+        "idade_meses": 23
+      },
+      {
+        "nome": "ANTHONY LEONES LEMOS SILVA CRUZ",
+        "sexo": "M",
+        "nascimento": "2023-08-20",
+        "idade_meses": 30
+      },
+      {
+        "nome": "ANTHONY RAPHAEL SOUZA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-07-08",
+        "idade_meses": 31
+      },
+      {
+        "nome": "ARIEL BRENDON DE LACERDA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-07-03",
+        "idade_meses": 31
+      },
+      {
+        "nome": "ARTHUR GABRIEL CAMARA DE OLIVEIRA",
+        "sexo": "M",
+        "nascimento": "2023-05-09",
+        "idade_meses": 33
+      },
+      {
+        "nome": "ARTHUR RAVI DE JESUS",
+        "sexo": "M",
+        "nascimento": "2023-12-22",
+        "idade_meses": 26
+      },
+      {
+        "nome": "AURORA LUIZA PEDROSA MENDES",
+        "sexo": "F",
+        "nascimento": "2023-04-23",
+        "idade_meses": 34
+      },
+      {
+        "nome": "ELISA LOPES SOARES",
+        "sexo": "F",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "ENRICO PACHECO DE MIRANDA",
+        "sexo": "M",
+        "nascimento": "2023-05-18",
+        "idade_meses": 33
+      },
+      {
+        "nome": "HENRY LUCCA NOGUEIRA DA SILVA",
+        "sexo": "M",
+        "nascimento": "2023-06-24",
+        "idade_meses": 32
+      },
+      {
+        "nome": "ISÍS VITÓRIA DE SOUZA CAIXETA",
+        "sexo": "F",
+        "nascimento": "2023-10-22",
+        "idade_meses": 28
+      },
+      {
+        "nome": "JHULLY MIKAELLE VERONICA DE OLIVEIRA",
+        "sexo": "F",
+        "nascimento": "2023-05-15",
+        "idade_meses": 33
+      },
+      {
+        "nome": "JOANA DOS SANTOS GOMES",
+        "sexo": "F",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "JOSUE OTNYEL FERREIRA DE SOUSA",
+        "sexo": "M",
+        "nascimento": "2023-05-19",
+        "idade_meses": 33
+      },
+      {
+        "nome": "MAITE SOARES SILVA",
+        "sexo": "F",
+        "nascimento": "2023-07-13",
+        "idade_meses": 31
+      },
+      {
+        "nome": "MARIA SOFIA DOS SANTOS MAGALHÃES",
+        "sexo": "F",
+        "nascimento": "2023-04-16",
+        "idade_meses": 34
+      },
+      {
+        "nome": "MURILO DIAS MIRANDA",
+        "sexo": "M",
+        "nascimento": "2023-07-19",
+        "idade_meses": 31
+      },
+      {
+        "nome": "RAVI MIGUEL LOPES NUNES",
+        "sexo": "M",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "SAMUEL ELIAS LIMA MARQUES",
+        "sexo": "M",
+        "nascimento": "2023-06-26",
+        "idade_meses": 32
+      },
+      {
+        "nome": "SARAH MARIA DE JESUS MENDES",
+        "sexo": "F",
+        "nascimento": "2024-02-19",
+        "idade_meses": 24
+      },
+      {
+        "nome": "VALENTINA SOARES GUIMARAES",
+        "sexo": "F",
+        "nascimento": "2023-07-21",
+        "idade_meses": 31
+      }
+    ]
+  },
+  {
+    "codigo": "MATERNAL_I_C",
+    "nome": "MATERNAL I C",
+    "professora": "EDILVANA",
+    "total_alunos": 14,
+    "alunos": [
+      {
+        "nome": "ALICE DOS ANJOS RODRIGUES",
+        "sexo": "F",
+        "nascimento": "2024-03-06",
+        "idade_meses": 23
+      },
+      {
+        "nome": "ARTHUR DOMINIC DE SOUZA EVANGELHO",
+        "sexo": "M",
+        "nascimento": "2024-02-04",
+        "idade_meses": 24
+      },
+      {
+        "nome": "AURORA MUNIZ DA CONCEIÇÃO",
+        "sexo": "F",
+        "nascimento": "2023-09-23",
+        "idade_meses": 29
+      },
+      {
+        "nome": "CAUA LUIZ DE JESUS SANTOS",
+        "sexo": "M",
+        "nascimento": "2023-05-07",
+        "idade_meses": 33
+      },
+      {
+        "nome": "GABRIEL SANTOS VASCONCELOS",
+        "sexo": "M",
+        "nascimento": "2023-04-08",
+        "idade_meses": 34
+      },
+      {
+        "nome": "HEITOR FEITOSA DE OLIVEIRA",
+        "sexo": "M",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "HEITOR PYETRO SOUSA MOURA",
+        "sexo": "M",
+        "nascimento": "2023-05-05",
+        "idade_meses": 33
+      },
+      {
+        "nome": "ISADORA ALVES DOS SANTOS",
+        "sexo": "F",
+        "nascimento": "2023-12-28",
+        "idade_meses": 26
+      },
+      {
+        "nome": "JOSE VITOR DE SOUZA SEIXAS",
+        "sexo": "M",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "JOSEPH LUIZ PAIVA ARAÚJO",
+        "sexo": "M",
+        "nascimento": "2023-06-23",
+        "idade_meses": 32
+      },
+      {
+        "nome": "LORENZO BEZERRA DOS SANTOS",
+        "sexo": "M",
+        "nascimento": "2024-01-01",
+        "idade_meses": 24
+      },
+      {
+        "nome": "NOAH ARAUJO ALVES SILVEIRA",
+        "sexo": "M",
+        "nascimento": "2024-01-08",
+        "idade_meses": 25
+      },
+      {
+        "nome": "OTAVIO GASPAR DE CARVALHO",
+        "sexo": "M",
+        "nascimento": "2023-07-11",
+        "idade_meses": 31
+      },
+      {
+        "nome": "PIETRO RIBEIRO LOPES",
+        "sexo": "M",
+        "nascimento": "2023-04-17",
+        "idade_meses": 34
+      }
+    ]
+  }
+]
