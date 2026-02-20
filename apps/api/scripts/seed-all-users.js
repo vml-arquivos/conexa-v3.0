@@ -47,11 +47,11 @@ async function main() {
     create: {
       id: 'turma-a-001',
       name: 'Turma A - Maternal',
-      shift: 'MATUTINO',
-      ageGroup: 'MATERNAL',
+      code: 'TURMA-A',
+      ageGroupMin: 24,
+      ageGroupMax: 36,
       capacity: 20,
       unitId: unit.id,
-      mantenedoraId: mantenedora.id,
     },
   });
 
@@ -61,11 +61,11 @@ async function main() {
     create: {
       id: 'turma-b-001',
       name: 'Turma B - Jardim I',
-      shift: 'VESPERTINO',
-      ageGroup: 'JARDIM_I',
-      capacity: 20,
+      code: 'TURMA-B',
+      ageGroupMin: 36,
+      ageGroupMax: 48,
+      capacity: 25,
       unitId: unit.id,
-      mantenedoraId: mantenedora.id,
     },
   });
 
@@ -75,11 +75,11 @@ async function main() {
     create: {
       id: 'turma-c-001',
       name: 'Turma C - Jardim II',
-      shift: 'INTEGRAL',
-      ageGroup: 'JARDIM_II',
+      code: 'TURMA-C',
+      ageGroupMin: 48,
+      ageGroupMax: 60,
       capacity: 20,
       unitId: unit.id,
-      mantenedoraId: mantenedora.id,
     },
   });
   console.log('✅ Turmas criadas: A, B, C');
