@@ -9,23 +9,18 @@ export class AttendanceService {
 
   /**
    * Registra a chamada de uma turma para uma data específica
-   * dto.classroomId, dto.date, dto.registros: [{childId, status, justification?}]
    */
   async register(dto: any, user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) {
       throw new ForbiddenException('Escopo inválido');
     }
-
     const { classroomId, date, registros } = dto;
-
     if (!classroomId || !date || !Array.isArray(registros) || registros.length === 0) {
       throw new BadRequestException('classroomId, date e registros são obrigatórios');
     }
-
     const dataRegistro = new Date(date);
     dataRegistro.setHours(0, 0, 0, 0);
 
-    // Upsert de cada registro de frequência
     const results = await Promise.all(
       registros.map(async (reg: any) => {
         return this.prisma.attendance.upsert({
@@ -43,7 +38,7 @@ export class AttendanceService {
           },
           create: {
             mantenedoraId: user.mantenedoraId,
-            unitId: user.unitId,
+            unitId: user.unitId ?? '',
             classroomId,
             childId: reg.childId,
             date: dataRegistro,
@@ -73,25 +68,42 @@ export class AttendanceService {
 
   /**
    * Busca chamada de hoje para uma turma
+   * Crianças são obtidas via Enrollment -> Child (schema correto)
    */
   async getToday(classroomId: string, user: JwtPayload) {
     if (!classroomId) {
       // Buscar turma do professor automaticamente
       const classroomTeacher = await this.prisma.classroomTeacher.findFirst({
         where: { teacherId: user.sub },
-        include: { classroom: { include: { children: true } } },
+        include: { classroom: true },
       });
       if (!classroomTeacher) throw new BadRequestException('Nenhuma turma encontrada');
-      classroomId = classroomTeacher.classroom.id;
+      classroomId = classroomTeacher.classroomId;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Buscar turma com alunos via enrollments (relação correta no schema)
     const [classroom, attendances] = await Promise.all([
       this.prisma.classroom.findUnique({
         where: { id: classroomId },
-        include: { children: { orderBy: { firstName: 'asc' } } },
+        include: {
+          enrollments: {
+            where: { status: 'ATIVA' },
+            include: {
+              child: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoUrl: true,
+                },
+              },
+            },
+            orderBy: { child: { firstName: 'asc' } },
+          },
+        },
       }),
       this.prisma.attendance.findMany({
         where: { classroomId, date: today },
@@ -101,8 +113,7 @@ export class AttendanceService {
     if (!classroom) throw new BadRequestException('Turma não encontrada');
 
     const attendanceMap = new Map(attendances.map((a) => [a.childId, a]));
-
-    const alunos = classroom.children.map((child) => {
+    const alunos = classroom.enrollments.map(({ child }) => {
       const att = attendanceMap.get(child.id);
       return {
         id: child.id,
@@ -139,7 +150,6 @@ export class AttendanceService {
     if (!classroomId || !startDate || !endDate) {
       throw new BadRequestException('classroomId, startDate e endDate são obrigatórios');
     }
-
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -154,7 +164,6 @@ export class AttendanceService {
       orderBy: { date: 'asc' },
     });
 
-    // Agrupar por aluno
     const byChild = new Map<string, { nome: string; presentes: number; ausentes: number; justificados: number; total: number }>();
     for (const att of attendances) {
       const key = att.childId;
@@ -190,21 +199,28 @@ export class AttendanceService {
 
   /**
    * Resumo de frequência de todas as turmas da unidade
+   * Usa enrollments para contar alunos (relação correta no schema)
    */
   async getUnitSummary(date: string, user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) {
       throw new ForbiddenException('Escopo inválido');
     }
-
     const targetDate = date ? new Date(date) : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
     const classrooms = await this.prisma.classroom.findMany({
       where: { unitId: user.unitId },
       include: {
-        children: { select: { id: true } },
-        classroomTeachers: {
-          include: { teacher: { select: { firstName: true, lastName: true } } },
+        enrollments: {
+          where: { status: 'ATIVA' },
+          select: { id: true },
+        },
+        teachers: {
+          where: { isActive: true },
+          include: {
+            teacher: { select: { firstName: true, lastName: true } },
+          },
+          take: 1,
         },
       },
     });
@@ -214,13 +230,11 @@ export class AttendanceService {
         const attendances = await this.prisma.attendance.findMany({
           where: { classroomId: classroom.id, date: targetDate },
         });
-
-        const totalAlunos = classroom.children.length;
+        const totalAlunos = classroom.enrollments.length;
         const presentes = attendances.filter((a) => a.status === 'PRESENTE').length;
         const ausentes = attendances.filter((a) => a.status === 'AUSENTE').length;
         const registrados = attendances.length;
-
-        const professor = classroom.classroomTeachers[0]?.teacher;
+        const professor = classroom.teachers[0]?.teacher;
 
         return {
           classroomId: classroom.id,

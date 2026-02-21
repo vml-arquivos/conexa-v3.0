@@ -10,36 +10,33 @@ export class TeachersService {
 
   /**
    * Dashboard do professor com dados da turma e alunos
+   * Alunos obtidos via enrollments -> child (relação correta no schema)
    */
   async getDashboard(user: JwtPayload) {
-    // Buscar turmas do professor
     const classroomTeachers = await this.prisma.classroomTeacher.findMany({
       where: { teacherId: user.sub },
       include: {
         classroom: {
           include: {
             unit: {
-              select: {
-                id: true,
-                name: true,
-              },
+              select: { id: true, name: true },
             },
-            children: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                birthDate: true,
-                gender: true,
-                photoUrl: true,
-                isActive: true,
+            enrollments: {
+              where: { status: 'ATIVA' },
+              include: {
+                child: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    birthDate: true,
+                    gender: true,
+                    photoUrl: true,
+                    isActive: true,
+                  },
+                },
               },
-              where: {
-                isActive: true,
-              },
-              orderBy: {
-                firstName: 'asc',
-              },
+              orderBy: { child: { firstName: 'asc' } },
             },
           },
         },
@@ -53,13 +50,10 @@ export class TeachersService {
       };
     }
 
-    // Pegar primeira turma (professor geralmente tem 1 turma)
     const primaryClassroom = classroomTeachers[0].classroom;
+    const alunos = primaryClassroom.enrollments.map((e) => e.child);
+    const totalAlunos = alunos.length;
 
-    // Buscar estatísticas
-    const totalAlunos = primaryClassroom.children.length;
-    
-    // Diários de bordo da semana
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
@@ -67,30 +61,23 @@ export class TeachersService {
     const diariosCount = await this.prisma.diaryEvent.count({
       where: {
         classroomId: primaryClassroom.id,
-        eventDate: {
-          gte: startOfWeek,
-        },
+        eventDate: { gte: startOfWeek },
       },
     });
 
-    // Requisições pendentes
     const requisicoesCount = await this.prisma.materialRequest.count({
       where: {
         classroomId: primaryClassroom.id,
         createdBy: user.sub,
-        status: {
-          in: ['RASCUNHO', 'SOLICITADO'],
-        },
+        status: { in: ['RASCUNHO', 'SOLICITADO'] },
       },
     });
 
-    // Planejamentos da semana
+    // Planejamentos da semana — usa startDate (campo correto no schema)
     const planejamentosCount = await this.prisma.planning.count({
       where: {
         classroomId: primaryClassroom.id,
-        weekStartDate: {
-          gte: startOfWeek,
-        },
+        startDate: { gte: startOfWeek },
       },
     });
 
@@ -105,7 +92,7 @@ export class TeachersService {
         capacity: primaryClassroom.capacity,
         unit: primaryClassroom.unit,
       },
-      alunos: primaryClassroom.children.map((child) => ({
+      alunos: alunos.map((child) => ({
         id: child.id,
         nome: `${child.firstName} ${child.lastName}`,
         firstName: child.firstName,
@@ -117,9 +104,9 @@ export class TeachersService {
       })),
       indicadores: {
         totalAlunos,
-        diariosEstaSemananum: diariosCount,
-        requisiçõesPendentes: requisicoesCount,
-        planejamentosEstaSemananum: planejamentosCount,
+        diariosEstaSemana: diariosCount,
+        requisicoesStatus: requisicoesCount,
+        planejamentosEstaSemana: planejamentosCount,
       },
     };
   }
@@ -130,22 +117,22 @@ export class TeachersService {
   private calculateAge(birthDate: Date): number {
     const now = new Date();
     const birth = new Date(birthDate);
-    const months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+    const months =
+      (now.getFullYear() - birth.getFullYear()) * 12 +
+      (now.getMonth() - birth.getMonth());
     return months;
   }
 
   /**
    * Gerar planejamento semanal automaticamente baseado na matriz curricular
+   * CurriculumMatrix não tem campo "code" — busca por segment + year + mantenedoraId
    */
   async generateWeeklyPlanning(dto: GeneratePlanningDto, user: JwtPayload) {
-    // Buscar turma do professor
     const classroomTeacher = await this.prisma.classroomTeacher.findFirst({
       where: { teacherId: user.sub },
       include: {
         classroom: {
-          include: {
-            unit: true,
-          },
+          include: { unit: true },
         },
       },
     });
@@ -155,29 +142,32 @@ export class TeachersService {
     }
 
     const classroom = classroomTeacher.classroom;
-
-    // Determinar faixa etária e matriz correspondente
     const ageGroupMin = classroom.ageGroupMin;
-    let matrixCode: string;
 
+    // Determinar segmento da faixa etária (EI01 / EI02 / EI03)
+    let segment: string;
     if (ageGroupMin >= 0 && ageGroupMin <= 18) {
-      matrixCode = 'EI01-2026';
+      segment = 'EI01';
     } else if (ageGroupMin >= 19 && ageGroupMin <= 47) {
-      matrixCode = 'EI02-2026';
+      segment = 'EI02';
     } else {
-      matrixCode = 'EI03-2026';
+      segment = 'EI03';
     }
 
-    // Buscar matriz curricular
+    // Buscar matriz curricular pelo segment + year (sem campo "code")
     const matrix = await this.prisma.curriculumMatrix.findFirst({
       where: {
-        code: matrixCode,
+        mantenedoraId: classroom.unit.mantenedoraId,
+        segment,
+        year: new Date().getFullYear(),
         isActive: true,
       },
     });
 
     if (!matrix) {
-      throw new BadRequestException(`Matriz curricular ${matrixCode} não encontrada. Execute o seed da matriz.`);
+      throw new BadRequestException(
+        `Matriz curricular para ${segment} não encontrada. Execute o seed da matriz.`,
+      );
     }
 
     // Buscar entradas da semana
@@ -188,18 +178,15 @@ export class TeachersService {
     const entries = await this.prisma.curriculumMatrixEntry.findMany({
       where: {
         matrixId: matrix.id,
-        date: {
-          gte: weekStart,
-          lte: weekEnd,
-        },
+        date: { gte: weekStart, lte: weekEnd },
       },
-      orderBy: {
-        date: 'asc',
-      },
+      orderBy: { date: 'asc' },
     });
 
     if (entries.length === 0) {
-      throw new BadRequestException('Nenhuma entrada curricular encontrada para esta semana. Verifique a matriz.');
+      throw new BadRequestException(
+        'Nenhuma entrada curricular encontrada para esta semana. Verifique a matriz.',
+      );
     }
 
     // Criar planejamento semanal
@@ -225,7 +212,6 @@ export class TeachersService {
           objetivoCurriculo: entry.objetivoCurriculo,
           intencionalidade: entry.intencionalidade,
           exemploAtividade: entry.exemploAtividade,
-          // Professor preenche estes campos:
           atividadePlanejada: '',
           materiaisNecessarios: [],
           observacoes: '',
@@ -241,7 +227,8 @@ export class TeachersService {
       matrix: {
         id: matrix.id,
         name: matrix.name,
-        code: matrix.code,
+        segment: matrix.segment,
+        year: matrix.year,
       },
       days: entries.length,
       content: planning.pedagogicalContent,

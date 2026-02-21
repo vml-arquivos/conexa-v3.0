@@ -122,9 +122,11 @@ export class CoordenacaoService {
       this.prisma.classroom.findMany({
         where: { unitId },
         include: {
-          children: { select: { id: true } },
-          classroomTeachers: {
+          enrollments: { where: { status: 'ATIVA' }, select: { id: true } },
+          teachers: {
+            where: { isActive: true },
             include: { teacher: { select: { id: true, firstName: true, lastName: true } } },
+            take: 1,
           },
         },
       }),
@@ -153,7 +155,7 @@ export class CoordenacaoService {
       }),
     ]);
 
-    const totalAlunos = turmas.reduce((sum, t) => sum + t.children.length, 0);
+    const totalAlunos = turmas.reduce((sum, t) => sum + t.enrollments.length, 0);
 
     // Turmas com chamada feita hoje
     const turmasComChamada = await this.prisma.attendance.groupBy({
@@ -218,9 +220,9 @@ export class CoordenacaoService {
       turmas: turmas.map((t) => ({
         id: t.id,
         nome: t.name,
-        totalAlunos: t.children.length,
-        professor: t.classroomTeachers[0]?.teacher
-          ? `${t.classroomTeachers[0].teacher.firstName} ${t.classroomTeachers[0].teacher.lastName}`
+        totalAlunos: t.enrollments.length,
+        professor: t.teachers[0]?.teacher
+          ? `${t.teachers[0].teacher.firstName} ${t.teachers[0].teacher.lastName}`
           : 'Não atribuído',
         chamadaFeita: turmasComChamada.some((c) => c.classroomId === t.id),
       })),
@@ -252,14 +254,14 @@ export class CoordenacaoService {
         include: {
           classrooms: {
             include: {
-              children: { select: { id: true } },
-              classroomTeachers: { select: { teacherId: true } },
+              enrollments: { where: { status: 'ATIVA' }, select: { id: true } },
+              teachers: { where: { isActive: true }, select: { teacherId: true } },
             },
           },
         },
       }),
       this.prisma.child.count({
-        where: { classroom: { unit: { mantenedoraId: user.mantenedoraId } } },
+        where: { enrollments: { some: { classroom: { unit: { mantenedoraId: user.mantenedoraId } } } } },
       }),
       this.prisma.classroomTeacher.count({
         where: { classroom: { unit: { mantenedoraId: user.mantenedoraId } } },
@@ -301,9 +303,9 @@ export class CoordenacaoService {
           }),
         ]);
 
-        const totalAlunosUnidade = unidade.classrooms.reduce((sum, c) => sum + c.children.length, 0);
+        const totalAlunosUnidade = unidade.classrooms.reduce((sum, c) => sum + c.enrollments.length, 0);
         const professoresUnidade = new Set(
-          unidade.classrooms.flatMap((c) => c.classroomTeachers.map((ct) => ct.teacherId)),
+          unidade.classrooms.flatMap((c) => c.teachers.map((ct) => ct.teacherId)),
         ).size;
 
         return {
