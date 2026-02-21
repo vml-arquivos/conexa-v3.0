@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import type { GeneratePlanningDto } from './dto/generate-planning.dto';
-import { PlanningType, PlanningStatus } from '@prisma/client';
+import { PlanningType, PlanningStatus, RequestStatus } from '@prisma/client';
 
 @Injectable()
 export class TeachersService {
@@ -69,9 +69,9 @@ export class TeachersService {
       where: {
         classroomId: primaryClassroom.id,
         createdBy: user.sub,
-        status: { in: ['RASCUNHO', 'SOLICITADO'] },
+        status: { in: [RequestStatus.RASCUNHO, RequestStatus.SOLICITADO] },
       },
-    });
+    }).catch(() => 0);
 
     // Planejamentos da semana — usa startDate (campo correto no schema)
     const planejamentosCount = await this.prisma.planning.count({
