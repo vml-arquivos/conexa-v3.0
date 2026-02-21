@@ -15,6 +15,12 @@ import DashboardCoordenacaoPedagogicaPage from '../pages/DashboardCoordenacaoPed
 import DashboardCoordenacaoGeralPage from '../pages/DashboardCoordenacaoGeralPage';
 import ControleFaltasPage from '../pages/ControleFaltasPage';
 import RdxPage from '../pages/RdxPage';
+// ─── Novas páginas implementadas ─────────────────────────────────────────────
+import PlanejamentosPage from '../pages/PlanejamentosPage';
+import RdicRiaPage from '../pages/RdicRiaPage';
+import DiarioBordoPage from '../pages/DiarioBordoPage';
+import MatrizPedagogicaPage from '../pages/MatrizPedagogicaPage';
+import ConfiguracoesPage from '../pages/ConfiguracoesPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -40,6 +46,7 @@ export const router = createBrowserRouter([
         path: 'dashboard',
         element: <DashboardPage />,
       },
+      // ─── Rotas legadas (mantidas para compatibilidade) ─────────────────────
       {
         path: 'plannings',
         element: <PlanningsPage />,
@@ -59,30 +66,75 @@ export const router = createBrowserRouter([
       {
         path: 'professor',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'DEVELOPER']}>
             <TeacherDashboardPage />
           </RoleProtectedRoute>
         ),
       },
-      // Dashboard do Professor — rota principal (redirecionamento pós-login)
+      // ─── Painel do Professor ───────────────────────────────────────────────
       {
         path: 'teacher-dashboard',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'COORDENADOR', 'DIRETOR', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'COORDENADOR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
             <TeacherDashboardPage />
           </RoleProtectedRoute>
         ),
       },
-      // Página dedicada de Requisições de Materiais
+      // ─── Planejamentos Pedagógicos com Templates e Matriz ─────────────────
+      {
+        path: 'planejamentos',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanejamentosPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── RDIC & RIA ────────────────────────────────────────────────────────
+      {
+        path: 'rdic-ria',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdicRiaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Diário de Bordo com Microgestos ──────────────────────────────────
+      {
+        path: 'diario-de-bordo',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DiarioBordoPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Matriz Pedagógica 2026 ────────────────────────────────────────────
+      {
+        path: 'matriz-pedagogica',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <MatrizPedagogicaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Configurações ────────────────────────────────────────────────────
+      {
+        path: 'configuracoes',
+        element: (
+          <ProtectedRoute>
+            <ConfiguracoesPage />
+          </ProtectedRoute>
+        ),
+      },
+      // ─── Requisições de Materiais ─────────────────────────────────────────
       {
         path: 'material-requests',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
             <MaterialRequestPage />
           </RoleProtectedRoute>
         ),
       },
-      // Pedidos de Compra — Unidade consolida, Mantenedora gerencia
+      // ─── Pedidos de Compra ────────────────────────────────────────────────
       {
         path: 'pedidos-compra',
         element: (
@@ -91,7 +143,7 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // Dashboard Central (Bruna/Carla) — somente leitura
+      // ─── Dashboard Central ────────────────────────────────────────────────
       {
         path: 'central',
         element: (
@@ -100,7 +152,7 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // Dashboard de Unidade — gestão operacional
+      // ─── Dashboard de Unidade ─────────────────────────────────────────────
       {
         path: 'unidade',
         element: (
@@ -109,35 +161,34 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // Atendimentos aos Pais/Responsáveis
+      // ─── Atendimentos aos Pais ────────────────────────────────────────────
       {
         path: 'atendimentos-pais',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <AtendimentoPaisPage />
           </RoleProtectedRoute>
         ),
       },
-      // ─── NOVAS ROTAS ─────────────────────────────────────────────────────────
-      // Chamada Diária / Controle de Faltas
+      // ─── Chamada Diária ───────────────────────────────────────────────────
       {
         path: 'chamada',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'DEVELOPER']}>
             <ControleFaltasPage />
           </RoleProtectedRoute>
         ),
       },
-      // Relatório de Fotos (RDX)
+      // ─── Relatório de Fotos (RDX) ─────────────────────────────────────────
       {
         path: 'rdx',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <RdxPage />
           </RoleProtectedRoute>
         ),
       },
-      // Dashboard de Coordenação Pedagógica (Unidade)
+      // ─── Dashboard de Coordenação Pedagógica ──────────────────────────────
       {
         path: 'coordenacao-pedagogica',
         element: (
@@ -146,7 +197,7 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // Dashboard de Coordenação Geral (Mantenedora)
+      // ─── Dashboard de Coordenação Geral ───────────────────────────────────
       {
         path: 'coordenacao-geral',
         element: (

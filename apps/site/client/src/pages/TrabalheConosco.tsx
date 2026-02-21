@@ -363,14 +363,14 @@ export default function TrabalheConosco() {
                     <div>
                       <Label htmlFor="unitId">Unidade de Interesse (Opcional)</Label>
                       <Select
-                        value={formData.unitId?.toString() || ''}
-                        onValueChange={(value) => handleInputChange('unitId', value ? parseInt(value) : undefined)}
+                        value={formData.unitId?.toString() || 'all'}
+                        onValueChange={(value) => handleInputChange('unitId', value && value !== 'all' ? parseInt(value) : undefined)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Qualquer unidade" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Qualquer unidade</SelectItem>
+                          <SelectItem value="all">Qualquer unidade</SelectItem>
                           {units?.map((unit) => (
                             <SelectItem key={unit.id} value={unit.id.toString()}>
                               {unit.unitName}

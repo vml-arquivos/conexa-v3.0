@@ -18,6 +18,10 @@ import {
   UserCheck,
   Building2,
   Network,
+  Brain,
+  Layers,
+  Settings,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles } from '../../app/RoleProtectedRoute';
@@ -26,7 +30,10 @@ interface MenuItem {
   path: string;
   label: string;
   icon: React.ReactNode;
+  badge?: string;
 }
+
+// ─── Menus por perfil ─────────────────────────────────────────────────────────
 
 const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/teacher-dashboard', label: 'Painel do Professor', icon: <GraduationCap className="h-4 w-4" /> },
@@ -34,10 +41,12 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
 ];
 
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
-  { path: '/app/plannings', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
+  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/rdic-ria', label: 'RDIC & RIA', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Relatório de Fotos', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
@@ -50,11 +59,12 @@ const UNIDADE_GESTAO: MenuItem[] = [
 ];
 
 const UNIDADE_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/plannings', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
+  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/rdic-ria', label: 'RDIC & RIA', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Relatório de Fotos', icon: <Camera className="h-4 w-4" /> },
-  { path: '/app/matrices', label: 'Matriz Curricular', icon: <Grid className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
@@ -63,6 +73,7 @@ const CENTRAL_ITEMS: MenuItem[] = [
   { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
   { path: '/app/coordenacao-geral', label: 'Coordenação Geral', icon: <Network className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
@@ -72,19 +83,24 @@ const MANTENEDORA_ITEMS: MenuItem[] = [
   { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
   { path: '/app/unidade', label: 'Gestão de Unidades', icon: <Users className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
 const DEV_EXTRA: MenuItem[] = [
-  { path: '/app/matrices', label: 'Matrizes Curriculares', icon: <Grid className="h-4 w-4" /> },
-  { path: '/app/plannings', label: 'Planejamentos', icon: <FileText className="h-4 w-4" /> },
-  { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/teacher-dashboard', label: 'Painel Professor', icon: <GraduationCap className="h-4 w-4" /> },
+  { path: '/app/planejamentos', label: 'Planejamentos', icon: <FileText className="h-4 w-4" /> },
+  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/rdic-ria', label: 'RDIC & RIA', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Relatório de Fotos (RDX)', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Fotos da Turma (RDX)', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/coordenacao-pedagogica', label: 'Coord. Pedagógica', icon: <Building2 className="h-4 w-4" /> },
   { path: '/app/coordenacao-geral', label: 'Coord. Geral', icon: <Network className="h-4 w-4" /> },
+  { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
 ];
 
+// ─── Item de menu ─────────────────────────────────────────────────────────────
 function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
   return (
     <Link
@@ -99,7 +115,14 @@ function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
         {item.icon}
         {item.label}
       </span>
-      {active && <ChevronRight className="h-3 w-3 opacity-70" />}
+      <span className="flex items-center gap-1">
+        {item.badge && !active && (
+          <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+            {item.badge}
+          </span>
+        )}
+        {active && <ChevronRight className="h-3 w-3 opacity-70" />}
+      </span>
     </Link>
   );
 }
@@ -119,6 +142,7 @@ function NavSection({ titulo, items, isActive }: { titulo: string; items: MenuIt
   );
 }
 
+// ─── Sidebar Principal ────────────────────────────────────────────────────────
 export function Sidebar() {
   const location = useLocation();
   const { user } = useAuth();
@@ -140,8 +164,12 @@ export function Sidebar() {
     : isProfessor ? 'Professor(a)'
     : 'Usuário';
 
+  // Item de configurações (disponível para todos)
+  const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
+
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
+      {/* Logo */}
       <div className="p-5 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -165,6 +193,7 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* Navegação */}
       <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
         {isDeveloper && (
           <>
@@ -172,7 +201,7 @@ export function Sidebar() {
             <NavSection titulo="Unidade" items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]} isActive={isActive} />
             <NavSection titulo="Central" items={CENTRAL_ITEMS} isActive={isActive} />
             <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} />
-            <NavSection titulo="Dev Extra" items={DEV_EXTRA} isActive={isActive} />
+            <NavSection titulo="Dev" items={DEV_EXTRA} isActive={isActive} />
           </>
         )}
         {!isDeveloper && isMantenedora && (
@@ -198,8 +227,10 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="p-3 border-t border-gray-800">
-        <p className="text-xs text-gray-600 text-center">Conexa V3 © 2026</p>
+      {/* Rodapé com configurações */}
+      <div className="p-3 border-t border-gray-800 space-y-1">
+        <NavItem item={configItem} active={isActive('/app/configuracoes')} />
+        <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
       </div>
     </aside>
   );
