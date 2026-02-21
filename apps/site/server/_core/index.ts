@@ -2,11 +2,12 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
 import { generateSitemap } from "../sitemap";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -19,53 +20,72 @@ function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-async function findAvailablePort(startPort: number = 3001): Promise<number> {
-  for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
+function serveStatic(app: express.Express) {
+  // Em produção o Vite gera os assets em dist/public (relativo à raiz do projeto)
+  const distPath = path.resolve(process.cwd(), "dist", "public");
+
+  if (!fs.existsSync(distPath)) {
+    console.error(`[Static] Diretório de build não encontrado: ${distPath}`);
+  } else {
+    console.log(`[Static] Servindo arquivos de: ${distPath}`);
   }
-  throw new Error(`No available port found starting from ${startPort}`);
+
+  app.use(express.static(distPath));
+
+  // Fallback SPA — todas as rotas retornam index.html
+  app.use("*", (_req, res) => {
+    const indexPath = path.resolve(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Aplicação não compilada. Execute pnpm build.");
+    }
+  });
 }
 
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
+
   registerOAuthRoutes(app);
-  
-  // Sitemap.xml
-  app.get('/sitemap.xml', async (req, res) => {
+
+  // Sitemap
+  app.get("/sitemap.xml", async (req, res) => {
     try {
       const protocol = req.protocol;
-      const host = req.get('host') || 'localhost:3001';
+      const host = req.get("host") || "localhost:3000";
       const baseUrl = `${protocol}://${host}`;
       const sitemap = await generateSitemap(baseUrl);
-      res.header('Content-Type', 'application/xml');
+      res.header("Content-Type", "application/xml");
       res.send(sitemap);
     } catch (error) {
-      console.error('[Sitemap] Error generating sitemap:', error);
-      res.status(500).send('Error generating sitemap');
+      console.error("[Sitemap] Erro:", error);
+      res.status(500).send("Erro ao gerar sitemap");
     }
   });
-  
-  // Health check endpoint
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'cocris-site', version: '3.0.0', timestamp: new Date().toISOString() });
+
+  // Health check para o Coolify
+  app.get("/api/health", (_req, res) => {
+    res.json({
+      status: "ok",
+      service: "cocris-site",
+      version: "3.0.0",
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Robots.txt
-  app.get('/robots.txt', (req, res) => {
+  app.get("/robots.txt", (req, res) => {
     const protocol = req.protocol;
-    const host = req.get('host') || 'localhost:3001';
+    const host = req.get("host") || "localhost:3000";
     const baseUrl = `${protocol}://${host}`;
-    res.type('text/plain');
+    res.type("text/plain");
     res.send(`User-agent: *\nAllow: /\nSitemap: ${baseUrl}/sitemap.xml`);
   });
-  
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -74,20 +94,22 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+
+  // IMPORTANTE: importação dinâmica para evitar que o esbuild inclua 'vite'
+  // no bundle de produção (vite é devDependency, não existe em produção)
   if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
+    const viteModule = await import("./vite");
+    await viteModule.setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Configuração Obrigatória de Rede para Coolify
-  const PORT = Number(process.env.PORT) || 3001; // Padrão 3001 para não conflitar com Backend
-  const HOST = '0.0.0.0'; // Obrigatório para Docker/Coolify
+  const PORT = Number(process.env.PORT) || 3000;
+  const HOST = "0.0.0.0";
 
   server.listen(PORT, HOST, () => {
-    console.log(`✅ Server running on http://${HOST}:${PORT}`);
-    console.log(`📡 Network: Site Cocris is ready on port ${PORT}`);
+    console.log(`✅ Conexa Site rodando em http://${HOST}:${PORT}`);
+    console.log(`🌐 Ambiente: ${process.env.NODE_ENV || "production"}`);
   });
 }
 
