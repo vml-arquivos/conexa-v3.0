@@ -4,19 +4,19 @@ import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
+// IMPORTANTE: NÃO importar vite.config.ts aqui.
+// Ele usa @builder.io/vite-plugin-jsx-loc (devDependency) que não existe em produção.
+// O esbuild (--packages=external) incluiria essa referência no bundle e causaria
+// ERR_MODULE_NOT_FOUND em runtime. Usamos configFile:true para o Vite ler o config sozinho.
 
 export async function setupVite(app: Express, server: Server) {
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
-  };
-
   const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    server: serverOptions,
+    configFile: true,
+    server: {
+      middlewareMode: true,
+      hmr: { server },
+      allowedHosts: true as const,
+    },
     appType: "custom",
   });
 
