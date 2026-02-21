@@ -43,6 +43,7 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
 ];
 
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
+  { path: '/app/plano-de-aula', label: 'Plano de Aula', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/planejamento-diario', label: 'Planejamento Diário', icon: <Calendar className="h-4 w-4" /> },
   { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
@@ -62,6 +63,7 @@ const UNIDADE_GESTAO: MenuItem[] = [
 ];
 
 const UNIDADE_PEDAGOGICO: MenuItem[] = [
+  { path: '/app/plano-de-aula', label: 'Plano de Aula', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/planejamento-diario', label: 'Planejamento Diário', icon: <Calendar className="h-4 w-4" /> },
   { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },

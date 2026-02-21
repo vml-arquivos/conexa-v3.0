@@ -26,6 +26,7 @@ import AdminUnidadesPage from '../pages/AdminUnidadesPage';
 import AdminTurmasPage from '../pages/AdminTurmasPage';
 import MeuPerfilPage from '../pages/MeuPerfilPage';
 import PlanejamentoDiarioPage from '../pages/PlanejamentoDiarioPage';
+import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -85,7 +86,16 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-         // ─── Planejamento Diário com Calendário Pedagógico 2026 ────────────
+         // ─── Plano de Aula com Matriz Completa 2026 ──────────────────
+      {
+        path: 'plano-de-aula',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Planejamento Diário com Calendário Pedagógico 2026 ────────────
       {
         path: 'planejamento-diario',
         element: (
