@@ -14,6 +14,10 @@ import {
   FileText,
   Home,
   MessageCircle,
+  Camera,
+  UserCheck,
+  Building2,
+  Network,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles } from '../../app/RoleProtectedRoute';
@@ -32,12 +36,15 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/plannings', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Relatório de Fotos', icon: <Camera className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
 const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/unidade', label: 'Painel da Unidade', icon: <Home className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica', label: 'Coordenação Pedagógica', icon: <Building2 className="h-4 w-4" /> },
   { path: '/app/material-requests', label: 'Requisições Pendentes', icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
@@ -45,6 +52,8 @@ const UNIDADE_GESTAO: MenuItem[] = [
 const UNIDADE_PEDAGOGICO: MenuItem[] = [
   { path: '/app/plannings', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Relatório de Fotos', icon: <Camera className="h-4 w-4" /> },
   { path: '/app/matrices', label: 'Matriz Curricular', icon: <Grid className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
@@ -52,12 +61,14 @@ const UNIDADE_PEDAGOGICO: MenuItem[] = [
 
 const CENTRAL_ITEMS: MenuItem[] = [
   { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
+  { path: '/app/coordenacao-geral', label: 'Coordenação Geral', icon: <Network className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
   { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
 const MANTENEDORA_ITEMS: MenuItem[] = [
   { path: '/app/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { path: '/app/coordenacao-geral', label: 'Coordenação Geral', icon: <Network className="h-4 w-4" /> },
   { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
   { path: '/app/unidade', label: 'Gestão de Unidades', icon: <Users className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
@@ -68,6 +79,10 @@ const DEV_EXTRA: MenuItem[] = [
   { path: '/app/matrices', label: 'Matrizes Curriculares', icon: <Grid className="h-4 w-4" /> },
   { path: '/app/plannings', label: 'Planejamentos', icon: <FileText className="h-4 w-4" /> },
   { path: '/app/diary', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx', label: 'Relatório de Fotos (RDX)', icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica', label: 'Coord. Pedagógica', icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao-geral', label: 'Coord. Geral', icon: <Network className="h-4 w-4" /> },
 ];
 
 function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
@@ -133,7 +148,7 @@ export function Sidebar() {
             <span className="text-white font-bold text-sm">C</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-none">Conexa V2</h1>
+            <h1 className="text-lg font-bold leading-none">Conexa V3</h1>
             <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
           </div>
         </div>
@@ -184,7 +199,7 @@ export function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-gray-800">
-        <p className="text-xs text-gray-600 text-center">Conexa V2 © 2026</p>
+        <p className="text-xs text-gray-600 text-center">Conexa V3 © 2026</p>
       </div>
     </aside>
   );

@@ -11,6 +11,10 @@ import { PedidosCompraPage } from '../pages/PedidosCompraPage';
 import { DashboardCentralPage } from '../pages/DashboardCentralPage';
 import { DashboardUnidadePage } from '../pages/DashboardUnidadePage';
 import { AtendimentoPaisPage } from '../pages/AtendimentoPaisPage';
+import DashboardCoordenacaoPedagogicaPage from '../pages/DashboardCoordenacaoPedagogicaPage';
+import DashboardCoordenacaoGeralPage from '../pages/DashboardCoordenacaoGeralPage';
+import ControleFaltasPage from '../pages/ControleFaltasPage';
+import RdxPage from '../pages/RdxPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -111,6 +115,43 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <AtendimentoPaisPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── NOVAS ROTAS ─────────────────────────────────────────────────────────
+      // Chamada Diária / Controle de Faltas
+      {
+        path: 'chamada',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'DEVELOPER']}>
+            <ControleFaltasPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // Relatório de Fotos (RDX)
+      {
+        path: 'rdx',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdxPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // Dashboard de Coordenação Pedagógica (Unidade)
+      {
+        path: 'coordenacao-pedagogica',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardCoordenacaoPedagogicaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // Dashboard de Coordenação Geral (Mantenedora)
+      {
+        path: 'coordenacao-geral',
+        element: (
+          <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardCoordenacaoGeralPage />
           </RoleProtectedRoute>
         ),
       },

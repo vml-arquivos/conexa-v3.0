@@ -28,6 +28,9 @@ import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
 import { ClassroomsModule } from './classrooms/classrooms.module';
 import { AtendimentoPaisModule } from './atendimento-pais/atendimento-pais.module';
 import { ChildrenModule } from './children/children.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { CoordenacaoModule } from './coordenacao/coordenacao.module';
+import { RdxModule } from './rdx/rdx.module';
 
 @Module({
   imports: [
@@ -59,6 +62,9 @@ import { ChildrenModule } from './children/children.module';
     ClassroomsModule,
     AtendimentoPaisModule,
     ChildrenModule,
+    AttendanceModule,
+    CoordenacaoModule,
+    RdxModule,
   ],
   controllers: [AppController],
   providers: [
