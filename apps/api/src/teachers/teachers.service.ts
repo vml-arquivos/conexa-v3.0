@@ -14,7 +14,7 @@ export class TeachersService {
    */
   async getDashboard(user: JwtPayload) {
     const classroomTeachers = await this.prisma.classroomTeacher.findMany({
-      where: { teacherId: user.sub },
+      where: { teacherId: user.sub, isActive: true },
       include: {
         classroom: {
           include: {
@@ -29,7 +29,7 @@ export class TeachersService {
                     id: true,
                     firstName: true,
                     lastName: true,
-                    birthDate: true,
+                    dateOfBirth: true,
                     gender: true,
                     photoUrl: true,
                     isActive: true,
@@ -97,8 +97,8 @@ export class TeachersService {
         nome: `${child.firstName} ${child.lastName}`,
         firstName: child.firstName,
         lastName: child.lastName,
-        birthDate: child.birthDate,
-        idade: this.calculateAge(child.birthDate),
+        dateOfBirth: child.dateOfBirth,
+        idade: this.calculateAge(child.dateOfBirth),
         gender: child.gender,
         photoUrl: child.photoUrl,
       })),
@@ -114,9 +114,9 @@ export class TeachersService {
   /**
    * Calcular idade em meses
    */
-  private calculateAge(birthDate: Date): number {
+  private calculateAge(dateOfBirth: Date): number {
     const now = new Date();
-    const birth = new Date(birthDate);
+    const birth = new Date(dateOfBirth);
     const months =
       (now.getFullYear() - birth.getFullYear()) * 12 +
       (now.getMonth() - birth.getMonth());
