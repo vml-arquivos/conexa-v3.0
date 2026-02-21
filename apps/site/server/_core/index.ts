@@ -52,6 +52,11 @@ async function startServer() {
     }
   });
   
+  // Health check endpoint
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'cocris-site', version: '3.0.0', timestamp: new Date().toISOString() });
+  });
+
   // Robots.txt
   app.get('/robots.txt', (req, res) => {
     const protocol = req.protocol;

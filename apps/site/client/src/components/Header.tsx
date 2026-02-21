@@ -1,11 +1,20 @@
-import { useState } from 'react';
-import { Menu, X } from 'lucide-react';
-import { Link } from 'wouter';
+import { useState, useEffect } from 'react';
+import { Menu, X, ExternalLink, Heart } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [location] = useLocation();
 
-  const toggleMenu = () => setIsOpen(!isOpen);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => { setIsOpen(false); }, [location]);
 
   const navLinks = [
     { label: 'Início', href: '/' },
@@ -14,53 +23,69 @@ export default function Header() {
     { label: 'Projetos', href: '/projetos' },
     { label: 'Notícias', href: '/blog' },
     { label: 'Transparência', href: '/transparencia' },
-    { label: 'Compliance', href: '/compliance' },
     { label: 'Trabalhe Conosco', href: '/trabalhe-conosco' },
     { label: 'Contato', href: '/contato' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
+    <header
+      className={`sticky top-0 z-50 bg-white border-b border-border transition-shadow duration-300 ${
+        scrolled ? 'shadow-md' : 'shadow-sm'
+      }`}
+    >
       <div className="container flex items-center justify-between h-20">
-        {/* Logo - Official COCRIS */}
+        {/* Logo */}
         <Link href="/">
-          <div className="flex items-center gap-3 font-bold text-lg hover:opacity-90 transition-opacity cursor-pointer">
-            <img 
-              src="/images/logo-cocris.png" 
-              alt="Logo COCRIS - Associação Beneficente Coração de Cristo" 
-              className="h-14 w-auto"
+          <div className="flex items-center gap-3 hover:opacity-90 transition-opacity cursor-pointer">
+            <img
+              src="/images/logo-cocris.png"
+              alt="COCRIS - Associação Beneficente Coração de Cristo"
+              className="h-12 w-auto"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
             />
-            <div className="hidden sm:flex flex-col">
-              <span className="text-primary font-bold text-sm">COCRIS</span>
-              <span className="text-xs text-secondary font-semibold">Educação Infantil</span>
+            <div className="flex flex-col">
+              <span className="text-primary font-bold text-base leading-tight">COCRIS</span>
+              <span className="text-xs text-muted-foreground font-medium">Educação Infantil</span>
             </div>
           </div>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center gap-8">
+        <nav className="hidden xl:flex items-center gap-6">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href}>
-              <span className="text-foreground hover:text-primary font-semibold transition-colors duration-300 relative group text-sm cursor-pointer">
+              <span
+                className={`text-sm font-semibold transition-colors duration-200 relative group cursor-pointer ${
+                  location === link.href ? 'text-primary' : 'text-foreground hover:text-primary'
+                }`}
+              >
                 {link.label}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300"></span>
+                <span
+                  className={`absolute -bottom-0.5 left-0 h-0.5 bg-primary transition-all duration-300 ${
+                    location === link.href ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}
+                />
               </span>
             </Link>
           ))}
         </nav>
 
-        {/* CTA Buttons */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* CTA Buttons — Desktop */}
+        <div className="hidden md:flex items-center gap-2">
           <a
-            href="https://democonexa.casadf.com.br/login"
+            href="https://app.conexa3.casadf.com.br"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-outline text-sm" style={{fontSize: '12px', fontWeight: '500'}}
+            className="flex items-center gap-1.5 px-4 py-2 border-2 border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary hover:text-white transition-all duration-200"
           >
+            <ExternalLink className="w-3.5 h-3.5" />
             Área do Colaborador
           </a>
           <Link href="/doacoes">
-            <button className="btn-primary text-sm" style={{fontSize: '12px'}}>
+            <button className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-semibold rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md">
+              <Heart className="w-3.5 h-3.5" />
               Fazer Doação
             </button>
           </Link>
@@ -68,9 +93,9 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <button
-          onClick={toggleMenu}
-          className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
-          aria-label="Toggle menu"
+          onClick={() => setIsOpen(!isOpen)}
+          className="xl:hidden p-2 hover:bg-muted rounded-lg transition-colors"
+          aria-label={isOpen ? 'Fechar menu' : 'Abrir menu'}
         >
           {isOpen ? (
             <X className="w-6 h-6 text-primary" />
@@ -82,29 +107,34 @@ export default function Header() {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <nav className="lg:hidden bg-muted border-t border-border">
-          <div className="container py-4 space-y-3">
+        <nav className="xl:hidden bg-white border-t border-border shadow-lg">
+          <div className="container py-4 space-y-1">
             {navLinks.map((link) => (
               <Link key={link.href} href={link.href}>
                 <span
-                  className="block px-4 py-2 text-foreground hover:bg-white hover:text-primary rounded-lg transition-colors cursor-pointer"
-                  onClick={() => setIsOpen(false)}
+                  className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                    location === link.href
+                      ? 'bg-primary/10 text-primary font-semibold'
+                      : 'text-foreground hover:bg-muted hover:text-primary'
+                  }`}
                 >
                   {link.label}
                 </span>
               </Link>
             ))}
-            <div className="pt-4 border-t border-border space-y-2">
+            <div className="pt-4 mt-2 border-t border-border space-y-2 px-1">
               <a
-                href="https://democonexa.casadf.com.br/login"
+                href="https://app.conexa3.casadf.com.br"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block btn-outline text-center text-sm"
+                className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-primary text-primary text-sm font-semibold rounded-xl hover:bg-primary hover:text-white transition-all duration-200"
               >
+                <ExternalLink className="w-4 h-4" />
                 Área do Colaborador
               </a>
               <Link href="/doacoes">
-                <button className="w-full btn-primary text-sm">
+                <button className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary text-white text-sm font-semibold rounded-xl hover:bg-primary/90 transition-all duration-200">
+                  <Heart className="w-4 h-4" />
                   Fazer Doação
                 </button>
               </Link>
