@@ -58,6 +58,7 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
 const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/unidade', label: 'Painel da Unidade', icon: <Home className="h-4 w-4" /> },
   { path: '/app/coordenacao-pedagogica', label: 'Coordenação Pedagógica', icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao', label: 'Turmas & Reuniões', icon: <Users className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/material-requests', label: 'Requisições Pendentes', icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
@@ -102,6 +103,7 @@ const DEV_EXTRA: MenuItem[] = [
   { path: '/app/rdx', label: 'Fotos da Turma (RDX)', icon: <Camera className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/coordenacao-pedagogica', label: 'Coord. Pedagógica', icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao', label: 'Turmas & Reuniões', icon: <Users className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/coordenacao-geral', label: 'Coord. Geral', icon: <Network className="h-4 w-4" /> },
   { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
 ];

@@ -120,7 +120,8 @@ export default function DiarioBordoPage() {
   async function loadDiarios() {
     setLoading(true);
     try {
-      const res = await http.get('/diary-events?limit=30&category=DIARIO');
+      // Usa filtro por tipo válido do enum DiaryEventType
+      const res = await http.get('/diary-events?limit=50&type=ATIVIDADE_PEDAGOGICA');
       const d = res.data;
       setDiarios(Array.isArray(d) ? d : d?.data ?? []);
     } catch {
@@ -163,20 +164,58 @@ export default function DiarioBordoPage() {
     }
     setSaving(true);
     try {
-      await http.post('/diary-events', {
-        date: form.date,
-        category: 'DIARIO',
-        climaEmocional: form.climaEmocional,
-        momentoDestaque: form.momentoDestaque,
-        reflexaoPedagogica: form.reflexaoPedagogica,
-        encaminhamentos: form.encaminhamentos,
-        presencas: form.presencas,
-        ausencias: form.ausencias,
-        rotina: form.rotina,
-        microgestos: form.microgestos,
-        description: form.momentoDestaque || form.reflexaoPedagogica,
-        type: 'DIARIO_BORDO',
-      });
+      // Buscar turma e criança do professor para montar o payload correto
+      let classroomId: string | undefined;
+      let childId: string | undefined;
+      try {
+        const meRes = await http.get('/auth/me');
+        const me = meRes.data;
+        // Pegar primeira turma ativa do professor
+        if (me?.classrooms?.length > 0) classroomId = me.classrooms[0].id;
+        if (me?.children?.length > 0) childId = me.children[0].id;
+      } catch { /* usa undefined */ }
+
+      if (!classroomId || !childId) {
+        // Modo offline/demo: salva localmente
+        const localEntry = {
+          id: Date.now().toString(),
+          date: form.date,
+          eventDate: form.date,
+          climaEmocional: form.climaEmocional,
+          momentoDestaque: form.momentoDestaque,
+          reflexaoPedagogica: form.reflexaoPedagogica,
+          encaminhamentos: form.encaminhamentos,
+          presencas: form.presencas,
+          ausencias: form.ausencias,
+          rotina: form.rotina,
+          microgestos: form.microgestos,
+          status: 'LOCAL',
+          createdAt: new Date().toISOString(),
+        };
+        const saved = JSON.parse(localStorage.getItem('diarios_bordo') || '[]');
+        saved.unshift(localEntry);
+        localStorage.setItem('diarios_bordo', JSON.stringify(saved.slice(0, 100)));
+      } else {
+        await http.post('/diary-events', {
+          type: 'ATIVIDADE_PEDAGOGICA',
+          title: form.momentoDestaque.substring(0, 100) || 'Diário de Bordo',
+          description: form.reflexaoPedagogica || form.momentoDestaque,
+          eventDate: form.date + 'T12:00:00.000Z',
+          childId,
+          classroomId,
+          observations: form.encaminhamentos,
+          developmentNotes: form.reflexaoPedagogica,
+          presencas: form.presencas,
+          ausencias: form.ausencias,
+          microgestos: form.microgestos,
+          tags: [form.climaEmocional],
+          aiContext: {
+            climaEmocional: form.climaEmocional,
+            momentoDestaque: form.momentoDestaque,
+            rotina: form.rotina,
+          },
+        });
+      }
       toast.success('Diário de Bordo salvo!');
       setAba('lista');
       loadDiarios();

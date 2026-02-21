@@ -27,6 +27,7 @@ import AdminTurmasPage from '../pages/AdminTurmasPage';
 import MeuPerfilPage from '../pages/MeuPerfilPage';
 import PlanejamentoDiarioPage from '../pages/PlanejamentoDiarioPage';
 import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
+import CoordenacaoPedagogicaPage from '../pages/CoordenacaoPedagogicaPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -257,12 +258,21 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // ─── Admin: Gestão de Turmas ──────────────────────────────────────────
+      // ─── Admin: Gestão de Turmas ──────────────────────────────────────────────────────
       {
         path: 'admin/turmas',
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <AdminTurmasPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Coordenação Pedagógica Completa (turmas + currículo + reuniões) ────
+      {
+        path: 'coordenacao',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <CoordenacaoPedagogicaPage />
           </RoleProtectedRoute>
         ),
       },

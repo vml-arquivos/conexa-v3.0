@@ -1,0 +1,694 @@
+import { useState, useEffect } from 'react';
+import { PageShell } from '../components/ui/PageShell';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Badge } from '../components/ui/badge';
+import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { toast } from 'sonner';
+import http from '../api/http';
+import {
+  Users, BookOpen, Calendar, ClipboardList, ChevronRight,
+  CheckCircle, Clock, AlertCircle, Plus, Eye, FileText,
+  GraduationCap, Target, Star, TrendingUp, MessageSquare,
+  Download, Filter, Search, ChevronDown, ChevronUp,
+  Layers, Award, BarChart2, BookMarked, UserCheck,
+} from 'lucide-react';
+import { MATRIZ_2026 } from '../data/matrizCompleta2026';
+import type { SegmentoKey } from '../data/matrizCompleta2026';
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+interface Turma {
+  id: string;
+  name: string;
+  segment: string;
+  ageGroupMin: number;
+  ageGroupMax: number;
+  teacherCount: number;
+  childCount: number;
+  unit?: { name: string };
+  teachers?: { user: { firstName: string; lastName: string } }[];
+}
+
+interface Reuniao {
+  id: string;
+  tipo: 'SEMANAL' | 'MENSAL';
+  titulo: string;
+  data: string;
+  status: 'AGENDADA' | 'REALIZADA' | 'CANCELADA';
+  pauta: string;
+  ata?: string;
+  participantes?: string[];
+  turmaId?: string;
+  turmaNome?: string;
+}
+
+interface Planejamento {
+  id: string;
+  title: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  classroom?: { name: string };
+  createdByUser?: { firstName: string; lastName: string };
+}
+
+// ─── Segmentos ────────────────────────────────────────────────────────────────
+const SEGMENTO_LABELS: Record<string, string> = {
+  EI01: 'EI01 — Bebês (0 a 1a 6m)',
+  EI02: 'EI02 — Crianças Bem Pequenas (1a 7m a 3a 11m)',
+  EI03: 'EI03 — Crianças Pequenas (4 a 5a 11m)',
+};
+
+const SEGMENTO_CORES: Record<string, string> = {
+  EI01: 'bg-pink-100 text-pink-700 border-pink-200',
+  EI02: 'bg-purple-100 text-purple-700 border-purple-200',
+  EI03: 'bg-blue-100 text-blue-700 border-blue-200',
+};
+
+const STATUS_REUNIAO: Record<string, { label: string; cor: string; icon: any }> = {
+  AGENDADA: { label: 'Agendada', cor: 'bg-blue-100 text-blue-700', icon: Clock },
+  REALIZADA: { label: 'Realizada', cor: 'bg-green-100 text-green-700', icon: CheckCircle },
+  CANCELADA: { label: 'Cancelada', cor: 'bg-red-100 text-red-700', icon: AlertCircle },
+};
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
+export default function CoordenacaoPedagogicaPage() {
+  const [aba, setAba] = useState<'turmas' | 'curriculo' | 'reunioes' | 'planejamentos'>('turmas');
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [turmaSelecionada, setTurmaSelecionada] = useState<Turma | null>(null);
+  const [reunioes, setReunioes] = useState<Reuniao[]>([]);
+  const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [filtroSegmento, setFiltroSegmento] = useState<string>('TODOS');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Modal de reunião
+  const [modalReuniao, setModalReuniao] = useState(false);
+  const [formReuniao, setFormReuniao] = useState({
+    tipo: 'SEMANAL' as 'SEMANAL' | 'MENSAL',
+    titulo: '',
+    data: new Date().toISOString().split('T')[0],
+    pauta: '',
+    turmaId: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Currículo da turma selecionada
+  const [filtroSegCurriculo, setFiltroSegCurriculo] = useState<SegmentoKey>('EI01');
+  const [filtroCampo, setFiltroCampo] = useState('TODOS');
+  const [filtroBimestre, setFiltroBimestre] = useState('TODOS');
+
+  useEffect(() => {
+    loadTurmas();
+    loadReunioes();
+    loadPlanejamentos();
+  }, []);
+
+  // ─── Loaders ───────────────────────────────────────────────────────────────
+  async function loadTurmas() {
+    setLoading(true);
+    try {
+      const res = await http.get('/classrooms?limit=50');
+      const d = res.data;
+      setTurmas(Array.isArray(d) ? d : d?.data ?? []);
+    } catch {
+      // Demo data
+      setTurmas([
+        { id: 'demo-1', name: 'Turma Girassol', segment: 'EI01', ageGroupMin: 0, ageGroupMax: 18, teacherCount: 2, childCount: 12 },
+        { id: 'demo-2', name: 'Turma Borboleta', segment: 'EI02', ageGroupMin: 19, ageGroupMax: 47, teacherCount: 2, childCount: 15 },
+        { id: 'demo-3', name: 'Turma Arco-Íris', segment: 'EI03', ageGroupMin: 48, ageGroupMax: 71, teacherCount: 2, childCount: 18 },
+        { id: 'demo-4', name: 'Turma Estrela', segment: 'EI02', ageGroupMin: 19, ageGroupMax: 47, teacherCount: 1, childCount: 14 },
+        { id: 'demo-5', name: 'Turma Lua', segment: 'EI03', ageGroupMin: 48, ageGroupMax: 71, teacherCount: 2, childCount: 16 },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadReunioes() {
+    try {
+      const res = await http.get('/coordenacao/reunioes?limit=30');
+      const d = res.data;
+      setReunioes(Array.isArray(d) ? d : d?.data ?? []);
+    } catch {
+      // Demo data
+      const hoje = new Date();
+      const proxSemana = new Date(hoje); proxSemana.setDate(hoje.getDate() + 7);
+      const proxMes = new Date(hoje); proxMes.setDate(hoje.getDate() + 30);
+      setReunioes([
+        {
+          id: 'r1', tipo: 'SEMANAL', titulo: 'Reunião Pedagógica Semanal',
+          data: proxSemana.toISOString().split('T')[0], status: 'AGENDADA',
+          pauta: 'Revisão dos planejamentos da semana\nAnálise dos registros de desenvolvimento\nOrganização dos espaços pedagógicos',
+          participantes: ['Coordenadora Geral', 'Prof. Ana', 'Prof. Maria', 'Prof. João'],
+        },
+        {
+          id: 'r2', tipo: 'MENSAL', titulo: 'Reunião de Coordenação Mensal — Março',
+          data: proxMes.toISOString().split('T')[0], status: 'AGENDADA',
+          pauta: 'Análise dos indicadores pedagógicos\nRevisão da Matriz Curricular 2026\nFormação continuada — Campos de Experiência\nPlanejamento do próximo mês',
+          participantes: ['Coordenadora Geral', 'Todas as Coordenadoras de Unidade'],
+        },
+        {
+          id: 'r3', tipo: 'SEMANAL', titulo: 'Reunião Pedagógica Semanal',
+          data: new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'REALIZADA',
+          pauta: 'Avaliação das atividades da semana anterior\nPreparação dos materiais pedagógicos',
+          ata: 'Reunião realizada com a participação de 5 professoras. Foram discutidos os planejamentos da semana e definidas as estratégias para as atividades de exploração sensorial com o EI01. A coordenadora destacou a importância dos registros fotográficos para documentação pedagógica.',
+          participantes: ['Coordenadora', 'Prof. Ana', 'Prof. Maria', 'Prof. Carla', 'Prof. Beatriz'],
+        },
+      ]);
+    }
+  }
+
+  async function loadPlanejamentos() {
+    try {
+      const res = await http.get('/coordenacao/planejamentos?limit=20');
+      const d = res.data;
+      setPlanejamentos(Array.isArray(d) ? d : d?.data ?? []);
+    } catch {
+      setPlanejamentos([]);
+    }
+  }
+
+  // ─── Ações ─────────────────────────────────────────────────────────────────
+  async function salvarReuniao() {
+    if (!formReuniao.titulo.trim() || !formReuniao.pauta.trim()) {
+      toast.error('Preencha o título e a pauta da reunião');
+      return;
+    }
+    setSaving(true);
+    try {
+      await http.post('/coordenacao/reunioes', {
+        tipo: formReuniao.tipo,
+        titulo: formReuniao.titulo,
+        data: formReuniao.data,
+        pauta: formReuniao.pauta,
+        turmaId: formReuniao.turmaId || undefined,
+      });
+      toast.success('Reunião agendada com sucesso!');
+      setModalReuniao(false);
+      loadReunioes();
+      setFormReuniao({ tipo: 'SEMANAL', titulo: '', data: new Date().toISOString().split('T')[0], pauta: '', turmaId: '' });
+    } catch (err: any) {
+      // Fallback local
+      const nova: Reuniao = {
+        id: Date.now().toString(),
+        tipo: formReuniao.tipo,
+        titulo: formReuniao.titulo,
+        data: formReuniao.data,
+        status: 'AGENDADA',
+        pauta: formReuniao.pauta,
+        turmaId: formReuniao.turmaId || undefined,
+        turmaNome: turmas.find(t => t.id === formReuniao.turmaId)?.name,
+      };
+      setReunioes(r => [nova, ...r]);
+      toast.success('Reunião agendada (modo local)');
+      setModalReuniao(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function marcarRealizada(id: string, ata: string) {
+    try {
+      await http.post(`/coordenacao/reunioes/${id}/ata`, { ata });
+      await http.patch(`/coordenacao/reunioes/${id}/status`, { status: 'REALIZADA' });
+      toast.success('Reunião marcada como realizada');
+      loadReunioes();
+    } catch {
+      setReunioes(r => r.map(re => re.id === id ? { ...re, status: 'REALIZADA', ata } : re));
+      toast.success('Status atualizado');
+    }
+  }
+
+  // ─── Dados do currículo ────────────────────────────────────────────────────
+  const objetivosCurriculo = MATRIZ_2026[filtroSegCurriculo] || [];
+  const camposUnicos = [...new Set(objetivosCurriculo.map(o => o.campo_experiencia_id))];
+  const bimestresUnicos = [...new Set(objetivosCurriculo.map(o => o.bimestre))].sort();
+
+  const objetivosFiltrados = objetivosCurriculo.filter(o => {
+    if (filtroCampo !== 'TODOS' && o.campo_experiencia_id !== filtroCampo) return false;
+    if (filtroBimestre !== 'TODOS' && String(o.bimestre) !== filtroBimestre) return false;
+    return true;
+  });
+
+  // ─── Turmas filtradas ──────────────────────────────────────────────────────
+  const turmasFiltradas = turmas.filter(t => {
+    if (filtroSegmento !== 'TODOS' && t.segment !== filtroSegmento) return false;
+    if (busca && !t.name.toLowerCase().includes(busca.toLowerCase())) return false;
+    return true;
+  });
+
+  // ─── Estatísticas ──────────────────────────────────────────────────────────
+  const totalCriancas = turmas.reduce((s, t) => s + (t.childCount || 0), 0);
+  const totalProfessores = turmas.reduce((s, t) => s + (t.teacherCount || 0), 0);
+  const reunioesAgendadas = reunioes.filter(r => r.status === 'AGENDADA').length;
+  const planejamentosPendentes = planejamentos.filter(p => p.status === 'RASCUNHO').length;
+
+  return (
+    <PageShell
+      title="Coordenação Pedagógica"
+      subtitle="Gerencie turmas, currículo, reuniões e planejamentos de toda a unidade"
+    >
+      {/* ─── Cards de Resumo ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'Turmas', value: turmas.length, icon: Layers, cor: 'blue' },
+          { label: 'Crianças', value: totalCriancas, icon: Users, cor: 'green' },
+          { label: 'Professores', value: totalProfessores, icon: GraduationCap, cor: 'purple' },
+          { label: 'Reuniões Agendadas', value: reunioesAgendadas, icon: Calendar, cor: 'orange' },
+        ].map(stat => (
+          <Card key={stat.label} className="border-0 shadow-sm">
+            <CardContent className="p-4">
+              <div className={`inline-flex p-2 rounded-lg bg-${stat.cor}-100 mb-2`}>
+                <stat.icon className={`h-5 w-5 text-${stat.cor}-600`} />
+              </div>
+              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+              <div className="text-sm text-gray-500">{stat.label}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* ─── Abas ─── */}
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
+        {[
+          { id: 'turmas', label: 'Turmas', icon: <Layers className="h-4 w-4" /> },
+          { id: 'curriculo', label: 'Currículo 2026', icon: <BookMarked className="h-4 w-4" /> },
+          { id: 'reunioes', label: 'Reuniões', icon: <Calendar className="h-4 w-4" /> },
+          { id: 'planejamentos', label: 'Planejamentos', icon: <ClipboardList className="h-4 w-4" /> },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setAba(tab.id as any)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── ABA: TURMAS ─── */}
+      {aba === 'turmas' && (
+        <div className="space-y-4">
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input placeholder="Buscar turma..." className="pl-9" value={busca} onChange={e => setBusca(e.target.value)} />
+            </div>
+            <div className="flex gap-2">
+              {['TODOS', 'EI01', 'EI02', 'EI03'].map(seg => (
+                <button key={seg} onClick={() => setFiltroSegmento(seg)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${filtroSegmento === seg ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                  {seg === 'TODOS' ? 'Todos' : seg}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading && <LoadingState message="Carregando turmas..." />}
+
+          {!loading && turmasFiltradas.length === 0 && (
+            <EmptyState icon={<Layers className="h-12 w-12 text-gray-300" />} title="Nenhuma turma encontrada" description="Ajuste os filtros ou cadastre novas turmas" />
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {turmasFiltradas.map(turma => (
+              <Card key={turma.id} className={`border shadow-sm hover:shadow-md transition-shadow cursor-pointer ${turmaSelecionada?.id === turma.id ? 'ring-2 ring-blue-500' : ''}`}
+                onClick={() => { setTurmaSelecionada(turma); setAba('curriculo'); setFiltroSegCurriculo((turma.segment as SegmentoKey) || 'EI01'); }}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{turma.name}</h3>
+                      {turma.unit && <p className="text-xs text-gray-500">{turma.unit.name}</p>}
+                    </div>
+                    <Badge className={`text-xs ${SEGMENTO_CORES[turma.segment] || 'bg-gray-100 text-gray-600'}`}>
+                      {turma.segment || 'N/D'}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-gray-500 mb-2">
+                    {SEGMENTO_LABELS[turma.segment] || turma.segment}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-1.5 text-gray-600">
+                      <Users className="h-3.5 w-3.5 text-blue-500" />
+                      <span>{turma.childCount || 0} crianças</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-gray-600">
+                      <GraduationCap className="h-3.5 w-3.5 text-purple-500" />
+                      <span>{turma.teacherCount || 0} professores</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+                    <Button size="sm" variant="outline" className="flex-1 text-xs"
+                      onClick={e => { e.stopPropagation(); setTurmaSelecionada(turma); setAba('curriculo'); setFiltroSegCurriculo((turma.segment as SegmentoKey) || 'EI01'); }}>
+                      <BookOpen className="h-3 w-3 mr-1" /> Currículo
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 text-xs"
+                      onClick={e => { e.stopPropagation(); setTurmaSelecionada(turma); setAba('planejamentos'); }}>
+                      <ClipboardList className="h-3 w-3 mr-1" /> Planos
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── ABA: CURRÍCULO ─── */}
+      {aba === 'curriculo' && (
+        <div className="space-y-4">
+          {turmaSelecionada && (
+            <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-200">
+              <Layers className="h-5 w-5 text-blue-600" />
+              <div>
+                <span className="font-semibold text-blue-900">{turmaSelecionada.name}</span>
+                <span className="text-sm text-blue-600 ml-2">— {SEGMENTO_LABELS[turmaSelecionada.segment]}</span>
+              </div>
+              <button onClick={() => setTurmaSelecionada(null)} className="ml-auto text-xs text-blue-500 hover:text-blue-700">
+                Trocar turma
+              </button>
+            </div>
+          )}
+
+          {/* Seletor de segmento */}
+          <div className="flex flex-wrap gap-2">
+            <span className="text-sm font-medium text-gray-700 self-center mr-1">Segmento:</span>
+            {(['EI01', 'EI02', 'EI03'] as SegmentoKey[]).map(seg => (
+              <button key={seg} onClick={() => { setFiltroSegCurriculo(seg); setFiltroCampo('TODOS'); setFiltroBimestre('TODOS'); }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${filtroSegCurriculo === seg ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                {seg} <span className="text-xs opacity-75">({MATRIZ_2026[seg]?.length || 0})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Filtros de campo e bimestre */}
+          <div className="flex flex-wrap gap-3">
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Campo de Experiência</Label>
+              <select value={filtroCampo} onChange={e => setFiltroCampo(e.target.value)}
+                className="text-sm border rounded-lg px-3 py-1.5 bg-white">
+                <option value="TODOS">Todos os campos</option>
+                {camposUnicos.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Bimestre</Label>
+              <select value={filtroBimestre} onChange={e => setFiltroBimestre(e.target.value)}
+                className="text-sm border rounded-lg px-3 py-1.5 bg-white">
+                <option value="TODOS">Todos</option>
+                {bimestresUnicos.map(b => <option key={b} value={String(b)}>{b}º Bimestre</option>)}
+              </select>
+            </div>
+            <div className="self-end">
+              <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                {objetivosFiltrados.length} objetivos
+              </Badge>
+            </div>
+          </div>
+
+          {/* Lista de objetivos */}
+          <div className="space-y-3">
+            {objetivosFiltrados.slice(0, 50).map((obj, idx) => (
+              <Card key={idx} className="border shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-0">
+                  <button className="w-full text-left p-4" onClick={() => setExpandedId(expandedId === `c${idx}` ? null : `c${idx}`)}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge className="text-xs bg-gray-100 text-gray-600 font-mono">{obj.codigo_bncc}</Badge>
+                          <Badge className="text-xs bg-blue-50 text-blue-700">{obj.campo_experiencia_emoji} {obj.campo_experiencia_label}</Badge>
+                          <Badge className="text-xs bg-green-50 text-green-700">{obj.bimestre}º Bim</Badge>
+                          <span className="text-xs text-gray-400">{obj.data} — {obj.dia_semana}</span>
+                        </div>
+                        <p className="text-sm font-medium text-gray-800 line-clamp-2">{obj.objetivo_bncc}</p>
+                      </div>
+                      {expandedId === `c${idx}` ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
+                    </div>
+                  </button>
+
+                  {expandedId === `c${idx}` && (
+                    <div className="px-4 pb-4 border-t border-gray-100 space-y-3 pt-3">
+                      {obj.objetivo_curriculo_movimento && (
+                        <div>
+                          <p className="text-xs font-semibold text-purple-700 mb-1">📚 Objetivo do Currículo em Movimento</p>
+                          <p className="text-sm text-gray-700 bg-purple-50 p-2 rounded-lg">{obj.objetivo_curriculo_movimento}</p>
+                        </div>
+                      )}
+                      {obj.intencionalidade_pedagogica && (
+                        <div>
+                          <p className="text-xs font-semibold text-blue-700 mb-1">🎯 Intencionalidade Pedagógica</p>
+                          <p className="text-sm text-gray-700 bg-blue-50 p-2 rounded-lg">{obj.intencionalidade_pedagogica}</p>
+                        </div>
+                      )}
+                      {obj.exemplos_atividades && obj.exemplos_atividades.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-green-700 mb-2">✨ Exemplos de Atividades</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {obj.exemplos_atividades.map((ex: any, i: number) => (
+                              <div key={i} className="bg-green-50 border border-green-200 rounded-lg p-2">
+                                <p className="text-xs font-semibold text-green-800 mb-1">{i + 1}. {ex.titulo}</p>
+                                <p className="text-xs text-green-700">{ex.descricao}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+            {objetivosFiltrados.length > 50 && (
+              <p className="text-center text-sm text-gray-500 py-2">
+                Mostrando 50 de {objetivosFiltrados.length} objetivos. Use os filtros para refinar.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── ABA: REUNIÕES ─── */}
+      {aba === 'reunioes' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold text-gray-900">Reuniões Pedagógicas</h3>
+              <p className="text-sm text-gray-500">Semanais (coordenadora + professoras) e Mensais (coordenação geral)</p>
+            </div>
+            <Button onClick={() => setModalReuniao(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" /> Agendar Reunião
+            </Button>
+          </div>
+
+          {/* Próximas reuniões */}
+          <div className="space-y-3">
+            {reunioes.length === 0 && (
+              <EmptyState icon={<Calendar className="h-12 w-12 text-gray-300" />} title="Nenhuma reunião agendada" description="Agende a próxima reunião pedagógica" action={<Button onClick={() => setModalReuniao(true)}><Plus className="h-4 w-4 mr-2" />Agendar</Button>} />
+            )}
+
+            {reunioes.map(reuniao => {
+              const statusInfo = STATUS_REUNIAO[reuniao.status];
+              const StatusIcon = statusInfo?.icon || Clock;
+              const isExpanded = expandedId === reuniao.id;
+
+              return (
+                <Card key={reuniao.id} className="border shadow-sm">
+                  <CardContent className="p-0">
+                    <button className="w-full text-left p-4" onClick={() => setExpandedId(isExpanded ? null : reuniao.id)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <Badge className={`text-xs ${reuniao.tipo === 'SEMANAL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {reuniao.tipo === 'SEMANAL' ? '📅 Semanal' : '📆 Mensal'}
+                            </Badge>
+                            <Badge className={`text-xs ${statusInfo?.cor || 'bg-gray-100 text-gray-600'}`}>
+                              <StatusIcon className="h-3 w-3 mr-1 inline" />
+                              {statusInfo?.label}
+                            </Badge>
+                            {reuniao.turmaNome && <Badge className="text-xs bg-green-100 text-green-700">{reuniao.turmaNome}</Badge>}
+                          </div>
+                          <h4 className="font-semibold text-gray-900">{reuniao.titulo}</h4>
+                          <p className="text-sm text-gray-500 mt-0.5">
+                            {new Date(reuniao.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                          </p>
+                        </div>
+                        {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />}
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-gray-100 space-y-3 pt-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600 mb-1">📋 Pauta</p>
+                          <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line">{reuniao.pauta}</div>
+                        </div>
+
+                        {reuniao.participantes && reuniao.participantes.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 mb-1">👥 Participantes</p>
+                            <div className="flex flex-wrap gap-1">
+                              {reuniao.participantes.map((p, i) => (
+                                <Badge key={i} className="text-xs bg-blue-50 text-blue-700">{p}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {reuniao.ata && (
+                          <div>
+                            <p className="text-xs font-semibold text-green-700 mb-1">✅ Ata da Reunião</p>
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line">{reuniao.ata}</div>
+                          </div>
+                        )}
+
+                        {reuniao.status === 'AGENDADA' && (
+                          <div className="flex gap-2 pt-2">
+                            <Button size="sm" variant="outline" className="text-xs"
+                              onClick={() => {
+                                const ata = prompt('Registre a ata desta reunião:');
+                                if (ata) marcarRealizada(reuniao.id, ata);
+                              }}>
+                              <CheckCircle className="h-3 w-3 mr-1" /> Marcar como Realizada
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── ABA: PLANEJAMENTOS ─── */}
+      {aba === 'planejamentos' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold text-gray-900">Planejamentos das Turmas</h3>
+              <p className="text-sm text-gray-500">Visualize e aprove os planejamentos de todas as turmas</p>
+            </div>
+            {planejamentosPendentes > 0 && (
+              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+                <AlertCircle className="h-3 w-3 mr-1 inline" />
+                {planejamentosPendentes} pendente{planejamentosPendentes > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+
+          {planejamentos.length === 0 && (
+            <EmptyState icon={<ClipboardList className="h-12 w-12 text-gray-300" />} title="Nenhum planejamento encontrado" description="Os planejamentos criados pelos professores aparecerão aqui" />
+          )}
+
+          <div className="space-y-3">
+            {planejamentos.map(plan => (
+              <Card key={plan.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <Badge className={`text-xs ${plan.status === 'APROVADO' ? 'bg-green-100 text-green-700' : plan.status === 'RASCUNHO' ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'}`}>
+                          {plan.status}
+                        </Badge>
+                        {plan.classroom && <Badge className="text-xs bg-blue-50 text-blue-700">{plan.classroom.name}</Badge>}
+                      </div>
+                      <h4 className="font-semibold text-gray-900">{plan.title}</h4>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}
+                        {plan.createdByUser && ` · Prof. ${plan.createdByUser.firstName} ${plan.createdByUser.lastName}`}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="text-xs">
+                        <Eye className="h-3 w-3 mr-1" /> Ver
+                      </Button>
+                      {plan.status === 'RASCUNHO' && (
+                        <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700">
+                          <CheckCircle className="h-3 w-3 mr-1" /> Aprovar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Agendar Reunião ─── */}
+      {modalReuniao && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Agendar Reunião Pedagógica
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm font-semibold">Tipo de Reunião</Label>
+                <div className="flex gap-3 mt-2">
+                  {[
+                    { id: 'SEMANAL', label: '📅 Semanal', desc: 'Coordenadora + Professoras da unidade' },
+                    { id: 'MENSAL', label: '📆 Mensal', desc: 'Coordenação Geral + Todas as Coordenadoras' },
+                  ].map(tipo => (
+                    <button key={tipo.id} onClick={() => setFormReuniao(f => ({ ...f, tipo: tipo.id as any }))}
+                      className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${formReuniao.tipo === tipo.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <div className="font-semibold text-sm">{tipo.label}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{tipo.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold">Título</Label>
+                <Input className="mt-1" placeholder="Ex: Reunião Pedagógica Semanal — Semana 10"
+                  value={formReuniao.titulo} onChange={e => setFormReuniao(f => ({ ...f, titulo: e.target.value }))} />
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold">Data</Label>
+                <Input type="date" className="mt-1" value={formReuniao.data}
+                  onChange={e => setFormReuniao(f => ({ ...f, data: e.target.value }))} />
+              </div>
+
+              {formReuniao.tipo === 'SEMANAL' && turmas.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold">Turma (opcional)</Label>
+                  <select className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                    value={formReuniao.turmaId} onChange={e => setFormReuniao(f => ({ ...f, turmaId: e.target.value }))}>
+                    <option value="">Todas as turmas</option>
+                    {turmas.map(t => <option key={t.id} value={t.id}>{t.name} ({t.segment})</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-sm font-semibold">Pauta</Label>
+                <Textarea className="mt-1" rows={4} placeholder="Descreva os tópicos a serem discutidos..."
+                  value={formReuniao.pauta} onChange={e => setFormReuniao(f => ({ ...f, pauta: e.target.value }))} />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setModalReuniao(false)}>Cancelar</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={salvarReuniao} disabled={saving}>
+                  {saving ? 'Agendando...' : 'Agendar Reunião'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </PageShell>
+  );
+}

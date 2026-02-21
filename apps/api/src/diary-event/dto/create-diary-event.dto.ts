@@ -41,15 +41,17 @@ export class CreateDiaryEventDto {
   @Matches(CUID_REGEX, { message: 'classroomId deve ser um CUID válido' })
   classroomId: string;
 
+  // planningId e curriculumEntryId são opcionais para permitir registros
+  // de diário e microgestos sem vínculo obrigatório a um planejamento
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Matches(CUID_REGEX, { message: 'planningId deve ser um CUID válido' })
-  planningId: string;
+  planningId?: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Matches(CUID_REGEX, { message: 'curriculumEntryId deve ser um CUID válido' })
-  curriculumEntryId: string;
+  curriculumEntryId?: string;
 
   // Micro-gestos (JSONB)
   @IsObject()
@@ -64,6 +66,35 @@ export class CreateDiaryEventDto {
   @IsString()
   @IsOptional()
   trocaFraldaStatus?: string;
+
+  // Microgestos pedagógicos livres (array de objetos)
+  @IsArray()
+  @IsOptional()
+  microgestos?: Record<string, any>[];
+
+  // Observações adicionais
+  @IsString()
+  @IsOptional()
+  observations?: string;
+
+  @IsString()
+  @IsOptional()
+  developmentNotes?: string;
+
+  @IsString()
+  @IsOptional()
+  behaviorNotes?: string;
+
+  // Presenças e ausências
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  presencas?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  ausencias?: number;
 
   @IsArray()
   @IsString({ each: true })
