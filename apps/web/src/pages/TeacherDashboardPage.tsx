@@ -1,37 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../app/AuthProvider';
-import { getPlannings, type Planning } from '../api/plannings';
-import { getCurriculumEntries, type CurriculumEntry } from '../api/curriculumEntries';
-import { getPedagogicalToday } from '../utils/pedagogicalDate';
-import { OneTouchDiaryPanel } from '../components/dashboard/OneTouchDiaryPanel';
-import { QuickObservationInput } from '../components/dashboard/QuickObservationInput';
-import { ClassroomFeedMini } from '../components/dashboard/ClassroomFeedMini';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import { PageShell } from '../components/ui/PageShell';
 import { LoadingState } from '../components/ui/LoadingState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { toast } from 'sonner';
-import { BookOpen, Users, CheckCircle, Info } from 'lucide-react';
+import { 
+  Users, 
+  BookOpen, 
+  FileText, 
+  ShoppingCart, 
+  Calendar,
+  UserCircle 
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-type DashboardState = 'loading' | 'blocked' | 'ready';
+interface DashboardData {
+  hasClassroom: boolean;
+  message?: string;
+  classroom?: {
+    id: string;
+    name: string;
+    code: string;
+    capacity: number;
+    unit: {
+      name: string;
+    };
+  };
+  alunos?: Array<{
+    id: string;
+    nome: string;
+    firstName: string;
+    lastName: string;
+    idade: number;
+    gender: string;
+    photoUrl?: string;
+  }>;
+  indicadores?: {
+    totalAlunos: number;
+    diariosEstaSemana: number;
+    requisiçõesPendentes: number;
+    planejamentosEstaSemana: number;
+  };
+}
 
 export default function TeacherDashboardPage() {
   const { user } = useAuth() as any;
-  const [state, setState] = useState<DashboardState>('loading');
-  const [planning, setPlanning] = useState<Planning | null>(null);
-  const [entry, setEntry] = useState<CurriculumEntry | null>(null);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [classroomId, setClassroomId] = useState<string | null>(null);
-
-  // Mock de alunos para o MVP (Em produção viria de uma API)
-  const studentsMock = [
-    { id: 'std-1', name: 'Ana Silva' },
-    { id: 'std-2', name: 'Bruno Oliveira' },
-    { id: 'std-3', name: 'Carla Santos' },
-    { id: 'std-4', name: 'Daniel Lima' },
-    { id: 'std-5', name: 'Eduarda Costa' },
-  ];
 
   useEffect(() => {
     loadDashboard();
@@ -39,179 +59,225 @@ export default function TeacherDashboardPage() {
 
   async function loadDashboard() {
     try {
-      setState('loading');
+      setLoading(true);
       setError(null);
 
-      const currentClassroomId = user?.user?.classrooms?.[0]?.id || null;
-      setClassroomId(currentClassroomId);
-      
-      if (!currentClassroomId) {
-        setState('blocked');
-        setError('Nenhuma turma atribuída ao seu usuário. Entre em contato com a coordenação.');
-        return;
-      }
-
-      const plannings = await getPlannings({ 
-        status: 'EM_EXECUCAO',
-        classroomId: currentClassroomId 
+      const response = await fetch('/api/teachers/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
       });
 
-      if (!plannings || plannings.length === 0) {
-        setState('blocked');
-        setError('Nenhum planejamento ativo encontrado para sua turma. Entre em contato com a coordenação.');
-        return;
+      if (!response.ok) {
+        throw new Error('Erro ao carregar dashboard');
       }
 
-      const activePlanning = plannings[0];
-      setPlanning(activePlanning);
+      const dashboardData = await response.json();
+      setData(dashboardData);
 
-      const today = getPedagogicalToday();
-      const entries = await getCurriculumEntries({
-        matrixId: activePlanning.curriculumMatrixId,
-        startDate: today,
-        endDate: today,
-      });
-
-      if (!entries || entries.length === 0) {
-        setState('blocked');
-        setError('Não há entrada curricular programada para hoje. Verifique o calendário letivo.');
-        return;
+      if (!dashboardData.hasClassroom) {
+        toast.error(dashboardData.message || 'Nenhuma turma encontrada');
       }
-
-      setEntry(entries[0]);
-      setState('ready');
     } catch (err: any) {
       console.error('Erro ao carregar dashboard:', err);
-      setState('blocked');
-      const errorMessage = err.response?.data?.message || err.message || 'Erro ao carregar informações do dia.';
-      setError(errorMessage);
-      toast.error("Erro de Carregamento", {
-        description: errorMessage,
-      });
+      setError(err.message || 'Erro ao carregar dados');
+      toast.error('Erro ao carregar dashboard');
+    } finally {
+      setLoading(false);
     }
   }
 
+  if (loading) {
+    return (
+      <PageShell title="Painel do Professor">
+        <LoadingState message="Carregando seus dados..." />
+      </PageShell>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <PageShell title="Painel do Professor">
+        <ErrorState 
+          message={error || 'Erro ao carregar dados'} 
+          onRetry={loadDashboard}
+        />
+      </PageShell>
+    );
+  }
+
+  if (!data.hasClassroom) {
+    return (
+      <PageShell title="Painel do Professor">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Nenhuma turma encontrada</h3>
+              <p className="text-muted-foreground">
+                {data.message || 'Entre em contato com a coordenação para atribuir uma turma.'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  const { classroom, alunos = [], indicadores } = data;
+
   return (
     <PageShell 
-      title="Dashboard do Professor" 
-      description="Gerencie as atividades da sua turma para hoje."
-      headerActions={
-        <Badge variant={state === 'ready' ? "success" : state === 'loading' ? "secondary" : "warning"} className="px-3 py-1">
-          {state === 'ready' ? "Pronto para Registro" : state === 'loading' ? "Carregando..." : "Bloqueado"}
-        </Badge>
-      }
+      title={`Painel do Professor - ${classroom?.name}`}
+      subtitle={`${classroom?.unit.name} • Código: ${classroom?.code}`}
     >
-      {state === 'loading' && <LoadingState />}
+      {/* Indicadores do Dia */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{indicadores?.totalAlunos || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Capacidade: {classroom?.capacity}
+            </p>
+          </CardContent>
+        </Card>
 
-      {state === 'blocked' && (
-        <div className="space-y-6">
-          <ErrorState 
-            title="Trava Pedagógica Ativa" 
-            message={error || "O registro de diário está bloqueado no momento."}
-            onRetry={loadDashboard}
-          />
-          
-          <Card className="bg-muted/50 border-dashed">
-            <CardContent className="pt-6 flex gap-4 items-start">
-              <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p className="font-semibold text-foreground">Por que estou bloqueado?</p>
-                <p>O registro de diário só é permitido quando:</p>
-                <ul className="list-disc list-inside ml-2">
-                  <li>Existe um planejamento ativo (EM_EXECUCAO) para sua turma.</li>
-                  <li>Existe uma entrada curricular programada para a data de hoje.</li>
-                </ul>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Diários Esta Semana</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{indicadores?.diariosEstaSemana || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Registros de atividades
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Requisições Pendentes</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{indicadores?.requisiçõesPendentes || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Materiais solicitados
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Planejamentos</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{indicadores?.planejamentosEstaSemana || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Desta semana
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ações Rápidas */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Ações Rápidas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2"
+              onClick={() => navigate('/diario-de-bordo')}
+            >
+              <BookOpen className="h-6 w-6" />
+              <span className="text-sm">Diário de Bordo</span>
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2"
+              onClick={() => navigate('/planejamentos')}
+            >
+              <FileText className="h-6 w-6" />
+              <span className="text-sm">Planejamentos</span>
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2"
+              onClick={() => navigate('/requisicoes-materiais')}
+            >
+              <ShoppingCart className="h-6 w-6" />
+              <span className="text-sm">Requisitar Materiais</span>
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="h-20 flex flex-col gap-2"
+              onClick={() => navigate('/atendimentos-pais')}
+            >
+              <Users className="h-6 w-6" />
+              <span className="text-sm">Atendimento Pais</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Alunos */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Meus Alunos ({alunos.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {alunos.map((aluno) => (
+              <div 
+                key={aluno.id}
+                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
+              >
+                {aluno.photoUrl ? (
+                  <img 
+                    src={aluno.photoUrl} 
+                    alt={aluno.nome}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <UserCircle className="w-8 h-8 text-primary" />
+                  </div>
+                )}
+                
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{aluno.nome}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{aluno.idade} meses</span>
+                    <span>•</span>
+                    <Badge variant="outline" className="text-xs">
+                      {aluno.gender === 'MASCULINO' ? 'M' : aluno.gender === 'FEMININO' ? 'F' : '-'}
+                    </Badge>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {state === 'ready' && planning && entry && classroomId && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Coluna Principal */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Status e Objetivo */}
-            <Card className="border-primary/10 bg-primary/5">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-primary" />
-                    Planejamento Ativo: {planning.title}
-                  </CardTitle>
-                  <Badge variant="secondary" className="uppercase">Em Execução</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-background p-4 rounded-lg border shadow-sm">
-                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <BookOpen className="h-3.5 w-3.5" /> Objetivo do Dia
-                    </h3>
-                    <p className="text-foreground font-medium leading-relaxed">{entry.objetivoBNCC}</p>
-                    <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="font-semibold text-muted-foreground">Intencionalidade:</span>
-                        <p className="text-foreground mt-1">{entry.intencionalidade}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-muted-foreground">Atividade Sugerida:</span>
-                        <p className="text-foreground mt-1">{entry.exemploAtividade}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* One-Touch Panel */}
-            <OneTouchDiaryPanel 
-              planningId={planning.id}
-              curriculumEntryId={entry.id}
-              classroomId={classroomId}
-              students={studentsMock}
-            />
-
-            {/* Quick Observation */}
-            <QuickObservationInput 
-              planningId={planning.id}
-              curriculumEntryId={entry.id}
-              classroomId={classroomId}
-              students={studentsMock}
-            />
+            ))}
           </div>
 
-          {/* Coluna Lateral */}
-          <div className="space-y-8">
-            {/* Info da Turma */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Sua Turma
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Total de Alunos:</span>
-                    <Badge variant="outline">{studentsMock.length}</Badge>
-                  </div>
-                  <div className="flex flex-col gap-1.5 pt-2 border-t">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">ID da Turma</span>
-                    <code className="text-[10px] bg-muted p-1.5 rounded block truncate font-mono">
-                      {classroomId}
-                    </code>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Feed de Atividades */}
-            <ClassroomFeedMini classroomId={classroomId} />
-          </div>
-        </div>
-      )}
+          {alunos.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>Nenhum aluno matriculado nesta turma</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </PageShell>
   );
 }

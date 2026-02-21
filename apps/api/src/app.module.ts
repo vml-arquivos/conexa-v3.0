@@ -19,6 +19,7 @@ import { HealthModule } from './health/health.module';
 import { ReportsModule } from './reports/reports.module';
 import { MaterialRequestModule } from './material-request/material-request.module';
 import { MaterialsModule } from './materials/materials.module';
+import { TeachersModule } from './teachers/teachers.module';
 import { LookupModule } from './lookup/lookup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AdminModule } from './admin/admin.module';
@@ -51,6 +52,7 @@ import { ChildrenModule } from './children/children.module';
     MetricsModule,
     MaterialRequestModule,
     MaterialsModule,
+    TeachersModule,
     LookupModule,
     PedidoCompraModule,
     IaAssistivaModule,

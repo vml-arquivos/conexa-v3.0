@@ -516,6 +516,9 @@ model Child {
   emergencyContactName  String? @db.VarChar(255)
   emergencyContactPhone String? @db.VarChar(20)
 
+  // Foto
+  photoUrl String? @db.VarChar(500)
+  
   // Informações de saúde
   bloodType         String? @db.VarChar(5)
   allergies         String? @db.Text
