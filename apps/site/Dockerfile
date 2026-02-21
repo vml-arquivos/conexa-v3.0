@@ -40,8 +40,8 @@ ENV NODE_ENV=production
 # Porta 3001 para não conflitar com a API (porta 3000)
 ENV PORT=3001
 
-# Instalar pnpm
-RUN npm install -g pnpm@9
+# Instalar wget para healthcheck e pnpm
+RUN apk add --no-cache wget && npm install -g pnpm@9
 
 # Copiar apenas arquivos necessários para dependências de produção
 COPY package.json pnpm-lock.yaml ./
