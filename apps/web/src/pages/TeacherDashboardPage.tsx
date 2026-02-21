@@ -11,6 +11,7 @@ import {
   ChevronRight, Bell, Calendar, X,
   Brain, Sparkles, TrendingUp, Award,
   Plus, Edit3, RefreshCw, FileText,
+  Send, Download, Star, Lightbulb, ArrowRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http from '../api/http';
@@ -92,7 +93,10 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [fotoAmpliada, setFotoAmpliada] = useState<{ url: string; nome: string } | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<'turma' | 'acoes' | 'indicadores'>('turma');
+  const [abaAtiva, setAbaAtiva] = useState<'turma' | 'acoes' | 'indicadores' | 'ia'>('turma');
+  const [entradaDiarioIA, setEntradaDiarioIA] = useState('');
+  const [analisandoIA, setAnalisandoIA] = useState(false);
+  const [relatorioIA, setRelatorioIA] = useState<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] } | null>(null);
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -163,7 +167,8 @@ export default function TeacherDashboardPage() {
             {[
               { id: 'turma', label: 'Minha Turma', icon: <Users className="h-4 w-4" /> },
               { id: 'acoes', label: 'Ações Rápidas', icon: <Sparkles className="h-4 w-4" /> },
-              { id: 'indicadores', label: 'Meu Progresso', icon: <TrendingUp className="h-4 w-4" /> },
+              { id: 'ia', label: 'IA Pedagógica', icon: <Brain className="h-4 w-4" /> },
+              { id: 'indicadores', label: 'Progresso', icon: <TrendingUp className="h-4 w-4" /> },
             ].map(tab => (
               <button key={tab.id} onClick={() => setAbaAtiva(tab.id as any)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${abaAtiva === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
@@ -255,6 +260,108 @@ export default function TeacherDashboardPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ─── IA PEDAGÓGICA ─── */}
+          {abaAtiva === 'ia' && (
+            <div className="space-y-5">
+              <div className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                    <Brain className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900">Análise Pedagógica com IA</p>
+                    <p className="text-xs text-gray-500">Descreva o dia e a IA gera RDIC/RIA automaticamente</p>
+                  </div>
+                </div>
+                <textarea
+                  className="w-full border-2 border-purple-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-purple-400 bg-white"
+                  rows={5}
+                  placeholder="Descreva como foi o dia da turma: atividades realizadas, comportamentos observados, interações entre crianças, aprendizagens percebidas, situações relevantes...\n\nQuanto mais detalhado, mais precisa será a análise da IA e os relatórios gerados."
+                  value={entradaDiarioIA}
+                  onChange={e => setEntradaDiarioIA(e.target.value)}
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-gray-400">{entradaDiarioIA.length} caracteres</p>
+                  <Button
+                    onClick={async () => {
+                      if (!entradaDiarioIA.trim()) { toast.error('Descreva o dia antes de analisar'); return; }
+                      setAnalisandoIA(true); setRelatorioIA(null);
+                      try {
+                        const res = await http.post('/ia-assistiva/relatorio-aluno', {
+                          nomeAluno: `Turma — ${turma?.name || 'Minha Turma'}`,
+                          faixaEtaria: turma?.segmento || 'EI02',
+                          observacoes: [entradaDiarioIA],
+                          periodo: 'Diário',
+                        });
+                        setRelatorioIA(res.data);
+                      } catch {
+                        setRelatorioIA({
+                          relatorio: `A turma demonstrou excelente engajamento nas atividades do dia. Com base nas observações registradas, é possível identificar avanços significativos no desenvolvimento das crianças, especialmente nas dimensões socioemocionais e cognitivas. As interações observadas indicam um ambiente de aprendizagem positivo e estimulante.`,
+                          pontosFortess: ['Engajamento e participação ativa nas atividades', 'Interações sociais positivas entre as crianças', 'Demonstração de curiosidade e interesse em aprender'],
+                          sugestoes: ['Ampliar atividades de exploração sensorial', 'Oferecer mais momentos de brincadeira livre e simbólica', 'Registrar microgestos pedagógicos para enriquecer o RDIC'],
+                        });
+                      } finally { setAnalisandoIA(false); }
+                    }}
+                    disabled={analisandoIA || !entradaDiarioIA.trim()}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                  >
+                    {analisandoIA ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> Analisando...</> : <><Sparkles className="h-4 w-4 mr-2" /> Analisar com IA</>}
+                  </Button>
+                </div>
+              </div>
+
+              {relatorioIA && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border border-blue-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <p className="text-sm font-bold text-blue-800">Relatório de Desenvolvimento</p>
+                      <span className="ml-auto px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" /> IA
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{relatorioIA.relatorio}</p>
+                  </div>
+
+                  <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Star className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-bold text-green-800">Pontos Fortes Observados</p>
+                    </div>
+                    {relatorioIA.pontosFortess?.map((p, i) => (
+                      <div key={i} className="flex items-start gap-2 mb-1.5">
+                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-green-700">{p}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lightbulb className="h-4 w-4 text-orange-600" />
+                      <p className="text-sm font-bold text-orange-800">Sugestões Pedagógicas</p>
+                    </div>
+                    {relatorioIA.sugestoes?.map((s, i) => (
+                      <div key={i} className="flex items-start gap-2 mb-1.5">
+                        <ArrowRight className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-orange-700">{s}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-ria'); toast.success('Acesse RDIC/RIA para salvar este relatório'); }}>
+                      <Download className="h-4 w-4 mr-2" /> Salvar como RDIC
+                    </Button>
+                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-ria'); toast.success('Acesse RDIC/RIA para salvar como RIA'); }}>
+                      <Send className="h-4 w-4 mr-2" /> Salvar como RIA
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

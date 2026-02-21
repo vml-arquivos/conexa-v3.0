@@ -21,6 +21,10 @@ import RdicRiaPage from '../pages/RdicRiaPage';
 import DiarioBordoPage from '../pages/DiarioBordoPage';
 import MatrizPedagogicaPage from '../pages/MatrizPedagogicaPage';
 import ConfiguracoesPage from '../pages/ConfiguracoesPage';
+import AdminUsuariosPage from '../pages/AdminUsuariosPage';
+import AdminUnidadesPage from '../pages/AdminUnidadesPage';
+import AdminTurmasPage from '../pages/AdminTurmasPage';
+import MeuPerfilPage from '../pages/MeuPerfilPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -203,6 +207,42 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <DashboardCoordenacaoGeralPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Meu Perfil (todos os usuários) ──────────────────────────────────
+      {
+        path: 'meu-perfil',
+        element: (
+          <ProtectedRoute>
+            <MeuPerfilPage />
+          </ProtectedRoute>
+        ),
+      },
+      // ─── Admin: Gestão de Usuários ────────────────────────────────────────
+      {
+        path: 'admin/usuarios',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <AdminUsuariosPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Admin: Gestão de Unidades ────────────────────────────────────────
+      {
+        path: 'admin/unidades',
+        element: (
+          <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <AdminUnidadesPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Admin: Gestão de Turmas ──────────────────────────────────────────
+      {
+        path: 'admin/turmas',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <AdminTurmasPage />
           </RoleProtectedRoute>
         ),
       },

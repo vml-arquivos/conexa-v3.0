@@ -49,6 +49,7 @@ interface RiaEntry {
   tipo: string;
   campoExperiencia: string;
   descricao: string;
+  description?: string;
   aprendizagens: string[];
   interacoes: string[];
   emocoes: string[];

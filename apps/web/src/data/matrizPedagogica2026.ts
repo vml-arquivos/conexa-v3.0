@@ -13,6 +13,8 @@ export interface ObjetivoAprendizagem {
   objetivo_bncc: string;
   exemplo_atividade: string;
   data?: string;
+  objetivo_curriculo_movimento?: string;
+  intencionalidade_pedagogica?: string;
 }
 
 export const MATRIZ_PEDAGOGICA_2026: ObjetivoAprendizagem[] = [

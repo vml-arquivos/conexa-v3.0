@@ -22,6 +22,7 @@ import {
   Layers,
   Settings,
   Sparkles,
+  UserCircle,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles } from '../../app/RoleProtectedRoute';
@@ -164,8 +165,14 @@ export function Sidebar() {
     : isProfessor ? 'Professor(a)'
     : 'Usuário';
 
-  // Item de configurações (disponível para todos)
+  // Item de configurações e perfil (disponível para todos)
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
+  const perfilItem: MenuItem = { path: '/app/meu-perfil', label: 'Meu Perfil', icon: <UserCircle className="h-4 w-4" /> };
+  const adminItems: MenuItem[] = [
+    { path: '/app/admin/usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> },
+    { path: '/app/admin/turmas', label: 'Turmas', icon: <GraduationCap className="h-4 w-4" /> },
+    ...(isMantenedora || isCentral || isDeveloper ? [{ path: '/app/admin/unidades', label: 'Unidades', icon: <Building2 className="h-4 w-4" /> }] : []),
+  ];
 
   return (
     <aside className="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
@@ -229,7 +236,13 @@ export function Sidebar() {
 
       {/* Rodapé com configurações */}
       <div className="p-3 border-t border-gray-800 space-y-1">
-        <NavItem item={configItem} active={isActive('/app/configuracoes')} />
+        {(isUnidade || isCentral || isMantenedora || isDeveloper) && (
+          <NavSection titulo="Administração" items={adminItems} isActive={isActive} />
+        )}
+        <div className="pt-1 space-y-1">
+          <NavItem item={perfilItem} active={isActive('/app/meu-perfil')} />
+          <NavItem item={configItem} active={isActive('/app/configuracoes')} />
+        </div>
         <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
       </div>
     </aside>
