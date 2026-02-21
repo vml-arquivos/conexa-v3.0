@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -20,5 +20,18 @@ export class TeachersController {
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
   getDashboard(@CurrentUser() user: JwtPayload) {
     return this.service.getDashboard(user);
+  }
+
+  /**
+   * POST /teachers/planning/generate
+   * Gera planejamento semanal automaticamente baseado na matriz curricular
+   */
+  @Post('planning/generate')
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
+  generateWeeklyPlanning(
+    @Body() dto: any,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.generateWeeklyPlanning(dto, user);
   }
 }
