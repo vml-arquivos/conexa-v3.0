@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 interface PageShellProps {
   children: React.ReactNode;
   title?: string;
+  subtitle?: string;
   description?: string;
   headerActions?: React.ReactNode;
   className?: string;
@@ -12,6 +13,7 @@ interface PageShellProps {
 export function PageShell({
   children,
   title,
+  subtitle,
   description,
   headerActions,
   className,
@@ -22,7 +24,8 @@ export function PageShell({
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             {title && <h1 className="text-3xl font-bold tracking-tight">{title}</h1>}
-            {description && <p className="text-muted-foreground">{description}</p>}
+            {subtitle && <p className="text-base text-muted-foreground">{subtitle}</p>}
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
           </div>
           {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
         </header>
