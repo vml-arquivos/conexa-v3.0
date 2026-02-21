@@ -1,22 +1,31 @@
 # ─── Stage 1: Build ────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
+# Build args injetados pelo Coolify
+ARG VITE_SITE_URL
+ARG DATABASE_URL
+
 WORKDIR /app
 
-# Install pnpm
+# Instalar pnpm
 RUN npm install -g pnpm@9
 
-# Copy dependency files
+# Copiar arquivos de dependência
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 
-# Install all dependencies
-RUN pnpm install --frozen-lockfile
+# Instalar TODAS as dependências (incluindo devDependencies para o build)
+# NODE_ENV deve ser development aqui para que TypeScript, Vite e esbuild sejam instalados
+ENV NODE_ENV=development
+RUN pnpm install --no-frozen-lockfile
 
-# Copy source
+# Copiar código-fonte
 COPY . .
 
-# Build (Vite frontend + esbuild backend)
+# Expor variáveis de build para o Vite
+ENV VITE_SITE_URL=$VITE_SITE_URL
+
+# Build: Vite (frontend) + esbuild (backend)
 RUN pnpm run build
 
 # ─── Stage 2: Production ───────────────────────────────────────────────────
@@ -27,25 +36,25 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install pnpm for production deps only
+# Instalar pnpm
 RUN npm install -g pnpm@9
 
-# Copy package files
+# Copiar apenas arquivos necessários para instalar dependências de produção
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
 
-# Install production dependencies only
-RUN pnpm install --frozen-lockfile --prod
+# Instalar somente dependências de produção
+RUN pnpm install --no-frozen-lockfile --prod
 
-# Copy built artifacts
+# Copiar artefatos do build
 COPY --from=builder /app/dist ./dist
 
-# Expose port
+# Expor porta
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget -qO- http://localhost:3000/api/health || exit 1
 
-# Start
+# Iniciar servidor
 CMD ["node", "dist/index.js"]
