@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -153,6 +155,9 @@ const EMOCOES = ['😊 Alegre', '😢 Triste', '😠 Irritado', '😨 Ansioso', 
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function RdicRiaPage() {
+  const { user } = useAuth();
+  // Professor só cria RDIC. RIA é feito pela coordenação/direção.
+  const soProfessor = isProfessor(user) && !user?.roles?.some(r => ['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER'].includes(r));
   const [aba, setAba] = useState<'rdic' | 'ria' | 'novo-rdic' | 'novo-ria'>('rdic');
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [rdicList, setRdicList] = useState<RdicEntry[]>([]);
@@ -294,8 +299,10 @@ export default function RdicRiaPage() {
         {[
           { id: 'rdic', label: 'RDIC', icon: <User className="h-4 w-4" />, desc: 'Desenvolvimento Individual' },
           { id: 'novo-rdic', label: 'Novo RDIC', icon: <Plus className="h-4 w-4" />, desc: '' },
-          { id: 'ria', label: 'RIA', icon: <Users className="h-4 w-4" />, desc: 'Interações e Aprendizagens' },
-          { id: 'novo-ria', label: 'Novo RIA', icon: <Plus className="h-4 w-4" />, desc: '' },
+          ...(!soProfessor ? [
+            { id: 'ria', label: 'RIA', icon: <Users className="h-4 w-4" />, desc: 'Interações e Aprendizagens' },
+            { id: 'novo-ria', label: 'Novo RIA', icon: <Plus className="h-4 w-4" />, desc: '' },
+          ] : []),
         ].map(tab => (
           <button key={tab.id} onClick={() => setAba(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>

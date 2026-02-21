@@ -11,13 +11,20 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
-  Heart, Smile, Cloud, Sun, CloudRain, Star, Zap, RefreshCw,
-  CheckCircle, Users, MessageCircle, Lightbulb, Target,
-  Clock, Edit3, Sparkles, Music, Palette, Activity,
-  UserCircle, Search, Filter,
+  Sparkles, Lightbulb, Target, Clock, RefreshCw,
+  CheckCircle, Users, Search, UserCircle, X,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+interface Crianca {
+  id: string;
+  firstName: string;
+  lastName: string;
+  photoUrl?: string;
+  idade?: number;
+  gender?: string;
+}
+
 interface DiaryEntry {
   id: string;
   date: string;
@@ -39,6 +46,7 @@ interface Microgesto {
   descricao: string;
   criancaId?: string;
   criancaNome?: string;
+  criancaFoto?: string;
   campo: string;
   horario?: string;
 }
@@ -52,14 +60,22 @@ interface RotinaItem {
 
 // ─── Microgestos Pedagógicos ──────────────────────────────────────────────────
 const TIPOS_MICROGESTO = [
-  { id: 'ESCUTA', label: 'Escuta Ativa', emoji: '👂', cor: 'blue', desc: 'Momento de escuta sensível e acolhimento da fala da criança' },
-  { id: 'MEDIACAO', label: 'Mediação', emoji: '🤝', cor: 'purple', desc: 'Intervenção pedagógica que amplia a experiência da criança' },
-  { id: 'PROVOCACAO', label: 'Provocação', emoji: '💡', cor: 'yellow', desc: 'Questionamento ou situação que instiga curiosidade e pensamento' },
-  { id: 'ACOLHIMENTO', label: 'Acolhimento', emoji: '💚', cor: 'green', desc: 'Gesto de cuidado, afeto e suporte emocional' },
-  { id: 'OBSERVACAO', label: 'Observação', emoji: '👁️', cor: 'indigo', desc: 'Registro de comportamento, aprendizagem ou interação observada' },
-  { id: 'ENCORAJAMENTO', label: 'Encorajamento', emoji: '⭐', cor: 'orange', desc: 'Incentivo à autonomia, persistência e autoconfiança' },
-  { id: 'DOCUMENTACAO', label: 'Documentação', emoji: '📸', cor: 'pink', desc: 'Registro fotográfico ou escrito de momento significativo' },
-  { id: 'INTENCIONALIDADE', label: 'Intencionalidade', emoji: '🎯', cor: 'red', desc: 'Ação pedagógica intencional vinculada ao planejamento' },
+  { id: 'ESCUTA', label: 'Escuta Ativa', emoji: '👂', desc: 'Momento de escuta sensível e acolhimento da fala da criança' },
+  { id: 'MEDIACAO', label: 'Mediação', emoji: '🤝', desc: 'Intervenção pedagógica que amplia a experiência da criança' },
+  { id: 'PROVOCACAO', label: 'Provocação', emoji: '💡', desc: 'Questionamento ou situação que instiga curiosidade e pensamento' },
+  { id: 'ACOLHIMENTO', label: 'Acolhimento', emoji: '💚', desc: 'Gesto de cuidado, afeto e suporte emocional' },
+  { id: 'OBSERVACAO', label: 'Observação', emoji: '👁️', desc: 'Registro de comportamento, aprendizagem ou interação observada' },
+  { id: 'ENCORAJAMENTO', label: 'Encorajamento', emoji: '⭐', desc: 'Incentivo à autonomia, persistência e autoconfiança' },
+  { id: 'DOCUMENTACAO', label: 'Documentação', emoji: '📸', desc: 'Registro fotográfico ou escrito de momento significativo' },
+  { id: 'INTENCIONALIDADE', label: 'Intencionalidade', emoji: '🎯', desc: 'Ação pedagógica intencional vinculada ao planejamento' },
+];
+
+const CAMPOS_EXPERIENCIA = [
+  { id: 'eu-outro-nos', label: 'O eu, o outro e o nós', emoji: '🤝' },
+  { id: 'corpo-gestos', label: 'Corpo, gestos e movimentos', emoji: '🏃' },
+  { id: 'tracos-sons', label: 'Traços, sons, cores e formas', emoji: '🎨' },
+  { id: 'escuta-fala', label: 'Escuta, fala, pensamento e imaginação', emoji: '💬' },
+  { id: 'espacos-tempos', label: 'Espaços, tempos, quantidades e relações', emoji: '🌍' },
 ];
 
 // ─── Clima Emocional da Turma ─────────────────────────────────────────────────
@@ -71,7 +87,7 @@ const CLIMAS = [
   { id: 'DIFICIL', label: 'Difícil', emoji: '🌧️', cor: 'bg-gray-100 text-gray-600 border-gray-300' },
 ];
 
-// ─── Rotina Padrão da Educação Infantil ──────────────────────────────────────
+// ─── Rotina Padrão ────────────────────────────────────────────────────────────
 const ROTINA_PADRAO = [
   { momento: 'Acolhida', descricao: 'Recepção das crianças, roda de conversa inicial', concluido: false },
   { momento: 'Roda de Conversa', descricao: 'Calendário, tempo, novidades, planejamento do dia', concluido: false },
@@ -84,10 +100,71 @@ const ROTINA_PADRAO = [
   { momento: 'Roda de Encerramento', descricao: 'Revisão do dia, combinados, despedida', concluido: false },
 ];
 
+// ─── Seletor de Criança por Foto ──────────────────────────────────────────────
+function SeletorCrianca({
+  criancas,
+  selecionadas,
+  onToggle,
+  multiplo = false,
+  label = 'Criança(s) envolvida(s)',
+}: {
+  criancas: Crianca[];
+  selecionadas: string[];
+  onToggle: (id: string) => void;
+  multiplo?: boolean;
+  label?: string;
+}) {
+  return (
+    <div>
+      <Label className="text-sm font-medium text-gray-700 mb-2 block">{label} (opcional)</Label>
+      {criancas.length === 0 ? (
+        <p className="text-xs text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {criancas.map(c => {
+            const sel = selecionadas.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onToggle(c.id)}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300'}`}
+                title={`${c.firstName} ${c.lastName}`}
+              >
+                {c.photoUrl ? (
+                  <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow">
+                    <UserCircle className="w-6 h-6 text-blue-400" />
+                  </div>
+                )}
+                <span className={`text-xs font-medium leading-tight text-center max-w-[60px] truncate ${sel ? 'text-blue-700' : 'text-gray-600'}`}>
+                  {c.firstName}
+                </span>
+                {sel && <span className="text-blue-500 text-xs">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {!multiplo && selecionadas.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onToggle(selecionadas[0])}
+          className="mt-1 text-xs text-gray-400 hover:text-red-400 flex items-center gap-1"
+        >
+          <X className="h-3 w-3" /> Remover seleção
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
   const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos'>('lista');
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
+  const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -104,6 +181,7 @@ export default function DiarioBordoPage() {
     ausencias: 0,
     rotina: ROTINA_PADRAO.map(r => ({ ...r })),
     microgestos: [] as Microgesto[],
+    criancasPresentes: [] as string[],
   });
 
   // Formulário de microgesto
@@ -112,37 +190,97 @@ export default function DiarioBordoPage() {
     descricao: '',
     campo: 'eu-outro-nos',
     horario: '',
-    criancaNome: '',
+    criancasSelecionadas: [] as string[],
   });
 
-  useEffect(() => { loadDiarios(); }, []);
+  // Dados da turma e professor
+  const [classroomId, setClassroomId] = useState<string | undefined>();
+  const [childId, setChildId] = useState<string | undefined>();
+
+  useEffect(() => {
+    loadDiarios();
+    loadTurmaECriancas();
+  }, []);
+
+  async function loadTurmaECriancas() {
+    try {
+      const meRes = await http.get('/auth/me');
+      const me = meRes.data;
+      if (me?.classrooms?.length > 0) setClassroomId(me.classrooms[0].id);
+      if (me?.children?.length > 0) setChildId(me.children[0].id);
+
+      // Buscar crianças da turma
+      const cid = me?.classrooms?.[0]?.id;
+      if (cid) {
+        try {
+          const res = await http.get(`/classrooms/${cid}/children`);
+          const lista = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+          setCriancas(lista);
+        } catch {
+          // Se não tiver endpoint, usa crianças do me
+          if (me?.children) setCriancas(me.children);
+        }
+      }
+    } catch {
+      // sem turma vinculada
+    }
+  }
 
   async function loadDiarios() {
     setLoading(true);
     try {
-      // Usa filtro por tipo válido do enum DiaryEventType
       const res = await http.get('/diary-events?limit=50&type=ATIVIDADE_PEDAGOGICA');
       const d = res.data;
       setDiarios(Array.isArray(d) ? d : d?.data ?? []);
     } catch {
-      // silencioso — pode não ter registros ainda
+      // Tenta carregar do localStorage como fallback
+      try {
+        const local = JSON.parse(localStorage.getItem('diarios_bordo') || '[]');
+        setDiarios(local);
+      } catch { /* silencioso */ }
     } finally {
       setLoading(false);
     }
   }
 
+  function toggleCriancaMicrogesto(id: string) {
+    setMicrogestoForm(f => ({
+      ...f,
+      criancasSelecionadas: f.criancasSelecionadas.includes(id)
+        ? f.criancasSelecionadas.filter(c => c !== id)
+        : [...f.criancasSelecionadas, id],
+    }));
+  }
+
+  function toggleCriancaPresente(id: string) {
+    setForm(f => ({
+      ...f,
+      criancasPresentes: f.criancasPresentes.includes(id)
+        ? f.criancasPresentes.filter(c => c !== id)
+        : [...f.criancasPresentes, id],
+    }));
+  }
+
   function adicionarMicrogesto() {
     if (!microgestoForm.descricao.trim()) { toast.error('Descreva o microgesto'); return; }
+
+    // Montar nomes e fotos das crianças selecionadas
+    const criancasSel = criancas.filter(c => microgestoForm.criancasSelecionadas.includes(c.id));
+    const criancaNome = criancasSel.map(c => c.firstName).join(', ');
+    const criancaFoto = criancasSel[0]?.photoUrl;
+
     const novo: Microgesto = {
       id: Date.now().toString(),
       tipo: microgestoForm.tipo,
       descricao: microgestoForm.descricao,
       campo: microgestoForm.campo,
       horario: microgestoForm.horario,
-      criancaNome: microgestoForm.criancaNome,
+      criancaId: criancasSel[0]?.id,
+      criancaNome: criancaNome || undefined,
+      criancaFoto: criancaFoto,
     };
     setForm(f => ({ ...f, microgestos: [...f.microgestos, novo] }));
-    setMicrogestoForm({ tipo: 'ESCUTA', descricao: '', campo: 'eu-outro-nos', horario: '', criancaNome: '' });
+    setMicrogestoForm({ tipo: 'ESCUTA', descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
     toast.success('Microgesto adicionado');
   }
 
@@ -164,29 +302,20 @@ export default function DiarioBordoPage() {
     }
     setSaving(true);
     try {
-      // Buscar turma e criança do professor para montar o payload correto
-      let classroomId: string | undefined;
-      let childId: string | undefined;
-      try {
-        const meRes = await http.get('/auth/me');
-        const me = meRes.data;
-        // Pegar primeira turma ativa do professor
-        if (me?.classrooms?.length > 0) classroomId = me.classrooms[0].id;
-        if (me?.children?.length > 0) childId = me.children[0].id;
-      } catch { /* usa undefined */ }
+      const presencasReais = form.criancasPresentes.length > 0 ? form.criancasPresentes.length : form.presencas;
+      const ausenciasReais = criancas.length > 0 ? criancas.length - presencasReais : form.ausencias;
 
       if (!classroomId || !childId) {
         // Modo offline/demo: salva localmente
         const localEntry = {
           id: Date.now().toString(),
           date: form.date,
-          eventDate: form.date,
           climaEmocional: form.climaEmocional,
           momentoDestaque: form.momentoDestaque,
           reflexaoPedagogica: form.reflexaoPedagogica,
           encaminhamentos: form.encaminhamentos,
-          presencas: form.presencas,
-          ausencias: form.ausencias,
+          presencas: presencasReais,
+          ausencias: ausenciasReais,
           rotina: form.rotina,
           microgestos: form.microgestos,
           status: 'LOCAL',
@@ -205,14 +334,15 @@ export default function DiarioBordoPage() {
           classroomId,
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
-          presencas: form.presencas,
-          ausencias: form.ausencias,
+          presencas: presencasReais,
+          ausencias: ausenciasReais,
           microgestos: form.microgestos,
           tags: [form.climaEmocional],
           aiContext: {
             climaEmocional: form.climaEmocional,
             momentoDestaque: form.momentoDestaque,
             rotina: form.rotina,
+            criancasPresentes: form.criancasPresentes,
           },
         });
       }
@@ -229,6 +359,7 @@ export default function DiarioBordoPage() {
         ausencias: 0,
         rotina: ROTINA_PADRAO.map(r => ({ ...r })),
         microgestos: [],
+        criancasPresentes: [],
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao salvar diário');
@@ -344,10 +475,19 @@ export default function DiarioBordoPage() {
                                 return (
                                   <div key={i} className="flex items-start gap-2 p-2 bg-purple-50 rounded-lg">
                                     <span className="text-base flex-shrink-0">{tipo?.emoji || '✨'}</span>
-                                    <div>
+                                    <div className="flex-1">
                                       <p className="text-xs font-medium text-purple-700">{tipo?.label || m.tipo}</p>
                                       <p className="text-xs text-gray-600">{m.descricao}</p>
-                                      {m.criancaNome && <p className="text-xs text-gray-400 mt-0.5">👤 {m.criancaNome}</p>}
+                                      {m.criancaNome && (
+                                        <div className="flex items-center gap-1 mt-1">
+                                          {m.criancaFoto ? (
+                                            <img src={m.criancaFoto} alt={m.criancaNome} className="w-5 h-5 rounded-full object-cover" />
+                                          ) : (
+                                            <UserCircle className="w-4 h-4 text-gray-400" />
+                                          )}
+                                          <p className="text-xs text-gray-500">{m.criancaNome}</p>
+                                        </div>
+                                      )}
                                     </div>
                                     {m.horario && <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{m.horario}</span>}
                                   </div>
@@ -385,20 +525,58 @@ export default function DiarioBordoPage() {
           <Card className="border-2 border-blue-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-blue-700"><Calendar className="h-5 w-5" /> Informações do Dia</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Data</Label>
                   <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                 </div>
-                <div>
-                  <Label>Presenças</Label>
-                  <Input type="number" min={0} value={form.presencas} onChange={e => setForm(f => ({ ...f, presencas: Number(e.target.value) }))} />
-                </div>
-                <div>
-                  <Label>Ausências</Label>
-                  <Input type="number" min={0} value={form.ausencias} onChange={e => setForm(f => ({ ...f, ausencias: Number(e.target.value) }))} />
-                </div>
+                {criancas.length === 0 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Presenças</Label>
+                      <Input type="number" min={0} value={form.presencas} onChange={e => setForm(f => ({ ...f, presencas: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <Label>Ausências</Label>
+                      <Input type="number" min={0} value={form.ausencias} onChange={e => setForm(f => ({ ...f, ausencias: Number(e.target.value) }))} />
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Chamada visual por fotos */}
+              {criancas.length > 0 && (
+                <div>
+                  <Label className="mb-2 block">Chamada — Crianças Presentes ({form.criancasPresentes.length}/{criancas.length})</Label>
+                  <p className="text-xs text-gray-400 mb-2">Toque na foto para marcar presença</p>
+                  <div className="flex flex-wrap gap-2">
+                    {criancas.map(c => {
+                      const presente = form.criancasPresentes.includes(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => toggleCriancaPresente(c.id)}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
+                        >
+                          {c.photoUrl ? (
+                            <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                              <UserCircle className="w-6 h-6 text-blue-400" />
+                            </div>
+                          )}
+                          <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
+                          {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {form.criancasPresentes.length} presente(s) · {criancas.length - form.criancasPresentes.length} ausente(s)
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label>Clima Emocional da Turma</Label>
@@ -442,6 +620,7 @@ export default function DiarioBordoPage() {
 
               {/* Formulário de microgesto */}
               <div className="bg-purple-50 rounded-xl p-4 space-y-3">
+                {/* Tipo */}
                 <div>
                   <Label>Tipo de Microgesto</Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
@@ -454,20 +633,46 @@ export default function DiarioBordoPage() {
                     ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Horário (opcional)</Label>
-                    <Input type="time" value={microgestoForm.horario} onChange={e => setMicrogestoForm(f => ({ ...f, horario: e.target.value }))} />
-                  </div>
-                  <div>
-                    <Label>Criança envolvida (opcional)</Label>
-                    <Input placeholder="Nome da criança..." value={microgestoForm.criancaNome} onChange={e => setMicrogestoForm(f => ({ ...f, criancaNome: e.target.value }))} />
+
+                {/* Campo de Experiência */}
+                <div>
+                  <Label>Campo de Experiência</Label>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {CAMPOS_EXPERIENCIA.map(c => (
+                      <button key={c.id} onClick={() => setMicrogestoForm(f => ({ ...f, campo: c.id }))}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-full border-2 text-xs font-medium transition-all ${microgestoForm.campo === c.id ? 'border-purple-500 bg-purple-100 text-purple-700' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'}`}>
+                        {c.emoji} {c.label.split(',')[0]}
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                {/* Seleção de criança por foto */}
+                <SeletorCrianca
+                  criancas={criancas}
+                  selecionadas={microgestoForm.criancasSelecionadas}
+                  onToggle={toggleCriancaMicrogesto}
+                  multiplo={true}
+                  label="Criança(s) envolvida(s)"
+                />
+
+                {/* Horário */}
+                <div>
+                  <Label>Horário (opcional)</Label>
+                  <Input type="time" value={microgestoForm.horario} onChange={e => setMicrogestoForm(f => ({ ...f, horario: e.target.value }))} />
+                </div>
+
+                {/* Descrição */}
                 <div>
                   <Label>Descrição do Microgesto *</Label>
-                  <Textarea placeholder="Descreva a ação pedagógica: o que você fez, como a criança respondeu, qual foi o impacto..." rows={2} value={microgestoForm.descricao} onChange={e => setMicrogestoForm(f => ({ ...f, descricao: e.target.value }))} />
+                  <Textarea
+                    placeholder="Descreva a ação pedagógica: o que você fez, como a criança respondeu, qual foi o impacto..."
+                    rows={2}
+                    value={microgestoForm.descricao}
+                    onChange={e => setMicrogestoForm(f => ({ ...f, descricao: e.target.value }))}
+                  />
                 </div>
+
                 <Button onClick={adicionarMicrogesto} variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-100">
                   <Plus className="h-4 w-4 mr-2" /> Adicionar Microgesto
                 </Button>
@@ -485,10 +690,21 @@ export default function DiarioBordoPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-purple-700">{tipo?.label}</p>
                           <p className="text-sm text-gray-700">{m.descricao}</p>
-                          {m.criancaNome && <p className="text-xs text-gray-400 mt-0.5">👤 {m.criancaNome}</p>}
+                          {m.criancaNome && (
+                            <div className="flex items-center gap-1 mt-1">
+                              {m.criancaFoto ? (
+                                <img src={m.criancaFoto} alt={m.criancaNome} className="w-5 h-5 rounded-full object-cover" />
+                              ) : (
+                                <UserCircle className="w-4 h-4 text-gray-400" />
+                              )}
+                              <p className="text-xs text-gray-500">{m.criancaNome}</p>
+                            </div>
+                          )}
                         </div>
                         {m.horario && <span className="text-xs text-gray-400 flex-shrink-0">{m.horario}</span>}
-                        <button onClick={() => removerMicrogesto(m.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">×</button>
+                        <button onClick={() => removerMicrogesto(m.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
                     );
                   })}
@@ -503,15 +719,30 @@ export default function DiarioBordoPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label>Momento de Destaque do Dia</Label>
-                <Textarea placeholder="Descreva o momento mais significativo do dia: uma descoberta, uma fala marcante, uma interação especial, uma conquista..." rows={3} value={form.momentoDestaque} onChange={e => setForm(f => ({ ...f, momentoDestaque: e.target.value }))} />
+                <Textarea
+                  placeholder="Descreva o momento mais significativo do dia: uma descoberta, uma fala marcante, uma interação especial, uma conquista..."
+                  rows={3}
+                  value={form.momentoDestaque}
+                  onChange={e => setForm(f => ({ ...f, momentoDestaque: e.target.value }))}
+                />
               </div>
               <div>
                 <Label>Reflexão Pedagógica</Label>
-                <Textarea placeholder="Reflita sobre sua prática: O que funcionou bem? O que você faria diferente? Quais aprendizagens emergiram? Como as crianças surpreenderam?" rows={3} value={form.reflexaoPedagogica} onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))} />
+                <Textarea
+                  placeholder="Reflita sobre sua prática: O que funcionou bem? O que você faria diferente? Quais aprendizagens emergiram? Como as crianças surpreenderam?"
+                  rows={3}
+                  value={form.reflexaoPedagogica}
+                  onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
+                />
               </div>
               <div>
                 <Label>Encaminhamentos e Próximos Passos</Label>
-                <Textarea placeholder="Registre o que precisa ser retomado, comunicado aos pais, encaminhado à coordenação ou planejado para os próximos dias..." rows={2} value={form.encaminhamentos} onChange={e => setForm(f => ({ ...f, encaminhamentos: e.target.value }))} />
+                <Textarea
+                  placeholder="Registre o que precisa ser retomado, comunicado aos pais, encaminhado à coordenação ou planejado para os próximos dias..."
+                  rows={2}
+                  value={form.encaminhamentos}
+                  onChange={e => setForm(f => ({ ...f, encaminhamentos: e.target.value }))}
+                />
               </div>
             </CardContent>
           </Card>
@@ -537,9 +768,9 @@ export default function DiarioBordoPage() {
               <div>
                 <h2 className="text-xl font-bold text-purple-800 mb-2">O que são Microgestos Pedagógicos?</h2>
                 <p className="text-gray-700 leading-relaxed">
-                  Microgestos pedagógicos são as <strong>pequenas ações intencionais</strong> que o professor realiza no cotidiano da Educação Infantil — 
-                  um olhar atento, uma pergunta provocadora, um gesto de acolhimento, uma mediação sutil. 
-                  Embora pareçam simples, esses gestos são <strong>poderosos instrumentos pedagógicos</strong> que promovem 
+                  Microgestos pedagógicos são as <strong>pequenas ações intencionais</strong> que o professor realiza no cotidiano da Educação Infantil —
+                  um olhar atento, uma pergunta provocadora, um gesto de acolhimento, uma mediação sutil.
+                  Embora pareçam simples, esses gestos são <strong>poderosos instrumentos pedagógicos</strong> que promovem
                   vínculos, ampliam aprendizagens e revelam a intencionalidade da prática docente.
                 </p>
               </div>

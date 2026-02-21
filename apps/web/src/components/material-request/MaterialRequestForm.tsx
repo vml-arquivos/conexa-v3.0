@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { ShoppingCart, Plus, Trash2, Send, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle } from 'lucide-react';
 import { createMaterialRequest, type MaterialCategory, type MaterialRequestItem } from '../../api/material-request';
 import { getErrorMessage } from '../../utils/errorMessage';
 
@@ -10,51 +9,94 @@ interface MaterialRequestFormProps {
   classroomId?: string;
   classroomName?: string;
   onSuccess?: () => void;
+  /** Se true, exibe apenas categorias de Higiene Pessoal e Pedagógico */
+  isProfessor?: boolean;
 }
 
-const CATEGORIAS = [
-  { value: 'PEDAGOGICO' as MaterialCategory, label: 'Material de Aula', icon: '📚', cor: 'border-blue-300 bg-blue-50',
-    itensComuns: ['Papel sulfite', 'Tinta guache', 'Tesoura sem ponta', 'Cola bastao', 'Massinha de modelar', 'Giz de cera', 'Pincel', 'EVA colorido'] },
-  { value: 'HIGIENE' as MaterialCategory, label: 'Higiene', icon: '🧴', cor: 'border-green-300 bg-green-50',
-    itensComuns: ['Sabonete liquido', 'Shampoo', 'Fralda descartavel', 'Lenco umedecido', 'Creme hidratante', 'Escova de dente', 'Pasta de dente'] },
-  { value: 'LIMPEZA' as MaterialCategory, label: 'Limpeza', icon: '🧹', cor: 'border-yellow-300 bg-yellow-50',
-    itensComuns: ['Desinfetante', 'Pano de chao', 'Esponja', 'Detergente', 'Papel toalha', 'Saco de lixo', 'Alcool gel'] },
-  { value: 'ALIMENTACAO' as MaterialCategory, label: 'Alimentacao', icon: '🍎', cor: 'border-orange-300 bg-orange-50',
-    itensComuns: ['Copo descartavel', 'Prato descartavel', 'Garfo plastico', 'Colher plastica', 'Guardanapo', 'Pote com tampa'] },
-  { value: 'OUTRO' as MaterialCategory, label: 'Outro', icon: '📦', cor: 'border-gray-300 bg-gray-50',
-    itensComuns: [] },
+// ─── Categorias disponíveis para PROFESSOR (apenas Higiene Pessoal e Pedagógico) ─
+const CATEGORIAS_PROFESSOR = [
+  {
+    value: 'PEDAGOGICO' as MaterialCategory,
+    label: 'Material Pedagógico',
+    icon: '📚',
+    cor: 'border-blue-300 bg-blue-50',
+    itensComuns: [
+      'Papel sulfite', 'Tinta guache', 'Pincel', 'Tesoura sem ponta',
+      'Cola bastão', 'EVA colorido', 'Cartolina', 'Canetinha',
+      'Lápis de cor', 'Massa de modelar', 'Giz de cera', 'Papel crepom',
+    ],
+  },
+  {
+    value: 'HIGIENE' as MaterialCategory,
+    label: 'Higiene Pessoal',
+    icon: '🧴',
+    cor: 'border-green-300 bg-green-50',
+    itensComuns: [
+      'Fraldas', 'Lenço umedecido', 'Sabonete líquido', 'Shampoo',
+      'Creme dental', 'Escova de dente', 'Toalha de papel', 'Álcool gel',
+      'Creme hidratante', 'Protetor solar',
+    ],
+  },
+];
+
+// ─── Categorias completas para coordenação/gestão ─────────────────────────────
+const CATEGORIAS_GESTAO = [
+  ...CATEGORIAS_PROFESSOR,
+  {
+    value: 'LIMPEZA' as MaterialCategory,
+    label: 'Limpeza',
+    icon: '🧹',
+    cor: 'border-yellow-300 bg-yellow-50',
+    itensComuns: ['Desinfetante', 'Pano de chão', 'Esponja', 'Detergente', 'Papel toalha', 'Saco de lixo', 'Álcool gel'],
+  },
+  {
+    value: 'ALIMENTACAO' as MaterialCategory,
+    label: 'Alimentação',
+    icon: '🍎',
+    cor: 'border-orange-300 bg-orange-50',
+    itensComuns: ['Copo descartável', 'Prato descartável', 'Garfo plástico', 'Colher plástica', 'Guardanapo', 'Pote com tampa'],
+  },
+  {
+    value: 'OUTRO' as MaterialCategory,
+    label: 'Outro',
+    icon: '📦',
+    cor: 'border-gray-300 bg-gray-50',
+    itensComuns: [],
+  },
 ];
 
 const URGENCIAS = [
   { value: 'BAIXA' as const, label: 'Sem pressa', desc: 'Pode esperar alguns dias', cor: 'border-green-300 bg-green-50 text-green-700' },
   { value: 'MEDIA' as const, label: 'Esta semana', desc: 'Preciso em breve', cor: 'border-yellow-300 bg-yellow-50 text-yellow-700' },
-  { value: 'ALTA' as const, label: 'Urgente', desc: 'Preciso hoje ou amanha', cor: 'border-red-300 bg-red-50 text-red-700' },
+  { value: 'ALTA' as const, label: 'Urgente', desc: 'Preciso hoje ou amanhã', cor: 'border-red-300 bg-red-50 text-red-700' },
 ];
 
 const JUSTIFICATIVAS_PRONTAS = [
-  'Para as atividades pedagogicas da semana',
+  'Para as atividades pedagógicas da semana',
   'Estoque acabou na sala',
   'Atividade especial planejada',
-  'Reposicao de rotina mensal',
-  'Necessidade identificada nas criancas',
-  'Projeto tematico em andamento',
+  'Reposição de rotina mensal',
+  'Necessidade identificada nas crianças',
+  'Projeto temático em andamento',
 ];
 
-export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: MaterialRequestFormProps) {
+export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isProfessor = false }: MaterialRequestFormProps) {
+  const CATEGORIAS = isProfessor ? CATEGORIAS_PROFESSOR : CATEGORIAS_GESTAO;
+
   const [loading, setLoading] = useState(false);
   const [enviado, setEnviado] = useState(false);
-  const [etapa, setEtapa] = useState<1|2|3>(1);
+  const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
   const [categoria, setCategoria] = useState<MaterialCategory>('PEDAGOGICO');
-  const [urgencia, setUrgencia] = useState<'BAIXA'|'MEDIA'|'ALTA'>('BAIXA');
+  const [urgencia, setUrgencia] = useState<'BAIXA' | 'MEDIA' | 'ALTA'>('BAIXA');
   const [justificativa, setJustificativa] = useState('');
   const [justificativaCustom, setJustificativaCustom] = useState('');
   const [itens, setItens] = useState<MaterialRequestItem[]>([{ item: '', quantidade: 1, unidade: 'unidade(s)' }]);
 
-  const categoriaAtual = CATEGORIAS.find(c => c.value === categoria)!;
+  const categoriaAtual = CATEGORIAS.find(c => c.value === categoria) ?? CATEGORIAS[0];
 
   function adicionarItemPreset(nome: string) {
     const jaExiste = itens.some(i => i.item.toLowerCase() === nome.toLowerCase());
-    if (jaExiste) { toast.error('Este item ja foi adicionado'); return; }
+    if (jaExiste) { toast.error('Este item já foi adicionado'); return; }
     const vazio = itens.findIndex(i => !i.item.trim());
     if (vazio >= 0) {
       const updated = [...itens];
@@ -100,12 +142,19 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
     return (
       <div className="text-center py-12">
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle className="w-10 h-10 text-green-500"/>
+          <CheckCircle className="w-10 h-10 text-green-500" />
         </div>
         <h3 className="text-xl font-bold text-gray-800 mb-2">Pedido enviado!</h3>
-        <p className="text-gray-500 text-sm mb-6">A coordenacao vai analisar e te dar um retorno em breve.</p>
-        <Button onClick={() => { setEnviado(false); setEtapa(1); setItens([{ item: '', quantidade: 1, unidade: 'unidade(s)' }]); setJustificativa(''); setJustificativaCustom(''); }}
-          className="rounded-xl bg-blue-500 hover:bg-blue-600">
+        <p className="text-gray-500 text-sm mb-6">A coordenação vai analisar e te dar um retorno em breve.</p>
+        {isProfessor && (
+          <p className="text-xs text-blue-600 bg-blue-50 rounded-xl px-4 py-2 inline-block mb-4">
+            📋 Lembrete: requisições são apenas para <strong>Higiene Pessoal</strong> e <strong>Material Pedagógico</strong>
+          </p>
+        )}
+        <Button
+          onClick={() => { setEnviado(false); setEtapa(1); setItens([{ item: '', quantidade: 1, unidade: 'unidade(s)' }]); setJustificativa(''); setJustificativaCustom(''); }}
+          className="rounded-xl bg-blue-500 hover:bg-blue-600"
+        >
           Fazer outro pedido
         </Button>
       </div>
@@ -114,27 +163,38 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
 
   return (
     <div className="space-y-5">
+      {/* Banner informativo para professor */}
+      {isProfessor && (
+        <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+          <span className="text-lg">ℹ️</span>
+          <p>Como professor(a), você pode solicitar apenas <strong>Material Pedagógico</strong> e <strong>Higiene Pessoal</strong> para a sua turma.</p>
+        </div>
+      )}
+
       {/* Indicador de etapas */}
       <div className="flex items-center gap-2">
-        {[1,2,3].map(n => (
+        {[1, 2, 3].map(n => (
           <div key={n} className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${etapa >= n ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{n}</div>
-            {n < 3 && <div className={`h-1 w-8 rounded-full ${etapa > n ? 'bg-blue-500' : 'bg-gray-100'}`}/>}
+            {n < 3 && <div className={`h-1 w-8 rounded-full ${etapa > n ? 'bg-blue-500' : 'bg-gray-100'}`} />}
           </div>
         ))}
         <span className="text-sm text-gray-500 ml-2">
-          {etapa === 1 ? 'Que tipo de material?' : etapa === 2 ? 'Quais itens?' : 'Qual a urgencia?'}
+          {etapa === 1 ? 'Que tipo de material?' : etapa === 2 ? 'Quais itens?' : 'Qual a urgência?'}
         </span>
       </div>
 
       {/* ETAPA 1: Categoria */}
       {etapa === 1 && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-500">Toque na categoria do material que voce precisa:</p>
+          <p className="text-sm text-gray-500">Toque na categoria do material que você precisa:</p>
           <div className="grid grid-cols-2 gap-3">
             {CATEGORIAS.map(cat => (
-              <button key={cat.value} onClick={() => { setCategoria(cat.value); setEtapa(2); }}
-                className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-md active:scale-95 ${categoria === cat.value ? cat.cor + ' border-opacity-100' : 'bg-white border-gray-100 hover:border-blue-200'}`}>
+              <button
+                key={cat.value}
+                onClick={() => { setCategoria(cat.value); setEtapa(2); }}
+                className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-md active:scale-95 ${categoria === cat.value ? cat.cor + ' border-opacity-100' : 'bg-white border-gray-100 hover:border-blue-200'}`}
+              >
                 <span className="text-3xl block mb-2">{cat.icon}</span>
                 <p className="font-bold text-sm text-gray-800">{cat.label}</p>
               </button>
@@ -146,11 +206,9 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
       {/* ETAPA 2: Itens */}
       {etapa === 2 && (
         <div className="space-y-4">
-          <button onClick={() => setEtapa(1)} className="text-sm text-blue-500 hover:text-blue-700">
-            Voltar
-          </button>
+          <button onClick={() => setEtapa(1)} className="text-sm text-blue-500 hover:text-blue-700">← Voltar</button>
 
-          {/* Itens comuns para clique rapido */}
+          {/* Itens comuns para clique rápido */}
           {categoriaAtual.itensComuns.length > 0 && (
             <div>
               <p className="text-sm font-semibold text-gray-600 mb-2">Toque para adicionar rapidamente:</p>
@@ -158,8 +216,11 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
                 {categoriaAtual.itensComuns.map(nome => {
                   const jaAdicionado = itens.some(i => i.item.toLowerCase() === nome.toLowerCase() && i.item.trim());
                   return (
-                    <button key={nome} onClick={() => adicionarItemPreset(nome)}
-                      className={`px-3 py-1.5 rounded-full border-2 text-sm font-medium transition-all ${jaAdicionado ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                    <button
+                      key={nome}
+                      onClick={() => adicionarItemPreset(nome)}
+                      className={`px-3 py-1.5 rounded-full border-2 text-sm font-medium transition-all ${jaAdicionado ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                    >
                       {jaAdicionado ? '✓ ' : '+ '}{nome}
                     </button>
                   );
@@ -189,37 +250,42 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
                 </div>
                 {itens.length > 1 && (
                   <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">
-                    <Trash2 className="h-4 w-4"/>
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 )}
               </div>
             ))}
-            <button onClick={addItem}
-              className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2">
-              <Plus className="h-4 w-4"/> Adicionar outro item
+            <button
+              onClick={addItem}
+              className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Adicionar outro item
             </button>
           </div>
 
-          <Button onClick={() => { if (itens.some(i => i.item.trim())) setEtapa(3); else toast.error('Adicione pelo menos um item'); }}
-            className="w-full h-12 rounded-xl bg-blue-500 hover:bg-blue-600 font-bold">
+          <Button
+            onClick={() => { if (itens.some(i => i.item.trim())) setEtapa(3); else toast.error('Adicione pelo menos um item'); }}
+            className="w-full h-12 rounded-xl bg-blue-500 hover:bg-blue-600 font-bold"
+          >
             Continuar
           </Button>
         </div>
       )}
 
-      {/* ETAPA 3: Urgencia + Motivo */}
+      {/* ETAPA 3: Urgência + Motivo */}
       {etapa === 3 && (
         <div className="space-y-4">
-          <button onClick={() => setEtapa(2)} className="text-sm text-blue-500 hover:text-blue-700">
-            Voltar
-          </button>
+          <button onClick={() => setEtapa(2)} className="text-sm text-blue-500 hover:text-blue-700">← Voltar</button>
 
           <div>
-            <p className="text-sm font-semibold text-gray-600 mb-2">Qual a urgencia?</p>
+            <p className="text-sm font-semibold text-gray-600 mb-2">Qual a urgência?</p>
             <div className="grid grid-cols-3 gap-3">
               {URGENCIAS.map(u => (
-                <button key={u.value} onClick={() => setUrgencia(u.value)}
-                  className={`p-3 rounded-2xl border-2 text-center transition-all ${urgencia === u.value ? u.cor : 'bg-white border-gray-100 hover:border-gray-300'}`}>
+                <button
+                  key={u.value}
+                  onClick={() => setUrgencia(u.value)}
+                  className={`p-3 rounded-2xl border-2 text-center transition-all ${urgencia === u.value ? u.cor : 'bg-white border-gray-100 hover:border-gray-300'}`}
+                >
                   <p className="font-bold text-sm">{u.label}</p>
                   <p className="text-xs mt-0.5 opacity-70">{u.desc}</p>
                 </button>
@@ -228,11 +294,14 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-600 mb-2">Por que voce precisa?</p>
+            <p className="text-sm font-semibold text-gray-600 mb-2">Por que você precisa?</p>
             <div className="flex flex-wrap gap-2 mb-3">
               {JUSTIFICATIVAS_PRONTAS.map(j => (
-                <button key={j} onClick={() => { setJustificativa(j); setJustificativaCustom(''); }}
-                  className={`px-3 py-1.5 rounded-full border-2 text-sm transition-all ${justificativa === j ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                <button
+                  key={j}
+                  onClick={() => { setJustificativa(j); setJustificativaCustom(''); }}
+                  className={`px-3 py-1.5 rounded-full border-2 text-sm transition-all ${justificativa === j ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                >
                   {j}
                 </button>
               ))}
@@ -250,13 +319,18 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess }: M
           <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100">
             <p className="text-xs font-semibold text-blue-600 mb-2">Resumo do pedido:</p>
             <p className="text-sm font-bold">{categoriaAtual.icon} {categoriaAtual.label}</p>
-            <p className="text-xs text-gray-500 mt-1">{itens.filter(i=>i.item.trim()).length} item(ns) · {URGENCIAS.find(u=>u.value===urgencia)?.label}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {itens.filter(i => i.item.trim()).length} item(ns) · {URGENCIAS.find(u => u.value === urgencia)?.label}
+            </p>
             {classroomName && <p className="text-xs text-gray-500">Turma: {classroomName}</p>}
           </div>
 
-          <Button onClick={handleSubmit} disabled={loading}
-            className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-base">
-            <Send className="h-5 w-5 mr-2"/>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-base"
+          >
+            <Send className="h-5 w-5 mr-2" />
             {loading ? 'Enviando...' : 'Enviar pedido'}
           </Button>
         </div>
