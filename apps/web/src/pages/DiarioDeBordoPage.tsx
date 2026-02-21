@@ -84,7 +84,27 @@ export default function DiarioDeBordoPage() {
     }
 
     try {
-      // TODO: Implementar chamada à API
+      const response = await fetch('/api/diary-event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          childId: form.alunoId,
+          date: new Date().toISOString(),
+          activities: form.atividade,
+          observations: form.observacoes,
+          microgestures: {
+            alimentacao: form.alimentacao,
+            sono: form.sono ? parseInt(form.sono) : null,
+            higiene: form.higiene,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error('Erro ao salvar registro');
+
       toast.success('Registro salvo com sucesso!');
       
       // Limpar formulário
@@ -96,9 +116,9 @@ export default function DiarioDeBordoPage() {
         sono: '',
         higiene: '',
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar:', err);
-      toast.error('Erro ao salvar registro');
+      toast.error(err.message || 'Erro ao salvar registro');
     }
   }
 
