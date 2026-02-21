@@ -95,10 +95,15 @@ async function startServer() {
     })
   );
 
-  // IMPORTANTE: importação dinâmica para evitar que o esbuild inclua 'vite'
-  // no bundle de produção (vite é devDependency, não existe em produção)
+  // IMPORTANTE: usar new Function para o import dinâmico de vite.ts
+  // O esbuild analisa import() estático e inclui vite.ts no bundle,
+  // o que faz o Node tentar resolver 'vite' (devDependency) em produção.
+  // new Function('return import(...)') é opaco para o esbuild — ele não
+  // analisa o conteúdo e não inclui vite.ts no bundle.
   if (process.env.NODE_ENV === "development") {
-    const viteModule = await import("./vite");
+    // eslint-disable-next-line no-new-func
+    const dynamicImport = new Function('specifier', 'return import(specifier)');
+    const viteModule = await dynamicImport('./vite.js');
     await viteModule.setupVite(app, server);
   } else {
     serveStatic(app);
