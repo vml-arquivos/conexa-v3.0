@@ -33,10 +33,14 @@ interface Diario {
   id: string; professorNome: string; turmaNome: string;
   data: string; titulo: string;
 }
+interface TurmaResumo {
+  id: string; nome: string; totalAlunos: number; professor: string; chamadaFeita: boolean;
+}
 interface DashboardData {
   turmas: number; professores: number; alunosTotal: number;
   requisicoesParaAnalisar: number; planejamentosParaRevisar: number;
   diariosEstaSemana: number; taxaPresencaMedia: number; alertas: string[];
+  turmasLista: TurmaResumo[];
 }
 
 export default function DashboardCoordenacaoPedagogicaPage() {
@@ -57,12 +61,58 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       setLoading(true);
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
         http.get('/coordenacao/dashboard/unidade'),
-        http.get('/coordenacao/requisicoes?status=PENDENTE'),
-        http.get('/coordenacao/planejamentos?status=AGUARDANDO_APROVACAO'),
-        http.get('/coordenacao/diarios?periodo=semana'),
+        http.get('/coordenacao/requisicoes'),
+        http.get('/coordenacao/planejamentos?status=RASCUNHO'),
+        http.get('/coordenacao/diarios'),
       ]);
-      if (dashRes.status === 'fulfilled') setDashboard(dashRes.value.data);
-      if (reqRes.status === 'fulfilled') setRequisicoes(reqRes.value.data ?? []);
+      if (dashRes.status === 'fulfilled') {
+        // A API retorna { indicadores: {...}, turmas: [...], requisicoesPendentesDetalhes: [...], planejamentosParaRevisao: [...] }
+        const raw = dashRes.value.data;
+        const ind = raw?.indicadores ?? {};
+        const turmasArr: TurmaResumo[] = Array.isArray(raw?.turmas) ? raw.turmas : [];
+        const professoresSet = new Set(turmasArr.map((t: TurmaResumo) => t.professor).filter((p: string) => p !== 'Não atribuído'));
+        setDashboard({
+          turmas: ind.totalTurmas ?? turmasArr.length,
+          professores: professoresSet.size || ind.totalProfessores ?? 0,
+          alunosTotal: ind.totalAlunos ?? 0,
+          requisicoesParaAnalisar: ind.requisicoesPendentes ?? 0,
+          planejamentosParaRevisar: ind.planejamentosRascunho ?? 0,
+          diariosEstaSemana: ind.diariosHoje ?? 0,
+          taxaPresencaMedia: ind.totalTurmas > 0
+            ? Math.round((ind.turmasComChamadaHoje / ind.totalTurmas) * 100)
+            : 0,
+          alertas: [],
+          turmasLista: turmasArr,
+        });
+        // Usar requisições e planejamentos da resposta do dashboard se disponíveis
+        if (Array.isArray(raw?.requisicoesPendentesDetalhes) && raw.requisicoesPendentesDetalhes.length > 0) {
+          setRequisicoes(raw.requisicoesPendentesDetalhes.map((r: Record<string, unknown>) => {
+            let itens: Array<{item: string; quantidade: number}> = [];
+            try { const desc = JSON.parse(r.description as string ?? '{}'); itens = desc.itens ?? []; } catch { itens = []; }
+            return {
+              id: r.id as string,
+              professorNome: (r.createdBy as string) ?? 'Professor',
+              turmaNome: (r.classroomId as string) ?? '—',
+              itens: itens.length > 0 ? itens : [{ item: r.title as string ?? 'Material', quantidade: 1 }],
+              urgencia: (r.priority as string)?.toUpperCase() === 'ALTA' ? 'ALTA' : (r.priority as string)?.toUpperCase() === 'BAIXA' ? 'BAIXA' : 'MEDIA',
+              justificativa: '',
+              criadoEm: (r.requestedDate as string) ?? new Date().toISOString(),
+            };
+          }));
+        }
+        if (Array.isArray(raw?.planejamentosParaRevisao) && raw.planejamentosParaRevisao.length > 0) {
+          setPlanejamentos(raw.planejamentosParaRevisao.map((p: Record<string, unknown>) => ({
+            id: p.id as string,
+            professorNome: (p.createdBy as string) ?? 'Professor',
+            turmaNome: (p.classroomId as string) ?? '—',
+            semana: p.startDate ? new Date(p.startDate as string).toLocaleDateString('pt-BR') : '—',
+            objetivos: undefined,
+          })));
+        }
+      }
+      if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value.data) && reqRes.value.data.length > 0) {
+        setRequisicoes(reqRes.value.data);
+      }
       if (planRes.status === 'fulfilled') setPlanejamentos(planRes.value.data ?? []);
       if (diarRes.status === 'fulfilled') setDiarios(diarRes.value.data ?? []);
     } catch { toast.error('Erro ao carregar painel'); }
@@ -72,7 +122,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function aprovarRequisicao(id: string) {
     try {
       setProcessando(id);
-      await http.patch(`/material-requests/${id}/status`, { status: 'APROVADO' });
+      await http.patch(`/material-requests/${id}/review`, { decision: 'APPROVED' });
       toast.success('Pedido aprovado! ✅');
       setRequisicoes(prev => prev.filter(r => r.id !== id));
     } catch { toast.error('Erro ao aprovar'); }
@@ -82,7 +132,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function rejeitarRequisicao(id: string, motivo: string) {
     try {
       setProcessando(id);
-      await http.patch(`/material-requests/${id}/status`, { status: 'REJEITADO', motivoRejeicao: motivo });
+      await http.patch(`/material-requests/${id}/review`, { decision: 'REJECTED' });
       toast.success('Pedido devolvido ao professor');
       setRequisicoes(prev => prev.filter(r => r.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');
@@ -93,7 +143,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function aprovarPlanejamento(id: string) {
     try {
       setProcessando(id);
-      await http.patch(`/coordenacao/planejamentos/${id}`, { status: 'APROVADO' });
+      await http.patch(`/coordenacao/planejamentos/${id}/aprovar`, { aprovar: true });
       toast.success('Planejamento aprovado! ✅');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
     } catch { toast.error('Erro ao aprovar'); }
@@ -103,7 +153,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function devolverPlanejamento(id: string, motivo: string) {
     try {
       setProcessando(id);
-      await http.patch(`/coordenacao/planejamentos/${id}`, { status: 'DEVOLVIDO', observacao: motivo });
+      await http.patch(`/coordenacao/planejamentos/${id}/aprovar`, { aprovar: false, observacao: motivo });
       toast.success('Planejamento devolvido com observações');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');

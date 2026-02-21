@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { ClipboardList, RefreshCw, Package, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
 import { Button } from '../ui/button';
+import http from '../../api/http';
 import {
-  listMyMaterialRequests,
   getCategoryLabel,
   getStatusLabel,
   getStatusColor,
@@ -54,7 +54,21 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
     try {
       setLoading(true);
       setError(null);
-      const data = await listMyMaterialRequests();
+      // Tenta /minhas (professor) primeiro; se 403, tenta /material-requests (coordenação)
+      let data: MaterialRequest[] = [];
+      try {
+        const res = await http.get('/material-requests/minhas');
+        data = res.data ?? [];
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
+          // Usuário é coordenação/direção — busca todas as requisições da unidade
+          const res2 = await http.get('/material-requests');
+          data = res2.data ?? [];
+        } else {
+          throw err;
+        }
+      }
       setRequests(data);
     } catch {
       setError('Não foi possível carregar as requisições. Verifique sua conexão.');

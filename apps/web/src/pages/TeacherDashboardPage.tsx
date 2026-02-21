@@ -11,6 +11,7 @@ import {
   ChevronRight, Bell, Star, Calendar,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import http from '../api/http';
 
 interface DashboardData {
   hasClassroom: boolean;
@@ -40,12 +41,8 @@ export default function TeacherDashboardPage() {
   async function loadDashboard() {
     try {
       setLoading(true);
-      const response = await fetch('/api/teachers/dashboard', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      });
-      if (!response.ok) throw new Error('Erro ao carregar');
-      const d = await response.json();
-      setData(d);
+      const response = await http.get('/teachers/dashboard');
+      setData(response.data);
     } catch {
       toast.error('Nao foi possivel carregar seu painel. Tente novamente.');
     } finally {
@@ -55,7 +52,7 @@ export default function TeacherDashboardPage() {
 
   if (loading) return <LoadingState message="Carregando seu painel..." />;
 
-  const nomeProf = user?.name?.split(' ')[0] ?? 'Professor(a)';
+  const nomeProf = (user?.nome ?? user?.firstName as string ?? 'Professor(a)').split(' ')[0];
   const alunos = data?.alunos ?? [];
   const ind = data?.indicadores;
   const turma = data?.classroom;

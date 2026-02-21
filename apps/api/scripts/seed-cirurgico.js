@@ -20,6 +20,8 @@ async function main() {
 
   // Ordem correta respeitando foreign keys
   await prisma.userRole.deleteMany({});
+  await prisma.classroomTeacher.deleteMany({});
+  await prisma.enrollment.deleteMany({});
   await prisma.child.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.classroom.deleteMany({});
@@ -148,6 +150,7 @@ async function main() {
 
   // 5. Professoras
   const professorasNomes = [...new Set(turmasData.map(t => t.professora))];
+  const professoresMap = {}; // nome -> userId
   
   for (const nome of professorasNomes) {
     const email = `${nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}@cepi.com.br`;
@@ -173,17 +176,33 @@ async function main() {
         scopeLevel: 'PROFESSOR',
       },
     });
+    professoresMap[nome] = prof.id;
   }
-  console.log(`✅ ${professorasNomes.length} Professoras`);
+  // Vincular professoras às turmas via ClassroomTeacher
+  for (const turmaData of turmasData) {
+    const turmaInfo = turmasMap[turmaData.codigo];
+    const profId = professoresMap[turmaData.professora];
+    if (turmaInfo && profId) {
+      await prisma.classroomTeacher.create({
+        data: {
+          classroomId: turmaInfo.id,
+          teacherId: profId,
+          role: 'MAIN',
+          isActive: true,
+        },
+      });
+    }
+  }
+  console.log(`✅ ${professorasNomes.length} Professoras vinculadas às turmas`);
 
-  // 6. Alunos
+  // 6. Alunos + Matrículas
   let totalAlunos = 0;
   for (const [codigo, turmaInfo] of Object.entries(turmasMap)) {
     for (const alunoData of turmaInfo.alunos) {
       const [firstName, ...lastNameParts] = alunoData.nome.split(' ');
       const lastName = lastNameParts.join(' ') || 'Silva';
       
-      await prisma.child.create({
+      const child = await prisma.child.create({
         data: {
           mantenedoraId: mantenedora.id,
           unitId: unit.id,
@@ -193,10 +212,19 @@ async function main() {
           gender: alunoData.sexo === 'M' ? 'MASCULINO' : 'FEMININO',
         },
       });
+      // Criar matrícula na turma
+      await prisma.enrollment.create({
+        data: {
+          childId: child.id,
+          classroomId: turmaInfo.id,
+          enrollmentDate: new Date('2026-02-01'),
+          status: 'ATIVA',
+        },
+      });
       totalAlunos++;
     }
   }
-  console.log(`✅ ${totalAlunos} Alunos`);
+  console.log(`✅ ${totalAlunos} Alunos matriculados nas turmas`);
 
   // 7. Usuários administrativos
   const userDev = await prisma.user.create({
