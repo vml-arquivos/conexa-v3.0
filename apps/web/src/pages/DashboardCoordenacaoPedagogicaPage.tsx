@@ -66,14 +66,15 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         http.get('/coordenacao/diarios'),
       ]);
       if (dashRes.status === 'fulfilled') {
-        // A API retorna { indicadores: {...}, turmas: [...], requisicoesPendentesDetalhes: [...], planejamentosParaRevisao: [...] }
         const raw = dashRes.value.data;
         const ind = raw?.indicadores ?? {};
         const turmasArr: TurmaResumo[] = Array.isArray(raw?.turmas) ? raw.turmas : [];
         const professoresSet = new Set(turmasArr.map((t: TurmaResumo) => t.professor).filter((p: string) => p !== 'Não atribuído'));
         setDashboard({
           turmas: ind.totalTurmas ?? turmasArr.length,
-          professores: professoresSet.size || ind.totalProfessores ?? 0,
+          // ✅ CORRIGIDO: era `professoresSet.size || ind.totalProfessores ?? 0`
+          // TS5076: '||' e '??' não podem ser misturados sem parênteses
+          professores: (professoresSet.size || ind.totalProfessores) ?? 0,
           alunosTotal: ind.totalAlunos ?? 0,
           requisicoesParaAnalisar: ind.requisicoesPendentes ?? 0,
           planejamentosParaRevisar: ind.planejamentosRascunho ?? 0,
@@ -84,7 +85,6 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           alertas: [],
           turmasLista: turmasArr,
         });
-        // Usar requisições e planejamentos da resposta do dashboard se disponíveis
         if (Array.isArray(raw?.requisicoesPendentesDetalhes) && raw.requisicoesPendentesDetalhes.length > 0) {
           setRequisicoes(raw.requisicoesPendentesDetalhes.map((r: Record<string, unknown>) => {
             let itens: Array<{item: string; quantidade: number}> = [];
