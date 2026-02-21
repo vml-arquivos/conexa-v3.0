@@ -137,8 +137,8 @@ export class DiaryEventService {
         eventDate,
         childId: createDto.childId,
         classroomId: createDto.classroomId,
-        planningId: createDto.planningId ?? null,
-        curriculumEntryId: createDto.curriculumEntryId ?? null,
+        planningId: createDto.planningId ?? undefined,
+        curriculumEntryId: createDto.curriculumEntryId ?? undefined,
 
         // Micro-gestos estruturados
         medicaoAlimentar: createDto.medicaoAlimentar ?? undefined,
