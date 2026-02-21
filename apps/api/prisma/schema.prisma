@@ -543,8 +543,10 @@ model Child {
   dietaryRestrictions DietaryRestriction[]
   reportBases         ReportBase[]
   aiContexts          AIContext[]
-  atendimentosPais    AtendimentoPais[]
-  rdixInstancias      RDIXInstancia[]
+  atendimentosPais         AtendimentoPais[]
+  rdixInstancias           RDIXInstancia[]
+  developmentObservations  DevelopmentObservation[]
+  developmentReports       DevelopmentReport[]
 
   @@index([mantenedoraId])
   @@index([unitId])
@@ -1723,4 +1725,104 @@ model MaterialRequestItem {
   
   @@index([requestId])
   @@index([materialId])
+}
+
+// ============================================================================
+// 17. RELATÓRIOS INDIVIDUAIS DE DESENVOLVIMENTO (RDIC)
+// ============================================================================
+
+/// Observações de Desenvolvimento Individual da Criança (RDIC)
+model DevelopmentObservation {
+  id      String @id @default(cuid())
+  childId String
+  date    DateTime @default(now())
+
+  // Categoria da observação
+  category ObservationCategory
+
+  // Comportamento
+  behaviorDescription String? @db.Text
+  socialInteraction   String? @db.Text
+  emotionalState      String? @db.Text
+
+  // Desenvolvimento
+  motorSkills     String? @db.Text
+  cognitiveSkills String? @db.Text
+  languageSkills  String? @db.Text
+
+  // Saúde e Bem-estar
+  healthNotes  String? @db.Text
+  dietaryNotes String? @db.Text
+  sleepPattern String? @db.Text
+
+  // Observações Pedagógicas
+  learningProgress String? @db.Text
+  interests        String? @db.Text
+  challenges       String? @db.Text
+
+  // Recomendações
+  recommendations String? @db.Text
+  nextSteps       String? @db.Text
+
+  // Metadados
+  createdBy String // userId do professor
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([date])
+  @@index([category])
+}
+
+enum ObservationCategory {
+  COMPORTAMENTO
+  DESENVOLVIMENTO
+  SAUDE
+  APRENDIZAGEM
+  GERAL
+}
+
+/// Relatório Individual de Desenvolvimento (RDI/RIA)
+model DevelopmentReport {
+  id      String @id @default(cuid())
+  childId String
+
+  // Período do relatório
+  startDate DateTime
+  endDate   DateTime
+
+  // Tipo de relatório
+  reportType ReportType
+
+  // Conteúdo gerado automaticamente
+  behaviorSummary    String @db.Text
+  developmentSummary String @db.Text
+  healthSummary      String @db.Text
+  learningSummary    String @db.Text
+  overallAssessment  String @db.Text
+  recommendations    String @db.Text
+
+  // Metadados
+  generatedBy String // userId
+  generatedAt DateTime @default(now())
+  approvedBy  String? // coordenador
+  approvedAt  DateTime?
+
+  // Relações
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([startDate, endDate])
+  @@index([reportType])
+}
+
+enum ReportType {
+  RDI // Relatório de Desenvolvimento Individual
+  RIA // Relatório Individual de Aprendizagem
+  RDIC // Relatório de Desenvolvimento Individual da Criança (completo)
+  BIMESTRAL
+  SEMESTRAL
+  ANUAL
 }
