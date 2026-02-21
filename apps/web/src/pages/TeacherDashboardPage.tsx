@@ -1,283 +1,157 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { PageShell } from '../components/ui/PageShell';
 import { LoadingState } from '../components/ui/LoadingState';
-import { ErrorState } from '../components/ui/ErrorState';
 import { toast } from 'sonner';
-import { 
-  Users, 
-  BookOpen, 
-  FileText, 
-  ShoppingCart, 
-  Calendar,
-  UserCircle 
+import {
+  Users, BookOpen, FileText, ShoppingCart,
+  Camera, ClipboardList, UserCircle, CheckCircle,
+  ChevronRight, Bell, Star, Calendar,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface DashboardData {
   hasClassroom: boolean;
   message?: string;
-  classroom?: {
-    id: string;
-    name: string;
-    code: string;
-    capacity: number;
-    unit: {
-      name: string;
-    };
-  };
-  alunos?: Array<{
-    id: string;
-    nome: string;
-    firstName: string;
-    lastName: string;
-    idade: number;
-    gender: string;
-    photoUrl?: string;
-  }>;
-  indicadores?: {
-    totalAlunos: number;
-    diariosEstaSemana: number;
-    requisiçõesPendentes: number;
-    planejamentosEstaSemana: number;
-  };
+  classroom?: { id: string; name: string; code: string; capacity: number; unit: { name: string } };
+  alunos?: Array<{ id: string; nome: string; firstName: string; lastName: string; idade: number; gender: string; photoUrl?: string }>;
+  indicadores?: { totalAlunos: number; diariosEstaSemana: number; requisicoesStatus?: string; planejamentosEstaSemana: number };
 }
+
+const ACOES_RAPIDAS = [
+  { id: 'chamada', label: 'Fazer Chamada', desc: 'Marcar presenca de hoje', icon: <CheckCircle className="h-7 w-7"/>, cor: 'bg-green-500', rota: '/app/chamada' },
+  { id: 'diario', label: 'Diario de Bordo', desc: 'Registrar atividades do dia', icon: <BookOpen className="h-7 w-7"/>, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
+  { id: 'planejamento', label: 'Planejamento', desc: 'Planejar a semana', icon: <Calendar className="h-7 w-7"/>, cor: 'bg-purple-500', rota: '/app/planejamentos' },
+  { id: 'materiais', label: 'Pedir Materiais', desc: 'Solicitar para a turma', icon: <ShoppingCart className="h-7 w-7"/>, cor: 'bg-orange-500', rota: '/app/requisicoes-materiais' },
+  { id: 'rdx', label: 'Fotos da Turma', desc: 'Registrar momentos', icon: <Camera className="h-7 w-7"/>, cor: 'bg-pink-500', rota: '/app/rdx' },
+  { id: 'relatorio', label: 'Relatorio', desc: 'Ver evolucao das criancas', icon: <FileText className="h-7 w-7"/>, cor: 'bg-teal-500', rota: '/app/relatorios' },
+];
 
 export default function TeacherDashboardPage() {
   const { user } = useAuth() as any;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  useEffect(() => { loadDashboard(); }, []);
 
   async function loadDashboard() {
     try {
       setLoading(true);
-      setError(null);
-
       const response = await fetch('/api/teachers/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
       });
-
-      if (!response.ok) {
-        throw new Error('Erro ao carregar dashboard');
-      }
-
-      const dashboardData = await response.json();
-      setData(dashboardData);
-
-      if (!dashboardData.hasClassroom) {
-        toast.error(dashboardData.message || 'Nenhuma turma encontrada');
-      }
-    } catch (err: any) {
-      console.error('Erro ao carregar dashboard:', err);
-      setError(err.message || 'Erro ao carregar dados');
-      toast.error('Erro ao carregar dashboard');
+      if (!response.ok) throw new Error('Erro ao carregar');
+      const d = await response.json();
+      setData(d);
+    } catch {
+      toast.error('Nao foi possivel carregar seu painel. Tente novamente.');
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) {
-    return (
-      <PageShell title="Painel do Professor">
-        <LoadingState message="Carregando seus dados..." />
-      </PageShell>
-    );
-  }
+  if (loading) return <LoadingState message="Carregando seu painel..." />;
 
-  if (error || !data) {
-    return (
-      <PageShell title="Painel do Professor">
-        <ErrorState 
-          message={error || 'Erro ao carregar dados'} 
-          onRetry={loadDashboard}
-        />
-      </PageShell>
-    );
-  }
-
-  if (!data.hasClassroom) {
-    return (
-      <PageShell title="Painel do Professor">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Nenhuma turma encontrada</h3>
-              <p className="text-muted-foreground">
-                {data.message || 'Entre em contato com a coordenação para atribuir uma turma.'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </PageShell>
-    );
-  }
-
-  const { classroom, alunos = [], indicadores } = data;
+  const nomeProf = user?.name?.split(' ')[0] ?? 'Professor(a)';
+  const alunos = data?.alunos ?? [];
+  const ind = data?.indicadores;
+  const turma = data?.classroom;
 
   return (
-    <PageShell 
-      title={`Painel do Professor - ${classroom?.name}`}
-      subtitle={`${classroom?.unit.name} • Código: ${classroom?.code}`}
+    <PageShell
+      title={`Ola, ${nomeProf}!`}
+      description={turma ? `${turma.name} · ${turma.unit?.name ?? ''}` : 'Bem-vindo(a) ao seu painel'}
     >
-      {/* Indicadores do Dia */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicadores?.totalAlunos || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Capacidade: {classroom?.capacity}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Diários Esta Semana</CardTitle>
-            <BookOpen className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicadores?.diariosEstaSemana || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Registros de atividades
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Requisições Pendentes</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicadores?.requisiçõesPendentes || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Materiais solicitados
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Planejamentos</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{indicadores?.planejamentosEstaSemana || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Desta semana
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Ações Rápidas */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Ações Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col gap-2"
-              onClick={() => navigate('/diario-de-bordo')}
-            >
-              <BookOpen className="h-6 w-6" />
-              <span className="text-sm">Diário de Bordo</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col gap-2"
-              onClick={() => navigate('/planejamentos')}
-            >
-              <FileText className="h-6 w-6" />
-              <span className="text-sm">Planejamentos</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col gap-2"
-              onClick={() => navigate('/requisicoes-materiais')}
-            >
-              <ShoppingCart className="h-6 w-6" />
-              <span className="text-sm">Requisitar Materiais</span>
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="h-20 flex flex-col gap-2"
-              onClick={() => navigate('/atendimentos-pais')}
-            >
-              <Users className="h-6 w-6" />
-              <span className="text-sm">Atendimento Pais</span>
-            </Button>
+      {/* Sem turma */}
+      {!data?.hasClassroom && (
+        <div className="text-center py-16">
+          <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Bell className="h-10 w-10 text-yellow-500"/>
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-xl font-bold text-gray-700 mb-2">Voce ainda nao tem turma</p>
+          <p className="text-gray-500 text-sm">Aguarde a coordenacao vincular voce a uma turma.</p>
+        </div>
+      )}
 
-      {/* Lista de Alunos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Meus Alunos ({alunos.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {alunos.map((aluno) => (
-              <div 
-                key={aluno.id}
-                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent cursor-pointer transition-colors"
-              >
-                {aluno.photoUrl ? (
-                  <img 
-                    src={aluno.photoUrl} 
-                    alt={aluno.nome}
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <UserCircle className="w-8 h-8 text-primary" />
-                  </div>
-                )}
-                
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{aluno.nome}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{aluno.idade} meses</span>
-                    <span>•</span>
-                    <Badge variant="outline" className="text-xs">
-                      {aluno.gender === 'MASCULINO' ? 'M' : aluno.gender === 'FEMININO' ? 'F' : '-'}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
+      {data?.hasClassroom && (
+        <div className="space-y-6">
+          {/* Cards de resumo */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: <Users className="h-6 w-6 text-blue-600"/>, bg: 'bg-blue-100', val: ind?.totalAlunos ?? alunos.length, label: 'Criancas' },
+              { icon: <BookOpen className="h-6 w-6 text-green-600"/>, bg: 'bg-green-100', val: ind?.diariosEstaSemana ?? 0, label: 'Diarios esta semana' },
+              { icon: <Calendar className="h-6 w-6 text-purple-600"/>, bg: 'bg-purple-100', val: ind?.planejamentosEstaSemana ?? 0, label: 'Planejamentos' },
+              { icon: <Star className="h-6 w-6 text-orange-600"/>, bg: 'bg-orange-100', val: turma?.capacity ?? '--', label: 'Vagas na turma' },
+            ].map((c, i) => (
+              <Card key={i} className="rounded-2xl border-2 text-center">
+                <CardContent className="pt-4 pb-3">
+                  <div className={`w-10 h-10 ${c.bg} rounded-xl flex items-center justify-center mx-auto mb-2`}>{c.icon}</div>
+                  <p className="text-2xl font-bold text-gray-800">{c.val}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
 
-          {alunos.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum aluno matriculado nesta turma</p>
+          {/* Acoes rapidas */}
+          <div>
+            <h2 className="text-base font-bold text-gray-700 mb-3">O que voce quer fazer?</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {ACOES_RAPIDAS.map(acao => (
+                <button key={acao.id} onClick={() => navigate(acao.rota)}
+                  className="p-4 bg-white border-2 border-gray-100 rounded-2xl text-left hover:border-blue-200 hover:shadow-md transition-all active:scale-95">
+                  <div className={`w-12 h-12 ${acao.cor} rounded-2xl flex items-center justify-center text-white mb-3`}>
+                    {acao.icon}
+                  </div>
+                  <p className="font-bold text-gray-800 text-sm">{acao.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{acao.desc}</p>
+                </button>
+              ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+
+          {/* Minhas criancas */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-gray-700">Minhas criancas ({alunos.length})</h2>
+              <button onClick={() => navigate('/app/chamada')}
+                className="flex items-center gap-1 text-blue-500 text-sm font-medium hover:text-blue-700">
+                Fazer chamada <ChevronRight className="h-4 w-4"/>
+              </button>
+            </div>
+            {alunos.length === 0 ? (
+              <div className="text-center py-10 bg-gray-50 rounded-2xl">
+                <Users className="w-12 h-12 mx-auto mb-2 text-gray-300"/>
+                <p className="text-gray-400">Nenhuma crianca matriculada ainda</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {alunos.map(aluno => (
+                  <div key={aluno.id}
+                    className="flex flex-col items-center p-4 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer">
+                    {aluno.photoUrl ? (
+                      <img src={aluno.photoUrl} alt={aluno.nome}
+                        className="w-14 h-14 rounded-full object-cover mb-2 border-2 border-blue-100"/>
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mb-2 border-2 border-blue-100">
+                        <UserCircle className="w-9 h-9 text-blue-400"/>
+                      </div>
+                    )}
+                    <p className="font-semibold text-sm text-center text-gray-800 leading-tight">{aluno.firstName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{aluno.idade} meses</p>
+                    <span className={`mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${aluno.gender === 'MASCULINO' ? 'bg-blue-100 text-blue-600' : aluno.gender === 'FEMININO' ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-500'}`}>
+                      {aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : '-'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }

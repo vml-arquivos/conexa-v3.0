@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
 import { PageShell } from '../components/ui/PageShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
 import {
   CheckCircle,
   XCircle,
-  Clock,
+  AlertCircle,
   Users,
   UserCheck,
   UserX,
   Save,
-  RefreshCw,
-  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
 } from 'lucide-react';
 
-interface AlunoPresenca {
+interface Aluno {
   id: string;
   nome: string;
   photoUrl?: string;
@@ -32,100 +32,107 @@ interface ChamadaData {
   classroomName: string;
   date: string;
   totalAlunos: number;
-  registrados: number;
   presentes: number;
   ausentes: number;
-  taxaPresenca: number;
-  chamadaCompleta: boolean;
-  alunos: AlunoPresenca[];
+  alunos: Aluno[];
+}
+
+// Motivos de falta pré-definidos (sem digitação)
+const MOTIVOS_FALTA = [
+  'Doença',
+  'Consulta médica',
+  'Viagem',
+  'Problema familiar',
+  'Outro motivo',
+];
+
+// Dias da semana em português
+const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+function formatarData(dateStr: string) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
 export default function ControleFaltasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);
-  const [registros, setRegistros] = useState<Record<string, { status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO'; justification?: string }>>({});
-  const [showJustificativa, setShowJustificativa] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const [registros, setRegistros] = useState<Record<string, { status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO'; motivo?: string }>>({});
+  const [alunoSelecionado, setAlunoSelecionado] = useState<string | null>(null);
+  const [etapa, setEtapa] = useState<'chamada' | 'resumo'>('chamada');
+
+  // Data de hoje
+  const hoje = new Date().toISOString().split('T')[0];
+  const [selectedDate] = useState(hoje);
 
   useEffect(() => {
     loadChamada();
-  }, [selectedDate]);
+  }, []);
 
   async function loadChamada() {
     try {
       setLoading(true);
-      const res = await http.get('/attendance/today', {
-        params: { date: selectedDate },
-      });
+      const res = await http.get('/attendance/today');
       const data: ChamadaData = res.data;
       setChamada(data);
 
-      // Inicializar registros com dados existentes
-      const initRegistros: typeof registros = {};
-      data.alunos.forEach((aluno) => {
-        if (aluno.status) {
-          initRegistros[aluno.id] = {
-            status: aluno.status,
-            justification: aluno.justification ?? undefined,
-          };
-        }
+      // Carregar registros já existentes
+      const init: typeof registros = {};
+      data.alunos.forEach((a) => {
+        if (a.status) init[a.id] = { status: a.status, motivo: a.justification ?? undefined };
       });
-      setRegistros(initRegistros);
-    } catch (err: any) {
-      console.error('Erro ao carregar chamada:', err);
-      toast.error('Erro ao carregar lista de alunos');
+      setRegistros(init);
+    } catch {
+      toast.error('Não foi possível carregar a lista de alunos');
     } finally {
       setLoading(false);
     }
   }
 
-  function marcarTodos(status: 'PRESENTE' | 'AUSENTE') {
-    if (!chamada) return;
-    const novosRegistros: typeof registros = {};
-    chamada.alunos.forEach((aluno) => {
-      novosRegistros[aluno.id] = { status };
-    });
-    setRegistros(novosRegistros);
-    toast.success(`Todos marcados como ${status === 'PRESENTE' ? 'Presentes' : 'Ausentes'}`);
-  }
-
-  function toggleStatus(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
+  function marcar(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
     setRegistros((prev) => ({
       ...prev,
-      [alunoId]: {
-        ...prev[alunoId],
-        status,
-        justification: status !== 'JUSTIFICADO' ? undefined : prev[alunoId]?.justification,
-      },
+      [alunoId]: { status, motivo: status !== 'AUSENTE' && status !== 'JUSTIFICADO' ? undefined : prev[alunoId]?.motivo },
     }));
-    if (status === 'JUSTIFICADO') {
-      setShowJustificativa(alunoId);
+
+    if (status === 'AUSENTE' || status === 'JUSTIFICADO') {
+      setAlunoSelecionado(alunoId);
+    } else {
+      setAlunoSelecionado(null);
     }
   }
 
-  function setJustificativa(alunoId: string, justification: string) {
+  function selecionarMotivo(alunoId: string, motivo: string) {
     setRegistros((prev) => ({
       ...prev,
-      [alunoId]: { ...prev[alunoId], justification },
+      [alunoId]: { ...prev[alunoId], motivo },
     }));
+    setAlunoSelecionado(null);
   }
 
-  async function salvarChamada() {
+  function marcarTodosPresentes() {
+    if (!chamada) return;
+    const novos: typeof registros = {};
+    chamada.alunos.forEach((a) => { novos[a.id] = { status: 'PRESENTE' }; });
+    setRegistros(novos);
+    setAlunoSelecionado(null);
+    toast.success('Todos marcados como presentes! 🎉');
+  }
+
+  async function salvar() {
     if (!chamada) return;
 
-    const listaRegistros = chamada.alunos
+    const lista = chamada.alunos
       .filter((a) => registros[a.id]?.status)
       .map((a) => ({
         childId: a.id,
         status: registros[a.id].status,
-        justification: registros[a.id].justification ?? null,
+        justification: registros[a.id].motivo ?? null,
       }));
 
-    if (listaRegistros.length === 0) {
+    if (lista.length === 0) {
       toast.error('Marque pelo menos um aluno antes de salvar');
       return;
     }
@@ -135,264 +142,299 @@ export default function ControleFaltasPage() {
       await http.post('/attendance/register', {
         classroomId: chamada.classroomId,
         date: selectedDate,
-        registros: listaRegistros,
+        registros: lista,
       });
-      toast.success(`Chamada salva! ${listaRegistros.length} alunos registrados.`);
-      loadChamada();
-    } catch (err: any) {
-      toast.error('Erro ao salvar chamada');
+      toast.success('Chamada salva com sucesso! ✅');
+      setEtapa('resumo');
+    } catch {
+      toast.error('Erro ao salvar a chamada. Tente novamente.');
     } finally {
       setSaving(false);
     }
   }
 
-  const totalMarcados = chamada ? chamada.alunos.filter((a) => registros[a.id]?.status).length : 0;
-  const totalPresentes = chamada ? chamada.alunos.filter((a) => registros[a.id]?.status === 'PRESENTE').length : 0;
-  const totalAusentes = chamada ? chamada.alunos.filter((a) => registros[a.id]?.status === 'AUSENTE').length : 0;
-  const totalJustificados = chamada ? chamada.alunos.filter((a) => registros[a.id]?.status === 'JUSTIFICADO').length : 0;
-
   if (loading) return <LoadingState message="Carregando lista de alunos..." />;
 
-  return (
-    <PageShell
-      title="Chamada Diária"
-      description={chamada ? `${chamada.classroomName} · ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}` : ''}
-      headerActions={
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            className="px-3 py-2 border rounded-md text-sm"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-          <Button variant="outline" size="sm" onClick={loadChamada}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      }
-    >
-      {!chamada ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-          <p>Nenhuma turma encontrada</p>
-        </div>
-      ) : (
-        <>
-          {/* Resumo */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold">{chamada.totalAlunos}</p>
-                  </div>
-                  <Users className="h-7 w-7 text-blue-500 opacity-70" />
-                </div>
-              </CardContent>
-            </Card>
+  if (!chamada) return (
+    <PageShell title="Chamada do Dia">
+      <div className="text-center py-16">
+        <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+        <p className="text-lg text-gray-500">Nenhuma turma encontrada</p>
+      </div>
+    </PageShell>
+  );
 
-            <Card className="border-l-4 border-l-green-500">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Presentes</p>
-                    <p className="text-2xl font-bold text-green-600">{totalPresentes}</p>
-                  </div>
-                  <UserCheck className="h-7 w-7 text-green-500 opacity-70" />
-                </div>
-              </CardContent>
-            </Card>
+  const totalMarcados = chamada.alunos.filter((a) => registros[a.id]?.status).length;
+  const totalPresentes = chamada.alunos.filter((a) => registros[a.id]?.status === 'PRESENTE').length;
+  const totalAusentes = chamada.alunos.filter((a) => registros[a.id]?.status === 'AUSENTE').length;
+  const totalJustificados = chamada.alunos.filter((a) => registros[a.id]?.status === 'JUSTIFICADO').length;
+  const chamadaCompleta = totalMarcados === chamada.totalAlunos;
 
-            <Card className="border-l-4 border-l-red-500">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Ausentes</p>
-                    <p className="text-2xl font-bold text-red-600">{totalAusentes}</p>
-                  </div>
-                  <UserX className="h-7 w-7 text-red-500 opacity-70" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-yellow-500">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Justificados</p>
-                    <p className="text-2xl font-bold text-yellow-600">{totalJustificados}</p>
-                  </div>
-                  <AlertCircle className="h-7 w-7 text-yellow-500 opacity-70" />
-                </div>
-              </CardContent>
-            </Card>
+  // ─── Tela de Resumo ──────────────────────────────────────────────────────────
+  if (etapa === 'resumo') {
+    return (
+      <PageShell title="Chamada Salva! ✅" description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}>
+        <div className="max-w-md mx-auto space-y-6">
+          {/* Resumo visual */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-6 bg-green-50 rounded-2xl border-2 border-green-200">
+              <p className="text-4xl font-bold text-green-600">{totalPresentes}</p>
+              <p className="text-sm text-green-700 mt-1 font-medium">Presentes</p>
+            </div>
+            <div className="text-center p-6 bg-red-50 rounded-2xl border-2 border-red-200">
+              <p className="text-4xl font-bold text-red-600">{totalAusentes}</p>
+              <p className="text-sm text-red-700 mt-1 font-medium">Ausentes</p>
+            </div>
+            <div className="text-center p-6 bg-yellow-50 rounded-2xl border-2 border-yellow-200">
+              <p className="text-4xl font-bold text-yellow-600">{totalJustificados}</p>
+              <p className="text-sm text-yellow-700 mt-1 font-medium">Justificados</p>
+            </div>
           </div>
 
-          {/* Barra de progresso */}
-          <Card className="mb-6">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Progresso da Chamada</span>
-                <span className="text-sm text-muted-foreground">
-                  {totalMarcados}/{chamada.totalAlunos} alunos registrados
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    totalMarcados === chamada.totalAlunos ? 'bg-green-500' : 'bg-blue-500'
-                  }`}
-                  style={{ width: `${chamada.totalAlunos > 0 ? (totalMarcados / chamada.totalAlunos) * 100 : 0}%` }}
-                />
-              </div>
-              {totalMarcados === chamada.totalAlunos && (
-                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Chamada completa!
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Ações rápidas */}
-          <div className="flex gap-2 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-green-600 border-green-300 hover:bg-green-50"
-              onClick={() => marcarTodos('PRESENTE')}
-            >
-              <UserCheck className="h-4 w-4 mr-1" />
-              Todos Presentes
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-red-600 border-red-300 hover:bg-red-50"
-              onClick={() => marcarTodos('AUSENTE')}
-            >
-              <UserX className="h-4 w-4 mr-1" />
-              Todos Ausentes
-            </Button>
+          {/* Taxa de presença */}
+          <div className="p-5 bg-blue-50 rounded-2xl text-center">
+            <p className="text-sm text-blue-600 font-medium mb-1">Taxa de presença hoje</p>
+            <p className="text-5xl font-bold text-blue-700">
+              {chamada.totalAlunos > 0 ? Math.round((totalPresentes / chamada.totalAlunos) * 100) : 0}%
+            </p>
           </div>
 
-          {/* Lista de Alunos */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-base">Lista de Alunos — {chamada.classroomName}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {chamada.alunos.map((aluno) => {
-                  const reg = registros[aluno.id];
-                  const status = reg?.status ?? null;
-
-                  return (
-                    <div key={aluno.id}>
-                      <div
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                          status === 'PRESENTE'
-                            ? 'bg-green-50 border-green-200'
-                            : status === 'AUSENTE'
-                            ? 'bg-red-50 border-red-200'
-                            : status === 'JUSTIFICADO'
-                            ? 'bg-yellow-50 border-yellow-200'
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
-                      >
-                        {/* Foto ou ícone */}
-                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {aluno.photoUrl ? (
-                            <img src={aluno.photoUrl} alt={aluno.nome} className="w-full h-full object-cover" />
-                          ) : (
-                            <Users className="h-5 w-5 text-gray-400" />
-                          )}
-                        </div>
-
-                        {/* Nome */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{aluno.nome}</p>
-                          {status && (
-                            <p className={`text-xs ${
-                              status === 'PRESENTE' ? 'text-green-600' :
-                              status === 'AUSENTE' ? 'text-red-600' : 'text-yellow-600'
-                            }`}>
-                              {status === 'PRESENTE' ? 'Presente' : status === 'AUSENTE' ? 'Ausente' : 'Justificado'}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Botões de status */}
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => toggleStatus(aluno.id, 'PRESENTE')}
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                              status === 'PRESENTE'
-                                ? 'bg-green-500 text-white'
-                                : 'bg-white border border-gray-300 text-gray-400 hover:bg-green-50 hover:text-green-600 hover:border-green-300'
-                            }`}
-                            title="Presente"
-                          >
-                            <CheckCircle className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => toggleStatus(aluno.id, 'AUSENTE')}
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                              status === 'AUSENTE'
-                                ? 'bg-red-500 text-white'
-                                : 'bg-white border border-gray-300 text-gray-400 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
-                            }`}
-                            title="Ausente"
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => toggleStatus(aluno.id, 'JUSTIFICADO')}
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                              status === 'JUSTIFICADO'
-                                ? 'bg-yellow-500 text-white'
-                                : 'bg-white border border-gray-300 text-gray-400 hover:bg-yellow-50 hover:text-yellow-600 hover:border-yellow-300'
-                            }`}
-                            title="Justificado"
-                          >
-                            <AlertCircle className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Campo de justificativa */}
-                      {status === 'JUSTIFICADO' && (
-                        <div className="ml-13 mt-1 pl-13">
-                          <input
-                            className="w-full px-3 py-1.5 text-sm border border-yellow-300 rounded-md bg-yellow-50"
-                            placeholder="Motivo da falta justificada..."
-                            value={reg?.justification ?? ''}
-                            onChange={(e) => setJustificativa(aluno.id, e.target.value)}
-                          />
-                        </div>
+          {/* Lista de ausentes */}
+          {totalAusentes + totalJustificados > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-gray-600">Crianças que faltaram:</p>
+              {chamada.alunos
+                .filter((a) => registros[a.id]?.status === 'AUSENTE' || registros[a.id]?.status === 'JUSTIFICADO')
+                .map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {a.photoUrl ? (
+                        <img src={a.photoUrl} alt={a.nome} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-bold text-gray-400">{a.nome[0]}</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{a.nome}</p>
+                      {registros[a.id]?.motivo && (
+                        <p className="text-xs text-gray-500">{registros[a.id].motivo}</p>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      registros[a.id]?.status === 'JUSTIFICADO'
+                        ? 'bg-yellow-100 text-yellow-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {registros[a.id]?.status === 'JUSTIFICADO' ? 'Justificado' : 'Ausente'}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
 
-          {/* Botão Salvar */}
-          <div className="sticky bottom-4">
-            <Button
-              onClick={salvarChamada}
-              disabled={saving || totalMarcados === 0}
-              className="w-full md:w-auto shadow-lg"
-              size="lg"
-            >
-              <Save className="h-5 w-5 mr-2" />
-              {saving ? 'Salvando...' : `Salvar Chamada (${totalMarcados}/${chamada.totalAlunos})`}
-            </Button>
+          <Button
+            onClick={() => setEtapa('chamada')}
+            variant="outline"
+            className="w-full"
+          >
+            Editar Chamada
+          </Button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  // ─── Tela Principal de Chamada ────────────────────────────────────────────────
+  return (
+    <PageShell
+      title="Chamada do Dia"
+      description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}
+    >
+      {/* Barra de progresso */}
+      <div className="mb-6 p-4 bg-white rounded-2xl border shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Sun className="h-5 w-5 text-yellow-500" />
+            <span className="font-semibold text-gray-700">
+              {chamadaCompleta ? '🎉 Chamada completa!' : `${totalMarcados} de ${chamada.totalAlunos} crianças`}
+            </span>
           </div>
-        </>
-      )}
+          <span className="text-sm text-gray-500">
+            {chamada.totalAlunos - totalMarcados > 0
+              ? `Faltam ${chamada.totalAlunos - totalMarcados}`
+              : 'Todas marcadas'}
+          </span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+          <div
+            className={`h-4 rounded-full transition-all duration-500 ${chamadaCompleta ? 'bg-green-500' : 'bg-blue-500'}`}
+            style={{ width: `${chamada.totalAlunos > 0 ? (totalMarcados / chamada.totalAlunos) * 100 : 0}%` }}
+          />
+        </div>
+
+        {/* Contadores rápidos */}
+        <div className="flex gap-3 mt-3">
+          <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
+            <UserCheck className="h-4 w-4" /> {totalPresentes} presentes
+          </span>
+          <span className="flex items-center gap-1 text-sm text-red-500 font-medium">
+            <UserX className="h-4 w-4" /> {totalAusentes} ausentes
+          </span>
+          {totalJustificados > 0 && (
+            <span className="flex items-center gap-1 text-sm text-yellow-600 font-medium">
+              <AlertCircle className="h-4 w-4" /> {totalJustificados} justificados
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Botão marcar todos presentes */}
+      <Button
+        onClick={marcarTodosPresentes}
+        variant="outline"
+        className="w-full mb-4 h-12 text-green-700 border-green-300 bg-green-50 hover:bg-green-100 font-semibold text-base"
+      >
+        <UserCheck className="h-5 w-5 mr-2" />
+        Todos estão presentes hoje
+      </Button>
+
+      {/* Cards dos alunos */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+        {chamada.alunos.map((aluno) => {
+          const reg = registros[aluno.id];
+          const status = reg?.status ?? null;
+          const isExpanded = alunoSelecionado === aluno.id;
+
+          return (
+            <div key={aluno.id} className="flex flex-col gap-2">
+              {/* Card do aluno */}
+              <div
+                className={`relative rounded-2xl border-2 overflow-hidden transition-all ${
+                  status === 'PRESENTE'
+                    ? 'border-green-400 bg-green-50'
+                    : status === 'AUSENTE'
+                    ? 'border-red-400 bg-red-50'
+                    : status === 'JUSTIFICADO'
+                    ? 'border-yellow-400 bg-yellow-50'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                {/* Foto */}
+                <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                  {aluno.photoUrl ? (
+                    <img src={aluno.photoUrl} alt={aluno.nome} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-4xl font-bold text-gray-300">{aluno.nome[0]}</span>
+                  )}
+                  {/* Badge de status */}
+                  {status && (
+                    <div className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center ${
+                      status === 'PRESENTE' ? 'bg-green-500' :
+                      status === 'AUSENTE' ? 'bg-red-500' : 'bg-yellow-500'
+                    }`}>
+                      {status === 'PRESENTE' && <CheckCircle className="h-5 w-5 text-white" />}
+                      {status === 'AUSENTE' && <XCircle className="h-5 w-5 text-white" />}
+                      {status === 'JUSTIFICADO' && <AlertCircle className="h-5 w-5 text-white" />}
+                    </div>
+                  )}
+                </div>
+
+                {/* Nome */}
+                <div className="p-2 text-center">
+                  <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">
+                    {aluno.nome.split(' ')[0]}
+                  </p>
+                  {reg?.motivo && (
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">{reg.motivo}</p>
+                  )}
+                </div>
+
+                {/* Botões de marcação */}
+                <div className="flex border-t">
+                  <button
+                    onClick={() => marcar(aluno.id, 'PRESENTE')}
+                    className={`flex-1 py-2.5 flex items-center justify-center transition-colors ${
+                      status === 'PRESENTE'
+                        ? 'bg-green-500 text-white'
+                        : 'bg-white text-gray-400 hover:bg-green-50 hover:text-green-600'
+                    }`}
+                    title="Presente"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => marcar(aluno.id, 'AUSENTE')}
+                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                      status === 'AUSENTE'
+                        ? 'bg-red-500 text-white'
+                        : 'bg-white text-gray-400 hover:bg-red-50 hover:text-red-600'
+                    }`}
+                    title="Ausente"
+                  >
+                    <XCircle className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => marcar(aluno.id, 'JUSTIFICADO')}
+                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                      status === 'JUSTIFICADO'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-white text-gray-400 hover:bg-yellow-50 hover:text-yellow-600'
+                    }`}
+                    title="Falta justificada"
+                  >
+                    <AlertCircle className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Seleção de motivo (aparece ao clicar em ausente/justificado) */}
+              {isExpanded && (
+                <div className="bg-white rounded-xl border-2 border-blue-200 p-2 shadow-lg">
+                  <p className="text-xs font-semibold text-gray-600 mb-2 text-center">Por que faltou?</p>
+                  <div className="space-y-1">
+                    {MOTIVOS_FALTA.map((motivo) => (
+                      <button
+                        key={motivo}
+                        onClick={() => selecionarMotivo(aluno.id, motivo)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                          reg?.motivo === motivo
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-50 text-gray-700 hover:bg-blue-50 hover:text-blue-700'
+                        }`}
+                      >
+                        {motivo}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setAlunoSelecionado(null)}
+                      className="w-full text-center px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Botão salvar fixo */}
+      <div className="sticky bottom-4 flex justify-center">
+        <Button
+          onClick={salvar}
+          disabled={saving || totalMarcados === 0}
+          size="lg"
+          className={`shadow-xl px-8 h-14 text-base font-bold rounded-2xl transition-all ${
+            chamadaCompleta
+              ? 'bg-green-600 hover:bg-green-700'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          <Save className="h-5 w-5 mr-2" />
+          {saving ? 'Salvando...' : chamadaCompleta ? 'Salvar Chamada Completa ✅' : `Salvar (${totalMarcados}/${chamada.totalAlunos})`}
+        </Button>
+      </div>
     </PageShell>
   );
 }

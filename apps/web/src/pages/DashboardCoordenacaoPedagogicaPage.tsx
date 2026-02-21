@@ -1,662 +1,380 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
 import {
-  Users,
-  BookOpen,
-  ShoppingCart,
-  ClipboardList,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Calendar,
-  AlertTriangle,
-  TrendingUp,
-  Eye,
-  Check,
-  X,
+  Users, BookOpen, ClipboardList, ShoppingCart,
+  CheckCircle, AlertCircle, ChevronRight,
+  Eye, ThumbsUp, MessageSquare, TrendingUp,
+  Bell, Star,
 } from 'lucide-react';
 
-interface DashboardUnidade {
-  unitId: string;
-  data: string;
-  indicadores: {
-    totalTurmas: number;
-    totalAlunos: number;
-    requisicoesPendentes: number;
-    planejamentosRascunho: number;
-    planejamentosPublicados: number;
-    diariosHoje: number;
-    turmasComChamadaHoje: number;
-    reunioesAgendadas: number;
-  };
-  turmas: Array<{
-    id: string;
-    nome: string;
-    totalAlunos: number;
-    professor: string;
-    chamadaFeita: boolean;
-  }>;
-  requisicoesPendentesDetalhes: Array<{
-    id: string;
-    title: string;
-    createdBy: string;
-    requestedDate: string;
-    classroomId: string;
-    priority: string;
-  }>;
-  planejamentosParaRevisao: Array<{
-    id: string;
-    title: string;
-    createdBy: string;
-    startDate: string;
-    endDate: string;
-    classroomId: string;
-  }>;
-  proximasReunioes: Array<{
-    id: string;
-    titulo: string;
-    dataRealizacao: string;
-    tipo: string;
-    status: string;
-  }>;
+const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
+  ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
+  MEDIA: { label: 'Normal', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500' },
+  BAIXA: { label: 'Sem pressa', cor: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500' },
+};
+
+const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+interface Requisicao {
+  id: string; professorNome: string; turmaNome: string;
+  itens: Array<{ item: string; quantidade: number }>; urgencia: string;
+  justificativa: string; criadoEm: string;
+}
+interface Planejamento {
+  id: string; professorNome: string; turmaNome: string;
+  semana: string; objetivos?: string;
+}
+interface Diario {
+  id: string; professorNome: string; turmaNome: string;
+  data: string; titulo: string;
+}
+interface DashboardData {
+  turmas: number; professores: number; alunosTotal: number;
+  requisicoesParaAnalisar: number; planejamentosParaRevisar: number;
+  diariosEstaSemana: number; taxaPresencaMedia: number; alertas: string[];
 }
 
 export default function DashboardCoordenacaoPedagogicaPage() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DashboardUnidade | null>(null);
-  const [aprovando, setAprovando] = useState<string | null>(null);
-  const [aprovandoReq, setAprovandoReq] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'visao-geral' | 'requisicoes' | 'planejamentos' | 'diarios' | 'reunioes'>('visao-geral');
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
+  const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
+  const [diarios, setDiarios] = useState<Diario[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'>('inicio');
+  const [processando, setProcessando] = useState<string|null>(null);
+  const [motivoRejeicao, setMotivoRejeicao] = useState('');
+  const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  useEffect(() => { loadDashboard(); }, []);
 
   async function loadDashboard() {
     try {
       setLoading(true);
-      const res = await http.get('/coordenacao/dashboard/unidade');
-      setData(res.data);
-    } catch (err: any) {
-      console.error('Erro ao carregar dashboard:', err);
-      toast.error('Erro ao carregar dashboard da coordenação');
-    } finally {
-      setLoading(false);
-    }
+      const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
+        http.get('/coordenacao/dashboard/unidade'),
+        http.get('/coordenacao/requisicoes?status=PENDENTE'),
+        http.get('/coordenacao/planejamentos?status=AGUARDANDO_APROVACAO'),
+        http.get('/coordenacao/diarios?periodo=semana'),
+      ]);
+      if (dashRes.status === 'fulfilled') setDashboard(dashRes.value.data);
+      if (reqRes.status === 'fulfilled') setRequisicoes(reqRes.value.data ?? []);
+      if (planRes.status === 'fulfilled') setPlanejamentos(planRes.value.data ?? []);
+      if (diarRes.status === 'fulfilled') setDiarios(diarRes.value.data ?? []);
+    } catch { toast.error('Erro ao carregar painel'); }
+    finally { setLoading(false); }
   }
 
-  async function aprovarPlanejamento(id: string, aprovar: boolean) {
+  async function aprovarRequisicao(id: string) {
     try {
-      setAprovando(id);
-      await http.patch(`/coordenacao/planejamentos/${id}/aprovar`, { aprovar });
-      toast.success(aprovar ? 'Planejamento aprovado!' : 'Planejamento devolvido para revisão');
-      loadDashboard();
-    } catch (err: any) {
-      toast.error('Erro ao processar planejamento');
-    } finally {
-      setAprovando(null);
-    }
+      setProcessando(id);
+      await http.patch(`/material-requests/${id}/status`, { status: 'APROVADO' });
+      toast.success('Pedido aprovado! ✅');
+      setRequisicoes(prev => prev.filter(r => r.id !== id));
+    } catch { toast.error('Erro ao aprovar'); }
+    finally { setProcessando(null); }
   }
 
-  async function aprovarRequisicao(id: string, aprovar: boolean) {
+  async function rejeitarRequisicao(id: string, motivo: string) {
     try {
-      setAprovandoReq(id);
-      await http.patch(`/material-requests/${id}/review`, {
-        decision: aprovar ? 'APPROVED' : 'REJECTED',
-        notes: aprovar ? 'Aprovado pela coordenação' : 'Rejeitado pela coordenação',
-      });
-      toast.success(aprovar ? 'Requisição aprovada!' : 'Requisição rejeitada');
-      loadDashboard();
-    } catch (err: any) {
-      toast.error('Erro ao processar requisição');
-    } finally {
-      setAprovandoReq(null);
-    }
+      setProcessando(id);
+      await http.patch(`/material-requests/${id}/status`, { status: 'REJEITADO', motivoRejeicao: motivo });
+      toast.success('Pedido devolvido ao professor');
+      setRequisicoes(prev => prev.filter(r => r.id !== id));
+      setItemParaRejeitar(null); setMotivoRejeicao('');
+    } catch { toast.error('Erro ao devolver'); }
+    finally { setProcessando(null); }
   }
 
-  if (loading) return <LoadingState message="Carregando dashboard da coordenação..." />;
-  if (!data) return (
-    <PageShell title="Dashboard Coordenação Pedagógica">
-      <div className="text-center py-12 text-muted-foreground">
-        <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-        <p>Erro ao carregar dados. Tente novamente.</p>
-        <Button onClick={loadDashboard} className="mt-4">Recarregar</Button>
-      </div>
-    </PageShell>
-  );
+  async function aprovarPlanejamento(id: string) {
+    try {
+      setProcessando(id);
+      await http.patch(`/coordenacao/planejamentos/${id}`, { status: 'APROVADO' });
+      toast.success('Planejamento aprovado! ✅');
+      setPlanejamentos(prev => prev.filter(p => p.id !== id));
+    } catch { toast.error('Erro ao aprovar'); }
+    finally { setProcessando(null); }
+  }
 
-  const { indicadores, turmas, requisicoesPendentesDetalhes, planejamentosParaRevisao, proximasReunioes } = data;
+  async function devolverPlanejamento(id: string, motivo: string) {
+    try {
+      setProcessando(id);
+      await http.patch(`/coordenacao/planejamentos/${id}`, { status: 'DEVOLVIDO', observacao: motivo });
+      toast.success('Planejamento devolvido com observações');
+      setPlanejamentos(prev => prev.filter(p => p.id !== id));
+      setItemParaRejeitar(null); setMotivoRejeicao('');
+    } catch { toast.error('Erro ao devolver'); }
+    finally { setProcessando(null); }
+  }
 
-  const tabs = [
-    { id: 'visao-geral', label: 'Visão Geral' },
-    { id: 'requisicoes', label: `Requisições (${indicadores.requisicoesPendentes})` },
-    { id: 'planejamentos', label: `Planejamentos (${indicadores.planejamentosRascunho})` },
-    { id: 'diarios', label: 'Diários' },
-    { id: 'reunioes', label: `Reuniões (${indicadores.reunioesAgendadas})` },
+  if (loading) return <LoadingState message="Carregando painel de coordenação..." />;
+
+  const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
+
+  const abas = [
+    { id: 'inicio', label: 'Início', icon: <Star className="h-4 w-4" /> },
+    { id: 'requisicoes', label: 'Pedidos de Material', icon: <ShoppingCart className="h-4 w-4" />, badge: dashboard?.requisicoesParaAnalisar },
+    { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
+    { id: 'diarios', label: 'Diários da Semana', icon: <ClipboardList className="h-4 w-4" /> },
   ] as const;
 
   return (
-    <PageShell
-      title="Coordenação Pedagógica"
-      description={`Unidade · ${new Date(data.data).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}`}
-      headerActions={
-        <Button onClick={loadDashboard} variant="outline" size="sm">
-          Atualizar
-        </Button>
-      }
-    >
-      {/* Indicadores */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Turmas</p>
-                <p className="text-2xl font-bold">{indicadores.totalTurmas}</p>
-                <p className="text-xs text-muted-foreground">{indicadores.turmasComChamadaHoje} com chamada hoje</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-500 opacity-70" />
+    <PageShell title="Coordenação Pedagógica" description="Acompanhe e apoie o trabalho dos professores">
+      {/* Modal motivo rejeição */}
+      {itemParaRejeitar && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="font-bold text-lg mb-2">Devolver com orientação</h3>
+            <p className="text-sm text-gray-500 mb-4">Escreva uma orientação para o professor:</p>
+            <textarea className="w-full border-2 rounded-xl p-3 text-sm resize-none mb-4" rows={4}
+              placeholder="Ex: Por favor, detalhe melhor os objetivos..."
+              value={motivoRejeicao} onChange={e => setMotivoRejeicao(e.target.value)} />
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 rounded-xl"
+                onClick={() => { setItemParaRejeitar(null); setMotivoRejeicao(''); }}>Cancelar</Button>
+              <Button className="flex-1 rounded-xl bg-orange-500 hover:bg-orange-600"
+                onClick={() => {
+                  if (!motivoRejeicao.trim()) { toast.error('Escreva uma orientação'); return; }
+                  if (itemParaRejeitar.tipo === 'req') rejeitarRequisicao(itemParaRejeitar.id, motivoRejeicao);
+                  else devolverPlanejamento(itemParaRejeitar.id, motivoRejeicao);
+                }}>Devolver</Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      )}
 
-        <Card className={`border-l-4 ${indicadores.requisicoesPendentes > 0 ? 'border-l-orange-500' : 'border-l-green-500'}`}>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Requisições Pendentes</p>
-                <p className="text-2xl font-bold">{indicadores.requisicoesPendentes}</p>
-                <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
-              </div>
-              <ShoppingCart className={`h-8 w-8 opacity-70 ${indicadores.requisicoesPendentes > 0 ? 'text-orange-500' : 'text-green-500'}`} />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Alerta de pendências */}
+      {totalPendencias > 0 && (
+        <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-center gap-3">
+          <Bell className="h-6 w-6 text-orange-500 flex-shrink-0" />
+          <div>
+            <p className="font-bold text-orange-800">{totalPendencias} {totalPendencias === 1 ? 'item precisa' : 'itens precisam'} da sua atenção</p>
+            <p className="text-sm text-orange-600">
+              {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 ? `${dashboard?.requisicoesParaAnalisar} pedido(s) de material · ` : ''}
+              {(dashboard?.planejamentosParaRevisar ?? 0) > 0 ? `${dashboard?.planejamentosParaRevisar} planejamento(s) para revisar` : ''}
+            </p>
+          </div>
+        </div>
+      )}
 
-        <Card className={`border-l-4 ${indicadores.planejamentosRascunho > 0 ? 'border-l-yellow-500' : 'border-l-green-500'}`}>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Planejamentos para Revisar</p>
-                <p className="text-2xl font-bold">{indicadores.planejamentosRascunho}</p>
-                <p className="text-xs text-muted-foreground">{indicadores.planejamentosPublicados} publicados</p>
-              </div>
-              <BookOpen className={`h-8 w-8 opacity-70 ${indicadores.planejamentosRascunho > 0 ? 'text-yellow-500' : 'text-green-500'}`} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-l-purple-500">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">Diários Hoje</p>
-                <p className="text-2xl font-bold">{indicadores.diariosHoje}</p>
-                <p className="text-xs text-muted-foreground">{indicadores.totalAlunos} alunos total</p>
-              </div>
-              <ClipboardList className="h-8 w-8 text-purple-500 opacity-70" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {tab.label}
+      {/* Abas */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
+        {abas.map(aba => (
+          <button key={aba.id} onClick={() => setAbaAtiva(aba.id as any)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+              abaAtiva === aba.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            {aba.icon}{aba.label}
+            {(aba as any).badge > 0 && (
+              <span className="bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                {(aba as any).badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Tab: Visão Geral */}
-      {activeTab === 'visao-geral' && (
+      {/* ABA: INÍCIO */}
+      {abaAtiva === 'inicio' && (
         <div className="space-y-6">
-          {/* Status das Turmas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Status das Turmas Hoje</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {turmas.map((turma) => (
-                  <div
-                    key={turma.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border ${
-                      turma.chamadaFeita ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    {turma.chamadaFeita ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{turma.nome}</p>
-                      <p className="text-xs text-muted-foreground truncate">{turma.professor}</p>
-                      <p className="text-xs text-muted-foreground">{turma.totalAlunos} alunos</p>
-                    </div>
-                    <Badge variant={turma.chamadaFeita ? 'default' : 'secondary'} className="text-xs">
-                      {turma.chamadaFeita ? 'Chamada OK' : 'Pendente'}
-                    </Badge>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: <Users className="h-6 w-6 text-blue-600"/>, bg: 'bg-blue-100', val: dashboard?.turmas ?? 0, label: 'Turmas' },
+              { icon: <Star className="h-6 w-6 text-purple-600"/>, bg: 'bg-purple-100', val: dashboard?.professores ?? 0, label: 'Professores' },
+              { icon: <TrendingUp className="h-6 w-6 text-green-600"/>, bg: 'bg-green-100', val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
+              { icon: <ClipboardList className="h-6 w-6 text-orange-600"/>, bg: 'bg-orange-100', val: dashboard?.diariosEstaSemana ?? 0, label: 'Diários esta semana' },
+            ].map((c, i) => (
+              <Card key={i} className="rounded-2xl border-2 text-center">
+                <CardContent className="pt-5 pb-4">
+                  <div className={`w-12 h-12 ${c.bg} rounded-2xl flex items-center justify-center mx-auto mb-3`}>{c.icon}</div>
+                  <p className="text-3xl font-bold text-gray-800">{c.val}</p>
+                  <p className="text-sm text-gray-500 mt-1">{c.label}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
+              <button onClick={() => setAbaAtiva('requisicoes')}
+                className="p-5 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <ShoppingCart className="h-6 w-6 text-red-500"/>
+                  <span className="bg-red-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.requisicoesParaAnalisar}</span>
+                </div>
+                <p className="font-bold text-red-800">Pedidos de material</p>
+                <p className="text-sm text-red-600 mt-1">aguardando sua análise</p>
+                <div className="flex items-center gap-1 mt-3 text-red-500 text-sm font-medium">Analisar agora <ChevronRight className="h-4 w-4"/></div>
+              </button>
+            )}
+            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
+              <button onClick={() => setAbaAtiva('planejamentos')}
+                className="p-5 bg-yellow-50 border-2 border-yellow-200 rounded-2xl text-left hover:bg-yellow-100 transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <BookOpen className="h-6 w-6 text-yellow-600"/>
+                  <span className="bg-yellow-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.planejamentosParaRevisar}</span>
+                </div>
+                <p className="font-bold text-yellow-800">Planejamentos</p>
+                <p className="text-sm text-yellow-600 mt-1">para revisar e aprovar</p>
+                <div className="flex items-center gap-1 mt-3 text-yellow-600 text-sm font-medium">Revisar agora <ChevronRight className="h-4 w-4"/></div>
+              </button>
+            )}
+            <button onClick={() => setAbaAtiva('diarios')}
+              className="p-5 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <ClipboardList className="h-6 w-6 text-blue-500"/>
+                <span className="bg-blue-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.diariosEstaSemana ?? 0}</span>
+              </div>
+              <p className="font-bold text-blue-800">Diários da semana</p>
+              <p className="text-sm text-blue-600 mt-1">registros dos professores</p>
+              <div className="flex items-center gap-1 mt-3 text-blue-500 text-sm font-medium">Ver diários <ChevronRight className="h-4 w-4"/></div>
+            </button>
+          </div>
+
+          {dashboard?.alertas && dashboard.alertas.length > 0 && (
+            <Card className="rounded-2xl border-2 border-orange-200 bg-orange-50">
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-orange-800"><AlertCircle className="h-5 w-5"/>Atenção</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {dashboard.alertas.map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-orange-700">
+                    <span className="w-2 h-2 bg-orange-400 rounded-full mt-1.5 flex-shrink-0"/>{a}
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Próximas Reuniões */}
-          {proximasReunioes.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Próximas Reuniões
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {proximasReunioes.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">{r.titulo}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(r.dataRealizacao).toLocaleDateString('pt-BR', {
-                            weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                      <Badge variant="outline">{r.tipo}</Badge>
-                    </div>
-                  ))}
-                </div>
               </CardContent>
             </Card>
           )}
         </div>
       )}
 
-      {/* Tab: Requisições */}
-      {activeTab === 'requisicoes' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Requisições Pendentes de Aprovação</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {requisicoesPendentesDetalhes.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-500" />
-                <p>Nenhuma requisição pendente!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {requisicoesPendentesDetalhes.map((req) => (
-                  <div key={req.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{req.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(req.requestedDate).toLocaleDateString('pt-BR')}
-                      </p>
-                      {req.priority && (
-                        <Badge
-                          variant={req.priority === 'alta' ? 'destructive' : 'secondary'}
-                          className="text-xs mt-1"
-                        >
-                          {req.priority === 'alta' ? 'Urgente' : req.priority === 'normal' ? 'Normal' : 'Baixa'}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600 border-green-300 hover:bg-green-50"
-                        onClick={() => aprovarRequisicao(req.id, true)}
-                        disabled={aprovandoReq === req.id}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600 border-red-300 hover:bg-red-50"
-                        onClick={() => aprovarRequisicao(req.id, false)}
-                        disabled={aprovandoReq === req.id}
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Rejeitar
-                      </Button>
+      {/* ABA: PEDIDOS DE MATERIAL */}
+      {abaAtiva === 'requisicoes' && (
+        <div className="space-y-4">
+          {requisicoes.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300"/>
+              <p className="text-xl font-bold text-gray-400">Tudo em dia!</p>
+              <p className="text-gray-400 text-sm mt-2">Nenhum pedido aguardando análise</p>
+            </div>
+          ) : requisicoes.map(req => {
+            const urg = URGENCIA_CONFIG[req.urgencia] ?? URGENCIA_CONFIG['MEDIA'];
+            const d = new Date(req.criadoEm);
+            return (
+              <Card key={req.id} className="rounded-2xl border-2 overflow-hidden">
+                <div className={`px-4 py-2 flex items-center justify-between ${req.urgencia === 'ALTA' ? 'bg-red-50' : req.urgencia === 'MEDIA' ? 'bg-yellow-50' : 'bg-green-50'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${urg.dot}`}/>
+                    <span className="text-sm font-semibold">{req.professorNome}</span>
+                    <span className="text-xs text-gray-500">· {req.turmaNome}</span>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full border font-medium ${urg.cor}`}>{urg.label}</span>
+                </div>
+                <CardContent className="p-4 space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2">O que está pedindo:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {req.itens.map((item, idx) => (
+                        <span key={idx} className="px-3 py-1.5 bg-gray-100 rounded-xl text-sm font-medium">{item.quantidade}x {item.item}</span>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tab: Planejamentos */}
-      {activeTab === 'planejamentos' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Planejamentos para Revisão</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {planejamentosParaRevisao.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-500" />
-                <p>Nenhum planejamento aguardando revisão!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {planejamentosParaRevisao.map((plan) => (
-                  <div key={plan.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{plan.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(plan.startDate).toLocaleDateString('pt-BR')} —{' '}
-                        {new Date(plan.endDate).toLocaleDateString('pt-BR')}
-                      </p>
+                  {req.justificativa && (
+                    <div className="p-3 bg-blue-50 rounded-xl">
+                      <p className="text-xs text-blue-600 font-medium mb-1">Por que precisa:</p>
+                      <p className="text-sm text-blue-800">{req.justificativa}</p>
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600 border-green-300 hover:bg-green-50"
-                        onClick={() => aprovarPlanejamento(plan.id, true)}
-                        disabled={aprovando === plan.id}
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-yellow-600 border-yellow-300 hover:bg-yellow-50"
-                        onClick={() => aprovarPlanejamento(plan.id, false)}
-                        disabled={aprovando === plan.id}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Devolver
-                      </Button>
-                    </div>
+                  )}
+                  <p className="text-xs text-gray-400">Pedido em {d.getDate()} de {MESES[d.getMonth()]}</p>
+                  <div className="flex gap-3 pt-1">
+                    <Button onClick={() => aprovarRequisicao(req.id)} disabled={processando === req.id}
+                      className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 font-bold">
+                      <ThumbsUp className="h-4 w-4 mr-2"/>Aprovar
+                    </Button>
+                    <Button onClick={() => setItemParaRejeitar({ id: req.id, tipo: 'req' })} disabled={processando === req.id}
+                      variant="outline" className="flex-1 h-11 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold">
+                      <MessageSquare className="h-4 w-4 mr-2"/>Devolver
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
-      {/* Tab: Diários */}
-      {activeTab === 'diarios' && (
-        <DiariosCoordenacaoTab unitId={data.unitId} />
+      {/* ABA: PLANEJAMENTOS */}
+      {abaAtiva === 'planejamentos' && (
+        <div className="space-y-4">
+          {planejamentos.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300"/>
+              <p className="text-xl font-bold text-gray-400">Tudo revisado!</p>
+            </div>
+          ) : planejamentos.map(plan => (
+            <Card key={plan.id} className="rounded-2xl border-2">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-bold text-gray-800">{plan.professorNome}</p>
+                    <p className="text-sm text-gray-500">{plan.turmaNome} · Semana de {plan.semana}</p>
+                  </div>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Para revisar</span>
+                </div>
+                {plan.objetivos && (
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-500 mb-1">Objetivos da semana:</p>
+                    <p className="text-sm text-gray-700 line-clamp-3">{plan.objetivos}</p>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <Button onClick={() => aprovarPlanejamento(plan.id)} disabled={processando === plan.id}
+                    className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 font-bold">
+                    <ThumbsUp className="h-4 w-4 mr-2"/>Aprovar
+                  </Button>
+                  <Button onClick={() => setItemParaRejeitar({ id: plan.id, tipo: 'plan' })} disabled={processando === plan.id}
+                    variant="outline" className="flex-1 h-11 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold">
+                    <MessageSquare className="h-4 w-4 mr-2"/>Devolver
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Tab: Reuniões */}
-      {activeTab === 'reunioes' && (
-        <ReunioesCoordenacaoTab mantenedoraId="" unitId={data.unitId} onRefresh={loadDashboard} />
+      {/* ABA: DIÁRIOS */}
+      {abaAtiva === 'diarios' && (
+        <div className="space-y-3">
+          {diarios.length === 0 ? (
+            <div className="text-center py-16">
+              <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-200"/>
+              <p className="text-xl font-bold text-gray-400">Nenhum diário esta semana</p>
+            </div>
+          ) : diarios.map(diario => {
+            const d = new Date(diario.data + 'T12:00:00');
+            return (
+              <Card key={diario.id} className="rounded-2xl border-2 hover:border-blue-300 transition-all">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <ClipboardList className="h-5 w-5 text-blue-600"/>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{diario.titulo}</p>
+                        <p className="text-xs text-gray-500">{diario.professorNome} · {diario.turmaNome} · {d.getDate()}/{d.getMonth()+1}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="ghost" className="rounded-xl"><Eye className="h-4 w-4"/></Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </PageShell>
-  );
-}
-
-// ─── Sub-componente: Diários ──────────────────────────────────────────────────
-
-function DiariosCoordenacaoTab({ unitId }: { unitId: string }) {
-  const [diarios, setDiarios] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadDiarios();
-  }, []);
-
-  async function loadDiarios() {
-    try {
-      setLoading(true);
-      const res = await http.get('/coordenacao/diarios');
-      setDiarios(res.data);
-    } catch {
-      toast.error('Erro ao carregar diários');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (loading) return <LoadingState message="Carregando diários..." />;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <ClipboardList className="h-4 w-4" />
-          Diários de Bordo — Última Semana
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {diarios.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p>Nenhum diário registrado esta semana</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {diarios.map((d: any) => (
-              <div key={d.id} className="p-3 border rounded-lg">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="font-medium text-sm">{d.classroom?.name ?? 'Turma'}</p>
-                  <span className="text-xs text-muted-foreground">
-                    {d.eventDate ? new Date(d.eventDate).toLocaleDateString('pt-BR') : ''}
-                  </span>
-                </div>
-                {d.child && (
-                  <p className="text-xs text-muted-foreground">
-                    Aluno: {d.child.firstName} {d.child.lastName}
-                  </p>
-                )}
-                {d.description && (
-                  <p className="text-sm mt-1 text-gray-700 line-clamp-2">{d.description}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Sub-componente: Reuniões ─────────────────────────────────────────────────
-
-function ReunioesCoordenacaoTab({ unitId, onRefresh }: { mantenedoraId: string; unitId: string; onRefresh: () => void }) {
-  const [reunioes, setReunioes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [criando, setCriando] = useState(false);
-  const [form, setForm] = useState({ titulo: '', dataRealizacao: '', localOuLink: '', tipo: 'UNIDADE', descricao: '' });
-
-  useEffect(() => {
-    loadReunioes();
-  }, []);
-
-  async function loadReunioes() {
-    try {
-      setLoading(true);
-      const res = await http.get('/coordenacao/reunioes');
-      setReunioes(res.data);
-    } catch {
-      toast.error('Erro ao carregar reuniões');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function criarReuniao() {
-    if (!form.titulo || !form.dataRealizacao) {
-      toast.error('Título e data são obrigatórios');
-      return;
-    }
-    try {
-      setCriando(true);
-      await http.post('/coordenacao/reunioes', form);
-      toast.success('Reunião criada!');
-      setForm({ titulo: '', dataRealizacao: '', localOuLink: '', tipo: 'UNIDADE', descricao: '' });
-      loadReunioes();
-      onRefresh();
-    } catch {
-      toast.error('Erro ao criar reunião');
-    } finally {
-      setCriando(false);
-    }
-  }
-
-  async function publicarReuniao(id: string) {
-    try {
-      await http.patch(`/coordenacao/reunioes/${id}/status`, { status: 'PUBLICADA' });
-      toast.success('Reunião publicada!');
-      loadReunioes();
-    } catch {
-      toast.error('Erro ao publicar reunião');
-    }
-  }
-
-  if (loading) return <LoadingState message="Carregando reuniões..." />;
-
-  return (
-    <div className="space-y-6">
-      {/* Criar nova reunião */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Nova Pauta / Reunião
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Título *</label>
-              <input
-                className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                placeholder="Ex: Reunião de Coordenação Pedagógica"
-                value={form.titulo}
-                onChange={(e) => setForm({ ...form, titulo: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Data e Hora *</label>
-              <input
-                type="datetime-local"
-                className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                value={form.dataRealizacao}
-                onChange={(e) => setForm({ ...form, dataRealizacao: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Local ou Link</label>
-              <input
-                className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                placeholder="Sala de reuniões ou link do Meet"
-                value={form.localOuLink}
-                onChange={(e) => setForm({ ...form, localOuLink: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Tipo</label>
-              <select
-                className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              >
-                <option value="UNIDADE">Unidade</option>
-                <option value="REDE">Rede</option>
-                <option value="FORMACAO">Formação</option>
-                <option value="EMERGENCIAL">Emergencial</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium">Pauta / Descrição</label>
-              <textarea
-                className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
-                rows={3}
-                placeholder="Descreva os pontos da pauta..."
-                value={form.descricao}
-                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-              />
-            </div>
-          </div>
-          <Button onClick={criarReuniao} disabled={criando} className="mt-4">
-            {criando ? 'Criando...' : 'Criar Reunião'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Lista de reuniões */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Reuniões Agendadas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {reunioes.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="w-10 h-10 mx-auto mb-2 opacity-40" />
-              <p>Nenhuma reunião cadastrada</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {reunioes.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{r.titulo}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(r.dataRealizacao).toLocaleDateString('pt-BR', {
-                        weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                      {r.localOuLink && ` · ${r.localOuLink}`}
-                    </p>
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">{r.tipo}</Badge>
-                      <Badge
-                        variant={r.status === 'PUBLICADA' ? 'default' : r.status === 'REALIZADA' ? 'secondary' : 'outline'}
-                        className="text-xs"
-                      >
-                        {r.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  {r.status === 'RASCUNHO' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => publicarReuniao(r.id)}
-                      className="ml-4"
-                    >
-                      Publicar
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
   );
 }
