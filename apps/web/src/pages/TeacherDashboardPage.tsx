@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http from '../api/http';
+import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -126,6 +127,20 @@ export default function TeacherDashboardPage() {
   const ind = data?.indicadores;
   const turma = data?.classroom;
 
+  // Widget do Objetivo do Dia
+  const hoje2 = new Date();
+  const ddmmHoje = `${String(hoje2.getDate()).padStart(2,'0')}/${String(hoje2.getMonth()+1).padStart(2,'0')}`;
+  const segmentoTurma = (turma?.segmento as SegmentoKey) || 'EI02';
+  const objetivosHoje = getObjetivosDia(ddmmHoje, segmentoTurma);
+  const segmentosHoje = getSegmentosNaData(ddmmHoje);
+  const CAMPO_CORES: Record<string, string> = {
+    'eu-outro-nos': 'bg-pink-50 border-pink-200 text-pink-800',
+    'corpo-gestos': 'bg-orange-50 border-orange-200 text-orange-800',
+    'tracos-sons': 'bg-purple-50 border-purple-200 text-purple-800',
+    'escuta-fala': 'bg-blue-50 border-blue-200 text-blue-800',
+    'espacos-tempos': 'bg-green-50 border-green-200 text-green-800',
+  };
+
   return (
     <PageShell
       title={`Olá, ${nomeProf}! 👋`}
@@ -144,6 +159,49 @@ export default function TeacherDashboardPage() {
 
       {data?.hasClassroom && (
         <div className="space-y-6">
+          {/* Widget: Objetivo do Dia */}
+          {objetivosHoje.length > 0 && (
+            <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center">
+                    <Star className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-amber-800 text-sm">Objetivo do Dia — {ddmmHoje}/2026</p>
+                    <p className="text-xs text-amber-600">{objetivosHoje[0]?.semana_tema && `Semana: "${objetivosHoje[0].semana_tema}"`}</p>
+                  </div>
+                </div>
+                <button onClick={() => navigate('/app/planejamento-diario')}
+                  className="text-xs text-amber-700 font-medium hover:text-amber-900 flex items-center gap-1">
+                  Ver calendário <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
+              <div className="space-y-2">
+                {objetivosHoje.map((obj, i) => (
+                  <div key={i} className={`rounded-xl border p-3 ${CAMPO_CORES[obj.campo_id] || 'bg-gray-50 border-gray-200 text-gray-800'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-base">{obj.campo_emoji}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 bg-white/60 rounded-full">{obj.codigo_bncc}</span>
+                      <span className="text-xs opacity-70">{obj.campo_label}</span>
+                    </div>
+                    <p className="text-sm font-medium leading-snug">{obj.objetivo_bncc}</p>
+                    {obj.intencionalidade && (
+                      <p className="text-xs opacity-70 mt-1 flex items-start gap-1">
+                        <Lightbulb className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        {obj.intencionalidade}
+                      </p>
+                    )}
+                    <button onClick={() => navigate('/app/planejamento-diario')}
+                      className="mt-2 text-xs font-semibold underline underline-offset-2 opacity-80 hover:opacity-100">
+                      Criar template de planejamento →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Cards de indicadores */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
