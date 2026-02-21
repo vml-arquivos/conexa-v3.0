@@ -8,9 +8,10 @@ import {
 } from 'lucide-react';
 import {
   MATRIZ_2026, SEGMENTOS, CAMPOS_EXPERIENCIA,
-  SegmentoKey, getEntradasSegmentoDia,
+  getEntradasSegmentoDia,
   getDatasLetivas,
 } from '../data/matrizCompleta2026';
+import type { SegmentoKey } from '../data/matrizCompleta2026';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ExemploAtividade {
