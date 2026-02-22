@@ -8,16 +8,9 @@ export class MaterialsService {
   /**
    * Listar todos os materiais ativos
    */
-  async findAll(category?: string) {
-    return this.prisma.material.findMany({
-      where: {
-        isActive: true,
-        ...(category && { category }),
-      },
-      orderBy: [
-        { category: 'asc' },
-        { name: 'asc' },
-      ],
+  async findAll(_category?: string) {
+    return this.prisma.stockItem.findMany({
+      orderBy: { name: 'asc' },
     });
   }
 
@@ -25,7 +18,7 @@ export class MaterialsService {
    * Buscar material por ID
    */
   async findOne(id: string) {
-    return this.prisma.material.findUnique({
+    return this.prisma.stockItem.findUnique({
       where: { id },
     });
   }
@@ -34,11 +27,9 @@ export class MaterialsService {
    * Buscar materiais por categoria
    */
   async findByCategory(category: string) {
-    return this.prisma.material.findMany({
-      where: {
-        category,
-        isActive: true,
-      },
+    // StockItem não tem campo category — filtra por name contains
+    return this.prisma.stockItem.findMany({
+      where: { name: { contains: category, mode: 'insensitive' } },
       orderBy: { name: 'asc' },
     });
   }

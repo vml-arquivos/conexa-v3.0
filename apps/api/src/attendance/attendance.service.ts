@@ -97,7 +97,6 @@ export class AttendanceService {
                   id: true,
                   firstName: true,
                   lastName: true,
-                  photoUrl: true,
                 },
               },
             },
@@ -118,7 +117,7 @@ export class AttendanceService {
       return {
         id: child.id,
         nome: `${child.firstName} ${child.lastName}`,
-        photoUrl: child.photoUrl,
+        photoUrl: null as string | null,
         status: att?.status ?? null,
         justification: att?.justification ?? null,
         registrado: !!att,

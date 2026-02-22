@@ -31,7 +31,6 @@ export class TeachersService {
                     lastName: true,
                     dateOfBirth: true,
                     gender: true,
-                    photoUrl: true,
                     isActive: true,
                   },
                 },
@@ -100,7 +99,7 @@ export class TeachersService {
         dateOfBirth: child.dateOfBirth,
         idade: this.calculateAge(child.dateOfBirth),
         gender: child.gender,
-        photoUrl: child.photoUrl,
+        photoUrl: null as string | null, // campo não existe no schema atual
       })),
       indicadores: {
         totalAlunos,

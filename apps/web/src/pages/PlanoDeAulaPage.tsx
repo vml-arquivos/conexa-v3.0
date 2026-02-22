@@ -124,6 +124,10 @@ function CardEntrada({ entrada, expanded, onToggle }: {
 }) {
   const [exemploSelecionado, setExemploSelecionado] = useState<number | null>(null);
   const [adicionadoAoPlano, setAdicionadoAoPlano] = useState(false);
+  const [avaliacaoAberta, setAvaliacaoAberta] = useState(false);
+  const [avaliacaoTexto, setAvaliacaoTexto] = useState('');
+  const [avaliacaoSalva, setAvaliacaoSalva] = useState(false);
+  const [notaGeral, setNotaGeral] = useState<'OTIMO' | 'BOM' | 'REGULAR' | 'NAO_REALIZADO' | ''>('');
   const cor = getCorCampo(entrada.campo_id);
 
   const exemplos: ExemploAtividade[] = (entrada as any).exemplos_atividades?.length
@@ -219,6 +223,70 @@ function CardEntrada({ entrada, expanded, onToggle }: {
             </div>
           </div>
 
+          {/* ─── Avaliação do Professor ─── */}
+          <div className="border-t border-gray-100 pt-4">
+            <button
+              onClick={() => setAvaliacaoAberta(!avaliacaoAberta)}
+              className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-blue-700 transition-colors w-full text-left"
+            >
+              <Star className={`h-4 w-4 ${notaGeral ? 'text-yellow-500 fill-yellow-400' : 'text-gray-400'}`} />
+              Avaliação do Professor
+              {notaGeral && (
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-medium ${
+                  notaGeral === 'OTIMO' ? 'bg-green-100 text-green-700' :
+                  notaGeral === 'BOM' ? 'bg-blue-100 text-blue-700' :
+                  notaGeral === 'REGULAR' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {notaGeral === 'OTIMO' ? '✅ Ótimo' : notaGeral === 'BOM' ? '👍 Bom' : notaGeral === 'REGULAR' ? '⚠️ Regular' : '❌ Não realizado'}
+                </span>
+              )}
+              {avaliacaoAberta ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
+            </button>
+            {avaliacaoAberta && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Como foi a atividade?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { id: 'OTIMO', label: '✅ Ótimo', cor: 'border-green-400 bg-green-50 text-green-700' },
+                      { id: 'BOM', label: '👍 Bom', cor: 'border-blue-400 bg-blue-50 text-blue-700' },
+                      { id: 'REGULAR', label: '⚠️ Regular', cor: 'border-yellow-400 bg-yellow-50 text-yellow-700' },
+                      { id: 'NAO_REALIZADO', label: '❌ Não realizado', cor: 'border-gray-400 bg-gray-50 text-gray-600' },
+                    ].map(op => (
+                      <button key={op.id} onClick={() => setNotaGeral(op.id as any)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 transition-all ${
+                          notaGeral === op.id ? op.cor + ' shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                        }`}>
+                        {op.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">Reflexão pedagógica (opcional)</p>
+                  <textarea
+                    rows={3}
+                    placeholder="Como as crianças reagiram? O que funcionou bem? O que adaptar na próxima vez? Quais microgestos observou?"
+                    value={avaliacaoTexto}
+                    onChange={e => setAvaliacaoTexto(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+                <button
+                  onClick={() => { setAvaliacaoSalva(true); setAvaliacaoAberta(false); setTimeout(() => setAvaliacaoSalva(false), 3000); }}
+                  disabled={!notaGeral}
+                  className={`flex items-center gap-2 text-sm px-4 py-2 rounded-xl font-semibold transition-all ${
+                    avaliacaoSalva ? 'bg-green-500 text-white' :
+                    notaGeral ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {avaliacaoSalva ? <><Check className="h-4 w-4" /> Avaliação salva!</> : <><Star className="h-4 w-4" /> Salvar avaliação</>}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Ações */}
           <div className="flex gap-2 pt-1">
             <button
@@ -254,7 +322,11 @@ function CardEntrada({ entrada, expanded, onToggle }: {
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function PlanoDeAulaPage() {
   const [segmento, setSegmento] = useState<SegmentoKey>('EI01');
-  const [modoVisualizacao, setModoVisualizacao] = useState<'diario' | 'lista'>('diario');
+  const [modoVisualizacao, setModoVisualizacao] = useState<'diario' | 'lista' | 'calendario'>('diario');
+  const [mesSelecionado, setMesSelecionado] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  });
   const [dataAtual, setDataAtual] = useState(hoje());
   const [filtroCampo, setFiltroCampo] = useState('');
   const [filtroBimestre, setFiltroBimestre] = useState('');
@@ -333,6 +405,7 @@ export default function PlanoDeAulaPage() {
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
               {[
                 { id: 'diario', label: 'Por Dia', icon: Calendar },
+                { id: 'calendario', label: 'Calendário', icon: Layers },
                 { id: 'lista', label: 'Lista Completa', icon: FileText },
               ].map(({ id, label, icon: Icon }) => (
                 <button
@@ -521,6 +594,99 @@ export default function PlanoDeAulaPage() {
             </div>
           </div>
         )}
+
+        {/* Modo Calendário Mensal */}
+        {modoVisualizacao === 'calendario' && (() => {
+          const [ano, mes] = mesSelecionado.split('-').map(Number);
+          const nomeMes = new Date(ano, mes - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+          const diasNoMes = new Date(ano, mes, 0).getDate();
+          const primeiroDia = new Date(ano, mes - 1, 1).getDay();
+          const diasLetivosDoMes = datasLetivas.filter(d => {
+            const [, mm] = d.split('/');
+            return parseInt(mm) === mes;
+          });
+          const entradasPorDia: Record<string, EntradaComExemplos[]> = {};
+          diasLetivosDoMes.forEach(dl => {
+            entradasPorDia[dl] = getEntradasSegmentoDia(dl, segmento) as EntradaComExemplos[];
+          });
+          const mesAnterior = mes === 1 ? `${ano-1}-12` : `${ano}-${String(mes-1).padStart(2,'0')}`;
+          const mesProximo = mes === 12 ? `${ano+1}-01` : `${ano}-${String(mes+1).padStart(2,'0')}`;
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+                <button onClick={() => setMesSelecionado(mesAnterior)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors">
+                  <ChevronLeft className="h-4 w-4" /> Mês anterior
+                </button>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-900 capitalize">{nomeMes}</p>
+                  <p className="text-xs text-gray-500">{diasLetivosDoMes.length} dias letivos com planejamentos</p>
+                </div>
+                <button onClick={() => setMesSelecionado(mesProximo)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 transition-colors">
+                  Próximo mês <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="grid grid-cols-7 bg-gray-50 border-b">
+                  {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => (
+                    <div key={d} className="text-center text-xs font-semibold text-gray-500 py-2">{d}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {Array.from({ length: primeiroDia }).map((_, i) => (
+                    <div key={`empty-${i}`} className="h-20 border-b border-r border-gray-100 bg-gray-50/50" />
+                  ))}
+                  {Array.from({ length: diasNoMes }).map((_, i) => {
+                    const dia = i + 1;
+                    const ddmm = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}`;
+                    const entradas = entradasPorDia[ddmm] || [];
+                    const temPlanejamento = entradas.length > 0;
+                    const isHoje = ddmm === hoje();
+                    return (
+                      <div
+                        key={dia}
+                        onClick={() => { if (temPlanejamento) { setDataAtual(ddmm); setModoVisualizacao('diario'); } }}
+                        className={`h-20 border-b border-r border-gray-100 p-1.5 transition-all ${
+                          temPlanejamento ? 'cursor-pointer hover:bg-blue-50' : 'bg-gray-50/30'
+                        } ${isHoje ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                      >
+                        <div className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
+                          isHoje ? 'bg-blue-600 text-white' : temPlanejamento ? 'text-gray-800' : 'text-gray-300'
+                        }`}>{dia}</div>
+                        {temPlanejamento && (
+                          <div className="space-y-0.5">
+                            {entradas.slice(0, 2).map((e, idx) => (
+                              <div key={idx} className={`text-[9px] px-1 py-0.5 rounded truncate font-medium ${
+                                e.campo_id === 'eu-outro-nos' ? 'bg-blue-100 text-blue-700' :
+                                e.campo_id === 'corpo-gestos' ? 'bg-green-100 text-green-700' :
+                                e.campo_id === 'tracos-sons' ? 'bg-purple-100 text-purple-700' :
+                                e.campo_id === 'escuta-fala' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-orange-100 text-orange-700'
+                              }`}>
+                                {e.campo_emoji} {e.campo_label.split(',')[0]}
+                              </div>
+                            ))}
+                            {entradas.length > 2 && <div className="text-[9px] text-gray-400">+{entradas.length - 2} mais</div>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3 text-xs">
+                {[
+                  { cor: 'bg-blue-100 text-blue-700', label: 'O eu, o outro e o nós' },
+                  { cor: 'bg-green-100 text-green-700', label: 'Corpo, gestos e movimentos' },
+                  { cor: 'bg-purple-100 text-purple-700', label: 'Traços, sons, cores e formas' },
+                  { cor: 'bg-yellow-100 text-yellow-700', label: 'Escuta, fala, pensamento' },
+                  { cor: 'bg-orange-100 text-orange-700', label: 'Espaços e transformações' },
+                ].map(l => (
+                  <span key={l.label} className={`px-2 py-1 rounded-full font-medium ${l.cor}`}>{l.label}</span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

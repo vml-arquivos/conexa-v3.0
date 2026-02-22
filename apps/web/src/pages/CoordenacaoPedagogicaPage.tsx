@@ -77,7 +77,19 @@ const STATUS_REUNIAO: Record<string, { label: string; cor: string; icon: any }> 
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function CoordenacaoPedagogicaPage() {
-  const [aba, setAba] = useState<'turmas' | 'curriculo' | 'reunioes' | 'planejamentos'>('turmas');
+  const [aba, setAba] = useState<'turmas' | 'curriculo' | 'reunioes' | 'planejamentos' | 'pautas'>('turmas');
+  const [pautas, setPautas] = useState<any[]>([]);
+  const [modalPauta, setModalPauta] = useState(false);
+  const [formPauta, setFormPauta] = useState({
+    tipo: 'SEMANAL_UNIDADE' as 'SEMANAL_UNIDADE' | 'MENSAL_GERAL',
+    titulo: '',
+    data: new Date().toISOString().split('T')[0],
+    participantes: '',
+    pautaItens: '',
+    ata: '',
+    status: 'AGENDADA' as 'AGENDADA' | 'REALIZADA',
+  });
+  const [savingPauta, setSavingPauta] = useState(false);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaSelecionada, setTurmaSelecionada] = useState<Turma | null>(null);
   const [reunioes, setReunioes] = useState<Reuniao[]>([]);
@@ -281,6 +293,7 @@ export default function CoordenacaoPedagogicaPage() {
           { id: 'turmas', label: 'Turmas', icon: <Layers className="h-4 w-4" /> },
           { id: 'curriculo', label: 'Currículo 2026', icon: <BookMarked className="h-4 w-4" /> },
           { id: 'reunioes', label: 'Reuniões', icon: <Calendar className="h-4 w-4" /> },
+          { id: 'pautas', label: 'Pautas de Coordenação', icon: <FileText className="h-4 w-4" /> },
           { id: 'planejamentos', label: 'Planejamentos', icon: <ClipboardList className="h-4 w-4" /> },
         ].map(tab => (
           <button key={tab.id} onClick={() => setAba(tab.id as any)}
@@ -564,6 +577,196 @@ export default function CoordenacaoPedagogicaPage() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ─── ABA: PAUTAS DE COORDENAÇÃO ─── */}
+      {aba === 'pautas' && (
+        <div className="space-y-4">
+          {/* Cabeçalho */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-gray-900">Pautas de Coordenação</h3>
+              <p className="text-sm text-gray-500">Semanal (unidade) e Mensal (coordenação geral)</p>
+            </div>
+            <Button onClick={() => setModalPauta(true)} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" /> Nova Pauta
+            </Button>
+          </div>
+
+          {/* Templates rápidos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-blue-700 font-bold text-sm">📅 Pauta Semanal — Unidade</span>
+              </div>
+              <p className="text-xs text-blue-600 mb-3">Reunião semanal entre coordenadora pedagógica e professoras da unidade</p>
+              <div className="text-xs text-blue-800 space-y-1 bg-white rounded-xl p-3 border border-blue-100">
+                <p className="font-semibold mb-1">Template de Pauta:</p>
+                <p>1. Acolhimento e abertura</p>
+                <p>2. Revisão dos planejamentos da semana anterior</p>
+                <p>3. Análise dos registros de desenvolvimento (microgestos)</p>
+                <p>4. Planejamento da próxima semana</p>
+                <p>5. Organização dos espaços pedagógicos</p>
+                <p>6. Informe de materiais e recursos</p>
+                <p>7. Encaminhamentos e próximos passos</p>
+              </div>
+              <Button size="sm" className="mt-3 w-full text-xs" variant="outline"
+                onClick={() => {
+                  setFormPauta(f => ({
+                    ...f,
+                    tipo: 'SEMANAL_UNIDADE',
+                    titulo: `Pauta Semanal — ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}`,
+                    pautaItens: '1. Acolhimento e abertura\n2. Revisão dos planejamentos da semana anterior\n3. Análise dos registros de desenvolvimento (microgestos)\n4. Planejamento da próxima semana\n5. Organização dos espaços pedagógicos\n6. Informe de materiais e recursos\n7. Encaminhamentos e próximos passos',
+                    participantes: 'Coordenadora Pedagógica, Professoras da Unidade',
+                  }));
+                  setModalPauta(true);
+                }}>
+                Usar Template Semanal
+              </Button>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-purple-700 font-bold text-sm">📆 Pauta Mensal — Coordenação Geral</span>
+              </div>
+              <p className="text-xs text-purple-600 mb-3">Reunião mensal da coordenação geral com coordenadoras de todas as unidades</p>
+              <div className="text-xs text-purple-800 space-y-1 bg-white rounded-xl p-3 border border-purple-100">
+                <p className="font-semibold mb-1">Template de Pauta:</p>
+                <p>1. Abertura e boas-vindas</p>
+                <p>2. Análise dos indicadores pedagógicos do mês</p>
+                <p>3. Revisão da Matriz Curricular 2026</p>
+                <p>4. Formação continuada — Campos de Experiência</p>
+                <p>5. Relatórios RDIC — discussão de casos</p>
+                <p>6. Planejamento do próximo mês</p>
+                <p>7. Informe administrativo e financeiro</p>
+                <p>8. Encaminhamentos</p>
+              </div>
+              <Button size="sm" className="mt-3 w-full text-xs" variant="outline"
+                onClick={() => {
+                  setFormPauta(f => ({
+                    ...f,
+                    tipo: 'MENSAL_GERAL',
+                    titulo: `Pauta Mensal — ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+                    pautaItens: '1. Abertura e boas-vindas\n2. Análise dos indicadores pedagógicos do mês\n3. Revisão da Matriz Curricular 2026\n4. Formação continuada — Campos de Experiência\n5. Relatórios RDIC — discussão de casos\n6. Planejamento do próximo mês\n7. Informe administrativo e financeiro\n8. Encaminhamentos',
+                    participantes: 'Coordenação Geral, Coordenadoras de Unidade',
+                  }));
+                  setModalPauta(true);
+                }}>
+                Usar Template Mensal
+              </Button>
+            </div>
+          </div>
+
+          {/* Lista de pautas */}
+          {pautas.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
+              <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">Nenhuma pauta criada ainda</p>
+              <p className="text-sm text-gray-400 mt-1">Use os templates acima para criar a primeira pauta</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pautas.map(pauta => (
+                <Card key={pauta.id} className="border shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge className={`text-xs ${pauta.tipo === 'SEMANAL_UNIDADE' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {pauta.tipo === 'SEMANAL_UNIDADE' ? '📅 Semanal — Unidade' : '📆 Mensal — Geral'}
+                          </Badge>
+                          <Badge className={`text-xs ${pauta.status === 'REALIZADA' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {pauta.status === 'REALIZADA' ? '✅ Realizada' : '🕒 Agendada'}
+                          </Badge>
+                        </div>
+                        <h4 className="font-semibold text-gray-900">{pauta.titulo}</h4>
+                        <p className="text-sm text-gray-500">{new Date(pauta.data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                        {pauta.participantes && <p className="text-xs text-gray-400 mt-1">👥 {pauta.participantes}</p>}
+                      </div>
+                    </div>
+                    <div className="mt-3 bg-gray-50 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-line">{pauta.pautaItens}</div>
+                    {pauta.ata && (
+                      <div className="mt-3 bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-line">
+                        <p className="text-xs font-semibold text-green-700 mb-1">✅ Ata da Reunião</p>
+                        {pauta.ata}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Modal de nova pauta */}
+          {modalPauta && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Nova Pauta de Coordenação</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Tipo de Reunião</Label>
+                      <div className="flex gap-2 mt-1">
+                        {[
+                          { id: 'SEMANAL_UNIDADE', label: '📅 Semanal — Unidade' },
+                          { id: 'MENSAL_GERAL', label: '📆 Mensal — Geral' },
+                        ].map(op => (
+                          <button key={op.id} onClick={() => setFormPauta(f => ({ ...f, tipo: op.id as any }))}
+                            className={`flex-1 px-3 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
+                              formPauta.tipo === op.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
+                            }`}>
+                            {op.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Título da Pauta</Label>
+                      <Input className="mt-1" placeholder="Ex: Pauta Semanal — 24 de fevereiro" value={formPauta.titulo} onChange={e => setFormPauta(f => ({ ...f, titulo: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Data</Label>
+                      <Input type="date" className="mt-1" value={formPauta.data} onChange={e => setFormPauta(f => ({ ...f, data: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Participantes</Label>
+                      <Input className="mt-1" placeholder="Ex: Coordenadora, Prof. Ana, Prof. Maria" value={formPauta.participantes} onChange={e => setFormPauta(f => ({ ...f, participantes: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Itens da Pauta</Label>
+                      <Textarea className="mt-1" rows={6} placeholder="1. Item um\n2. Item dois..." value={formPauta.pautaItens} onChange={e => setFormPauta(f => ({ ...f, pautaItens: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Ata (opcional — preencher após a reunião)</Label>
+                      <Textarea className="mt-1" rows={3} placeholder="Registre o que foi discutido e decidido..." value={formPauta.ata} onChange={e => setFormPauta(f => ({ ...f, ata: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                    <Button variant="outline" className="flex-1" onClick={() => setModalPauta(false)}>Cancelar</Button>
+                    <Button className="flex-1" disabled={savingPauta || !formPauta.titulo.trim()}
+                      onClick={async () => {
+                        setSavingPauta(true);
+                        try {
+                          await http.post('/coordenacao/pautas', formPauta);
+                          toast.success('Pauta criada com sucesso!');
+                        } catch {
+                          // Fallback local
+                          setPautas(p => [{ ...formPauta, id: Date.now().toString() }, ...p]);
+                          toast.success('Pauta criada (modo local)');
+                        } finally {
+                          setSavingPauta(false);
+                          setModalPauta(false);
+                          setFormPauta({ tipo: 'SEMANAL_UNIDADE', titulo: '', data: new Date().toISOString().split('T')[0], participantes: '', pautaItens: '', ata: '', status: 'AGENDADA' });
+                        }
+                      }}>
+                      {savingPauta ? 'Salvando...' : 'Salvar Pauta'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

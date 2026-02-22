@@ -13,7 +13,7 @@ interface MaterialRequestFormProps {
   isProfessor?: boolean;
 }
 
-// ─── Categorias disponíveis para PROFESSOR (apenas Higiene Pessoal e Pedagógico) ─
+// ─── Categorias disponíveis para PROFESSOR: Pedagógico, Higiene e Outros ────────────────
 const CATEGORIAS_PROFESSOR = [
   {
     value: 'PEDAGOGICO' as MaterialCategory,
@@ -36,6 +36,13 @@ const CATEGORIAS_PROFESSOR = [
       'Creme dental', 'Escova de dente', 'Toalha de papel', 'Álcool gel',
       'Creme hidratante', 'Protetor solar',
     ],
+  },
+  {
+    value: 'OUTRO' as MaterialCategory,
+    label: 'Outros',
+    icon: '📦',
+    cor: 'border-gray-300 bg-gray-50',
+    itensComuns: [],
   },
 ];
 
@@ -148,7 +155,7 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
         <p className="text-gray-500 text-sm mb-6">A coordenação vai analisar e te dar um retorno em breve.</p>
         {isProfessor && (
           <p className="text-xs text-blue-600 bg-blue-50 rounded-xl px-4 py-2 inline-block mb-4">
-            📋 Lembrete: requisições são apenas para <strong>Higiene Pessoal</strong> e <strong>Material Pedagógico</strong>
+            📋 Lembrete: requisições são para <strong>Material Pedagógico</strong>, <strong>Higiene Pessoal</strong> e <strong>Outros</strong>
           </p>
         )}
         <Button
@@ -167,7 +174,7 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
       {isProfessor && (
         <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
           <span className="text-lg">ℹ️</span>
-          <p>Como professor(a), você pode solicitar apenas <strong>Material Pedagógico</strong> e <strong>Higiene Pessoal</strong> para a sua turma.</p>
+          <p>Como professor(a), você pode solicitar <strong>Material Pedagógico</strong>, <strong>Higiene Pessoal</strong> e <strong>Outros</strong> para a sua turma.</p>
         </div>
       )}
 

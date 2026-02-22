@@ -515,7 +515,7 @@ export default function ConfiguracoesPage() {
                   { key: 'emailPlanejamentos', label: 'Planejamentos pendentes', desc: 'Lembrete semanal para criar planejamentos' },
                   { key: 'emailDiarios', label: 'Diário de Bordo', desc: 'Lembrete diário para registrar o dia' },
                   { key: 'emailRequisicoes', label: 'Requisições de materiais', desc: 'Atualizações sobre pedidos de materiais' },
-                  { key: 'emailRdic', label: 'RDIC & RIA', desc: 'Lembretes de registros de desenvolvimento' },
+                  { key: 'emailRdic', label: 'RDIC', desc: 'Lembretes de registros de desenvolvimento da criança' },
                   { key: 'pushAtivado', label: 'Notificações push', desc: 'Notificações em tempo real no navegador' },
                 ].map(item => (
                   <div key={item.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
