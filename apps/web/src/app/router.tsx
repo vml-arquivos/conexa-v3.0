@@ -28,6 +28,7 @@ import MeuPerfilPage from '../pages/MeuPerfilPage';
 import PlanejamentoDiarioPage from '../pages/PlanejamentoDiarioPage';
 import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
 import CoordenacaoPedagogicaPage from '../pages/CoordenacaoPedagogicaPage';
+import RelatorioConsumoMateriaisPage from '../pages/RelatorioConsumoMateriaisPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -273,6 +274,15 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <CoordenacaoPedagogicaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Relatório de Consumo de Materiais (Coordenação) ─────────────────
+      {
+        path: 'relatorio-consumo-materiais',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RelatorioConsumoMateriaisPage />
           </RoleProtectedRoute>
         ),
       },

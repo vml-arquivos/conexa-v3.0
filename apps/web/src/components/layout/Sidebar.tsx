@@ -60,6 +60,7 @@ const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/coordenacao-pedagogica', label: 'Coordenação Pedagógica', icon: <Building2 className="h-4 w-4" /> },
   { path: '/app/coordenacao', label: 'Turmas & Reuniões', icon: <Users className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/material-requests', label: 'Requisições Pendentes', icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/relatorio-consumo-materiais', label: 'Consumo de Materiais', icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 

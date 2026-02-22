@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -44,5 +44,17 @@ export class MaterialRequestController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.svc.review(id, dto, user);
+  }
+
+  /** Relatório de consumo de materiais por turma e período */
+  @Get('relatorio-consumo')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  relatorioConsumo(
+    @CurrentUser() user: JwtPayload,
+    @Query('classroomId') classroomId?: string,
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+  ) {
+    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim });
   }
 }

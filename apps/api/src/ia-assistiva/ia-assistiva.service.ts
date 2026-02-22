@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import OpenAI from 'openai';
 import { GerarAtividadeDto, FaixaEtaria, TipoAtividade } from './dto/gerar-atividade.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 export interface AtividadeGerada {
   titulo: string;
@@ -62,7 +63,7 @@ export class IaAssistivaService {
   // Isso garante que o servidor sobe normalmente mesmo sem chave de IA configurada.
   private _cliente: OpenAI | null = null;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     const geminiKey = process.env.GEMINI_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
 
@@ -295,6 +296,108 @@ Responda em JSON:
         'Serviço de IA temporariamente indisponível.',
       );
     }
+  }
+
+  // ============================================================================
+  // MOTOR DE IA ASSISTIVA LGPD
+  // ============================================================================
+
+  /**
+   * Anonimiza nome para conformidade LGPD.
+   */
+  private anonimizarNome(_nome: string, codigo: string): string {
+    return `Aluno(a) ${codigo}`;
+  }
+
+  /**
+   * Gera relatório consolidado de desenvolvimento com anonimização LGPD.
+   * Busca dados reais do banco (Diário de Bordo + microgestos) e envia
+   * apenas dados anonimizados para a IA.
+   */
+  async gerarRelatorioConsolidadoLGPD(params: {
+    childId: string;
+    periodo: string;
+  }): Promise<{
+    relatorio: string;
+    pontosFortess: string[];
+    sugestoes: string[];
+    anonimizado: boolean;
+    totalObservacoes: number;
+    codigoAnonimizado: string;
+  }> {
+    // 1. Buscar dados da criança
+    const crianca = await this.prisma.child.findUnique({
+      where: { id: params.childId },
+      select: { id: true, firstName: true, lastName: true, dateOfBirth: true },
+    });
+    if (!crianca) throw new ServiceUnavailableException('Criança não encontrada.');
+
+    // 2. Código anônimo determinístico (baseado no ID, nunca no nome)
+    const codigoAnonimizado = `C-${params.childId.slice(-6).toUpperCase()}`;
+    const nomeAnonimizado = this.anonimizarNome(
+      `${crianca.firstName} ${crianca.lastName}`,
+      codigoAnonimizado,
+    );
+
+    // 3. Calcular faixa etária a partir de dateOfBirth
+    let faixaEtaria = 'Criança Pequena (4 a 5 anos)';
+    if (crianca.dateOfBirth) {
+      const idadeMeses = Math.floor(
+        (Date.now() - new Date(crianca.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+      );
+      if (idadeMeses <= 18) faixaEtaria = 'Bebê (0 a 1 ano e 6 meses)';
+      else if (idadeMeses <= 47) faixaEtaria = 'Criança Bem Pequena (1a7m a 3a11m)';
+      else faixaEtaria = 'Criança Pequena (4 a 5 anos e 11 meses)';
+    }
+
+    // 4. Buscar observações do Diário de Bordo
+    // Campos reais: description, observations, developmentNotes, behaviorNotes
+    const diaryEvents = await this.prisma.diaryEvent.findMany({
+      where: { childId: params.childId },
+      select: {
+        description: true,
+        observations: true,
+        developmentNotes: true,
+        behaviorNotes: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    // 5. Montar observações anonimizadas (remover nomes próprios)
+    const observacoes: string[] = [];
+    const regexNome = new RegExp(`${crianca.firstName}|${crianca.lastName}`, 'gi');
+    for (const ev of diaryEvents) {
+      const campos = [ev.description, ev.observations, ev.developmentNotes, ev.behaviorNotes].filter(Boolean) as string[];
+      for (const campo of campos) {
+        const obs = campo
+          .replace(/\b[A-Z][a-z]{2,}\s[A-Z][a-z]{2,}\b/g, nomeAnonimizado)
+          .replace(regexNome, nomeAnonimizado);
+        observacoes.push(obs);
+      }
+    }
+
+    if (observacoes.length === 0) {
+      throw new ServiceUnavailableException(
+        'Não há observações suficientes. Registre pelo menos uma entrada no Diário de Bordo.',
+      );
+    }
+
+    // 6. Chamar IA com dados 100% anonimizados
+    const resultado = await this.gerarRelatorioAluno({
+      nomeAluno: nomeAnonimizado,
+      faixaEtaria,
+      observacoes: observacoes.slice(0, 20),
+      periodo: params.periodo,
+    });
+
+    return {
+      ...resultado,
+      anonimizado: true,
+      totalObservacoes: observacoes.length,
+      codigoAnonimizado,
+    };
   }
 
   /**

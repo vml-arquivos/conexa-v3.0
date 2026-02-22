@@ -124,4 +124,84 @@ export class MaterialRequestService {
       data: { status, approvedBy: user.sub, approvedDate: new Date() },
     });
   }
+
+  /**
+   * Relatório de consumo de materiais por turma e período
+   * Retorna: totais por categoria, por turma, por status e lista detalhada
+   */
+  async relatorioConsumo(
+    user: JwtPayload,
+    params: { classroomId?: string; dataInicio?: string; dataFim?: string },
+  ) {
+    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+    if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode acessar o relatório');
+
+    const where: Record<string, unknown> = {
+      mantenedoraId: user.mantenedoraId,
+      unitId: user.unitId,
+    };
+    if (params.classroomId) where.classroomId = params.classroomId;
+    if (params.dataInicio || params.dataFim) {
+      const dateFilter: Record<string, Date> = {};
+      if (params.dataInicio) dateFilter.gte = new Date(params.dataInicio);
+      if (params.dataFim) dateFilter.lte = new Date(params.dataFim);
+      where.requestedDate = dateFilter;
+    }
+
+    const requisicoes = await this.prisma.materialRequest.findMany({
+      where: where as any,
+      include: { classroom: { select: { name: true } } },
+      orderBy: { requestedDate: 'desc' },
+    });
+
+    const porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number }> = {};
+    const porTurmaMap: Record<string, { nome: string; total: number; aprovados: number }> = {};
+    const porStatus: Record<string, number> = {};
+    let custoEstimadoTotal = 0;
+
+    for (const r of requisicoes) {
+      if (!porCategoria[r.type]) porCategoria[r.type] = { total: 0, aprovados: 0, pendentes: 0, rejeitados: 0 };
+      porCategoria[r.type].total++;
+      if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porCategoria[r.type].aprovados++;
+      else if (r.status === 'REJEITADO') porCategoria[r.type].rejeitados++;
+      else porCategoria[r.type].pendentes++;
+
+      if (r.classroomId && r.classroom) {
+        if (!porTurmaMap[r.classroomId]) porTurmaMap[r.classroomId] = { nome: r.classroom.name, total: 0, aprovados: 0 };
+        porTurmaMap[r.classroomId].total++;
+        if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porTurmaMap[r.classroomId].aprovados++;
+      }
+
+      porStatus[r.status] = (porStatus[r.status] || 0) + 1;
+      if (r.estimatedCost) custoEstimadoTotal += r.estimatedCost;
+    }
+
+    return {
+      periodo: { inicio: params.dataInicio || null, fim: params.dataFim || null },
+      totais: {
+        requisicoes: requisicoes.length,
+        aprovadas: porStatus['APROVADO'] || 0,
+        pendentes: (porStatus['SOLICITADO'] || 0) + (porStatus['EM_ANALISE'] || 0),
+        rejeitadas: porStatus['REJEITADO'] || 0,
+        entregues: porStatus['ENTREGUE'] || 0,
+        custoEstimadoTotal: Math.round(custoEstimadoTotal * 100) / 100,
+      },
+      porCategoria,
+      porTurma: Object.values(porTurmaMap),
+      porStatus,
+      detalhes: requisicoes.map(r => ({
+        id: r.id,
+        code: r.code,
+        titulo: r.title,
+        tipo: r.type,
+        quantidade: r.quantity,
+        status: r.status,
+        prioridade: r.priority,
+        turma: r.classroom?.name || null,
+        custoEstimado: r.estimatedCost,
+        dataSolicitacao: r.requestedDate,
+        dataAprovacao: r.approvedDate,
+      })),
+    };
+  }
 }

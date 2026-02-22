@@ -76,4 +76,21 @@ export class IaAssistivaController {
   ) {
     return this.iaService.gerarRelatorioAluno(body);
   }
+
+  /**
+   * POST /ia/relatorio-consolidado-lgpd
+   * Gera relatório consolidado com anonimização LGPD.
+   * Busca dados reais do banco e envia apenas dados anonimizados para a IA.
+   */
+  @Post('relatorio-consolidado-lgpd')
+  @HttpCode(HttpStatus.OK)
+  gerarRelatorioConsolidadoLGPD(
+    @Body() body: { childId: string; periodo: string },
+    @CurrentUser() _user: JwtPayload,
+  ) {
+    return this.iaService.gerarRelatorioConsolidadoLGPD({
+      childId: body.childId,
+      periodo: body.periodo,
+    });
+  }
 }

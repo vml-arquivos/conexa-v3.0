@@ -210,6 +210,7 @@ export class ChildrenService {
 
   /**
    * Adicionar restrição alimentar
+   * Após criar, gera AlertaOperacional + Notificações para nutricionista e coordenação
    */
   async addDietaryRestriction(id: string, restrictionData: any, user: any) {
     const child = await this.findOne(id, user);
@@ -219,10 +220,87 @@ export class ChildrenService {
         childId: id,
         type: restrictionData.type,
         name: restrictionData.name,
-        description: restrictionData.description,
+        description: restrictionData.description ?? null,
         severity: restrictionData.severity || 'leve',
+        allowedFoods: restrictionData.allowedFoods ?? null,
+        forbiddenFoods: restrictionData.forbiddenFoods ?? null,
+        createdBy: user.sub,
       },
     });
+
+    // ─── Gerar alerta operacional + notificações para nutricionista e coordenação ───
+    try {
+      const nomeCompleto = `${child.firstName} ${child.lastName}`;
+      const severidade =
+        restrictionData.severity === 'severa' ? 'ALTA'
+        : restrictionData.severity === 'moderada' ? 'MEDIA'
+        : 'BAIXA';
+
+      const alerta = await this.prisma.alertaOperacional.create({
+        data: {
+          mantenedoraId: child.mantenedoraId,
+          unitId: child.unitId,
+          childId: id,
+          tipo: 'OUTRO',
+          severidade: severidade as any,
+          titulo: `Restrição alimentar registrada: ${nomeCompleto}`,
+          descricao:
+            `Tipo: ${restrictionData.type} | Restrição: ${restrictionData.name}` +
+            (restrictionData.description ? ` | Obs: ${restrictionData.description}` : '') +
+            (restrictionData.forbiddenFoods ? ` | Proibidos: ${restrictionData.forbiddenFoods}` : ''),
+          metadados: {
+            childId: id,
+            childName: nomeCompleto,
+            restrictionType: restrictionData.type,
+            restrictionName: restrictionData.name,
+            severity: restrictionData.severity || 'leve',
+            forbiddenFoods: restrictionData.forbiddenFoods ?? null,
+            allowedFoods: restrictionData.allowedFoods ?? null,
+          },
+        },
+      });
+
+      // Buscar nutricionistas e coordenadores da unidade para notificar
+      const destinatarios = await this.prisma.user.findMany({
+        where: {
+          unitId: child.unitId,
+          roles: {
+            some: {
+              role: {
+                type: {
+                  in: [
+                    'UNIDADE_NUTRICIONISTA',
+                    'UNIDADE_COORDENADOR_PEDAGOGICO',
+                    'UNIDADE_DIRETOR',
+                  ] as any,
+                },
+              },
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      if (destinatarios.length > 0) {
+        await this.prisma.notificacao.createMany({
+          data: destinatarios.map((u) => ({
+            usuarioId: u.id,
+            alertaId: alerta.id,
+            titulo: `⚠️ Restrição alimentar: ${nomeCompleto}`,
+            mensagem:
+              `${restrictionData.type === 'ALERGIA' ? 'ALERGIA' : 'Restrição'} registrada para ${nomeCompleto}: ${restrictionData.name}.` +
+              (restrictionData.forbiddenFoods
+                ? ` Alimentos proibidos: ${restrictionData.forbiddenFoods}.`
+                : '') +
+              ' Verifique o cardápio e tome as providências necessárias.',
+            link: `/app/coordenacao-pedagogica`,
+          })),
+        });
+      }
+    } catch (e) {
+      // Não bloqueia o fluxo principal se a notificação falhar
+      console.warn('[DietaryRestriction] Falha ao criar alerta/notificação:', e);
+    }
 
     return restriction;
   }

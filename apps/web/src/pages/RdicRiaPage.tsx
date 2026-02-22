@@ -13,7 +13,9 @@ import http from '../api/http';
 import {
   User, Plus, Save, Search, ChevronDown, ChevronUp,
   Brain, RefreshCw, Calendar, UserCircle, Edit3,
+  FileText, ClipboardCheck, AlertTriangle, CheckCircle,
 } from 'lucide-react';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -105,15 +107,49 @@ const NIVEIS = [
   { id: 'AMPLIADO', label: 'Ampliado', cor: 'bg-blue-100 text-blue-700', short: 'A' },
 ];
 
+// ─── Interface RIA ───────────────────────────────────────────────────────────
+interface RiaEntry {
+  id: string;
+  childId: string;
+  child?: { firstName: string; lastName: string };
+  periodo: string;
+  tipoIntervencao: string;
+  descricaoSituacao: string;
+  estrategiasAdotadas: string;
+  encaminhamentos: string;
+  resultadoObservado: string;
+  proximaAvaliacao: string;
+  status: 'ABERTO' | 'EM_ACOMPANHAMENTO' | 'CONCLUIDO';
+  createdAt: string;
+}
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function RdicRiaPage() {
   const { user } = useAuth();
-  const [aba, setAba] = useState<'rdic' | 'novo-rdic'>('rdic');
+  const userRoles = normalizeRoles(user);
+  const isCoordenador = userRoles.some(r =>
+    r === 'UNIDADE' || r.startsWith('UNIDADE_') ||
+    r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_') ||
+    r === 'MANTENEDORA' || r === 'DEVELOPER'
+  );
+  const [aba, setAba] = useState<'rdic' | 'novo-rdic' | 'ria' | 'nova-ria'>('rdic');
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [rdicList, setRdicList] = useState<RdicEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [busca, setBusca] = useState('');
+  // ─── Estado RIA ─────────────────────────────────────────────────────
+  const [riaList, setRiaList] = useState<RiaEntry[]>([]);
+  const [riaForm, setRiaForm] = useState({
+    childId: '',
+    periodo: '',
+    tipoIntervencao: 'PEDAGOGICA',
+    descricaoSituacao: '',
+    estrategiasAdotadas: '',
+    encaminhamentos: '',
+    resultadoObservado: '',
+    proximaAvaliacao: '',
+    status: 'ABERTO' as const,
+  });
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [rdicForm, setRdicForm] = useState({
@@ -191,21 +227,59 @@ export default function RdicRiaPage() {
     } finally { setSaving(false); }
   }
 
+   async function salvarRia() {
+    if (!riaForm.childId) { toast.error('Selecione uma criança'); return; }
+    if (!riaForm.descricaoSituacao.trim()) { toast.error('Descreva a situação'); return; }
+    if (!riaForm.periodo.trim()) { toast.error('Informe o período'); return; }
+    setSaving(true);
+    try {
+      const res = await http.post('/rdx', {
+        childId: riaForm.childId,
+        type: 'RIA',
+        periodo: riaForm.periodo,
+        tipoIntervencao: riaForm.tipoIntervencao,
+        descricaoSituacao: riaForm.descricaoSituacao,
+        estrategiasAdotadas: riaForm.estrategiasAdotadas,
+        encaminhamentos: riaForm.encaminhamentos,
+        resultadoObservado: riaForm.resultadoObservado,
+        proximaAvaliacao: riaForm.proximaAvaliacao,
+        status: riaForm.status,
+      });
+      setRiaList(prev => [res.data, ...prev]);
+      toast.success('RIA salvo com sucesso!');
+      setAba('ria');
+      setRiaForm({
+        childId: '', periodo: '', tipoIntervencao: 'PEDAGOGICA',
+        descricaoSituacao: '', estrategiasAdotadas: '', encaminhamentos: '',
+        resultadoObservado: '', proximaAvaliacao: '', status: 'ABERTO',
+      });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao salvar RIA');
+    } finally { setSaving(false); }
+  }
+
   const criancaAtualRdic = criancas.find(c => c.id === rdicForm.childId);
+  const criancaAtualRia = criancas.find(c => c.id === riaForm.childId);
   const rdicFiltrado = rdicList.filter(r =>
     !busca || `${r.child?.firstName} ${r.child?.lastName}`.toLowerCase().includes(busca.toLowerCase())
   );
-
+  const riaFiltrada = riaList.filter(r =>
+    !busca || `${r.child?.firstName} ${r.child?.lastName}`.toLowerCase().includes(busca.toLowerCase())
+  );
   return (
     <PageShell
       title="RDIC — Registro de Desenvolvimento Individual da Criança"
       subtitle="Avaliação bimestral por dimensões de desenvolvimento baseada nos 5 Campos de Experiência da BNCC"
     >
       {/* Abas */}
-      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">
+      <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 flex-wrap">
         {[
           { id: 'rdic', label: 'Registros RDIC', icon: <User className="h-4 w-4" /> },
           { id: 'novo-rdic', label: 'Novo RDIC', icon: <Plus className="h-4 w-4" /> },
+          ...(isCoordenador ? [
+            { id: 'ria', label: 'RIA — Intervenções', icon: <ClipboardCheck className="h-4 w-4" /> },
+            { id: 'nova-ria', label: 'Nova RIA', icon: <FileText className="h-4 w-4" /> },
+          ] : []),
         ].map(tab => (
           <button key={tab.id} onClick={() => setAba(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
@@ -420,6 +494,154 @@ export default function RdicRiaPage() {
               Salvar RDIC
             </Button>
             <Button variant="outline" onClick={() => setAba('rdic')}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+      {/* ─── LISTA RIA ─── */}
+      {aba === 'ria' && (
+        <div className="space-y-4">
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <ClipboardCheck className="h-6 w-6 text-purple-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-purple-800">RIA — Relatório de Intervenção e Acompanhamento</h3>
+                <p className="text-sm text-purple-600 mt-0.5">
+                  Elaborado pela coordenação pedagógica. Registra situações que demandam intervenção, as estratégias adotadas e o acompanhamento da criança.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm" placeholder="Buscar por nome da criança..." value={busca} onChange={e => setBusca(e.target.value)} />
+            </div>
+            <Button onClick={() => setAba('nova-ria')}><Plus className="h-4 w-4 mr-2" />Nova RIA</Button>
+          </div>
+          {riaFiltrada.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <ClipboardCheck className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium">Nenhum RIA registrado</p>
+              <p className="text-sm mt-1">Crie o primeiro Relatório de Intervenção e Acompanhamento</p>
+              <Button className="mt-4" onClick={() => setAba('nova-ria')}><Plus className="h-4 w-4 mr-2" />Criar RIA</Button>
+            </div>
+          ) : (
+            riaFiltrada.map(ria => (
+              <Card key={ria.id} className="border border-purple-100">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                        <UserCircle className="h-6 w-6 text-purple-500" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-800">{ria.child?.firstName} {ria.child?.lastName}</p>
+                        <p className="text-xs text-gray-500">{ria.periodo} · {ria.tipoIntervencao}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      ria.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700'
+                      : ria.status === 'EM_ACOMPANHAMENTO' ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                    }`}>{ria.status === 'CONCLUIDO' ? 'Concluído' : ria.status === 'EM_ACOMPANHAMENTO' ? 'Em Acompanhamento' : 'Aberto'}</span>
+                  </div>
+                  <button className="mt-3 w-full flex items-center justify-between text-sm text-gray-600 hover:text-gray-800" onClick={() => setExpandedId(expandedId === ria.id ? null : ria.id)}>
+                    <span>Ver detalhes</span>
+                    {expandedId === ria.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  {expandedId === ria.id && (
+                    <div className="mt-3 space-y-2 border-t pt-3">
+                      {ria.descricaoSituacao && <div><p className="text-xs font-medium text-gray-500">Situação</p><p className="text-sm text-gray-700">{ria.descricaoSituacao}</p></div>}
+                      {ria.estrategiasAdotadas && <div><p className="text-xs font-medium text-gray-500">Estratégias Adotadas</p><p className="text-sm text-gray-700">{ria.estrategiasAdotadas}</p></div>}
+                      {ria.encaminhamentos && <div><p className="text-xs font-medium text-gray-500">Encaminhamentos</p><p className="text-sm text-gray-700">{ria.encaminhamentos}</p></div>}
+                      {ria.resultadoObservado && <div><p className="text-xs font-medium text-gray-500">Resultado Observado</p><p className="text-sm text-gray-700">{ria.resultadoObservado}</p></div>}
+                      {ria.proximaAvaliacao && <div><p className="text-xs font-medium text-gray-500">Próxima Avaliação</p><p className="text-sm text-gray-700">{ria.proximaAvaliacao}</p></div>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ─── FORMULARIO NOVA RIA ─── */}
+      {aba === 'nova-ria' && (
+        <div className="space-y-4">
+          <Card className="border-2 border-purple-100">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-purple-700"><FileText className="h-5 w-5" /> Nova RIA — Relatório de Intervenção e Acompanhamento</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Criança *</Label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm" value={riaForm.childId} onChange={e => setRiaForm(f => ({ ...f, childId: e.target.value }))}>
+                    <option value="">Selecione uma criança...</option>
+                    {criancas.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label>Período *</Label>
+                  <Input placeholder="Ex: 1º Bimestre 2026" value={riaForm.periodo} onChange={e => setRiaForm(f => ({ ...f, periodo: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Tipo de Intervenção</Label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm" value={riaForm.tipoIntervencao} onChange={e => setRiaForm(f => ({ ...f, tipoIntervencao: e.target.value }))}>
+                    <option value="PEDAGOGICA">Pedagógica</option>
+                    <option value="COMPORTAMENTAL">Comportamental</option>
+                    <option value="FAMILIAR">Familiar</option>
+                    <option value="SAUDE">Saúde</option>
+                    <option value="INCLUSAO">Inclusão / NEE</option>
+                    <option value="OUTRO">Outro</option>
+                  </select>
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm" value={riaForm.status} onChange={e => setRiaForm(f => ({ ...f, status: e.target.value as any }))}>
+                    <option value="ABERTO">Aberto</option>
+                    <option value="EM_ACOMPANHAMENTO">Em Acompanhamento</option>
+                    <option value="CONCLUIDO">Concluído</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label>Descrição da Situação *</Label>
+                <Textarea placeholder="Descreva a situação que motivou a intervenção, o contexto e os comportamentos observados..." rows={3} value={riaForm.descricaoSituacao} onChange={e => setRiaForm(f => ({ ...f, descricaoSituacao: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Estratégias Adotadas</Label>
+                <Textarea placeholder="Quais estratégias pedagógicas, adaptações ou encaminhamentos foram realizados?" rows={3} value={riaForm.estrategiasAdotadas} onChange={e => setRiaForm(f => ({ ...f, estrategiasAdotadas: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Encaminhamentos</Label>
+                <Textarea placeholder="Encaminhamentos para família, especialistas, serviços de saúde, etc." rows={2} value={riaForm.encaminhamentos} onChange={e => setRiaForm(f => ({ ...f, encaminhamentos: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Resultado Observado</Label>
+                <Textarea placeholder="Descreva os resultados observados após as intervenções..." rows={2} value={riaForm.resultadoObservado} onChange={e => setRiaForm(f => ({ ...f, resultadoObservado: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Próxima Avaliação</Label>
+                <Input placeholder="Data ou período da próxima avaliação" value={riaForm.proximaAvaliacao} onChange={e => setRiaForm(f => ({ ...f, proximaAvaliacao: e.target.value }))} />
+              </div>
+              {criancaAtualRia && (
+                <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl">
+                  <div className="w-12 h-12 rounded-full bg-purple-200 flex items-center justify-center">
+                    <UserCircle className="h-7 w-7 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-purple-800">{criancaAtualRia.firstName} {criancaAtualRia.lastName}</p>
+                    <p className="text-xs text-purple-600">{criancaAtualRia.idade} meses</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <div className="flex gap-3">
+            <Button onClick={salvarRia} disabled={saving} className="flex-1 bg-purple-600 hover:bg-purple-700">
+              {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar RIA
+            </Button>
+            <Button variant="outline" onClick={() => setAba('ria')}>Cancelar</Button>
           </div>
         </div>
       )}
