@@ -29,6 +29,7 @@ import PlanejamentoDiarioPage from '../pages/PlanejamentoDiarioPage';
 import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
 import CoordenacaoPedagogicaPage from '../pages/CoordenacaoPedagogicaPage';
 import RelatorioConsumoMateriaisPage from '../pages/RelatorioConsumoMateriaisPage';
+import RdicCriancaPage from '../pages/RdicCriancaPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -112,6 +113,15 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PlanejamentosPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── RDIC por Criança (professor) ──────────────────────────────────────
+      {
+        path: 'rdic-crianca',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdicCriancaPage />
           </RoleProtectedRoute>
         ),
       },

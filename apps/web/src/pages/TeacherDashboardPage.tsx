@@ -41,7 +41,7 @@ const ACOES_RAPIDAS = [
   { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
   { id: 'diario', label: 'Diário de Bordo', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
   { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
-  { id: 'rdic', label: 'RDIC', desc: 'Desenvolvimento', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-ria' },
+  { id: 'rdic', label: 'RDIC por Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-crianca' },
   { id: 'materiais', label: 'Materiais', desc: 'Solicitar recursos', icon: <ShoppingCart className="h-6 w-6" />, cor: 'bg-orange-500', rota: '/app/material-requests' },
   { id: 'fotos', label: 'Fotos da Turma', desc: 'Galeria e RDX', icon: <Camera className="h-6 w-6" />, cor: 'bg-pink-500', rota: '/app/rdx' },
   { id: 'relatorio', label: 'Relatórios', desc: 'Ver evolução', icon: <TrendingUp className="h-6 w-6" />, cor: 'bg-teal-500', rota: '/app/reports' },
@@ -282,7 +282,7 @@ export default function TeacherDashboardPage() {
 
                       {/* Ações rápidas por criança */}
                       <div className="flex gap-1 mt-2">
-                        <button onClick={() => navigate('/app/rdic-ria')} title="RDIC"
+                        <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
                           className="p-1.5 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-all">
                           <Brain className="h-3.5 w-3.5" />
                         </button>
@@ -411,10 +411,10 @@ export default function TeacherDashboardPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-ria'); toast.success('Acesse RDIC para salvar este relatório'); }}>
+                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-crianca'); toast.success('Acesse RDIC para salvar este relatório'); }}>
                       <Download className="h-4 w-4 mr-2" /> Salvar como RDIC
                     </Button>
-                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-ria'); toast.success('Acesse RDIC para salvar o registro'); }}>
+                    <Button variant="outline" className="flex-1 text-sm" onClick={() => { navigate('/app/rdic-crianca'); toast.success('Acesse RDIC para salvar o registro'); }}>
                       <Send className="h-4 w-4 mr-2" /> Salvar como RIA
                     </Button>
                   </div>
@@ -488,7 +488,7 @@ export default function TeacherDashboardPage() {
                       <span className="text-3xl font-bold text-indigo-600">{ind?.rdicsRegistrados ?? 0}</span>
                       <span className="text-sm text-gray-400 mb-1">registros</span>
                     </div>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-indigo-600 border-indigo-200" onClick={() => navigate('/app/rdic-ria')}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-indigo-600 border-indigo-200" onClick={() => navigate('/app/rdic-crianca')}>
                       <Plus className="h-3 w-3 mr-1" /> Novo Registro
                     </Button>
                   </CardContent>
