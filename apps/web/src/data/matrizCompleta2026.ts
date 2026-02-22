@@ -1,6 +1,15 @@
+// ============================================================
 // Matriz Pedagógica 2026 — Sequência Pedagógica Piloto
 // Total: 585 entradas | EI01: 200 | EI02: 199 | EI03: 186
 // Cada entrada contém 4 exemplos de atividade distintos para escolha do professor
+//
+// Histórico de alterações:
+//   v1.0.0  — Versão inicial
+//   v1.1.0  — Adicionados campos de compatibilidade estendida para
+//             CoordenacaoPedagogicaPage.tsx (campo_experiencia_*, 
+//             objetivo_curriculo_movimento, intencionalidade_pedagogica)
+//             Fix: TS2339 nas linhas 231, 235, 424, 436, 439, 442, 445
+// ============================================================
 
 export interface ExemploAtividade {
   titulo: string;
@@ -8,19 +17,45 @@ export interface ExemploAtividade {
 }
 
 export interface EntradaMatriz {
+  // ── Identificação temporal ─────────────────────────────────
   data: string;
   dia_semana: string;
+  semana_tema: string;
+  bimestre: string;
+
+  // ── Campo de Experiência (campos canônicos) ────────────────
   campo_id: string;
   campo_label: string;
   campo_emoji: string;
+
+  // ── Campo de Experiência (aliases estendidos) ──────────────
+  // Utilizados em CoordenacaoPedagogicaPage.tsx para filtragem
+  // e exibição via componentes de coordenação pedagógica.
+  // Quando ausentes, devem ser lidos a partir dos campos canônicos
+  // correspondentes: campo_id, campo_label e campo_emoji.
+  campo_experiencia_id?: string;
+  campo_experiencia_label?: string;
+  campo_experiencia_emoji?: string;
+
+  // ── BNCC ──────────────────────────────────────────────────
   codigo_bncc: string;
   objetivo_bncc: string;
+
+  // ── Currículo e Intencionalidade (campos canônicos) ────────
   objetivo_curriculo: string;
   intencionalidade: string;
+
+  // ── Currículo e Intencionalidade (campos estendidos) ───────
+  // Variantes específicas usadas pela coordenação pedagógica
+  // para registro de movimento/psicomotricidade e intencionalidade
+  // pedagógica formal. Quando ausentes, podem ser derivados dos
+  // campos canônicos objetivo_curriculo e intencionalidade.
+  objetivo_curriculo_movimento?: string;
+  intencionalidade_pedagogica?: string;
+
+  // ── Atividades ────────────────────────────────────────────
   exemplo_atividade: string;
   exemplos_atividades: ExemploAtividade[];
-  semana_tema: string;
-  bimestre: string;
 }
 
 export type SegmentoKey = 'EI01' | 'EI02' | 'EI03';
@@ -18770,20 +18805,76 @@ export const MATRIZ_2026: Record<SegmentoKey, EntradaMatriz[]> = {
 
 // ─── Funções utilitárias ──────────────────────────────────────────────────────
 
+/**
+ * Resolve os campos de alias (campo_experiencia_*) a partir dos campos
+ * canônicos, garantindo compatibilidade com CoordenacaoPedagogicaPage.tsx.
+ * Use esta função ao renderizar entradas que podem ter sido criadas sem
+ * os campos estendidos preenchidos.
+ */
+export function resolveEntradaAliases(entrada: EntradaMatriz): Required<
+  Pick<EntradaMatriz,
+    | 'campo_experiencia_id'
+    | 'campo_experiencia_label'
+    | 'campo_experiencia_emoji'
+    | 'objetivo_curriculo_movimento'
+    | 'intencionalidade_pedagogica'
+  >
+> {
+  return {
+    campo_experiencia_id:         entrada.campo_experiencia_id         ?? entrada.campo_id,
+    campo_experiencia_label:      entrada.campo_experiencia_label      ?? entrada.campo_label,
+    campo_experiencia_emoji:      entrada.campo_experiencia_emoji      ?? entrada.campo_emoji,
+    objetivo_curriculo_movimento: entrada.objetivo_curriculo_movimento ?? entrada.objetivo_curriculo,
+    intencionalidade_pedagogica:  entrada.intencionalidade_pedagogica  ?? entrada.intencionalidade,
+  };
+}
+
+/**
+ * Retorna todas as entradas de um segmento para uma data especifica (DD/MM).
+ */
 export function getEntradasSegmentoDia(dataDDMM: string, segmento: SegmentoKey): EntradaMatriz[] {
   return MATRIZ_2026[segmento].filter(e => e.data === dataDDMM);
 }
 
+/**
+ * Retorna todas as datas letivas unicas de um segmento, ordenadas cronologicamente.
+ */
 export function getDatasLetivas(segmento: SegmentoKey): string[] {
   return [...new Set(MATRIZ_2026[segmento].map(e => e.data))].sort((a, b) => {
-    const [da, ma] = a.split("/").map(Number);
-    const [db, mb] = b.split("/").map(Number);
+    const [da, ma] = a.split('/').map(Number);
+    const [db, mb] = b.split('/').map(Number);
     return ma !== mb ? ma - mb : da - db;
   });
 }
 
+/**
+ * Verifica se existe pelo menos uma atividade registrada na data informada,
+ * em qualquer segmento.
+ */
 export function temAtividadeNaData(dataDDMM: string): boolean {
-  return ['EI01', 'EI02', 'EI03'].some(seg =>
-    MATRIZ_2026[seg as SegmentoKey].some(e => e.data === dataDDMM)
+  return (['EI01', 'EI02', 'EI03'] as SegmentoKey[]).some(seg =>
+    MATRIZ_2026[seg].some(e => e.data === dataDDMM)
   );
+}
+
+/**
+ * Filtra entradas por campo de experiencia (campo_id canonico ou alias).
+ */
+export function getEntradasPorCampo(
+  segmento: SegmentoKey,
+  campoId: string,
+): EntradaMatriz[] {
+  return MATRIZ_2026[segmento].filter(e =>
+    (e.campo_experiencia_id ?? e.campo_id) === campoId
+  );
+}
+
+/**
+ * Retorna todas as entradas de um bimestre para um segmento.
+ */
+export function getEntradasPorBimestre(
+  segmento: SegmentoKey,
+  bimestre: string,
+): EntradaMatriz[] {
+  return MATRIZ_2026[segmento].filter(e => e.bimestre === bimestre);
 }
