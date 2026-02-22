@@ -30,6 +30,8 @@ import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
 import CoordenacaoPedagogicaPage from '../pages/CoordenacaoPedagogicaPage';
 import RelatorioConsumoMateriaisPage from '../pages/RelatorioConsumoMateriaisPage';
 import RdicCriancaPage from '../pages/RdicCriancaPage';
+import RdicCoordPage from '../pages/RdicCoordPage';
+import RdicGeralPage from '../pages/RdicGeralPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -122,6 +124,24 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <RdicCriancaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── RDIC Coordenação Pedagógica da Unidade (revisão e aprovação) ────────
+      {
+        path: 'rdic-coord',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdicCoordPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── RDIC Coordenação Geral (somente leitura, apenas PUBLICADOS) ────────
+      {
+        path: 'rdic-geral',
+        element: (
+          <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdicGeralPage />
           </RoleProtectedRoute>
         ),
       },

@@ -31,6 +31,7 @@ import { ChildrenModule } from './children/children.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { CoordenacaoModule } from './coordenacao/coordenacao.module';
 import { RdxModule } from './rdx/rdx.module';
+import { RdicModule } from './rdic/rdic.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { RdxModule } from './rdx/rdx.module';
     AttendanceModule,
     CoordenacaoModule,
     RdxModule,
+    RdicModule,
   ],
   controllers: [AppController],
   providers: [

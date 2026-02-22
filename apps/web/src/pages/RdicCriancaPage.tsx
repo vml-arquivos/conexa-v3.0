@@ -24,7 +24,7 @@ import {
   Brain, Sparkles, User, Users, ChevronLeft, ChevronRight,
   Save, RefreshCw, CheckCircle, AlertCircle, Star,
   BookOpen, Heart, Music, Palette, Calculator, MessageSquare,
-  ArrowLeft, FileText, Eye, EyeOff,
+  ArrowLeft, FileText, Eye, EyeOff, Send, Plus,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -335,7 +335,7 @@ export default function RdicCriancaPage() {
   async function carregarRdicsDoAluno(childId: string) {
     try {
       setLoadingRdics(true);
-      const res = await http.get('/rdx', { params: { childId, type: 'RDIC' } });
+      const res = await http.get('/rdic', { params: { childId } });
       setRdicsDoAluno(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
     } catch {
       setRdicsDoAluno([]);
@@ -401,15 +401,22 @@ export default function RdicCriancaPage() {
     try {
       const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
       const ano = new Date().getFullYear();
-      await http.post('/rdx', {
+      const payload = {
         childId: alunoSelecionado.id,
-        type: 'RDIC',
-        periodo: `${bimestreAtual?.label ?? `${bimestre}º Bimestre`} ${ano}`,
-        bimestre,
-        dimensoes,
-        observacaoGeral,
-        proximosPassos,
-      });
+        classroomId: turma?.id,
+        periodo: `${bimestreAtual?.label ?? `${bimestre}º Bimestre`}`,
+        anoLetivo: ano,
+        rascunhoJson: { bimestre, dimensoes, observacaoGeral, proximosPassos },
+      };
+      // Verificar se já existe RDIC para este período (tenta atualizar, se não cria)
+      const existente = rdicsDoAluno.find(
+        r => r.periodo === payload.periodo && r.anoLetivo === ano && r.status === 'RASCUNHO'
+      );
+      if (existente) {
+        await http.patch(`/rdic/${existente.id}`, { rascunhoJson: payload.rascunhoJson });
+      } else {
+        await http.post('/rdic', payload);
+      }
       toast.success(`RDIC de ${alunoSelecionado.firstName} salvo com sucesso!`);
       await carregarRdicsDoAluno(alunoSelecionado.id);
       setEtapa('historico');
@@ -799,8 +806,35 @@ export default function RdicCriancaPage() {
                 {saving ? (
                   <><RefreshCw className="h-4 w-4 animate-spin" /> Salvando...</>
                 ) : (
-                  <><Save className="h-4 w-4" /> Salvar RDIC</>
+                  <><Save className="h-4 w-4" /> Salvar Rascunho</>
                 )}
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!alunoSelecionado) return;
+                  await salvarRdic();
+                  // Após salvar, buscar o RDIC recém-criado e enviar para revisão
+                  try {
+                    const lista = await http.get('/rdic', { params: { childId: alunoSelecionado.id } });
+                    const rdics = Array.isArray(lista.data) ? lista.data : lista.data?.data ?? [];
+                    const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
+                    const ano = new Date().getFullYear();
+                    const periodo = `${bimestreAtual?.label ?? `${bimestre}º Bimestre`}`;
+                    const rdic = rdics.find((r: any) => r.periodo === periodo && r.anoLetivo === ano && r.status === 'RASCUNHO');
+                    if (rdic) {
+                      await http.patch(`/rdic/${rdic.id}/enviar-revisao`);
+                      toast.success('RDIC enviado para revisão da coordenação pedagógica!');
+                      await carregarRdicsDoAluno(alunoSelecionado.id);
+                      setEtapa('historico');
+                    }
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.message || 'Erro ao enviar para revisão');
+                  }
+                }}
+                disabled={saving || !observacaoGeral.trim()}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Send className="h-4 w-4" /> Enviar para Revisão
               </Button>
             </div>
           </div>
