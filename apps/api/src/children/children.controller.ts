@@ -78,8 +78,7 @@ export class ChildrenController {
    * Upload de foto da criança
    */
   @Post(':id/photo')
-  @RequireRoles(RoleLevel.UNIDADE)
-  @UseInterceptors(FileInterceptor('photo'))
+  @UseInterceptors(FileInterceptor('file'))
   async uploadPhoto(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,

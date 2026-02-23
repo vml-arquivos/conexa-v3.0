@@ -160,13 +160,20 @@ export class ChildrenService {
    * Upload de foto da criança
    */
   async uploadPhoto(id: string, file: Express.Multer.File, user: any) {
-    const child = await this.findOne(id, user);
+    await this.findOne(id, user);
+    if (!file) throw new Error('Arquivo não recebido');
 
-    // TODO: Implementar upload para S3
-    // Por enquanto, apenas retornar sucesso
-    const photoUrl = `/uploads/children/${id}/${file.filename}`;
+    // Converte para base64 data URL — persiste sem S3
+    const base64 = file.buffer.toString('base64');
+    const photoUrl = `data:${file.mimetype};base64,${base64}`;
 
-    return { photoUrl, message: 'Upload de foto será implementado com S3' };
+    // Salva no banco
+    await this.prisma.child.update({
+      where: { id },
+      data: { photoUrl },
+    });
+
+    return { photoUrl, message: 'Foto atualizada com sucesso' };
   }
 
   /**

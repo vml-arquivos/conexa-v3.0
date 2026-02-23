@@ -14,7 +14,7 @@ import {
   GraduationCap, Plus, Save, RefreshCw, BookOpen, Star, Users,
   FileText, Image, Paperclip, ChevronDown, ChevronUp, BarChart2,
   CheckCircle, Clock, AlertCircle, UserCircle, Trash2, Eye,
-  Upload, History, TrendingUp, Brain, Heart, Activity, X,
+  Upload, History, TrendingUp, Brain, Heart, Activity, X, Camera,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -127,6 +127,34 @@ export default function SalaDeAulaVirtualPage() {
   const [postDesempenho, setPostDesempenho] = useState<ClassroomPost | null>(null);
   const [filterType, setFilterType] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+
+  async function handleUploadFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !alunoSelecionado) return;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande (máx. 5MB)'); return; }
+    setUploadingFoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await http.post(`/children/${alunoSelecionado.id}/photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = res.data?.photoUrl || res.data?.url;
+      if (url) {
+        setAlunoSelecionado(prev => prev ? { ...prev, photoUrl: url } : prev);
+        setCriancas(prev => prev.map(c => c.id === alunoSelecionado.id ? { ...c, photoUrl: url } : c));
+        toast.success(`Foto de ${alunoSelecionado.firstName} atualizada!`);
+      }
+    } catch {
+      toast.error('Erro ao fazer upload da foto');
+    } finally {
+      setUploadingFoto(false);
+      if (fotoInputRef.current) fotoInputRef.current.value = '';
+    }
+  }
 
   const [form, setForm] = useState({
     title: '',
@@ -732,13 +760,24 @@ export default function SalaDeAulaVirtualPage() {
               {/* ─── Cabeçalho do aluno ─── */}
               <div className="flex items-center gap-3 bg-white border-2 border-indigo-100 rounded-2xl p-4">
                 <button onClick={() => setAlunoSelecionado(null)} className="text-indigo-600 hover:underline text-sm font-medium">← Voltar</button>
-                {alunoSelecionado.photoUrl ? (
-                  <img src={alunoSelecionado.photoUrl} className="w-12 h-12 rounded-full object-cover" alt="" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                    <UserCircle className="w-7 h-7 text-indigo-400" />
-                  </div>
-                )}
+                <div className="relative">
+                  {alunoSelecionado.photoUrl ? (
+                    <img src={alunoSelecionado.photoUrl} className="w-12 h-12 rounded-full object-cover" alt="" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                      <UserCircle className="w-7 h-7 text-indigo-400" />
+                    </div>
+                  )}
+                  <input ref={fotoInputRef} type="file" accept="image/*" className="hidden" onChange={handleUploadFoto} />
+                  <button
+                    onClick={() => fotoInputRef.current?.click()}
+                    disabled={uploadingFoto}
+                    className="absolute bottom-0 right-0 w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center text-white hover:bg-indigo-600 transition-all shadow-md"
+                    title="Adicionar foto"
+                  >
+                    {uploadingFoto ? <RefreshCw className="h-2.5 w-2.5 animate-spin" /> : <Camera className="h-2.5 w-2.5" />}
+                  </button>
+                </div>
                 <div className="flex-1">
                   <h2 className="font-bold text-gray-900">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</h2>
                   <p className="text-xs text-gray-500">{turmas[0]?.name} · {historicoAluno.length} registro(s)</p>
