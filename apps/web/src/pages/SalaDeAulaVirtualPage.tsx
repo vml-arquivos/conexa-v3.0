@@ -106,24 +106,33 @@ export default function SalaDeAulaVirtualPage() {
   const [desempenhoMap, setDesempenhoMap] = useState<Record<string, { performance: string; notes: string }>>({});
 
   useEffect(() => {
-    loadTurmas();
+    loadDashboard();
   }, []);
 
   useEffect(() => {
     if (turmaId) {
       loadPosts();
-      loadCriancas();
     }
   }, [turmaId, filterType]);
 
-  async function loadTurmas() {
+  // Usa o mesmo endpoint que RdicCriancaPage e outras telas — retorna classroom + alunos
+  async function loadDashboard() {
     try {
-      const res = await http.get('/teachers/minhas-turmas');
-      const lista: Turma[] = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-      setTurmas(lista);
-      if (lista.length > 0) setTurmaId(lista[0].id);
+      const res = await http.get('/teachers/dashboard');
+      const data = res.data;
+      if (data?.hasClassroom === false || !data?.classroom) {
+        setTurmas([]);
+        return;
+      }
+      const turma: Turma = { id: data.classroom.id, name: data.classroom.name };
+      setTurmas([turma]);
+      setTurmaId(turma.id);
+      // alunos já vêm do dashboard — sem segunda requisição
+      const lista: Crianca[] = Array.isArray(data.alunos) ? data.alunos : [];
+      setCriancas(lista);
     } catch {
       setTurmas([]);
+      setCriancas([]);
     }
   }
 
@@ -138,15 +147,6 @@ export default function SalaDeAulaVirtualPage() {
       setPosts([]);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function loadCriancas() {
-    try {
-      const res = await http.get(`/classrooms/${turmaId}/children`);
-      setCriancas(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
-    } catch {
-      setCriancas([]);
     }
   }
 
