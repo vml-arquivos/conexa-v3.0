@@ -13,7 +13,7 @@ interface MaterialRequestFormProps {
   isProfessor?: boolean;
 }
 
-// ─── Categorias disponíveis para PROFESSOR: Pedagógico, Higiene e Outros ────────────────
+// ─── Categorias disponíveis para PROFESSOR: apenas Pedagógico, Higiene Pessoal e Outros ─
 const CATEGORIAS_PROFESSOR = [
   {
     value: 'PEDAGOGICO' as MaterialCategory,
@@ -42,7 +42,7 @@ const CATEGORIAS_PROFESSOR = [
     label: 'Outros',
     icon: '📦',
     cor: 'border-gray-300 bg-gray-50',
-    itensComuns: [],
+    itensComuns: ['Caixa de lenços', 'Saquinhos plásticos', 'Fita adesiva', 'Grampeador', 'Clipes', 'Caneta esferográfica'],
   },
 ];
 

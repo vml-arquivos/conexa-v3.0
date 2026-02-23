@@ -16,7 +16,7 @@ export function MaterialRequestPage() {
           Requisições de Materiais
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Solicite materiais pedagógicos, de higiene, limpeza e alimentação para sua turma.
+          Solicite materiais pedagógicos, de higiene pessoal e outros para sua turma.
           As solicitações são encaminhadas à Coordenadora Pedagógica da unidade.
         </p>
       </header>

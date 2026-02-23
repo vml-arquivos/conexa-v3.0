@@ -12,7 +12,7 @@ import http from '../api/http';
 import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
-  CheckCircle, Users, Search, UserCircle, X,
+  CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -49,6 +49,24 @@ interface Microgesto {
   criancaFoto?: string;
   campo: string;
   horario?: string;
+}
+
+interface ObservacaoIndividual {
+  id?: string;
+  childId: string;
+  category: string;
+  date: string;
+  behaviorDescription?: string;
+  socialInteraction?: string;
+  emotionalState?: string;
+  dietaryNotes?: string;
+  sleepPattern?: string;
+  learningProgress?: string;
+  planningParticipation?: string;
+  psychologicalNotes?: string;
+  developmentAlerts?: string;
+  recommendations?: string;
+  child?: { id: string; firstName: string; lastName: string; photoUrl?: string };
 }
 
 interface RotinaItem {
@@ -162,7 +180,7 @@ function SeletorCrianca({
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
-  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos'>('lista');
+  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes'>('lista');
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
@@ -197,10 +215,71 @@ export default function DiarioBordoPage() {
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
 
+  // Observações individuais
+  const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
+  const [loadingObs, setLoadingObs] = useState(false);
+  const [savingObs, setSavingObs] = useState(false);
+  const [criancaSelecionadaObs, setCriancaSelecionadaObs] = useState<string>('');
+  const [obsForm, setObsForm] = useState({
+    category: 'GERAL',
+    date: new Date().toISOString().split('T')[0],
+    behaviorDescription: '',
+    socialInteraction: '',
+    emotionalState: '',
+    dietaryNotes: '',
+    sleepPattern: '',
+    learningProgress: '',
+    planningParticipation: '',
+    psychologicalNotes: '',
+    developmentAlerts: '',
+    recommendations: '',
+  });
+
   useEffect(() => {
     loadDiarios();
     loadTurmaECriancas();
   }, []);
+
+  async function loadObservacoes(cid?: string) {
+    setLoadingObs(true);
+    try {
+      const params: Record<string, string> = {};
+      if (cid) params.childId = cid;
+      if (classroomId) params.classroomId = classroomId;
+      const res = await http.get('/development-observations', { params });
+      setObservacoes(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+    } catch {
+      setObservacoes([]);
+    } finally {
+      setLoadingObs(false);
+    }
+  }
+
+  async function salvarObservacao() {
+    if (!criancaSelecionadaObs) { toast.error('Selecione uma criança'); return; }
+    setSavingObs(true);
+    try {
+      await http.post('/development-observations', {
+        childId: criancaSelecionadaObs,
+        classroomId,
+        ...obsForm,
+        date: obsForm.date + 'T12:00:00.000Z',
+      });
+      toast.success('Observação salva com sucesso!');
+      setObsForm({
+        category: 'GERAL', date: new Date().toISOString().split('T')[0],
+        behaviorDescription: '', socialInteraction: '', emotionalState: '',
+        dietaryNotes: '', sleepPattern: '', learningProgress: '',
+        planningParticipation: '', psychologicalNotes: '', developmentAlerts: '', recommendations: '',
+      });
+      setCriancaSelecionadaObs('');
+      loadObservacoes();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao salvar observação');
+    } finally {
+      setSavingObs(false);
+    }
+  }
 
   async function loadTurmaECriancas() {
     try {
@@ -380,6 +459,7 @@ export default function DiarioBordoPage() {
         {[
           { id: 'lista', label: 'Meus Diários', icon: <BookOpen className="h-4 w-4" /> },
           { id: 'novo', label: 'Novo Registro', icon: <Plus className="h-4 w-4" /> },
+          { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
         ].map(tab => (
           <button key={tab.id} onClick={() => setAba(tab.id as any)}
@@ -754,6 +834,152 @@ export default function DiarioBordoPage() {
             </Button>
             <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
           </div>
+        </div>
+      )}
+
+      {/* ─── OBSERVAÇÕES INDIVIDUAIS ─── */}
+      {aba === 'observacoes' && (
+        <div className="space-y-6 max-w-3xl">
+          <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl p-4">
+            <p className="text-sm text-teal-700">
+              Registre observações individuais de cada criança: comportamento, alimentação, sono, participação no plano de aula, desenvolvimento psicológico e físico.
+              Essas informações ficam disponíveis para a coordenadora pedagógica e geram relatórios de evolução.
+            </p>
+          </div>
+
+          {/* Seletor de criança */}
+          <Card className="border-2 border-teal-100">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-teal-700"><UserCircle className="h-5 w-5" /> Selecionar Criança</CardTitle></CardHeader>
+            <CardContent>
+              {criancas.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {criancas.map(c => {
+                    const sel = criancaSelecionadaObs === c.id;
+                    return (
+                      <button key={c.id} type="button"
+                        onClick={() => { setCriancaSelecionadaObs(sel ? '' : c.id); loadObservacoes(sel ? undefined : c.id); }}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-teal-500 bg-teal-50 shadow-sm' : 'border-gray-200 bg-white hover:border-teal-300'}`}>
+                        {c.photoUrl ? (
+                          <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center">
+                            <UserCircle className="w-6 h-6 text-teal-400" />
+                          </div>
+                        )}
+                        <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-teal-700' : 'text-gray-600'}`}>{c.firstName}</span>
+                        {sel && <span className="text-teal-500 text-xs">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Formulário de observação */}
+          {criancaSelecionadaObs && (
+            <Card className="border-2 border-teal-100">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-teal-700">
+                  <Plus className="h-5 w-5" />
+                  Nova Observação — {criancas.find(c => c.id === criancaSelecionadaObs)?.firstName}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Data</Label>
+                    <input type="date" className="w-full border rounded-lg px-3 py-2 text-sm" value={obsForm.date}
+                      onChange={e => setObsForm(f => ({ ...f, date: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Categoria</Label>
+                    <select className="w-full border rounded-lg px-3 py-2 text-sm" value={obsForm.category}
+                      onChange={e => setObsForm(f => ({ ...f, category: e.target.value }))}>
+                      <option value="GERAL">Geral</option>
+                      <option value="COMPORTAMENTO">Comportamento</option>
+                      <option value="DESENVOLVIMENTO">Desenvolvimento</option>
+                      <option value="SAUDE">Saúde e Bem-estar</option>
+                      <option value="APRENDIZAGEM">Aprendizagem</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Comportamento */}
+                <div className="bg-orange-50 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-orange-700 flex items-center gap-2"><Heart className="h-4 w-4" /> Comportamento e Emoções</p>
+                  <Textarea placeholder="Como foi o comportamento geral da criança hoje? Houve agitação, choro, agressividade, tranquilidade?" rows={2}
+                    value={obsForm.behaviorDescription} onChange={e => setObsForm(f => ({ ...f, behaviorDescription: e.target.value }))} />
+                  <Textarea placeholder="Interação social com outras crianças e adultos..." rows={2}
+                    value={obsForm.socialInteraction} onChange={e => setObsForm(f => ({ ...f, socialInteraction: e.target.value }))} />
+                  <Textarea placeholder="Estado emocional: alegre, triste, ansioso, calmo..." rows={2}
+                    value={obsForm.emotionalState} onChange={e => setObsForm(f => ({ ...f, emotionalState: e.target.value }))} />
+                </div>
+
+                {/* Alimentação e sono */}
+                <div className="bg-green-50 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-green-700 flex items-center gap-2"><Apple className="h-4 w-4" /> Alimentação e Sono</p>
+                  <Textarea placeholder="Como foi a alimentação? Aceitou bem? Recusou algum alimento? Quantidade ingerida..." rows={2}
+                    value={obsForm.dietaryNotes} onChange={e => setObsForm(f => ({ ...f, dietaryNotes: e.target.value }))} />
+                  <Textarea placeholder="Padrão de sono: dormiu bem, teve dificuldade, dormiu mais que o habitual..." rows={2}
+                    value={obsForm.sleepPattern} onChange={e => setObsForm(f => ({ ...f, sleepPattern: e.target.value }))} />
+                </div>
+
+                {/* Pedagógico */}
+                <div className="bg-blue-50 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-blue-700 flex items-center gap-2"><Star className="h-4 w-4" /> Desenvolvimento Pedagógico</p>
+                  <Textarea placeholder="Como foi o aprendizado? Progresso observado, dificuldades, conquistas..." rows={2}
+                    value={obsForm.learningProgress} onChange={e => setObsForm(f => ({ ...f, learningProgress: e.target.value }))} />
+                  <Textarea placeholder="Participação no plano de aula: engajamento, interesse, como foi o desempenho na atividade planejada..." rows={2}
+                    value={obsForm.planningParticipation} onChange={e => setObsForm(f => ({ ...f, planningParticipation: e.target.value }))} />
+                </div>
+
+                {/* Psicológico / Desenvolvimento integral */}
+                <div className="bg-purple-50 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-purple-700 flex items-center gap-2"><Brain className="h-4 w-4" /> Desenvolvimento Integral</p>
+                  <Textarea placeholder="Observações psicológicas, mentais e físicas: sinais de ansiedade, dificuldades de atenção, desenvolvimento motor, linguagem..." rows={2}
+                    value={obsForm.psychologicalNotes} onChange={e => setObsForm(f => ({ ...f, psychologicalNotes: e.target.value }))} />
+                  <Textarea placeholder="Alertas de desenvolvimento: algo que chama atenção e pode indicar necessidade de acompanhamento especializado..." rows={2}
+                    value={obsForm.developmentAlerts} onChange={e => setObsForm(f => ({ ...f, developmentAlerts: e.target.value }))} />
+                  <Textarea placeholder="Recomendações e próximos passos para esta criança..." rows={2}
+                    value={obsForm.recommendations} onChange={e => setObsForm(f => ({ ...f, recommendations: e.target.value }))} />
+                </div>
+
+                <Button onClick={salvarObservacao} disabled={savingObs} className="w-full bg-teal-600 hover:bg-teal-700">
+                  {savingObs ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Salvar Observação Individual
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Lista de observações da criança selecionada */}
+          {criancaSelecionadaObs && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-600 uppercase">Histórico de Observações</h3>
+              {loadingObs && <LoadingState message="Carregando observações..." />}
+              {!loadingObs && observacoes.length === 0 && (
+                <p className="text-sm text-gray-400 italic text-center py-4">Nenhuma observação registrada para esta criança</p>
+              )}
+              {observacoes.map(obs => (
+                <Card key={obs.id} className="border hover:border-teal-200 transition-all">
+                  <CardContent className="pt-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">{obs.category}</span>
+                      <span className="text-xs text-gray-400">{new Date(obs.date).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    {obs.behaviorDescription && <p className="text-sm text-gray-700 mb-1"><span className="font-medium">Comportamento:</span> {obs.behaviorDescription}</p>}
+                    {obs.dietaryNotes && <p className="text-sm text-gray-700 mb-1"><span className="font-medium">Alimentação:</span> {obs.dietaryNotes}</p>}
+                    {obs.learningProgress && <p className="text-sm text-gray-700 mb-1"><span className="font-medium">Aprendizagem:</span> {obs.learningProgress}</p>}
+                    {obs.planningParticipation && <p className="text-sm text-gray-700 mb-1"><span className="font-medium">Plano de Aula:</span> {obs.planningParticipation}</p>}
+                    {obs.developmentAlerts && <p className="text-sm text-red-600 mb-1"><span className="font-medium">⚠️ Alerta:</span> {obs.developmentAlerts}</p>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

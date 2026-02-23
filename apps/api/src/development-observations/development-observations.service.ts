@@ -1,0 +1,132 @@
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { RoleLevel } from '@prisma/client';
+
+function hasLevel(user: JwtPayload, ...levels: RoleLevel[]): boolean {
+  return Array.isArray(user.roles) && user.roles.some((r: any) => levels.includes(r?.level));
+}
+
+@Injectable()
+export class DevelopmentObservationsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Professor cria observação individual de um aluno */
+  async criar(dto: any, user: JwtPayload) {
+    const {
+      childId, classroomId, category, date,
+      behaviorDescription, socialInteraction, emotionalState,
+      motorSkills, cognitiveSkills, languageSkills,
+      healthNotes, dietaryNotes, sleepPattern,
+      learningProgress, planningParticipation, interests, challenges,
+      psychologicalNotes, developmentAlerts,
+      recommendations, nextSteps,
+    } = dto;
+
+    return this.prisma.developmentObservation.create({
+      data: {
+        childId,
+        classroomId: classroomId ?? null,
+        category: category ?? 'GERAL',
+        date: date ? new Date(date) : new Date(),
+        behaviorDescription, socialInteraction, emotionalState,
+        motorSkills, cognitiveSkills, languageSkills,
+        healthNotes, dietaryNotes, sleepPattern,
+        learningProgress, planningParticipation, interests, challenges,
+        psychologicalNotes, developmentAlerts,
+        recommendations, nextSteps,
+        createdBy: user.sub,
+      },
+      include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
+    });
+  }
+
+  /** Listar observações — filtro por aluno, turma, categoria, período */
+  async listar(query: any, user: JwtPayload) {
+    const { childId, classroomId, category, startDate, endDate, limit } = query;
+    const where: any = {};
+
+    if (childId) where.childId = childId;
+    if (classroomId) where.classroomId = classroomId;
+    if (category) where.category = category;
+
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(endDate);
+    }
+
+    // Professor vê apenas observações que ele criou
+    if (hasLevel(user, RoleLevel.PROFESSOR)) {
+      where.createdBy = user.sub;
+    }
+
+    return this.prisma.developmentObservation.findMany({
+      where,
+      orderBy: { date: 'desc' },
+      take: Number(limit) || 100,
+      include: {
+        child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
+      },
+    });
+  }
+
+  /** Detalhe de uma observação */
+  async getById(id: string) {
+    const obs = await this.prisma.developmentObservation.findUnique({
+      where: { id },
+      include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
+    });
+    if (!obs) throw new NotFoundException('Observação não encontrada');
+    return obs;
+  }
+
+  /** Atualizar observação */
+  async atualizar(id: string, dto: any, user: JwtPayload) {
+    const obs = await this.prisma.developmentObservation.findUnique({ where: { id } });
+    if (!obs) throw new NotFoundException('Observação não encontrada');
+
+    if (hasLevel(user, RoleLevel.PROFESSOR) && obs.createdBy !== user.sub) {
+      throw new ForbiddenException('Sem permissão para editar esta observação');
+    }
+
+    return this.prisma.developmentObservation.update({
+      where: { id },
+      data: { ...dto, date: dto.date ? new Date(dto.date) : obs.date },
+      include: { child: { select: { id: true, firstName: true, lastName: true } } },
+    });
+  }
+
+  /** Deletar observação */
+  async deletar(id: string, user: JwtPayload) {
+    const obs = await this.prisma.developmentObservation.findUnique({ where: { id } });
+    if (!obs) throw new NotFoundException('Observação não encontrada');
+
+    if (hasLevel(user, RoleLevel.PROFESSOR) && obs.createdBy !== user.sub) {
+      throw new ForbiddenException('Sem permissão para excluir esta observação');
+    }
+
+    await this.prisma.developmentObservation.delete({ where: { id } });
+    return { success: true };
+  }
+
+  /** Resumo de desenvolvimento de um aluno (para relatório da coordenadora) */
+  async resumoAluno(childId: string) {
+    const [obs, total] = await Promise.all([
+      this.prisma.developmentObservation.findMany({
+        where: { childId },
+        orderBy: { date: 'desc' },
+        take: 20,
+        include: { child: { select: { id: true, firstName: true, lastName: true } } },
+      }),
+      this.prisma.developmentObservation.count({ where: { childId } }),
+    ]);
+
+    const porCategoria = obs.reduce((acc: Record<string, number>, o) => {
+      acc[o.category] = (acc[o.category] || 0) + 1;
+      return acc;
+    }, {});
+
+    return { total, porCategoria, ultimas: obs };
+  }
+}

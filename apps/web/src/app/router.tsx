@@ -32,6 +32,7 @@ import RelatorioConsumoMateriaisPage from '../pages/RelatorioConsumoMateriaisPag
 import PainelAlergiasPage from '../pages/PainelAlergiasPage';
 import DashboardConsumoMateriaisPage from '../pages/DashboardConsumoMateriaisPage';
 import RdicCriancaPage from '../pages/RdicCriancaPage';
+import SalaDeAulaVirtualPage from '../pages/SalaDeAulaVirtualPage';
 import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -333,6 +334,15 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PainelAlergiasPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Sala de Aula Virtual (Professor + Coordenação) ─────────────────────
+      {
+        path: 'sala-de-aula-virtual',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <SalaDeAulaVirtualPage />
           </RoleProtectedRoute>
         ),
       },

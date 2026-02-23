@@ -32,6 +32,9 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { CoordenacaoModule } from './coordenacao/coordenacao.module';
 import { RdxModule } from './rdx/rdx.module';
 import { RdicModule } from './rdic/rdic.module';
+import { ClassroomPostsModule } from './classroom-posts/classroom-posts.module';
+import { RecadosModule } from './recados/recados.module';
+import { DevelopmentObservationsModule } from './development-observations/development-observations.module';
 
 @Module({
   imports: [
@@ -67,6 +70,9 @@ import { RdicModule } from './rdic/rdic.module';
     CoordenacaoModule,
     RdxModule,
     RdicModule,
+    ClassroomPostsModule,
+    RecadosModule,
+    DevelopmentObservationsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -43,7 +43,8 @@ export default function DashboardCoordenacaoGeralPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardGeral>(DEMO);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
-  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'>('visao');
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -89,6 +90,8 @@ export default function DashboardCoordenacaoGeralPage() {
     { id:'visao', label:'Visao Geral', icon:<Star className="h-4 w-4"/> },
     { id:'unidades', label:'Por Unidade', icon:<Building2 className="h-4 w-4"/> },
     { id:'relatorio', label:'Relatorio', icon:<BarChart2 className="h-4 w-4"/> },
+    { id:'alunos', label:'Alunos por Unidade', icon:<Users className="h-4 w-4"/> },
+    { id:'observacoes', label:'Observacoes Individuais', icon:<ClipboardList className="h-4 w-4"/> },
     { id:'matriz', label:'Matriz 2026', icon:<Layers className="h-4 w-4"/> },
   ] as const;
   const filtros = [
@@ -432,6 +435,70 @@ export default function DashboardCoordenacaoGeralPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+      {/* ABA: ALUNOS POR UNIDADE */}
+      {abaAtiva === 'alunos' && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <p className="text-sm text-blue-700">
+              Selecione uma unidade para visualizar todas as turmas, alunos, chamadas, diários de bordo e RDIC.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {dashboard.unidades.map(unidade => (
+              <button key={unidade.id}
+                onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/turmas`)}
+                className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <Building2 className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800">{unidade.nome}</p>
+                    <p className="text-xs text-gray-400">{unidade.totalTurmas} turmas · {unidade.totalAlunos} alunos · {unidade.totalProfessores} professores</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${unidade.taxaPresenca}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-500">{unidade.taxaPresenca}% presença</span>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-300" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
+      {abaAtiva === 'observacoes' && (
+        <div className="space-y-4">
+          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+            <p className="text-sm text-teal-700">
+              Visualize as observações individuais de desenvolvimento, comportamento e evolução de todos os alunos de todas as unidades.
+              Selecione uma unidade para começar.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {dashboard.unidades.map(unidade => (
+              <button key={unidade.id}
+                onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/observacoes`)}
+                className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <ClipboardList className="h-6 w-6 text-teal-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800">{unidade.nome}</p>
+                    <p className="text-xs text-gray-400">{unidade.totalAlunos} alunos · {unidade.totalTurmas} turmas</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-300" />
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </PageShell>

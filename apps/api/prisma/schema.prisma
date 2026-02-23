@@ -326,6 +326,7 @@ model Unit {
   aiContexts           AIContext[]
 
   dailyMetrics DailyMetric[]
+  recados      RecadoTurma[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
@@ -547,7 +548,7 @@ model Child {
   rdixInstancias           RDIXInstancia[]
   developmentObservations  DevelopmentObservation[]
   developmentReports       DevelopmentReport[]
-
+  postPerformances         StudentPostPerformance[]
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([isActive])
@@ -620,6 +621,7 @@ model Classroom {
   attendances      Attendance[]
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
+  classroomPosts   ClassroomPost[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -1733,47 +1735,45 @@ model MaterialRequestItem {
 
 /// Observações de Desenvolvimento Individual da Criança (RDIC)
 model DevelopmentObservation {
-  id      String @id @default(cuid())
-  childId String
-  date    DateTime @default(now())
-
+  id          String   @id @default(cuid())
+  childId     String
+  classroomId String?
+  date        DateTime @default(now())
   // Categoria da observação
-  category ObservationCategory
-
+  category ObservationCategory @default(GERAL)
   // Comportamento
   behaviorDescription String? @db.Text
   socialInteraction   String? @db.Text
   emotionalState      String? @db.Text
-
-  // Desenvolvimento
+  // Desenvolvimento físico/motor
   motorSkills     String? @db.Text
   cognitiveSkills String? @db.Text
   languageSkills  String? @db.Text
-
   // Saúde e Bem-estar
   healthNotes  String? @db.Text
   dietaryNotes String? @db.Text
   sleepPattern String? @db.Text
-
-  // Observações Pedagógicas
-  learningProgress String? @db.Text
-  interests        String? @db.Text
-  challenges       String? @db.Text
-
+  // Pedagógico
+  learningProgress       String? @db.Text
+  planningParticipation  String? @db.Text
+  interests              String? @db.Text
+  challenges             String? @db.Text
+  // Psicológico / desenvolvimento integral
+  psychologicalNotes  String? @db.Text
+  developmentAlerts   String? @db.Text
   // Recomendações
   recommendations String? @db.Text
   nextSteps       String? @db.Text
-
   // Metadados
-  createdBy String // userId do professor
+  createdBy String
   updatedAt DateTime @updatedAt
-
   // Relações
   child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
-
   @@index([childId])
+  @@index([classroomId])
   @@index([date])
   @@index([category])
+  @@index([createdBy])
 }
 
 enum ObservationCategory {
@@ -1825,4 +1825,122 @@ enum ReportType {
   BIMESTRAL
   SEMESTRAL
   ANUAL
+}
+
+// ============================================================================
+// 33. SALA DE AULA VIRTUAL
+// ============================================================================
+enum PostType {
+  TAREFA
+  AVISO
+  ATIVIDADE
+  MATERIAL
+  REGISTRO
+  PLANEJAMENTO
+}
+
+enum PostStatus {
+  RASCUNHO
+  PUBLICADO
+  ARQUIVADO
+}
+
+model ClassroomPost {
+  id            String     @id @default(cuid())
+  classroomId   String
+  mantenedoraId String
+  unitId        String
+  type          PostType   @default(TAREFA)
+  status        PostStatus @default(PUBLICADO)
+  title         String     @db.VarChar(255)
+  content       String     @db.Text
+  planningId    String?
+  dueDate       DateTime?
+  createdBy     String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  classroom    Classroom               @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  files        ClassroomPostFile[]
+  performances StudentPostPerformance[]
+
+  @@index([classroomId])
+  @@index([mantenedoraId])
+  @@index([createdAt])
+}
+
+model ClassroomPostFile {
+  id           String   @id @default(cuid())
+  postId       String
+  nomeOriginal String   @db.VarChar(255)
+  url          String   @db.VarChar(500)
+  mimeType     String   @db.VarChar(100) @default("application/octet-stream")
+  tamanhoBytes Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  post ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+model StudentPostPerformance {
+  id          String   @id @default(cuid())
+  postId      String
+  childId     String
+  performance String   @db.VarChar(50) @default("NAO_AVALIADO")
+  notes       String?  @db.Text
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post  ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  child Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, childId])
+  @@index([postId])
+  @@index([childId])
+}
+
+// ============================================================================
+// 34. RECADOS DA COORDENADORA
+// ============================================================================
+enum RecadoDestinatario {
+  TODAS_PROFESSORAS
+  TURMA_ESPECIFICA
+  PROFESSOR_ESPECIFICO
+}
+
+model RecadoTurma {
+  id            String             @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  classroomId   String?
+  destinatario  RecadoDestinatario @default(TODAS_PROFESSORAS)
+  professorId   String?
+  titulo        String             @db.VarChar(255)
+  mensagem      String             @db.Text
+  importante    Boolean            @default(false)
+  criadoPorId   String
+  criadoEm      DateTime           @default(now())
+  expiresAt     DateTime?
+
+  unit     Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  leituras RecadoLeitura[]
+
+  @@index([unitId])
+  @@index([classroomId])
+  @@index([criadoEm])
+}
+
+model RecadoLeitura {
+  id       String   @id @default(cuid())
+  recadoId String
+  userId   String
+  lidoEm   DateTime @default(now())
+
+  recado RecadoTurma @relation(fields: [recadoId], references: [id], onDelete: Cascade)
+
+  @@unique([recadoId, userId])
+  @@index([recadoId])
+  @@index([userId])
 }

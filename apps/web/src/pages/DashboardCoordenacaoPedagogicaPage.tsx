@@ -9,8 +9,10 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
   Eye, ThumbsUp, MessageSquare, TrendingUp,
-  Bell, Star,
+  Bell, Star, Brain, GraduationCap, Plus,
 } from 'lucide-react';
+import { RecadosWidget } from '../components/recados/RecadosWidget';
+import { useNavigate } from 'react-router-dom';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -49,7 +51,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'>('inicio');
+  const navigate = useNavigate();
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
@@ -170,6 +173,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     { id: 'requisicoes', label: 'Pedidos de Material', icon: <ShoppingCart className="h-4 w-4" />, badge: dashboard?.requisicoesParaAnalisar },
     { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
     { id: 'diarios', label: 'Diários da Semana', icon: <ClipboardList className="h-4 w-4" /> },
+    { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
+    { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -424,6 +429,73 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             );
           })}
         </div>
+      )}
+      {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
+      {abaAtiva === 'observacoes' && (
+        <div className="space-y-4">
+          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+            <p className="text-sm text-teal-700">
+              Visualize as observações individuais registradas pelos professores para cada aluno.
+              Você pode filtrar por turma, aluno ou categoria.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {dashboard?.turmasLista?.map(turma => (
+              <button key={turma.id}
+                onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
+                className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-gray-800">{turma.nome}</p>
+                    <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: SALA DE AULA VIRTUAL */}
+      {abaAtiva === 'sala' && (
+        <div className="space-y-4">
+          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+            <p className="text-sm text-indigo-700">
+              Acompanhe as atividades e tarefas publicadas pelos professores na Sala de Aula Virtual.
+              Visualize o desempenho individual de cada aluno por atividade.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {dashboard?.turmasLista?.map(turma => (
+              <button key={turma.id}
+                onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
+                className="p-4 bg-white border-2 border-indigo-100 rounded-2xl text-left hover:border-indigo-300 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <GraduationCap className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-gray-800">{turma.nome}</p>
+                    <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Widget de Recados */}
+      {abaAtiva === 'inicio' && (
+        <RecadosWidget
+          titulo="Recados para Professoras"
+          podeEnviar={true}
+          unitId={undefined}
+          turmas={dashboard?.turmasLista?.map(t => ({ id: t.id, name: t.nome })) ?? []}
+        />
       )}
     </PageShell>
   );

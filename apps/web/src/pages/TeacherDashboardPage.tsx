@@ -11,11 +11,12 @@ import {
   ChevronRight, Bell, Calendar, X,
   Brain, Sparkles, TrendingUp, Award,
   Plus, Edit3, RefreshCw, FileText,
-  Send, Download, Star, Lightbulb, ArrowRight,
+  Send, Download, Star, Lightbulb, ArrowRight, GraduationCap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http from '../api/http';
 import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
+import { RecadosWidget } from '../components/recados/RecadosWidget';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -41,6 +42,7 @@ const ACOES_RAPIDAS = [
   { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
   { id: 'diario', label: 'Diário de Bordo', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
   { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
+  { id: 'sala', label: 'Sala de Aula Virtual', desc: 'Tarefas e desempenho', icon: <GraduationCap className="h-6 w-6" />, cor: 'bg-violet-500', rota: '/app/sala-de-aula-virtual' },
   { id: 'rdic', label: 'RDIC por Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-crianca' },
   { id: 'materiais', label: 'Materiais', desc: 'Solicitar recursos', icon: <ShoppingCart className="h-6 w-6" />, cor: 'bg-orange-500', rota: '/app/material-requests' },
   { id: 'fotos', label: 'Fotos da Turma', desc: 'Galeria e RDX', icon: <Camera className="h-6 w-6" />, cor: 'bg-pink-500', rota: '/app/rdx' },
@@ -300,6 +302,11 @@ export default function TeacherDashboardPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Recados da Coordenadora (sempre visível na aba turma) */}
+          {abaAtiva === 'turma' && (
+            <RecadosWidget titulo="Recados da Coordenação" />
           )}
 
           {/* ─── AÇÕES RÁPIDAS ─── */}
