@@ -14,6 +14,7 @@ import {
   GraduationCap, Plus, Save, RefreshCw, BookOpen, Star, Users,
   FileText, Image, Paperclip, ChevronDown, ChevronUp, BarChart2,
   CheckCircle, Clock, AlertCircle, UserCircle, Trash2, Eye,
+  Upload, History, TrendingUp, Brain, Heart, Activity, X,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -53,6 +54,23 @@ interface Crianca {
   photoUrl?: string;
 }
 
+interface ObservacaoHistorico {
+  id: string;
+  date: string;
+  category: string;
+  learningProgress?: string;
+  behaviorDescription?: string;
+  planningParticipation?: string;
+  emotionalState?: string;
+  psychologicalNotes?: string;
+  developmentAlerts?: string;
+  recommendations?: string;
+  atividadeTitulo?: string;
+  atividadeDescricao?: string;
+  atividadeArquivoUrl?: string;
+  atividadeArquivoNome?: string;
+}
+
 interface Turma {
   id: string;
   name: string;
@@ -85,9 +103,22 @@ export default function SalaDeAulaVirtualPage() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState<string>('');
   const [alunoSelecionado, setAlunoSelecionado] = useState<Crianca | null>(null);
+  const [abaAluno, setAbaAluno] = useState<'registro' | 'historico' | 'desenvolvimento'>('registro');
   const [anotacaoAluno, setAnotacaoAluno] = useState('');
   const [avaliacaoAluno, setAvaliacaoAluno] = useState('NAO_AVALIADO');
+  const [atividadeTitulo, setAtividadeTitulo] = useState('');
+  const [atividadeDescricao, setAtividadeDescricao] = useState('');
+  const [participacaoAtividade, setParticipacaoAtividade] = useState('');
+  const [estadoEmocional, setEstadoEmocional] = useState('');
+  const [notasPsicologicas, setNotasPsicologicas] = useState('');
+  const [alertasDesenvolvimento, setAlertasDesenvolvimento] = useState('');
+  const [recomendacoes, setRecomendacoes] = useState('');
+  const [arquivoAtividade, setArquivoAtividade] = useState<File | null>(null);
+  const [arquivoPreview, setArquivoPreview] = useState<string>('');
+  const [historicoAluno, setHistoricoAluno] = useState<ObservacaoHistorico[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [savingAluno, setSavingAluno] = useState(false);
+  const fileInputAlunoRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -185,6 +216,113 @@ export default function SalaDeAulaVirtualPage() {
     });
     setDesempenhoMap(map);
     setAba('desempenho');
+  }
+
+  async function selecionarAluno(c: Crianca) {
+    setAlunoSelecionado(c);
+    setAbaAluno('registro');
+    setAnotacaoAluno('');
+    setAvaliacaoAluno('NAO_AVALIADO');
+    setAtividadeTitulo('');
+    setAtividadeDescricao('');
+    setParticipacaoAtividade('');
+    setEstadoEmocional('');
+    setNotasPsicologicas('');
+    setAlertasDesenvolvimento('');
+    setRecomendacoes('');
+    setArquivoAtividade(null);
+    setArquivoPreview('');
+    // Carrega histórico em paralelo
+    carregarHistoricoAluno(c.id);
+  }
+
+  async function carregarHistoricoAluno(childId: string) {
+    setLoadingHistorico(true);
+    try {
+      const res = await http.get('/development-observations', { params: { childId, limit: 30 } });
+      setHistoricoAluno(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+    } catch {
+      setHistoricoAluno([]);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  }
+
+  function handleArquivoAtividade(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo 10MB.'); return; }
+    setArquivoAtividade(file);
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = ev => setArquivoPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setArquivoPreview('');
+    }
+  }
+
+  async function salvarRegistroAluno() {
+    if (!alunoSelecionado) return;
+    if (!atividadeTitulo.trim() && !anotacaoAluno.trim() && avaliacaoAluno === 'NAO_AVALIADO') {
+      toast.error('Preencha ao menos o título da atividade, uma anotação ou a avaliação.');
+      return;
+    }
+    setSavingAluno(true);
+    try {
+      // Upload de arquivo como base64 se houver
+      let arquivoUrl = '';
+      let arquivoNome = '';
+      if (arquivoAtividade) {
+        arquivoNome = arquivoAtividade.name;
+        // Converte para base64 para envio
+        arquivoUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target?.result as string);
+          reader.readAsDataURL(arquivoAtividade);
+        });
+      }
+
+      await http.post('/development-observations', {
+        childId: alunoSelecionado.id,
+        classroomId: turmaId,
+        date: new Date().toISOString(),
+        category: 'ATIVIDADE',
+        learningProgress: avaliacaoAluno !== 'NAO_AVALIADO' ? avaliacaoAluno : undefined,
+        behaviorDescription: anotacaoAluno || undefined,
+        planningParticipation: participacaoAtividade || undefined,
+        emotionalState: estadoEmocional || undefined,
+        psychologicalNotes: notasPsicologicas || undefined,
+        developmentAlerts: alertasDesenvolvimento || undefined,
+        recommendations: recomendacoes || undefined,
+        // Campos extras para atividade
+        atividadeTitulo: atividadeTitulo || undefined,
+        atividadeDescricao: atividadeDescricao || undefined,
+        atividadeArquivoUrl: arquivoUrl || undefined,
+        atividadeArquivoNome: arquivoNome || undefined,
+      });
+
+      toast.success(`Registro de ${alunoSelecionado.firstName} salvo com sucesso!`);
+      // Limpa o formulário
+      setAnotacaoAluno('');
+      setAvaliacaoAluno('NAO_AVALIADO');
+      setAtividadeTitulo('');
+      setAtividadeDescricao('');
+      setParticipacaoAtividade('');
+      setEstadoEmocional('');
+      setNotasPsicologicas('');
+      setAlertasDesenvolvimento('');
+      setRecomendacoes('');
+      setArquivoAtividade(null);
+      setArquivoPreview('');
+      // Recarrega histórico
+      carregarHistoricoAluno(alunoSelecionado.id);
+      setAbaAluno('historico');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao salvar. Tente novamente.');
+    } finally {
+      setSavingAluno(false);
+    }
   }
 
   async function salvarDesempenhos() {
@@ -491,13 +629,13 @@ export default function SalaDeAulaVirtualPage() {
         <div className="space-y-4 max-w-3xl">
           {!alunoSelecionado ? (
             <>
-              <p className="text-sm text-gray-500">Selecione um aluno para registrar avaliação, anotações e observações individuais.</p>
+              <p className="text-sm text-gray-500">Selecione um aluno para registrar atividades, avaliações e acompanhar o desenvolvimento individual.</p>
               {criancas.length === 0 && <EmptyState title="Nenhum aluno encontrado" description="Verifique se a turma possui alunos cadastrados." />}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {criancas.map(c => (
                   <button
                     key={c.id}
-                    onClick={() => { setAlunoSelecionado(c); setAnotacaoAluno(''); setAvaliacaoAluno('NAO_AVALIADO'); }}
+                    onClick={() => selecionarAluno(c)}
                     className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-100 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-center"
                   >
                     {c.photoUrl ? (
@@ -513,89 +651,358 @@ export default function SalaDeAulaVirtualPage() {
               </div>
             </>
           ) : (
-            <Card className="border-2 border-indigo-100">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setAlunoSelecionado(null)} className="text-indigo-600 hover:underline text-sm">← Voltar</button>
-                  {alunoSelecionado.photoUrl ? (
-                    <img src={alunoSelecionado.photoUrl} className="w-10 h-10 rounded-full object-cover" alt="" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                      <UserCircle className="w-6 h-6 text-indigo-400" />
-                    </div>
-                  )}
-                  <CardTitle className="text-lg">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                {/* Avaliação geral */}
-                <div>
-                  <Label className="mb-2 block font-semibold">Avaliação Geral</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DESEMPENHOS.map(d => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => setAvaliacaoAluno(d.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border-2 transition-all ${
-                          avaliacaoAluno === d.id ? d.cor + ' border-current shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
-                        }`}
-                      >
-                        {d.emoji} {d.label}
-                      </button>
-                    ))}
+            <div className="space-y-4 max-w-3xl">
+              {/* ─── Cabeçalho do aluno ─── */}
+              <div className="flex items-center gap-3 bg-white border-2 border-indigo-100 rounded-2xl p-4">
+                <button onClick={() => setAlunoSelecionado(null)} className="text-indigo-600 hover:underline text-sm font-medium">← Voltar</button>
+                {alunoSelecionado.photoUrl ? (
+                  <img src={alunoSelecionado.photoUrl} className="w-12 h-12 rounded-full object-cover" alt="" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                    <UserCircle className="w-7 h-7 text-indigo-400" />
                   </div>
+                )}
+                <div className="flex-1">
+                  <h2 className="font-bold text-gray-900">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</h2>
+                  <p className="text-xs text-gray-500">{turmas[0]?.name} · {historicoAluno.length} registro(s)</p>
                 </div>
+                <Button variant="outline" size="sm" onClick={() => navigate('/app/diario-de-bordo')}>
+                  <FileText className="h-3 w-3 mr-1" /> Diário
+                </Button>
+              </div>
 
-                {/* Anotações e observações */}
-                <div>
-                  <Label className="mb-2 block font-semibold">Anotações e Observações</Label>
-                  <Textarea
-                    placeholder={`Registre observações sobre ${alunoSelecionado.firstName}: comportamento, alimentação, participação nas atividades, evolução, desenvolvimento, alertas...`}
-                    rows={6}
-                    value={anotacaoAluno}
-                    onChange={e => setAnotacaoAluno(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    onClick={async () => {
-                      if (!anotacaoAluno.trim() && avaliacaoAluno === 'NAO_AVALIADO') {
-                        toast.error('Preencha ao menos a avaliação ou uma anotação.');
-                        return;
-                      }
-                      setSavingAluno(true);
-                      try {
-                        await http.post('/development-observations', {
-                          childId: alunoSelecionado.id,
-                          classroomId: turmaId,
-                          date: new Date().toISOString(),
-                          category: 'GERAL',
-                          learningProgress: avaliacaoAluno !== 'NAO_AVALIADO' ? avaliacaoAluno : undefined,
-                          behaviorDescription: anotacaoAluno || undefined,
-                        });
-                        toast.success(`Observação de ${alunoSelecionado.firstName} salva!`);
-                        setAnotacaoAluno('');
-                        setAvaliacaoAluno('NAO_AVALIADO');
-                      } catch {
-                        toast.error('Erro ao salvar. Tente novamente.');
-                      } finally {
-                        setSavingAluno(false);
-                      }
-                    }}
-                    disabled={savingAluno}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+              {/* ─── Abas internas do aluno ─── */}
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                {[
+                  { id: 'registro', label: 'Registrar Atividade', icon: <Plus className="h-3.5 w-3.5" /> },
+                  { id: 'historico', label: 'Histórico', icon: <History className="h-3.5 w-3.5" /> },
+                  { id: 'desenvolvimento', label: 'Desenvolvimento', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAbaAluno(tab.id as typeof abaAluno)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                      abaAluno === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
                   >
-                    {savingAluno ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Salvar Observação
-                  </Button>
-                  <Button variant="outline" onClick={() => navigate(`/app/diario-de-bordo`)}>
-                    <FileText className="h-4 w-4 mr-2" /> Diário de Bordo
-                  </Button>
+                    {tab.icon} {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ─── ABA: REGISTRAR ATIVIDADE ─── */}
+              {abaAluno === 'registro' && (
+                <Card className="border-2 border-indigo-50">
+                  <CardContent className="pt-5 space-y-5">
+
+                    {/* Título da atividade */}
+                    <div>
+                      <Label className="mb-1.5 block font-semibold text-sm">Título da Atividade <span className="text-gray-400 font-normal">(opcional)</span></Label>
+                      <Input
+                        placeholder="Ex: Pintura com tinta, Roda de conversa, Atividade de encaixe..."
+                        value={atividadeTitulo}
+                        onChange={e => setAtividadeTitulo(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Avaliação geral */}
+                    <div>
+                      <Label className="mb-2 block font-semibold text-sm">Como o aluno se saiu nesta atividade?</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {DESEMPENHOS.map(d => (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => setAvaliacaoAluno(d.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium border-2 transition-all ${
+                              avaliacaoAluno === d.id ? d.cor + ' border-current shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                            }`}
+                          >
+                            {d.emoji} {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Participação e comportamento */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="mb-1.5 block font-semibold text-sm">Participação na Atividade</Label>
+                        <Textarea
+                          placeholder="O aluno participou? Como reagiu? Mostrou interesse?"
+                          rows={3}
+                          value={participacaoAtividade}
+                          onChange={e => setParticipacaoAtividade(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 block font-semibold text-sm">Estado Emocional</Label>
+                        <Textarea
+                          placeholder="Como estava o humor? Agitado, tranquilo, triste, alegre?"
+                          rows={3}
+                          value={estadoEmocional}
+                          onChange={e => setEstadoEmocional(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Observações gerais */}
+                    <div>
+                      <Label className="mb-1.5 block font-semibold text-sm">Observações e Anotações Gerais</Label>
+                      <Textarea
+                        placeholder={`Registre tudo sobre ${alunoSelecionado.firstName}: comportamento, alimentação, interação com colegas, evolução, conquistas do dia...`}
+                        rows={4}
+                        value={anotacaoAluno}
+                        onChange={e => setAnotacaoAluno(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Notas psicológicas e alertas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="mb-1.5 flex items-center gap-1.5 font-semibold text-sm">
+                          <Brain className="h-3.5 w-3.5 text-purple-500" /> Observações Psicológicas
+                        </Label>
+                        <Textarea
+                          placeholder="Comportamentos que chamaram atenção, sinais de ansiedade, isolamento..."
+                          rows={3}
+                          value={notasPsicologicas}
+                          onChange={e => setNotasPsicologicas(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 flex items-center gap-1.5 font-semibold text-sm">
+                          <AlertCircle className="h-3.5 w-3.5 text-orange-500" /> Alertas de Desenvolvimento
+                        </Label>
+                        <Textarea
+                          placeholder="Dificuldades motoras, de linguagem, cognitivas que precisam de atenção..."
+                          rows={3}
+                          value={alertasDesenvolvimento}
+                          onChange={e => setAlertasDesenvolvimento(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Recomendações */}
+                    <div>
+                      <Label className="mb-1.5 block font-semibold text-sm">Recomendações e Próximos Passos</Label>
+                      <Textarea
+                        placeholder="Sugestões para a coordenação, família ou próximas atividades..."
+                        rows={2}
+                        value={recomendacoes}
+                        onChange={e => setRecomendacoes(e.target.value)}
+                      />
+                    </div>
+
+                    {/* Upload de arquivo da atividade */}
+                    <div>
+                      <Label className="mb-2 block font-semibold text-sm">
+                        <Upload className="h-3.5 w-3.5 inline mr-1.5" /> Anexar Registro da Atividade
+                        <span className="text-gray-400 font-normal ml-1">(foto, PDF, imagem — máx. 10MB)</span>
+                      </Label>
+                      <input
+                        ref={fileInputAlunoRef}
+                        type="file"
+                        accept="image/*,.pdf,.doc,.docx"
+                        className="hidden"
+                        onChange={handleArquivoAtividade}
+                      />
+                      {!arquivoAtividade ? (
+                        <button
+                          type="button"
+                          onClick={() => fileInputAlunoRef.current?.click()}
+                          className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all"
+                        >
+                          <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">Clique para selecionar ou arraste o arquivo aqui</p>
+                          <p className="text-xs text-gray-400 mt-1">Foto da atividade, trabalho feito, registro do dia</p>
+                        </button>
+                      ) : (
+                        <div className="border-2 border-indigo-200 rounded-xl p-4 bg-indigo-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {arquivoPreview ? (
+                                <img src={arquivoPreview} className="w-16 h-16 rounded-lg object-cover" alt="preview" />
+                              ) : (
+                                <div className="w-16 h-16 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                  <FileText className="h-8 w-8 text-indigo-400" />
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{arquivoAtividade.name}</p>
+                                <p className="text-xs text-gray-500">{(arquivoAtividade.size / 1024).toFixed(0)} KB</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => { setArquivoAtividade(null); setArquivoPreview(''); }}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      onClick={salvarRegistroAluno}
+                      disabled={savingAluno}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 py-3"
+                    >
+                      {savingAluno ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                      Salvar Registro de {alunoSelecionado.firstName}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* ─── ABA: HISTÓRICO ─── */}
+              {abaAluno === 'historico' && (
+                <div className="space-y-3">
+                  {loadingHistorico ? (
+                    <LoadingState message="Carregando histórico..." />
+                  ) : historicoAluno.length === 0 ? (
+                    <EmptyState title="Nenhum registro ainda" description="Os registros de atividades e observações aparecerão aqui." />
+                  ) : (
+                    historicoAluno.map(obs => (
+                      <Card key={obs.id} className="border hover:border-indigo-200 transition-all">
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-gray-800 text-sm">
+                                {obs.atividadeTitulo || (obs.category === 'ATIVIDADE' ? 'Registro de Atividade' : 'Observação Geral')}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {new Date(obs.date).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                              </p>
+                            </div>
+                            {obs.learningProgress && obs.learningProgress !== 'NAO_AVALIADO' && (
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                obs.learningProgress === 'EXCELENTE' ? 'bg-yellow-100 text-yellow-700' :
+                                obs.learningProgress === 'BOM' ? 'bg-green-100 text-green-700' :
+                                obs.learningProgress === 'REGULAR' ? 'bg-blue-100 text-blue-700' :
+                                'bg-orange-100 text-orange-700'
+                              }`}>
+                                {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.emoji} {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.label}
+                              </span>
+                            )}
+                          </div>
+                          {obs.behaviorDescription && <p className="text-sm text-gray-600 mb-2">{obs.behaviorDescription}</p>}
+                          {obs.planningParticipation && (
+                            <p className="text-xs text-gray-500"><span className="font-medium">Participação:</span> {obs.planningParticipation}</p>
+                          )}
+                          {obs.emotionalState && (
+                            <p className="text-xs text-gray-500"><span className="font-medium">Estado emocional:</span> {obs.emotionalState}</p>
+                          )}
+                          {obs.developmentAlerts && (
+                            <div className="mt-2 flex items-start gap-1.5 bg-orange-50 border border-orange-200 rounded-lg p-2">
+                              <AlertCircle className="h-3.5 w-3.5 text-orange-500 mt-0.5 shrink-0" />
+                              <p className="text-xs text-orange-700">{obs.developmentAlerts}</p>
+                            </div>
+                          )}
+                          {obs.atividadeArquivoUrl && (
+                            <div className="mt-3">
+                              {obs.atividadeArquivoUrl.startsWith('data:image') ? (
+                                <img src={obs.atividadeArquivoUrl} className="w-full max-h-48 object-contain rounded-lg border" alt="atividade" />
+                              ) : (
+                                <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-2 text-indigo-600 text-xs hover:underline">
+                                  <Paperclip className="h-3.5 w-3.5" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              )}
+
+              {/* ─── ABA: DESENVOLVIMENTO ─── */}
+              {abaAluno === 'desenvolvimento' && (
+                <div className="space-y-4">
+                  {loadingHistorico ? (
+                    <LoadingState message="Calculando desenvolvimento..." />
+                  ) : (
+                    <>
+                      {/* Resumo de avaliações */}
+                      <Card className="border-2 border-indigo-50">
+                        <CardHeader><CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4 text-indigo-600" /> Resumo de Avaliações</CardTitle></CardHeader>
+                        <CardContent>
+                          {historicoAluno.length === 0 ? (
+                            <p className="text-sm text-gray-400">Nenhum registro ainda.</p>
+                          ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              {DESEMPENHOS.filter(d => d.id !== 'NAO_AVALIADO').map(d => {
+                                const count = historicoAluno.filter(h => h.learningProgress === d.id).length;
+                                const pct = historicoAluno.length > 0 ? Math.round((count / historicoAluno.length) * 100) : 0;
+                                return (
+                                  <div key={d.id} className={`rounded-xl p-3 text-center ${d.cor.split(' ')[0]} border`}>
+                                    <p className="text-2xl">{d.emoji}</p>
+                                    <p className="text-xs font-medium mt-1">{d.label}</p>
+                                    <p className="text-lg font-bold">{count}</p>
+                                    <p className="text-xs opacity-70">{pct}%</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {/* Alertas de desenvolvimento */}
+                      {historicoAluno.filter(h => h.developmentAlerts).length > 0 && (
+                        <Card className="border-2 border-orange-100">
+                          <CardHeader><CardTitle className="text-base flex items-center gap-2"><AlertCircle className="h-4 w-4 text-orange-500" /> Alertas de Desenvolvimento</CardTitle></CardHeader>
+                          <CardContent className="space-y-2">
+                            {historicoAluno.filter(h => h.developmentAlerts).map(h => (
+                              <div key={h.id} className="flex items-start gap-2 bg-orange-50 rounded-lg p-3">
+                                <AlertCircle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-xs text-gray-400">{new Date(h.date).toLocaleDateString('pt-BR')}</p>
+                                  <p className="text-sm text-orange-800">{h.developmentAlerts}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Observações psicológicas */}
+                      {historicoAluno.filter(h => h.psychologicalNotes).length > 0 && (
+                        <Card className="border-2 border-purple-100">
+                          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Brain className="h-4 w-4 text-purple-500" /> Observações Psicológicas</CardTitle></CardHeader>
+                          <CardContent className="space-y-2">
+                            {historicoAluno.filter(h => h.psychologicalNotes).map(h => (
+                              <div key={h.id} className="bg-purple-50 rounded-lg p-3">
+                                <p className="text-xs text-gray-400">{new Date(h.date).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-sm text-purple-800">{h.psychologicalNotes}</p>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {/* Recomendações */}
+                      {historicoAluno.filter(h => h.recommendations).length > 0 && (
+                        <Card className="border-2 border-green-100">
+                          <CardHeader><CardTitle className="text-base flex items-center gap-2"><CheckCircle className="h-4 w-4 text-green-500" /> Recomendações</CardTitle></CardHeader>
+                          <CardContent className="space-y-2">
+                            {historicoAluno.filter(h => h.recommendations).map(h => (
+                              <div key={h.id} className="bg-green-50 rounded-lg p-3">
+                                <p className="text-xs text-gray-400">{new Date(h.date).toLocaleDateString('pt-BR')}</p>
+                                <p className="text-sm text-green-800">{h.recommendations}</p>
+                              </div>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
