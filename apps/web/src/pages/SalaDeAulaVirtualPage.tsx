@@ -103,7 +103,9 @@ export default function SalaDeAulaVirtualPage() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState<string>('');
   const [alunoSelecionado, setAlunoSelecionado] = useState<Crianca | null>(null);
-  const [abaAluno, setAbaAluno] = useState<'registro' | 'historico' | 'desenvolvimento'>('registro');
+  const [abaAluno, setAbaAluno] = useState<'registro' | 'hoje' | 'mes' | 'historico' | 'desenvolvimento' | 'rdic'>('registro');
+  const [resumoAluno, setResumoAluno] = useState<any>(null);
+  const [gerandoRdic, setGerandoRdic] = useState(false);
   const [anotacaoAluno, setAnotacaoAluno] = useState('');
   const [avaliacaoAluno, setAvaliacaoAluno] = useState('NAO_AVALIADO');
   const [atividadeTitulo, setAtividadeTitulo] = useState('');
@@ -239,12 +241,87 @@ export default function SalaDeAulaVirtualPage() {
   async function carregarHistoricoAluno(childId: string) {
     setLoadingHistorico(true);
     try {
-      const res = await http.get('/development-observations', { params: { childId, limit: 30 } });
-      setHistoricoAluno(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+      const [resObs, resResumo] = await Promise.all([
+        http.get('/development-observations', { params: { childId, limit: 100 } }),
+        http.get(`/development-observations/resumo/${childId}`).catch(() => ({ data: null })),
+      ]);
+      setHistoricoAluno(Array.isArray(resObs.data) ? resObs.data : resObs.data?.data ?? []);
+      setResumoAluno(resResumo.data);
     } catch {
       setHistoricoAluno([]);
+      setResumoAluno(null);
     } finally {
       setLoadingHistorico(false);
+    }
+  }
+
+  async function gerarRdicAutomatico() {
+    if (!alunoSelecionado || !turmaId) return;
+    setGerandoRdic(true);
+    try {
+      // Verifica se já existe RDIC para este período
+      const anoAtual = new Date().getFullYear();
+      const mesAtual = new Date().getMonth() + 1;
+      const periodo = mesAtual <= 3 ? '1B' : mesAtual <= 6 ? '2B' : mesAtual <= 9 ? '3B' : '4B';
+      // Monta o rascunhoJson a partir das observações coletadas
+      const obsDoMes = historicoAluno.filter(h => {
+        const d = new Date(h.date);
+        return d.getFullYear() === anoAtual;
+      });
+      const avaliacoesCont = DESEMPENHOS.filter(d => d.id !== 'NAO_AVALIADO').reduce((acc: Record<string, number>, d) => {
+        acc[d.id] = obsDoMes.filter(h => h.learningProgress === d.id).length;
+        return acc;
+      }, {});
+      const avaliacaoMaisFreq = Object.entries(avaliacoesCont).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'NAO_AVALIADO';
+      const observacoesTexto = obsDoMes
+        .filter(h => h.behaviorDescription)
+        .map(h => `• ${new Date(h.date).toLocaleDateString('pt-BR')}: ${h.behaviorDescription}`)
+        .join('\n');
+      const alertasTexto = obsDoMes
+        .filter(h => h.developmentAlerts)
+        .map(h => h.developmentAlerts)
+        .join('; ');
+      const psicologicoTexto = obsDoMes
+        .filter(h => h.psychologicalNotes)
+        .map(h => h.psychologicalNotes)
+        .join('; ');
+      const recomendacoesTexto = obsDoMes
+        .filter(h => h.recommendations)
+        .map(h => h.recommendations)
+        .join('; ');
+      const rascunhoJson = {
+        avaliacaoGeral: avaliacaoMaisFreq,
+        totalRegistros: obsDoMes.length,
+        avaliacoesPorNivel: avaliacoesCont,
+        observacoesComportamento: observacoesTexto || 'Sem observações registradas.',
+        alertasDesenvolvimento: alertasTexto || 'Nenhum alerta registrado.',
+        notasPsicologicas: psicologicoTexto || 'Sem observações psicológicas.',
+        recomendacoes: recomendacoesTexto || 'Sem recomendações.',
+        geradoAutomaticamente: true,
+        geradoEm: new Date().toISOString(),
+      };
+      // Tenta criar o RDIC (se já existir, vai para a página de edição)
+      try {
+        await http.post('/rdic', {
+          childId: alunoSelecionado.id,
+          classroomId: turmaId,
+          periodo,
+          anoLetivo: anoAtual,
+          rascunhoJson,
+        });
+        toast.success(`RDIC de ${alunoSelecionado.firstName} criado! Acesse RDIC por Criança para completar.`);
+      } catch (err: any) {
+        if (err?.response?.status === 400 && err?.response?.data?.message?.includes('Já existe')) {
+          toast.info(`RDIC de ${alunoSelecionado.firstName} já existe para este período. Acesse RDIC por Criança para editar.`);
+        } else {
+          throw err;
+        }
+      }
+      navigate('/app/rdic-crianca');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao gerar RDIC.');
+    } finally {
+      setGerandoRdic(false);
     }
   }
 
@@ -672,16 +749,19 @@ export default function SalaDeAulaVirtualPage() {
               </div>
 
               {/* ─── Abas internas do aluno ─── */}
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {[
-                  { id: 'registro', label: 'Registrar Atividade', icon: <Plus className="h-3.5 w-3.5" /> },
+                  { id: 'registro', label: 'Registrar', icon: <Plus className="h-3.5 w-3.5" /> },
+                  { id: 'hoje', label: 'Hoje', icon: <Clock className="h-3.5 w-3.5" /> },
+                  { id: 'mes', label: 'Este Mês', icon: <BarChart2 className="h-3.5 w-3.5" /> },
                   { id: 'historico', label: 'Histórico', icon: <History className="h-3.5 w-3.5" /> },
-                  { id: 'desenvolvimento', label: 'Desenvolvimento', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+                  { id: 'desenvolvimento', label: 'Evolução', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+                  { id: 'rdic', label: 'RDIC', icon: <FileText className="h-3.5 w-3.5" /> },
                 ].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setAbaAluno(tab.id as typeof abaAluno)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                    className={`flex-shrink-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
                       abaAluno === tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -920,6 +1000,206 @@ export default function SalaDeAulaVirtualPage() {
               )}
 
               {/* ─── ABA: DESENVOLVIMENTO ─── */}
+              {/* ─── ABA: HOJE ─── */}
+              {abaAluno === 'hoje' && (
+                <div className="space-y-3">
+                  {loadingHistorico ? (
+                    <LoadingState message="Carregando registros de hoje..." />
+                  ) : (() => {
+                    const hoje = new Date().toDateString();
+                    const obsHoje = historicoAluno.filter(h => new Date(h.date).toDateString() === hoje);
+                    return obsHoje.length === 0 ? (
+                      <EmptyState
+                        title="Nenhum registro hoje"
+                        description={`Nenhuma atividade registrada para ${alunoSelecionado?.firstName} hoje. Vá para a aba Registrar para adicionar.`}
+                      />
+                    ) : (
+                      obsHoje.map(obs => (
+                        <Card key={obs.id} className="border-2 border-blue-100">
+                          <CardContent className="pt-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-semibold text-gray-800">{obs.atividadeTitulo || 'Registro do Dia'}</p>
+                              {obs.learningProgress && obs.learningProgress !== 'NAO_AVALIADO' && (
+                                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                  {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.emoji} {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.label}
+                                </span>
+                              )}
+                            </div>
+                            {obs.behaviorDescription && <p className="text-sm text-gray-600"><strong>Comportamento:</strong> {obs.behaviorDescription}</p>}
+                            {obs.planningParticipation && <p className="text-sm text-gray-600"><strong>Participação:</strong> {obs.planningParticipation}</p>}
+                            {obs.emotionalState && <p className="text-sm text-gray-600"><strong>Estado emocional:</strong> {obs.emotionalState}</p>}
+                            {obs.psychologicalNotes && (
+                              <div className="bg-purple-50 rounded-lg p-2">
+                                <p className="text-xs font-semibold text-purple-700">Observação Psicológica</p>
+                                <p className="text-sm text-purple-800">{obs.psychologicalNotes}</p>
+                              </div>
+                            )}
+                            {obs.developmentAlerts && (
+                              <div className="bg-orange-50 rounded-lg p-2">
+                                <p className="text-xs font-semibold text-orange-700">Alerta</p>
+                                <p className="text-sm text-orange-800">{obs.developmentAlerts}</p>
+                              </div>
+                            )}
+                            {obs.atividadeArquivoUrl && (
+                              <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-sm text-indigo-600 hover:underline">
+                                <Paperclip className="h-4 w-4" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
+                              </a>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* ─── ABA: ESTE MÊS ─── */}
+              {abaAluno === 'mes' && (
+                <div className="space-y-3">
+                  {loadingHistorico ? (
+                    <LoadingState message="Carregando registros do mês..." />
+                  ) : (() => {
+                    const agora = new Date();
+                    const obsMes = historicoAluno.filter(h => {
+                      const d = new Date(h.date);
+                      return d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear();
+                    });
+                    const avaliacoesCont = DESEMPENHOS.filter(d => d.id !== 'NAO_AVALIADO').map(d => ({
+                      ...d,
+                      count: obsMes.filter(h => h.learningProgress === d.id).length,
+                    }));
+                    return (
+                      <>
+                        <Card className="border-2 border-indigo-50">
+                          <CardHeader><CardTitle className="text-base">
+                            {agora.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} — {obsMes.length} registros
+                          </CardTitle></CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                              {avaliacoesCont.map(d => (
+                                <div key={d.id} className={`rounded-xl p-3 text-center ${d.cor.split(' ')[0]} border`}>
+                                  <p className="text-2xl">{d.emoji}</p>
+                                  <p className="text-xs font-medium mt-1">{d.label}</p>
+                                  <p className="text-xl font-bold">{d.count}</p>
+                                  <p className="text-xs opacity-70">{obsMes.length > 0 ? Math.round((d.count / obsMes.length) * 100) : 0}%</p>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        {obsMes.length === 0 ? (
+                          <EmptyState title="Nenhum registro este mês" description="Adicione registros na aba Registrar." />
+                        ) : (
+                          obsMes.map(obs => (
+                            <Card key={obs.id} className="border hover:border-indigo-200 transition-all">
+                              <CardContent className="pt-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-xs text-gray-400">{new Date(obs.date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
+                                  {obs.learningProgress && obs.learningProgress !== 'NAO_AVALIADO' && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                                      {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.emoji} {DESEMPENHOS.find(d => d.id === obs.learningProgress)?.label}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="font-medium text-sm text-gray-800">{obs.atividadeTitulo || 'Observação'}</p>
+                                {obs.behaviorDescription && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{obs.behaviorDescription}</p>}
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* ─── ABA: RDIC ─── */}
+              {abaAluno === 'rdic' && (
+                <div className="space-y-4">
+                  <Card className="border-2 border-indigo-100">
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-indigo-600" />
+                        Relatório de Desenvolvimento Individual da Criança (RDIC)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Resumo dos dados coletados */}
+                      {loadingHistorico ? (
+                        <LoadingState message="Calculando dados para o RDIC..." />
+                      ) : (
+                        <>
+                          <div className="bg-blue-50 rounded-xl p-4">
+                            <p className="text-sm font-semibold text-blue-800 mb-2">Dados coletados para gerar o RDIC:</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="bg-white rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-indigo-600">{historicoAluno.length}</p>
+                                <p className="text-xs text-gray-500">Registros totais</p>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-orange-500">{historicoAluno.filter(h => h.developmentAlerts).length}</p>
+                                <p className="text-xs text-gray-500">Alertas registrados</p>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-purple-600">{historicoAluno.filter(h => h.psychologicalNotes).length}</p>
+                                <p className="text-xs text-gray-500">Obs. psicológicas</p>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 text-center">
+                                <p className="text-2xl font-bold text-green-600">
+                                  {DESEMPENHOS.find(d => d.id === (Object.entries(
+                                    DESEMPENHOS.filter(d => d.id !== 'NAO_AVALIADO').reduce((acc: Record<string, number>, d) => {
+                                      acc[d.id] = historicoAluno.filter(h => h.learningProgress === d.id).length;
+                                      return acc;
+                                    }, {})
+                                  ).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'NAO_AVALIADO'))?.emoji ?? '❓'}
+                                </p>
+                                <p className="text-xs text-gray-500">Avaliação predominante</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                            <p className="text-sm font-semibold text-amber-800 mb-1">O que acontece ao gerar o RDIC:</p>
+                            <ul className="text-sm text-amber-700 space-y-1 list-disc list-inside">
+                              <li>Um rascunho do RDIC é criado automaticamente com base nos seus registros</li>
+                              <li>Você será redirecionado para a página RDIC por Criança para completar e enviar</li>
+                              <li>A coordenadora revisará e aprovará o relatório final</li>
+                              <li>Após publicado, fica disponível para coordenadora geral e psicóloga</li>
+                            </ul>
+                          </div>
+
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={gerarRdicAutomatico}
+                              disabled={gerandoRdic || historicoAluno.length === 0}
+                              className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              {gerandoRdic ? (
+                                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Gerando RDIC...</>
+                              ) : (
+                                <><FileText className="h-4 w-4 mr-2" /> Gerar RDIC de {alunoSelecionado?.firstName}</>
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => navigate('/app/rdic-crianca')}
+                              className="flex-1"
+                            >
+                              <Eye className="h-4 w-4 mr-2" /> Ver RDICs Existentes
+                            </Button>
+                          </div>
+
+                          {historicoAluno.length === 0 && (
+                            <p className="text-center text-sm text-gray-400">Adicione pelo menos 1 registro de atividade para gerar o RDIC.</p>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
               {abaAluno === 'desenvolvimento' && (
                 <div className="space-y-4">
                   {loadingHistorico ? (

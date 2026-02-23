@@ -51,7 +51,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'>('inicio');
   const navigate = useNavigate();
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
@@ -175,6 +175,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     { id: 'diarios', label: 'Diários da Semana', icon: <ClipboardList className="h-4 w-4" /> },
     { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
     { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
+    { id: 'relatorios', label: 'Relatórios', icon: <TrendingUp className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -484,6 +485,80 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: RELATÓRIOS */}
+      {abaAtiva === 'relatorios' && (
+        <div className="space-y-4">
+          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-teal-800 mb-1">Relatórios de Desenvolvimento por Turma</p>
+            <p className="text-sm text-teal-700">
+              Selecione uma turma para visualizar o relatório consolidado de desenvolvimento, evolução e observações individuais de cada aluno.
+            </p>
+          </div>
+
+          {/* Acesso rápido por turma */}
+          <div className="grid grid-cols-1 gap-3">
+            {dashboard?.turmasLista?.map(turma => (
+              <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-teal-200 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                      <Users className="h-5 w-5 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{turma.nome}</p>
+                      <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor}</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {turma.chamadaFeita ? '✅ Chamada feita' : '⏳ Chamada pendente'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
+                    <Brain className="h-5 w-5 text-purple-600" />
+                    <span className="text-xs font-medium text-purple-700">Observações</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
+                    <GraduationCap className="h-5 w-5 text-indigo-600" />
+                    <span className="text-xs font-medium text-indigo-700">Atividades</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/app/rdic?classroomId=${turma.id}`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
+                    <ClipboardList className="h-5 w-5 text-teal-600" />
+                    <span className="text-xs font-medium text-teal-700">RDICs</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Atalhos de relatórios gerais */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate('/app/reports')}
+              className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
+              <TrendingUp className="h-6 w-6 text-blue-600 mb-2" />
+              <p className="font-semibold text-sm text-gray-800">Relatório de Diários</p>
+              <p className="text-xs text-gray-400">Por turma e período</p>
+            </button>
+            <button
+              onClick={() => navigate('/app/relatorio-consumo-materiais')}
+              className="p-4 bg-white border-2 border-orange-100 rounded-2xl text-left hover:border-orange-300 hover:shadow-sm transition-all">
+              <ShoppingCart className="h-6 w-6 text-orange-600 mb-2" />
+              <p className="font-semibold text-sm text-gray-800">Consumo de Materiais</p>
+              <p className="text-xs text-gray-400">Pedidos e gastos</p>
+            </button>
           </div>
         </div>
       )}

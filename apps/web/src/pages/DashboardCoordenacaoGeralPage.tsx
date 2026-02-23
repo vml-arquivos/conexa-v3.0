@@ -43,7 +43,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardGeral>(DEMO);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
-  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'>('visao');
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
 
   useEffect(() => { loadDashboard(); }, []);
@@ -92,6 +92,7 @@ export default function DashboardCoordenacaoGeralPage() {
     { id:'relatorio', label:'Relatorio', icon:<BarChart2 className="h-4 w-4"/> },
     { id:'alunos', label:'Alunos por Unidade', icon:<Users className="h-4 w-4"/> },
     { id:'observacoes', label:'Observacoes Individuais', icon:<ClipboardList className="h-4 w-4"/> },
+    { id:'psicologia', label:'Desenvolvimento Psicológico', icon:<Network className="h-4 w-4"/> },
     { id:'matriz', label:'Matriz 2026', icon:<Layers className="h-4 w-4"/> },
   ] as const;
   const filtros = [
@@ -498,6 +499,91 @@ export default function DashboardCoordenacaoGeralPage() {
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: DESENVOLVIMENTO PSICOLÓGICO */}
+      {abaAtiva === 'psicologia' && (
+        <div className="space-y-4">
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-purple-800 mb-1">Relatórios de Desenvolvimento Psicológico e Mental</p>
+            <p className="text-sm text-purple-700">
+              Acesse os alertas de desenvolvimento, observações psicológicas e relatórios individuais de evolução de todas as crianças.
+              Disponível para coordenadora geral e psicóloga.
+            </p>
+          </div>
+
+          {/* Alertas por unidade */}
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-gray-700">Selecione uma unidade para ver os alertas:</p>
+            {dashboard.unidades.map(unidade => (
+              <div key={unidade.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-purple-200 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{unidade.nome}</p>
+                      <p className="text-xs text-gray-400">{unidade.totalAlunos} alunos · {unidade.totalTurmas} turmas</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium border ${STATUS_CONFIG[unidade.status].cor}`}>
+                    {STATUS_CONFIG[unidade.status].label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/observacoes`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
+                    <Network className="h-5 w-5 text-purple-600" />
+                    <span className="text-xs font-medium text-purple-700">Obs. Psicol.</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/rdic`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
+                    <ClipboardList className="h-5 w-5 text-indigo-600" />
+                    <span className="text-xs font-medium text-indigo-700">RDICs</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(`/app/reports?unitId=${unidade.id}`)}
+                    className="flex flex-col items-center gap-1 p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
+                    <TrendingUp className="h-5 w-5 text-teal-600" />
+                    <span className="text-xs font-medium text-teal-700">Evolução</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Indicadores consolidados */}
+          <div className="bg-white border-2 border-purple-100 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Indicadores Consolidados — Todas as Unidades</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-purple-600">{dashboard.totalAlunos}</p>
+                <p className="text-xs text-gray-500">Total de crianças</p>
+              </div>
+              <div className="bg-orange-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-orange-600">
+                  {dashboard.unidades.filter(u => u.status === 'critico').length}
+                </p>
+                <p className="text-xs text-gray-500">Unidades em alerta crítico</p>
+              </div>
+              <div className="bg-yellow-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-yellow-600">
+                  {dashboard.unidades.filter(u => u.status === 'atencao').length}
+                </p>
+                <p className="text-xs text-gray-500">Unidades em atenção</p>
+              </div>
+              <div className="bg-green-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-green-600">
+                  {dashboard.unidades.filter(u => u.status === 'otimo').length}
+                </p>
+                <p className="text-xs text-gray-500">Unidades ótimas</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
