@@ -319,6 +319,44 @@ export class ChildrenService {
   }
 
   /**
+   * Buscar todas as restrições alimentares ativas de uma unidade (para nutricionista)
+   */
+  async getAllDietaryRestrictionsByUnit(user: any, unitId?: string) {
+    const targetUnitId = unitId || user.unitId;
+    if (!targetUnitId) {
+      throw new ForbiddenException('Unidade não identificada');
+    }
+    const restrictions = await this.prisma.dietaryRestriction.findMany({
+      where: {
+        isActive: true,
+        child: {
+          mantenedoraId: user.mantenedoraId,
+          unitId: targetUnitId,
+        },
+      },
+      include: {
+        child: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            dateOfBirth: true,
+            enrollments: {
+              where: { status: 'ATIVA' },
+              include: { classroom: { select: { id: true, name: true } } },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: [
+        { child: { firstName: 'asc' } },
+      ],
+    });
+    return restrictions;
+  }
+
+  /**
    * Buscar histórico de saúde da criança
    */
   async getHealthHistory(id: string, user: any) {

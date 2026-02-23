@@ -110,6 +110,17 @@ export class ChildrenController {
   }
 
   /**
+   * Listar todas as restrições alimentares ativas da unidade (para nutricionista)
+   */
+  @Get('dietary-restrictions/unidade')
+  async getAllDietaryRestrictionsByUnit(
+    @Request() req,
+    @Query('unitId') unitId?: string,
+  ) {
+    return this.childrenService.getAllDietaryRestrictionsByUnit(req.user, unitId);
+  }
+
+  /**
    * Adicionar restrição alimentar
    */
   @Post(':id/dietary-restriction')

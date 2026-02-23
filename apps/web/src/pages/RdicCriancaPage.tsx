@@ -24,7 +24,7 @@ import {
   Brain, Sparkles, User, Users, ChevronLeft, ChevronRight,
   Save, RefreshCw, CheckCircle, AlertCircle, Star,
   BookOpen, Heart, Music, Palette, Calculator, MessageSquare,
-  ArrowLeft, FileText, Eye, EyeOff, Send, Plus,
+  ArrowLeft, FileText, Eye, EyeOff, Send, Plus, Printer,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -859,6 +859,31 @@ export default function RdicCriancaPage() {
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm"
             >
               <Plus className="h-4 w-4" /> Novo RDIC
+            </Button>
+            <Button
+              onClick={() => {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow || !alunoSelecionado) return;
+                const rdicsHtml = rdicsDoAluno.map(rdic => {
+                  const prog = calcularProgresso(rdic.dimensoes ?? []);
+                  const dimHtml = (rdic.dimensoes ?? []).map(d => {
+                    const def = DIMENSOES_BNCC.find(x => x.id === d.dimensao);
+                    const indsHtml = d.indicadores.map(ind =>
+                      `<tr><td style="padding:4px 8px;font-size:12px;color:#555">${ind.codigo}</td><td style="padding:4px 8px;font-size:12px">${ind.descricao}</td><td style="padding:4px 8px;font-size:12px;text-align:center;font-weight:600;color:${ind.nivel==='CONSOLIDADO'?'#16a34a':ind.nivel==='AMPLIADO'?'#2563eb':ind.nivel==='EM_DESENVOLVIMENTO'?'#d97706':'#9ca3af'}">${ind.nivel.replace('_',' ')}</td></tr>`
+                    ).join('');
+                    return `<div style="margin-bottom:16px"><h4 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 6px">${def?.label ?? d.dimensao}</h4><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb"><thead><tr style="background:#f9fafb"><th style="padding:4px 8px;font-size:11px;text-align:left">Código</th><th style="padding:4px 8px;font-size:11px;text-align:left">Indicador</th><th style="padding:4px 8px;font-size:11px;text-align:center">Nível</th></tr></thead><tbody>${indsHtml}</tbody></table></div>`;
+                  }).join('');
+                  return `<div style="page-break-inside:avoid;margin-bottom:32px;border:1px solid #e5e7eb;border-radius:8px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-size:15px;font-weight:700;margin:0">${rdic.periodo}</h3><span style="font-size:12px;padding:2px 8px;border-radius:12px;background:${rdic.status==='PUBLICADO'?'#dcfce7':rdic.status==='REVISAO'?'#fef9c3':'#f3f4f6'};color:${rdic.status==='PUBLICADO'?'#15803d':rdic.status==='REVISAO'?'#854d0e':'#6b7280'}">${rdic.status}</span></div>${dimHtml}<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Observação Geral:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.observacaoGeral || '—'}</p></div>${rdic.proximosPassos?`<div style="margin-top:8px;padding:12px;background:#f0fdf4;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Próximos Passos:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.proximosPassos}</p></div>`:''}<p style="font-size:11px;color:#9ca3af;margin-top:8px">Progresso: ${prog.pct}% preenchido · Registrado em ${new Date(rdic.createdAt).toLocaleDateString('pt-BR')}</p></div>`;
+                }).join('');
+                printWindow.document.write(`<!DOCTYPE html><html><head><title>RDIC — ${alunoSelecionado.firstName} ${alunoSelecionado.lastName}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;font-weight:400;color:#6b7280;margin:0 0 24px}@media print{.no-print{display:none}}</style></head><body><h1>RDIC — Relatório de Desenvolvimento Individual da Criança</h1><h2>${alunoSelecionado.firstName} ${alunoSelecionado.lastName} · ${turma?.name ?? ''} · ${turma?.unit?.name ?? ''}</h2><p style="font-size:12px;color:#9ca3af;margin-bottom:24px">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>${rdicsHtml}</body></html>`);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 500);
+              }}
+              disabled={rdicsDoAluno.length === 0}
+              className="flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white text-sm disabled:opacity-40"
+            >
+              <Printer className="h-4 w-4" /> Exportar PDF
             </Button>
           </div>
 

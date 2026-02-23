@@ -29,6 +29,8 @@ import PlanejamentoDiarioPage from '../pages/PlanejamentoDiarioPage';
 import PlanoDeAulaPage from '../pages/PlanoDeAulaPage';
 import CoordenacaoPedagogicaPage from '../pages/CoordenacaoPedagogicaPage';
 import RelatorioConsumoMateriaisPage from '../pages/RelatorioConsumoMateriaisPage';
+import PainelAlergiasPage from '../pages/PainelAlergiasPage';
+import DashboardConsumoMateriaisPage from '../pages/DashboardConsumoMateriaisPage';
 import RdicCriancaPage from '../pages/RdicCriancaPage';
 import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
@@ -313,6 +315,24 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <RelatorioConsumoMateriaisPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Dashboard de Consumo de Materiais com gráficos ─────────────────────
+      {
+        path: 'dashboard-consumo-materiais',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardConsumoMateriaisPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Painel de Alergias e Dietas (Nutricionista) ─────────────────────
+      {
+        path: 'painel-alergias',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PainelAlergiasPage />
           </RoleProtectedRoute>
         ),
       },
