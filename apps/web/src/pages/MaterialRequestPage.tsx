@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor } from '../api/auth';
 import { MaterialRequestForm } from '../components/material-request/MaterialRequestForm';
 import { MaterialRequestList } from '../components/material-request/MaterialRequestList';
 import { ShoppingCart, ClipboardList, Info } from 'lucide-react';
 
 export function MaterialRequestPage() {
+  const { user } = useAuth();
+  const ehProfessor = isProfessor(user);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
 
@@ -64,6 +68,7 @@ export function MaterialRequestPage() {
       {/* Layout desktop: duas colunas */}
       <div className="hidden lg:grid lg:grid-cols-2 gap-6">
         <MaterialRequestForm
+          isProfessor={ehProfessor}
           onSuccess={() => setRefreshTrigger(prev => prev + 1)}
         />
         <MaterialRequestList refreshTrigger={refreshTrigger} />
@@ -73,6 +78,7 @@ export function MaterialRequestPage() {
       <div className="lg:hidden">
         {activeView === 'form' && (
           <MaterialRequestForm
+            isProfessor={ehProfessor}
             onSuccess={() => {
               setRefreshTrigger(prev => prev + 1);
               setActiveView('list');

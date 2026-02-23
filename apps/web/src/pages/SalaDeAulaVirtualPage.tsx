@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -77,11 +78,16 @@ const DESEMPENHOS = [
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function SalaDeAulaVirtualPage() {
-  const [aba, setAba] = useState<'feed' | 'novo' | 'desempenho'>('feed');
+  const navigate = useNavigate();
+  const [aba, setAba] = useState<'feed' | 'novo' | 'desempenho' | 'alunos'>('feed');
   const [posts, setPosts] = useState<ClassroomPost[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState<string>('');
+  const [alunoSelecionado, setAlunoSelecionado] = useState<Crianca | null>(null);
+  const [anotacaoAluno, setAnotacaoAluno] = useState('');
+  const [avaliacaoAluno, setAvaliacaoAluno] = useState('NAO_AVALIADO');
+  const [savingAluno, setSavingAluno] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -224,17 +230,12 @@ export default function SalaDeAulaVirtualPage() {
 
   return (
     <PageShell title="Sala de Aula Virtual" subtitle="Gerencie tarefas, atividades e o desempenho individual de cada aluno">
-      {/* ─── Seletor de turma ─── */}
-      {turmas.length > 1 && (
-        <div className="flex items-center gap-3 mb-4">
-          <Label className="text-sm font-medium text-gray-600">Turma:</Label>
-          <select
-            className="border rounded-lg px-3 py-2 text-sm"
-            value={turmaId}
-            onChange={e => setTurmaId(e.target.value)}
-          >
-            {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+      {/* Turma carregada automaticamente — sem seletor visível para o professor */}
+      {turmas.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 text-sm text-gray-500">
+          <GraduationCap className="h-4 w-4 text-indigo-500" />
+          <span className="font-medium text-gray-700">{turmas.find(t => t.id === turmaId)?.name ?? 'Minha Turma'}</span>
+          <span className="text-gray-400">· {criancas.length} aluno{criancas.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
@@ -242,6 +243,7 @@ export default function SalaDeAulaVirtualPage() {
       <div className="flex gap-2 flex-wrap mb-6">
         {[
           { id: 'feed', label: 'Feed da Turma', icon: <BookOpen className="h-4 w-4" /> },
+          { id: 'alunos', label: 'Meus Alunos', icon: <Users className="h-4 w-4" /> },
           { id: 'novo', label: 'Novo Post', icon: <Plus className="h-4 w-4" /> },
         ].map(tab => (
           <button
@@ -484,7 +486,121 @@ export default function SalaDeAulaVirtualPage() {
         </div>
       )}
 
-      {/* ─── DESEMPENHO DOS ALUNOS ─── */}
+      {/* ─── MEUS ALUNOS — avaliação e anotações individuais ─── */}
+      {aba === 'alunos' && (
+        <div className="space-y-4 max-w-3xl">
+          {!alunoSelecionado ? (
+            <>
+              <p className="text-sm text-gray-500">Selecione um aluno para registrar avaliação, anotações e observações individuais.</p>
+              {criancas.length === 0 && <EmptyState title="Nenhum aluno encontrado" description="Verifique se a turma possui alunos cadastrados." />}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {criancas.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setAlunoSelecionado(c); setAnotacaoAluno(''); setAvaliacaoAluno('NAO_AVALIADO'); }}
+                    className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-100 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-center"
+                  >
+                    {c.photoUrl ? (
+                      <img src={c.photoUrl} className="w-14 h-14 rounded-full object-cover" alt="" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                        <UserCircle className="w-8 h-8 text-indigo-400" />
+                      </div>
+                    )}
+                    <p className="text-sm font-medium text-gray-800 leading-tight">{c.firstName} {c.lastName}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <Card className="border-2 border-indigo-100">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setAlunoSelecionado(null)} className="text-indigo-600 hover:underline text-sm">← Voltar</button>
+                  {alunoSelecionado.photoUrl ? (
+                    <img src={alunoSelecionado.photoUrl} className="w-10 h-10 rounded-full object-cover" alt="" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                      <UserCircle className="w-6 h-6 text-indigo-400" />
+                    </div>
+                  )}
+                  <CardTitle className="text-lg">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Avaliação geral */}
+                <div>
+                  <Label className="mb-2 block font-semibold">Avaliação Geral</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DESEMPENHOS.map(d => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => setAvaliacaoAluno(d.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border-2 transition-all ${
+                          avaliacaoAluno === d.id ? d.cor + ' border-current shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                        }`}
+                      >
+                        {d.emoji} {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Anotações e observações */}
+                <div>
+                  <Label className="mb-2 block font-semibold">Anotações e Observações</Label>
+                  <Textarea
+                    placeholder={`Registre observações sobre ${alunoSelecionado.firstName}: comportamento, alimentação, participação nas atividades, evolução, desenvolvimento, alertas...`}
+                    rows={6}
+                    value={anotacaoAluno}
+                    onChange={e => setAnotacaoAluno(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    onClick={async () => {
+                      if (!anotacaoAluno.trim() && avaliacaoAluno === 'NAO_AVALIADO') {
+                        toast.error('Preencha ao menos a avaliação ou uma anotação.');
+                        return;
+                      }
+                      setSavingAluno(true);
+                      try {
+                        await http.post('/development-observations', {
+                          childId: alunoSelecionado.id,
+                          classroomId: turmaId,
+                          date: new Date().toISOString(),
+                          category: 'GERAL',
+                          learningProgress: avaliacaoAluno !== 'NAO_AVALIADO' ? avaliacaoAluno : undefined,
+                          behaviorDescription: anotacaoAluno || undefined,
+                        });
+                        toast.success(`Observação de ${alunoSelecionado.firstName} salva!`);
+                        setAnotacaoAluno('');
+                        setAvaliacaoAluno('NAO_AVALIADO');
+                      } catch {
+                        toast.error('Erro ao salvar. Tente novamente.');
+                      } finally {
+                        setSavingAluno(false);
+                      }
+                    }}
+                    disabled={savingAluno}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {savingAluno ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Salvar Observação
+                  </Button>
+                  <Button variant="outline" onClick={() => navigate(`/app/diario-de-bordo`)}>
+                    <FileText className="h-4 w-4 mr-2" /> Diário de Bordo
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ─── DESEMPENHO DOS ALUNOS (via post) ─── */}
       {aba === 'desempenho' && postDesempenho && (
         <div className="space-y-6 max-w-2xl">
           <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
