@@ -1,120 +1,70 @@
 -- ============================================================================
 -- Migration: sala_virtual_recados_observacoes
--- Criada em: 2026-02-23 | Corrigida v3: 2026-02-23 (totalmente idempotente)
--- Adiciona:
---   1. DevelopmentObservation  — observações individuais por aluno (professor)
---   2. DevelopmentReport       — relatório consolidado de desenvolvimento
---   3. ClassroomPost           — sala de aula virtual (tarefas/posts por turma)
---   4. ClassroomPostFile       — arquivos anexados a posts da sala virtual
---   5. StudentPostPerformance  — desempenho individual por post/tarefa
---   6. RecadoTurma             — recados da coordenadora para professoras/turma
---   7. RecadoLeitura           — controle de leitura dos recados
---   8. MaterialRequestItem     — itens detalhados de requisição de material
---   9. Enums novos             — ObservationCategory, ReportType, PostType, PostStatus, RecadoDestinatario
--- NOTA: Todos os DDL são totalmente idempotentes:
---   - CREATE TYPE: DO $$ EXCEPTION WHEN duplicate_object
---   - CREATE TABLE: IF NOT EXISTS
---   - ALTER TABLE ADD COLUMN: IF NOT EXISTS (para tabelas que podem já existir parcialmente)
---   - CREATE INDEX: IF NOT EXISTS
---   - ADD CONSTRAINT: DO $$ EXCEPTION WHEN duplicate_object
+-- Versão FINAL: baseada no estado REAL do banco de produção (inspecionado em 2026-02-23)
+--
+-- Estado real do banco ANTES desta migration:
+--   ✅ DevelopmentObservation — existe (20 colunas), faltam: classroomId, diaryEventId,
+--      planningParticipation, psychologicalNotes, developmentAlerts
+--   ✅ DevelopmentReport — existe completa (15 colunas) — apenas garantir índices/FK
+--   ✅ MaterialRequestItem — existe com schema DIFERENTE (requestId, materialId, etc.)
+--      NÃO tem materialRequestId — não recriar, apenas adicionar colunas novas se necessário
+--   ✅ ObservationCategory, ReportType — enums já existem
+--   ❌ ClassroomPost, ClassroomPostFile, StudentPostPerformance — não existem → CREATE
+--   ❌ RecadoTurma, RecadoLeitura — não existem → CREATE
+--   ❌ PostType, PostStatus, RecadoDestinatario — não existem → CREATE
 -- ============================================================================
 
--- ─── 1. Enums (idempotentes via DO $$ EXCEPTION WHEN duplicate_object) ────────
+-- ─── 1. Enums novos (PostType, PostStatus, RecadoDestinatario) ───────────────
+-- ObservationCategory e ReportType já existem — usar DO $$ EXCEPTION por segurança
 
 DO $$ BEGIN
   CREATE TYPE "ObservationCategory" AS ENUM (
-    'COMPORTAMENTO',
-    'DESENVOLVIMENTO',
-    'SAUDE',
-    'APRENDIZAGEM',
-    'GERAL'
+    'COMPORTAMENTO','DESENVOLVIMENTO','SAUDE','APRENDIZAGEM','GERAL'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE "ReportType" AS ENUM (
-    'RDI',
-    'RIA',
-    'RDIC',
-    'BIMESTRAL',
-    'SEMESTRAL',
-    'ANUAL'
+    'RDI','RIA','RDIC','BIMESTRAL','SEMESTRAL','ANUAL'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE "PostType" AS ENUM (
-    'TAREFA',
-    'AVISO',
-    'ATIVIDADE',
-    'MATERIAL',
-    'REGISTRO',
-    'PLANEJAMENTO'
+    'TAREFA','AVISO','ATIVIDADE','MATERIAL','REGISTRO','PLANEJAMENTO'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE "PostStatus" AS ENUM (
-    'RASCUNHO',
-    'PUBLICADO',
-    'ARQUIVADO'
+    'RASCUNHO','PUBLICADO','ARQUIVADO'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE "RecadoDestinatario" AS ENUM (
-    'TODAS_PROFESSORAS',
-    'TURMA_ESPECIFICA',
-    'PROFESSOR_ESPECIFICO'
+    'TODAS_PROFESSORAS','TURMA_ESPECIFICA','PROFESSOR_ESPECIFICO'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 2. DevelopmentObservation ───────────────────────────────────────────────
--- CREATE TABLE IF NOT EXISTS garante idempotência se a tabela já existe.
--- ALTER TABLE ... ADD COLUMN IF NOT EXISTS garante que colunas novas sejam
--- adicionadas mesmo se a tabela foi criada parcialmente em tentativa anterior.
+-- ─── 2. DevelopmentObservation — tabela JÁ EXISTE, adicionar apenas colunas faltantes ──
 
-CREATE TABLE IF NOT EXISTS "DevelopmentObservation" (
-    "id"                    TEXT NOT NULL,
-    "childId"               TEXT NOT NULL,
-    "date"                  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "category"              "ObservationCategory" NOT NULL DEFAULT 'GERAL',
-    "createdBy"             TEXT NOT NULL,
-    "updatedAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "DevelopmentObservation_pkey" PRIMARY KEY ("id")
-);
-
--- Adicionar colunas opcionais/novas com IF NOT EXISTS (idempotente)
 ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "classroomId"           TEXT;
 ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "diaryEventId"          TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "behaviorDescription"   TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "socialInteraction"     TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "emotionalState"        TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "motorSkills"           TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "cognitiveSkills"       TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "languageSkills"        TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "healthNotes"           TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "dietaryNotes"          TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "sleepPattern"          TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "learningProgress"      TEXT;
 ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "planningParticipation" TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "interests"             TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "challenges"            TEXT;
 ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "psychologicalNotes"    TEXT;
 ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "developmentAlerts"     TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "recommendations"       TEXT;
-ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "nextSteps"             TEXT;
 
-CREATE INDEX IF NOT EXISTS "DevelopmentObservation_childId_idx"      ON "DevelopmentObservation"("childId");
-CREATE INDEX IF NOT EXISTS "DevelopmentObservation_classroomId_idx"  ON "DevelopmentObservation"("classroomId");
-CREATE INDEX IF NOT EXISTS "DevelopmentObservation_date_idx"         ON "DevelopmentObservation"("date");
-CREATE INDEX IF NOT EXISTS "DevelopmentObservation_category_idx"     ON "DevelopmentObservation"("category");
-CREATE INDEX IF NOT EXISTS "DevelopmentObservation_createdBy_idx"    ON "DevelopmentObservation"("createdBy");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_childId_idx"     ON "DevelopmentObservation"("childId");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_classroomId_idx" ON "DevelopmentObservation"("classroomId");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_date_idx"        ON "DevelopmentObservation"("date");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_category_idx"    ON "DevelopmentObservation"("category");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_createdBy_idx"   ON "DevelopmentObservation"("createdBy");
 
 DO $$ BEGIN
   ALTER TABLE "DevelopmentObservation"
@@ -123,29 +73,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 3. DevelopmentReport ────────────────────────────────────────────────────
+-- ─── 3. DevelopmentReport — tabela JÁ EXISTE completa, apenas índices/FK ─────
 
-CREATE TABLE IF NOT EXISTS "DevelopmentReport" (
-    "id"                  TEXT NOT NULL,
-    "childId"             TEXT NOT NULL,
-    "startDate"           TIMESTAMP(3) NOT NULL,
-    "endDate"             TIMESTAMP(3) NOT NULL,
-    "reportType"          "ReportType" NOT NULL DEFAULT 'BIMESTRAL',
-    "behaviorSummary"     TEXT NOT NULL DEFAULT '',
-    "developmentSummary"  TEXT NOT NULL DEFAULT '',
-    "healthSummary"       TEXT NOT NULL DEFAULT '',
-    "learningSummary"     TEXT NOT NULL DEFAULT '',
-    "overallAssessment"   TEXT NOT NULL DEFAULT '',
-    "recommendations"     TEXT NOT NULL DEFAULT '',
-    "generatedBy"         TEXT NOT NULL,
-    "generatedAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "approvedBy"          TEXT,
-    "approvedAt"          TIMESTAMP(3),
-    CONSTRAINT "DevelopmentReport_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "DevelopmentReport_childId_idx"              ON "DevelopmentReport"("childId");
-CREATE INDEX IF NOT EXISTS "DevelopmentReport_startDate_endDate_idx"    ON "DevelopmentReport"("startDate", "endDate");
+CREATE INDEX IF NOT EXISTS "DevelopmentReport_childId_idx"           ON "DevelopmentReport"("childId");
+CREATE INDEX IF NOT EXISTS "DevelopmentReport_startDate_endDate_idx" ON "DevelopmentReport"("startDate", "endDate");
 
 DO $$ BEGIN
   ALTER TABLE "DevelopmentReport"
@@ -154,7 +85,19 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 4. ClassroomPost ────────────────────────────────────────────────────────
+-- ─── 4. MaterialRequestItem — tabela JÁ EXISTE com schema diferente ──────────
+-- A tabela existe com: requestId, materialId, quantity, unitPrice, totalPrice,
+-- observations, createdAt, updatedAt
+-- Adicionar apenas colunas novas que o sistema precisa (item, quantidade, unidade)
+-- NÃO recriar a tabela, NÃO criar índice em colunas que não existem
+
+ALTER TABLE "MaterialRequestItem" ADD COLUMN IF NOT EXISTS "item"       VARCHAR(255);
+ALTER TABLE "MaterialRequestItem" ADD COLUMN IF NOT EXISTS "quantidade" INTEGER;
+ALTER TABLE "MaterialRequestItem" ADD COLUMN IF NOT EXISTS "unidade"    VARCHAR(50);
+
+CREATE INDEX IF NOT EXISTS "MaterialRequestItem_requestId_idx" ON "MaterialRequestItem"("requestId");
+
+-- ─── 5. ClassroomPost — NÃO EXISTE → criar ───────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "ClassroomPost" (
     "id"            TEXT NOT NULL,
@@ -184,7 +127,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 5. ClassroomPostFile ────────────────────────────────────────────────────
+-- ─── 6. ClassroomPostFile — NÃO EXISTE → criar ───────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "ClassroomPostFile" (
     "id"           TEXT NOT NULL,
@@ -206,7 +149,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 6. StudentPostPerformance ───────────────────────────────────────────────
+-- ─── 7. StudentPostPerformance — NÃO EXISTE → criar ─────────────────────────
 
 CREATE TABLE IF NOT EXISTS "StudentPostPerformance" (
     "id"          TEXT NOT NULL,
@@ -238,21 +181,21 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 7. RecadoTurma ──────────────────────────────────────────────────────────
+-- ─── 8. RecadoTurma — NÃO EXISTE → criar ────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "RecadoTurma" (
-    "id"             TEXT NOT NULL,
-    "mantenedoraId"  TEXT NOT NULL,
-    "unitId"         TEXT NOT NULL,
-    "classroomId"    TEXT,
-    "destinatario"   "RecadoDestinatario" NOT NULL DEFAULT 'TODAS_PROFESSORAS',
-    "professorId"    TEXT,
-    "titulo"         VARCHAR(255) NOT NULL,
-    "mensagem"       TEXT NOT NULL,
-    "importante"     BOOLEAN NOT NULL DEFAULT false,
-    "criadoPorId"    TEXT NOT NULL,
-    "criadoEm"       TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "expiresAt"      TIMESTAMP(3),
+    "id"            TEXT NOT NULL,
+    "mantenedoraId" TEXT NOT NULL,
+    "unitId"        TEXT NOT NULL,
+    "classroomId"   TEXT,
+    "destinatario"  "RecadoDestinatario" NOT NULL DEFAULT 'TODAS_PROFESSORAS',
+    "professorId"   TEXT,
+    "titulo"        VARCHAR(255) NOT NULL,
+    "mensagem"      TEXT NOT NULL,
+    "importante"    BOOLEAN NOT NULL DEFAULT false,
+    "criadoPorId"   TEXT NOT NULL,
+    "criadoEm"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt"     TIMESTAMP(3),
     CONSTRAINT "RecadoTurma_pkey" PRIMARY KEY ("id")
 );
 
@@ -267,7 +210,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ─── 8. RecadoLeitura ────────────────────────────────────────────────────────
+-- ─── 9. RecadoLeitura — NÃO EXISTE → criar ───────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "RecadoLeitura" (
     "id"       TEXT NOT NULL,
@@ -285,26 +228,5 @@ DO $$ BEGIN
   ALTER TABLE "RecadoLeitura"
     ADD CONSTRAINT "RecadoLeitura_recadoId_fkey"
     FOREIGN KEY ("recadoId") REFERENCES "RecadoTurma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- ─── 9. MaterialRequestItem ──────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "MaterialRequestItem" (
-    "id"                TEXT NOT NULL,
-    "materialRequestId" TEXT NOT NULL,
-    "item"              VARCHAR(255) NOT NULL,
-    "quantidade"        INTEGER NOT NULL DEFAULT 1,
-    "unidade"           VARCHAR(50) NOT NULL DEFAULT 'unidade(s)',
-    "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "MaterialRequestItem_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "MaterialRequestItem_materialRequestId_idx" ON "MaterialRequestItem"("materialRequestId");
-
-DO $$ BEGIN
-  ALTER TABLE "MaterialRequestItem"
-    ADD CONSTRAINT "MaterialRequestItem_materialRequestId_fkey"
-    FOREIGN KEY ("materialRequestId") REFERENCES "MaterialRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
