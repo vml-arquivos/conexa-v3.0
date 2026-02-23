@@ -1,109 +1,121 @@
 -- ============================================================================
 -- Migration: sala_virtual_recados_observacoes
--- Criada em: 2026-02-23
+-- Criada em: 2026-02-23 | Corrigida: 2026-02-23 (idempotente)
 -- Adiciona:
 --   1. DevelopmentObservation  — observações individuais por aluno (professor)
 --   2. DevelopmentReport       — relatório consolidado de desenvolvimento
 --   3. ClassroomPost           — sala de aula virtual (tarefas/posts por turma)
 --   4. ClassroomPostFile       — arquivos anexados a posts da sala virtual
---   5. RecadoTurma             — recados da coordenadora para professoras/turma
---   6. MaterialRequestItem     — itens detalhados de requisição de material
---   7. Enums novos             — ObservationCategory, ReportType, PostType
+--   5. StudentPostPerformance  — desempenho individual por post/tarefa
+--   6. RecadoTurma             — recados da coordenadora para professoras/turma
+--   7. RecadoLeitura           — controle de leitura dos recados
+--   8. MaterialRequestItem     — itens detalhados de requisição de material
+--   9. Enums novos             — ObservationCategory, ReportType, PostType, PostStatus, RecadoDestinatario
+-- NOTA: Todos os CREATE TYPE e CREATE TABLE são idempotentes (IF NOT EXISTS / DO $$ EXCEPTION)
 -- ============================================================================
 
--- ─── 1. Enums ────────────────────────────────────────────────────────────────
+-- ─── 1. Enums (idempotentes via DO $$ EXCEPTION WHEN duplicate_object) ────────
 
-CREATE TYPE "ObservationCategory" AS ENUM (
-  'COMPORTAMENTO',
-  'DESENVOLVIMENTO',
-  'SAUDE',
-  'APRENDIZAGEM',
-  'GERAL'
-);
+DO $$ BEGIN
+  CREATE TYPE "ObservationCategory" AS ENUM (
+    'COMPORTAMENTO',
+    'DESENVOLVIMENTO',
+    'SAUDE',
+    'APRENDIZAGEM',
+    'GERAL'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE "ReportType" AS ENUM (
-  'RDI',
-  'RIA',
-  'RDIC',
-  'BIMESTRAL',
-  'SEMESTRAL',
-  'ANUAL'
-);
+DO $$ BEGIN
+  CREATE TYPE "ReportType" AS ENUM (
+    'RDI',
+    'RIA',
+    'RDIC',
+    'BIMESTRAL',
+    'SEMESTRAL',
+    'ANUAL'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE "PostType" AS ENUM (
-  'TAREFA',
-  'AVISO',
-  'ATIVIDADE',
-  'MATERIAL',
-  'REGISTRO',
-  'PLANEJAMENTO'
-);
+DO $$ BEGIN
+  CREATE TYPE "PostType" AS ENUM (
+    'TAREFA',
+    'AVISO',
+    'ATIVIDADE',
+    'MATERIAL',
+    'REGISTRO',
+    'PLANEJAMENTO'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE "PostStatus" AS ENUM (
-  'RASCUNHO',
-  'PUBLICADO',
-  'ARQUIVADO'
-);
+DO $$ BEGIN
+  CREATE TYPE "PostStatus" AS ENUM (
+    'RASCUNHO',
+    'PUBLICADO',
+    'ARQUIVADO'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE TYPE "RecadoDestinatario" AS ENUM (
-  'TODAS_PROFESSORAS',
-  'TURMA_ESPECIFICA',
-  'PROFESSOR_ESPECIFICO'
-);
+DO $$ BEGIN
+  CREATE TYPE "RecadoDestinatario" AS ENUM (
+    'TODAS_PROFESSORAS',
+    'TURMA_ESPECIFICA',
+    'PROFESSOR_ESPECIFICO'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 2. DevelopmentObservation ───────────────────────────────────────────────
--- Observações individuais por aluno registradas pelo professor no diário
 
-CREATE TABLE "DevelopmentObservation" (
-    "id"                  TEXT NOT NULL,
-    "childId"             TEXT NOT NULL,
-    "classroomId"         TEXT,
-    "diaryEventId"        TEXT,
-    "date"                TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "category"            "ObservationCategory" NOT NULL DEFAULT 'GERAL',
-    -- Comportamento
-    "behaviorDescription" TEXT,
-    "socialInteraction"   TEXT,
-    "emotionalState"      TEXT,
-    -- Desenvolvimento físico/motor
-    "motorSkills"         TEXT,
-    "cognitiveSkills"     TEXT,
-    "languageSkills"      TEXT,
-    -- Saúde e bem-estar
-    "healthNotes"         TEXT,
-    "dietaryNotes"        TEXT,
-    "sleepPattern"        TEXT,
-    -- Pedagógico
-    "learningProgress"    TEXT,
+CREATE TABLE IF NOT EXISTS "DevelopmentObservation" (
+    "id"                    TEXT NOT NULL,
+    "childId"               TEXT NOT NULL,
+    "classroomId"           TEXT,
+    "diaryEventId"          TEXT,
+    "date"                  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "category"              "ObservationCategory" NOT NULL DEFAULT 'GERAL',
+    "behaviorDescription"   TEXT,
+    "socialInteraction"     TEXT,
+    "emotionalState"        TEXT,
+    "motorSkills"           TEXT,
+    "cognitiveSkills"       TEXT,
+    "languageSkills"        TEXT,
+    "healthNotes"           TEXT,
+    "dietaryNotes"          TEXT,
+    "sleepPattern"          TEXT,
+    "learningProgress"      TEXT,
     "planningParticipation" TEXT,
-    "interests"           TEXT,
-    "challenges"          TEXT,
-    -- Psicológico / desenvolvimento integral
-    "psychologicalNotes"  TEXT,
-    "developmentAlerts"   TEXT,
-    -- Recomendações
-    "recommendations"     TEXT,
-    "nextSteps"           TEXT,
-    -- Metadados
-    "createdBy"           TEXT NOT NULL,
-    "updatedAt"           TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "interests"             TEXT,
+    "challenges"            TEXT,
+    "psychologicalNotes"    TEXT,
+    "developmentAlerts"     TEXT,
+    "recommendations"       TEXT,
+    "nextSteps"             TEXT,
+    "createdBy"             TEXT NOT NULL,
+    "updatedAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "DevelopmentObservation_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "DevelopmentObservation_childId_idx" ON "DevelopmentObservation"("childId");
-CREATE INDEX "DevelopmentObservation_classroomId_idx" ON "DevelopmentObservation"("classroomId");
-CREATE INDEX "DevelopmentObservation_date_idx" ON "DevelopmentObservation"("date");
-CREATE INDEX "DevelopmentObservation_category_idx" ON "DevelopmentObservation"("category");
-CREATE INDEX "DevelopmentObservation_createdBy_idx" ON "DevelopmentObservation"("createdBy");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_childId_idx"      ON "DevelopmentObservation"("childId");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_classroomId_idx"  ON "DevelopmentObservation"("classroomId");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_date_idx"         ON "DevelopmentObservation"("date");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_category_idx"     ON "DevelopmentObservation"("category");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_createdBy_idx"    ON "DevelopmentObservation"("createdBy");
 
-ALTER TABLE "DevelopmentObservation"
-  ADD CONSTRAINT "DevelopmentObservation_childId_fkey"
-  FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "DevelopmentObservation"
+    ADD CONSTRAINT "DevelopmentObservation_childId_fkey"
+    FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 3. DevelopmentReport ────────────────────────────────────────────────────
--- Relatório consolidado de desenvolvimento (gerado periodicamente)
 
-CREATE TABLE "DevelopmentReport" (
+CREATE TABLE IF NOT EXISTS "DevelopmentReport" (
     "id"                  TEXT NOT NULL,
     "childId"             TEXT NOT NULL,
     "startDate"           TIMESTAMP(3) NOT NULL,
@@ -122,17 +134,19 @@ CREATE TABLE "DevelopmentReport" (
     CONSTRAINT "DevelopmentReport_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "DevelopmentReport_childId_idx" ON "DevelopmentReport"("childId");
-CREATE INDEX "DevelopmentReport_startDate_endDate_idx" ON "DevelopmentReport"("startDate", "endDate");
+CREATE INDEX IF NOT EXISTS "DevelopmentReport_childId_idx"              ON "DevelopmentReport"("childId");
+CREATE INDEX IF NOT EXISTS "DevelopmentReport_startDate_endDate_idx"    ON "DevelopmentReport"("startDate", "endDate");
 
-ALTER TABLE "DevelopmentReport"
-  ADD CONSTRAINT "DevelopmentReport_childId_fkey"
-  FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "DevelopmentReport"
+    ADD CONSTRAINT "DevelopmentReport_childId_fkey"
+    FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 4. ClassroomPost ────────────────────────────────────────────────────────
--- Sala de Aula Virtual: posts/tarefas criados pelo professor por turma
 
-CREATE TABLE "ClassroomPost" (
+CREATE TABLE IF NOT EXISTS "ClassroomPost" (
     "id"            TEXT NOT NULL,
     "classroomId"   TEXT NOT NULL,
     "mantenedoraId" TEXT NOT NULL,
@@ -149,18 +163,20 @@ CREATE TABLE "ClassroomPost" (
     CONSTRAINT "ClassroomPost_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "ClassroomPost_classroomId_idx" ON "ClassroomPost"("classroomId");
-CREATE INDEX "ClassroomPost_mantenedoraId_idx" ON "ClassroomPost"("mantenedoraId");
-CREATE INDEX "ClassroomPost_createdAt_idx" ON "ClassroomPost"("createdAt");
+CREATE INDEX IF NOT EXISTS "ClassroomPost_classroomId_idx"   ON "ClassroomPost"("classroomId");
+CREATE INDEX IF NOT EXISTS "ClassroomPost_mantenedoraId_idx" ON "ClassroomPost"("mantenedoraId");
+CREATE INDEX IF NOT EXISTS "ClassroomPost_createdAt_idx"     ON "ClassroomPost"("createdAt");
 
-ALTER TABLE "ClassroomPost"
-  ADD CONSTRAINT "ClassroomPost_classroomId_fkey"
-  FOREIGN KEY ("classroomId") REFERENCES "Classroom"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "ClassroomPost"
+    ADD CONSTRAINT "ClassroomPost_classroomId_fkey"
+    FOREIGN KEY ("classroomId") REFERENCES "Classroom"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 5. ClassroomPostFile ────────────────────────────────────────────────────
--- Arquivos anexados a posts da sala virtual
 
-CREATE TABLE "ClassroomPostFile" (
+CREATE TABLE IF NOT EXISTS "ClassroomPostFile" (
     "id"           TEXT NOT NULL,
     "postId"       TEXT NOT NULL,
     "nomeOriginal" VARCHAR(255) NOT NULL,
@@ -171,16 +187,18 @@ CREATE TABLE "ClassroomPostFile" (
     CONSTRAINT "ClassroomPostFile_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "ClassroomPostFile_postId_idx" ON "ClassroomPostFile"("postId");
+CREATE INDEX IF NOT EXISTS "ClassroomPostFile_postId_idx" ON "ClassroomPostFile"("postId");
 
-ALTER TABLE "ClassroomPostFile"
-  ADD CONSTRAINT "ClassroomPostFile_postId_fkey"
-  FOREIGN KEY ("postId") REFERENCES "ClassroomPost"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "ClassroomPostFile"
+    ADD CONSTRAINT "ClassroomPostFile_postId_fkey"
+    FOREIGN KEY ("postId") REFERENCES "ClassroomPost"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 6. StudentPostPerformance ───────────────────────────────────────────────
--- Desempenho individual de cada aluno em um post/tarefa
 
-CREATE TABLE "StudentPostPerformance" (
+CREATE TABLE IF NOT EXISTS "StudentPostPerformance" (
     "id"          TEXT NOT NULL,
     "postId"      TEXT NOT NULL,
     "childId"     TEXT NOT NULL,
@@ -193,21 +211,26 @@ CREATE TABLE "StudentPostPerformance" (
     CONSTRAINT "StudentPostPerformance_postId_childId_key" UNIQUE ("postId", "childId")
 );
 
-CREATE INDEX "StudentPostPerformance_postId_idx" ON "StudentPostPerformance"("postId");
-CREATE INDEX "StudentPostPerformance_childId_idx" ON "StudentPostPerformance"("childId");
+CREATE INDEX IF NOT EXISTS "StudentPostPerformance_postId_idx"  ON "StudentPostPerformance"("postId");
+CREATE INDEX IF NOT EXISTS "StudentPostPerformance_childId_idx" ON "StudentPostPerformance"("childId");
 
-ALTER TABLE "StudentPostPerformance"
-  ADD CONSTRAINT "StudentPostPerformance_postId_fkey"
-  FOREIGN KEY ("postId") REFERENCES "ClassroomPost"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "StudentPostPerformance"
+    ADD CONSTRAINT "StudentPostPerformance_postId_fkey"
+    FOREIGN KEY ("postId") REFERENCES "ClassroomPost"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-ALTER TABLE "StudentPostPerformance"
-  ADD CONSTRAINT "StudentPostPerformance_childId_fkey"
-  FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "StudentPostPerformance"
+    ADD CONSTRAINT "StudentPostPerformance_childId_fkey"
+    FOREIGN KEY ("childId") REFERENCES "Child"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 7. RecadoTurma ──────────────────────────────────────────────────────────
--- Recados da coordenadora para professoras (por turma, por unidade ou geral)
 
-CREATE TABLE "RecadoTurma" (
+CREATE TABLE IF NOT EXISTS "RecadoTurma" (
     "id"             TEXT NOT NULL,
     "mantenedoraId"  TEXT NOT NULL,
     "unitId"         TEXT NOT NULL,
@@ -223,48 +246,55 @@ CREATE TABLE "RecadoTurma" (
     CONSTRAINT "RecadoTurma_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "RecadoTurma_unitId_idx" ON "RecadoTurma"("unitId");
-CREATE INDEX "RecadoTurma_classroomId_idx" ON "RecadoTurma"("classroomId");
-CREATE INDEX "RecadoTurma_criadoEm_idx" ON "RecadoTurma"("criadoEm");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_unitId_idx"     ON "RecadoTurma"("unitId");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_classroomId_idx" ON "RecadoTurma"("classroomId");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_criadoEm_idx"   ON "RecadoTurma"("criadoEm");
 
-ALTER TABLE "RecadoTurma"
-  ADD CONSTRAINT "RecadoTurma_unitId_fkey"
-  FOREIGN KEY ("unitId") REFERENCES "Unit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "RecadoTurma"
+    ADD CONSTRAINT "RecadoTurma_unitId_fkey"
+    FOREIGN KEY ("unitId") REFERENCES "Unit"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 8. RecadoLeitura ────────────────────────────────────────────────────────
--- Controle de leitura dos recados por professor
 
-CREATE TABLE "RecadoLeitura" (
-    "id"         TEXT NOT NULL,
-    "recadoId"   TEXT NOT NULL,
-    "userId"     TEXT NOT NULL,
-    "lidoEm"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS "RecadoLeitura" (
+    "id"       TEXT NOT NULL,
+    "recadoId" TEXT NOT NULL,
+    "userId"   TEXT NOT NULL,
+    "lidoEm"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RecadoLeitura_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "RecadoLeitura_recadoId_userId_key" UNIQUE ("recadoId", "userId")
 );
 
-CREATE INDEX "RecadoLeitura_recadoId_idx" ON "RecadoLeitura"("recadoId");
-CREATE INDEX "RecadoLeitura_userId_idx" ON "RecadoLeitura"("userId");
+CREATE INDEX IF NOT EXISTS "RecadoLeitura_recadoId_idx" ON "RecadoLeitura"("recadoId");
+CREATE INDEX IF NOT EXISTS "RecadoLeitura_userId_idx"   ON "RecadoLeitura"("userId");
 
-ALTER TABLE "RecadoLeitura"
-  ADD CONSTRAINT "RecadoLeitura_recadoId_fkey"
-  FOREIGN KEY ("recadoId") REFERENCES "RecadoTurma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "RecadoLeitura"
+    ADD CONSTRAINT "RecadoLeitura_recadoId_fkey"
+    FOREIGN KEY ("recadoId") REFERENCES "RecadoTurma"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 9. MaterialRequestItem ──────────────────────────────────────────────────
--- Itens individuais de uma requisição de material (já existe no schema, adiciona tabela)
 
-CREATE TABLE "MaterialRequestItem" (
-    "id"               TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS "MaterialRequestItem" (
+    "id"                TEXT NOT NULL,
     "materialRequestId" TEXT NOT NULL,
-    "item"             VARCHAR(255) NOT NULL,
-    "quantidade"       INTEGER NOT NULL DEFAULT 1,
-    "unidade"          VARCHAR(50) NOT NULL DEFAULT 'unidade(s)',
-    "createdAt"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "item"              VARCHAR(255) NOT NULL,
+    "quantidade"        INTEGER NOT NULL DEFAULT 1,
+    "unidade"           VARCHAR(50) NOT NULL DEFAULT 'unidade(s)',
+    "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "MaterialRequestItem_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "MaterialRequestItem_materialRequestId_idx" ON "MaterialRequestItem"("materialRequestId");
+CREATE INDEX IF NOT EXISTS "MaterialRequestItem_materialRequestId_idx" ON "MaterialRequestItem"("materialRequestId");
 
-ALTER TABLE "MaterialRequestItem"
-  ADD CONSTRAINT "MaterialRequestItem_materialRequestId_fkey"
-  FOREIGN KEY ("materialRequestId") REFERENCES "MaterialRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "MaterialRequestItem"
+    ADD CONSTRAINT "MaterialRequestItem_materialRequestId_fkey"
+    FOREIGN KEY ("materialRequestId") REFERENCES "MaterialRequest"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
