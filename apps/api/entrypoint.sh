@@ -3,58 +3,138 @@ set -e
 
 echo "=== Conexa-V3 Entrypoint ==="
 
-# ── Validação de variáveis obrigatórias ──────────────────────────
+# ── Validação de variáveis obrigatórias ──────────────────────────────────────
 echo "Validando variáveis de ambiente obrigatórias..."
-REQUIRED_VARS=("DATABASE_URL" "JWT_SECRET")
-for VAR in "${REQUIRED_VARS[@]}"; do
-  if [ -z "${!VAR}" ]; then
+for VAR in DATABASE_URL JWT_SECRET; do
+  if [ -z "${!VAR:-}" ]; then
     echo "❌ ERRO: variável obrigatória '$VAR' não definida."
     exit 1
   fi
 done
 echo "✅ Variáveis de ambiente validadas."
 
-# ── Resolver migrations FAILED via SQL direto (nome exato) ───────
-echo "Verificando migrations com status FAILED no banco..."
-FAILED=$(psql "$DATABASE_URL" -t -A -c "
-  SELECT migration_name
-  FROM \"_prisma_migrations\"
-  WHERE finished_at IS NULL
-    AND rolled_back_at IS NULL
-    AND applied_steps_count > 0;
-" 2>/dev/null || echo "")
+# ── Função: verificar se a tabela _prisma_migrations existe ──────────────────
+table_exists() {
+  psql "$DATABASE_URL" -t -A -c \
+    "SELECT to_regclass('public._prisma_migrations') IS NOT NULL;" \
+    2>/dev/null | grep -q "t"
+}
 
-if [ -n "$FAILED" ]; then
+# ── Função: resolver todas as migrations FAILED (sem filtro de steps) ────────
+resolve_failed_migrations() {
+  echo "Verificando migrations com status FAILED no banco..."
+
+  if ! table_exists; then
+    echo "  ℹ️  Tabela _prisma_migrations ainda não existe (DB zerado). Pulando resolução."
+    return 0
+  fi
+
+  # Condição correta: finished_at IS NULL AND rolled_back_at IS NULL
+  # NÃO filtra por applied_steps_count — migration pode falhar com steps=0
+  local FAILED
+  FAILED=$(psql "$DATABASE_URL" -t -A \
+    -c "SELECT migration_name FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NULL;" \
+    2>&1)
+
+  if [ $? -ne 0 ]; then
+    echo "  ⚠️  Erro ao consultar _prisma_migrations: $FAILED"
+    return 0
+  fi
+
+  FAILED=$(echo "$FAILED" | grep -v "^$" || true)
+
+  if [ -z "$FAILED" ]; then
+    echo "✅ Nenhuma migration FAILED encontrada."
+    return 0
+  fi
+
   echo "⚠️  Migrations FAILED encontradas. Resolvendo via SQL..."
   while IFS= read -r MIG; do
     [ -z "$MIG" ] && continue
-    echo "  → Resolvendo: $MIG"
-    psql "$DATABASE_URL" -c "
-      UPDATE \"_prisma_migrations\"
-      SET rolled_back_at = NOW()
-      WHERE migration_name = '$MIG';
-    " && echo "    ✅ Resolvido." || echo "    ⚠️  Falha ao resolver $MIG"
+    echo "  → Resolvendo migration FAILED: '$MIG'"
+    local RESULT
+    RESULT=$(psql "$DATABASE_URL" -c \
+      "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '$MIG' AND rolled_back_at IS NULL;" \
+      2>&1)
+    if echo "$RESULT" | grep -q "UPDATE [1-9]"; then
+      echo "    ✅ Migration '$MIG' marcada como rolled-back."
+    else
+      echo "    ⚠️  Resultado inesperado para '$MIG': $RESULT"
+    fi
   done <<< "$FAILED"
-else
-  echo "✅ Nenhuma migration FAILED encontrada."
-fi
+}
 
-# ── Aplicar migrations ────────────────────────────────────────────
-echo "Executando prisma migrate deploy..."
-if npx prisma migrate deploy; then
-  echo "✅ Migrations aplicadas com sucesso."
-else
-  EXIT_CODE=$?
-  echo "❌ ERRO: prisma migrate deploy falhou (exit $EXIT_CODE)."
-  if [ "${MIGRATE_BEST_EFFORT:-false}" = "true" ]; then
-    echo "⚠️  MIGRATE_BEST_EFFORT=true — continuando mesmo assim."
-  else
-    echo "Deploy abortado."
-    exit 1
+# ── Função: executar migrate deploy com retry automático em P3009 ─────────────
+run_migrate_deploy() {
+  echo "Executando prisma migrate deploy..."
+
+  local MIGRATE_OUTPUT
+  local MIGRATE_EXIT
+
+  # Captura stdout+stderr para poder inspecionar P3009
+  set +e
+  MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
+  MIGRATE_EXIT=$?
+  set -e
+
+  echo "$MIGRATE_OUTPUT"
+
+  if [ $MIGRATE_EXIT -eq 0 ]; then
+    echo "✅ Migrations aplicadas com sucesso."
+    return 0
   fi
-fi
 
-# ── Iniciar aplicação ─────────────────────────────────────────────
+  # Verifica se é P3009 — se sim, extrai o nome da migration e resolve
+  if echo "$MIGRATE_OUTPUT" | grep -q "P3009"; then
+    echo "⚠️  P3009 detectado. Extraindo migration FAILED do output do Prisma..."
+
+    # Extrai o nome da migration do output do Prisma (linha: "The `NOME` migration started at")
+    local FAILED_MIG
+    FAILED_MIG=$(echo "$MIGRATE_OUTPUT" | grep -oP "(?<=The \`)[^\`]+" | head -1 || true)
+
+    if [ -n "$FAILED_MIG" ]; then
+      echo "  → Migration FAILED identificada pelo Prisma: '$FAILED_MIG'"
+      local RESULT
+      RESULT=$(psql "$DATABASE_URL" -c \
+        "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '$FAILED_MIG' AND rolled_back_at IS NULL;" \
+        2>&1)
+      echo "    SQL result: $RESULT"
+      echo "  → Retentando prisma migrate deploy (1 retry)..."
+
+      set +e
+      MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
+      MIGRATE_EXIT=$?
+      set -e
+
+      echo "$MIGRATE_OUTPUT"
+
+      if [ $MIGRATE_EXIT -eq 0 ]; then
+        echo "✅ Migrations aplicadas com sucesso (após retry)."
+        return 0
+      else
+        echo "❌ ERRO: prisma migrate deploy falhou novamente após retry (exit $MIGRATE_EXIT)."
+        echo "   Isso indica um erro real no SQL da migration. Deploy abortado."
+        exit 1
+      fi
+    else
+      echo "  ⚠️  Não foi possível extrair o nome da migration do output P3009."
+      echo "❌ ERRO: prisma migrate deploy falhou com P3009 (exit $MIGRATE_EXIT). Deploy abortado."
+      exit 1
+    fi
+  fi
+
+  # Erro diferente de P3009
+  echo "❌ ERRO: prisma migrate deploy falhou (exit $MIGRATE_EXIT). Deploy abortado."
+  exit 1
+}
+
+# ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
+resolve_failed_migrations
+
+# ── Passo 2: Aplicar migrations (com retry inteligente em P3009) ──────────────
+run_migrate_deploy
+
+# ── Passo 3: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js
@@ -62,6 +142,6 @@ elif [ -f /app/dist/main.js ]; then
   exec node /app/dist/main.js
 else
   echo "❌ ERRO: entrypoint compilado não encontrado em /app/dist."
-  ls -la /app/dist || true
+  ls -la /app/dist/ 2>/dev/null || true
   exit 1
 fi
