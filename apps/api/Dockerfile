@@ -7,7 +7,7 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV CI=true
 
-# Prisma em Debian slim pode precisar do binário openssl para detecção
+# Prisma em Debian slim precisa do openssl para geração do client
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
@@ -20,7 +20,6 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
-# IMPORTANTÍSSIMO:
 # Remove devDependencies, mas mantém o Prisma Client gerado dentro do node_modules
 RUN npm prune --omit=dev
 
@@ -34,16 +33,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Instalar dependências de runtime: wget, curl, openssl, ca-certificates
-# wget é usado pelo Coolify healthcheck
-# curl pode ser usado pela aplicação
-# openssl e ca-certificates são necessários para Prisma e HTTPS
+# postgresql-client: necessário para o entrypoint usar psql para resolver migrations FAILED
+# wget: usado pelo Coolify healthcheck
+# curl: usado pela aplicação
+# openssl + ca-certificates: necessários para Prisma e HTTPS
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends \
     wget \
     curl \
     openssl \
     ca-certificates \
+    postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 
 # Copia o node_modules já "podado" do builder (contém Prisma Client gerado)
