@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Migration: sala_virtual_recados_observacoes
--- Criada em: 2026-02-23 | Corrigida: 2026-02-23 (idempotente)
+-- Criada em: 2026-02-23 | Corrigida v3: 2026-02-23 (totalmente idempotente)
 -- Adiciona:
 --   1. DevelopmentObservation  — observações individuais por aluno (professor)
 --   2. DevelopmentReport       — relatório consolidado de desenvolvimento
@@ -11,7 +11,12 @@
 --   7. RecadoLeitura           — controle de leitura dos recados
 --   8. MaterialRequestItem     — itens detalhados de requisição de material
 --   9. Enums novos             — ObservationCategory, ReportType, PostType, PostStatus, RecadoDestinatario
--- NOTA: Todos os CREATE TYPE e CREATE TABLE são idempotentes (IF NOT EXISTS / DO $$ EXCEPTION)
+-- NOTA: Todos os DDL são totalmente idempotentes:
+--   - CREATE TYPE: DO $$ EXCEPTION WHEN duplicate_object
+--   - CREATE TABLE: IF NOT EXISTS
+--   - ALTER TABLE ADD COLUMN: IF NOT EXISTS (para tabelas que podem já existir parcialmente)
+--   - CREATE INDEX: IF NOT EXISTS
+--   - ADD CONSTRAINT: DO $$ EXCEPTION WHEN duplicate_object
 -- ============================================================================
 
 -- ─── 1. Enums (idempotentes via DO $$ EXCEPTION WHEN duplicate_object) ────────
@@ -70,35 +75,40 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- ─── 2. DevelopmentObservation ───────────────────────────────────────────────
+-- CREATE TABLE IF NOT EXISTS garante idempotência se a tabela já existe.
+-- ALTER TABLE ... ADD COLUMN IF NOT EXISTS garante que colunas novas sejam
+-- adicionadas mesmo se a tabela foi criada parcialmente em tentativa anterior.
 
 CREATE TABLE IF NOT EXISTS "DevelopmentObservation" (
     "id"                    TEXT NOT NULL,
     "childId"               TEXT NOT NULL,
-    "classroomId"           TEXT,
-    "diaryEventId"          TEXT,
     "date"                  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "category"              "ObservationCategory" NOT NULL DEFAULT 'GERAL',
-    "behaviorDescription"   TEXT,
-    "socialInteraction"     TEXT,
-    "emotionalState"        TEXT,
-    "motorSkills"           TEXT,
-    "cognitiveSkills"       TEXT,
-    "languageSkills"        TEXT,
-    "healthNotes"           TEXT,
-    "dietaryNotes"          TEXT,
-    "sleepPattern"          TEXT,
-    "learningProgress"      TEXT,
-    "planningParticipation" TEXT,
-    "interests"             TEXT,
-    "challenges"            TEXT,
-    "psychologicalNotes"    TEXT,
-    "developmentAlerts"     TEXT,
-    "recommendations"       TEXT,
-    "nextSteps"             TEXT,
     "createdBy"             TEXT NOT NULL,
     "updatedAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "DevelopmentObservation_pkey" PRIMARY KEY ("id")
 );
+
+-- Adicionar colunas opcionais/novas com IF NOT EXISTS (idempotente)
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "classroomId"           TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "diaryEventId"          TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "behaviorDescription"   TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "socialInteraction"     TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "emotionalState"        TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "motorSkills"           TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "cognitiveSkills"       TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "languageSkills"        TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "healthNotes"           TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "dietaryNotes"          TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "sleepPattern"          TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "learningProgress"      TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "planningParticipation" TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "interests"             TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "challenges"            TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "psychologicalNotes"    TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "developmentAlerts"     TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "recommendations"       TEXT;
+ALTER TABLE "DevelopmentObservation" ADD COLUMN IF NOT EXISTS "nextSteps"             TEXT;
 
 CREATE INDEX IF NOT EXISTS "DevelopmentObservation_childId_idx"      ON "DevelopmentObservation"("childId");
 CREATE INDEX IF NOT EXISTS "DevelopmentObservation_classroomId_idx"  ON "DevelopmentObservation"("classroomId");
@@ -246,9 +256,9 @@ CREATE TABLE IF NOT EXISTS "RecadoTurma" (
     CONSTRAINT "RecadoTurma_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX IF NOT EXISTS "RecadoTurma_unitId_idx"     ON "RecadoTurma"("unitId");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_unitId_idx"      ON "RecadoTurma"("unitId");
 CREATE INDEX IF NOT EXISTS "RecadoTurma_classroomId_idx" ON "RecadoTurma"("classroomId");
-CREATE INDEX IF NOT EXISTS "RecadoTurma_criadoEm_idx"   ON "RecadoTurma"("criadoEm");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_criadoEm_idx"    ON "RecadoTurma"("criadoEm");
 
 DO $$ BEGIN
   ALTER TABLE "RecadoTurma"
