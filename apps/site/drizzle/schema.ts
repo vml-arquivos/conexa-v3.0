@@ -1,28 +1,49 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json } from "drizzle-orm/mysql-core";
+import {
+  serial,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+  boolean,
+  json,
+  integer,
+} from "drizzle-orm/pg-core";
 
+// ─── Enums ────────────────────────────────────────────────────────────────────
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const contactStatusEnum = pgEnum("contact_status", ["new", "read", "replied", "archived"]);
+export const donationFrequencyEnum = pgEnum("donation_frequency", ["one-time", "monthly", "quarterly", "yearly"]);
+export const donationDestinationTypeEnum = pgEnum("donation_destination_type", ["general", "unit", "project"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "completed", "failed", "refunded"]);
+export const transparencyCategoryEnum = pgEnum("transparency_category", ["financial", "institutional", "reports", "other"]);
+export const jobStatusEnum = pgEnum("job_status", ["new", "reviewing", "interview", "approved", "rejected"]);
+
+// ─── Users ────────────────────────────────────────────────────────────────────
 /**
  * Core user table backing auth flow.
  */
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  role: roleEnum("role").default("user").notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// ─── Units ────────────────────────────────────────────────────────────────────
 /**
  * Units table - CEPIs and Creches
  */
-export const units = mysqlTable("units", {
-  id: int("id").autoincrement().primaryKey(),
+export const units = pgTable("units", {
+  id: serial("id").primaryKey(),
   unitCode: varchar("unitCode", { length: 50 }).notNull().unique(),
   unitName: varchar("unitName", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
@@ -38,189 +59,169 @@ export const units = mysqlTable("units", {
   latitude: varchar("latitude", { length: 50 }),
   longitude: varchar("longitude", { length: 50 }),
   active: boolean("active").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type Unit = typeof units.$inferSelect;
 export type InsertUnit = typeof units.$inferInsert;
 
-/**
- * Blog categories
- */
-export const blogCategories = mysqlTable("blogCategories", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Blog Categories ──────────────────────────────────────────────────────────
+export const blogCategories = pgTable("blogCategories", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   description: text("description"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type BlogCategory = typeof blogCategories.$inferSelect;
 export type InsertBlogCategory = typeof blogCategories.$inferInsert;
 
-/**
- * Blog tags
- */
-export const blogTags = mysqlTable("blogTags", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Blog Tags ────────────────────────────────────────────────────────────────
+export const blogTags = pgTable("blogTags", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type BlogTag = typeof blogTags.$inferSelect;
 export type InsertBlogTag = typeof blogTags.$inferInsert;
 
-/**
- * Blog posts
- */
-export const blogPosts = mysqlTable("blogPosts", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Blog Posts ───────────────────────────────────────────────────────────────
+export const blogPosts = pgTable("blogPosts", {
+  id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   excerpt: text("excerpt"),
   content: text("content").notNull(),
   featuredImage: text("featuredImage"),
-  categoryId: int("categoryId").references(() => blogCategories.id),
-  authorId: int("authorId").references(() => users.id),
+  categoryId: integer("categoryId").references(() => blogCategories.id),
+  authorId: integer("authorId").references(() => users.id),
   published: boolean("published").default(false).notNull(),
-  publishedAt: timestamp("publishedAt"),
-  views: int("views").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  publishedAt: timestamp("publishedAt", { mode: "date" }),
+  views: integer("views").default(0).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = typeof blogPosts.$inferInsert;
 
-/**
- * Blog post tags (many-to-many relationship)
- */
-export const blogPostTags = mysqlTable("blogPostTags", {
-  id: int("id").autoincrement().primaryKey(),
-  postId: int("postId").notNull().references(() => blogPosts.id, { onDelete: "cascade" }),
-  tagId: int("tagId").notNull().references(() => blogTags.id, { onDelete: "cascade" }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+// ─── Blog Post Tags (M2M) ─────────────────────────────────────────────────────
+export const blogPostTags = pgTable("blogPostTags", {
+  id: serial("id").primaryKey(),
+  postId: integer("postId").notNull().references(() => blogPosts.id, { onDelete: "cascade" }),
+  tagId: integer("tagId").notNull().references(() => blogTags.id, { onDelete: "cascade" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type BlogPostTag = typeof blogPostTags.$inferSelect;
 export type InsertBlogPostTag = typeof blogPostTags.$inferInsert;
 
-/**
- * Newsletter subscriptions
- */
-export const newsletterSubscriptions = mysqlTable("newsletterSubscriptions", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Newsletter Subscriptions ─────────────────────────────────────────────────
+export const newsletterSubscriptions = pgTable("newsletterSubscriptions", {
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   active: boolean("active").default(true).notNull(),
-  confirmedAt: timestamp("confirmedAt"),
-  unsubscribedAt: timestamp("unsubscribedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  confirmedAt: timestamp("confirmedAt", { mode: "date" }),
+  unsubscribedAt: timestamp("unsubscribedAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type NewsletterSubscription = typeof newsletterSubscriptions.$inferSelect;
 export type InsertNewsletterSubscription = typeof newsletterSubscriptions.$inferInsert;
 
-/**
- * Contact form submissions
- */
-export const contactSubmissions = mysqlTable("contactSubmissions", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Contact Submissions ──────────────────────────────────────────────────────
+export const contactSubmissions = pgTable("contactSubmissions", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   subject: varchar("subject", { length: 255 }).notNull(),
   message: text("message").notNull(),
-  unitId: int("unitId").references(() => units.id),
-  status: mysqlEnum("status", ["new", "read", "replied", "archived"]).default("new").notNull(),
-  readAt: timestamp("readAt"),
-  repliedAt: timestamp("repliedAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  unitId: integer("unitId").references(() => units.id),
+  status: contactStatusEnum("status").default("new").notNull(),
+  readAt: timestamp("readAt", { mode: "date" }),
+  repliedAt: timestamp("repliedAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 export type InsertContactSubmission = typeof contactSubmissions.$inferInsert;
 
-/**
- * Donations
- */
-export const donations = mysqlTable("donations", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Donations ────────────────────────────────────────────────────────────────
+export const donations = pgTable("donations", {
+  id: serial("id").primaryKey(),
   donorName: varchar("donorName", { length: 255 }).notNull(),
   donorEmail: varchar("donorEmail", { length: 320 }).notNull(),
   donorPhone: varchar("donorPhone", { length: 50 }),
-  amount: int("amount").notNull(), // Amount in cents
+  amount: integer("amount").notNull(), // Amount in cents
   currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
-  frequency: mysqlEnum("frequency", ["one-time", "monthly", "quarterly", "yearly"]).default("one-time").notNull(),
-  destinationType: mysqlEnum("destinationType", ["general", "unit", "project"]).default("general").notNull(),
-  destinationId: int("destinationId"), // References units.id or projects.id
+  frequency: donationFrequencyEnum("frequency").default("one-time").notNull(),
+  destinationType: donationDestinationTypeEnum("destinationType").default("general").notNull(),
+  destinationId: integer("destinationId"),
   paymentMethod: varchar("paymentMethod", { length: 50 }).notNull(),
-  paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed", "failed", "refunded"]).default("pending").notNull(),
+  paymentStatus: paymentStatusEnum("paymentStatus").default("pending").notNull(),
   transactionId: varchar("transactionId", { length: 255 }),
-  paymentData: json("paymentData"), // Store additional payment gateway data
+  paymentData: json("paymentData"),
   anonymous: boolean("anonymous").default(false).notNull(),
   message: text("message"),
   receiptSent: boolean("receiptSent").default(false).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type Donation = typeof donations.$inferSelect;
 export type InsertDonation = typeof donations.$inferInsert;
 
-/**
- * Projects (for donations and transparency)
- */
-export const projects = mysqlTable("projects", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Projects ─────────────────────────────────────────────────────────────────
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   description: text("description"),
   content: text("content"),
   featuredImage: text("featuredImage"),
-  goalAmount: int("goalAmount"), // Goal amount in cents
-  currentAmount: int("currentAmount").default(0).notNull(), // Current amount raised in cents
+  goalAmount: integer("goalAmount"),
+  currentAmount: integer("currentAmount").default(0).notNull(),
   active: boolean("active").default(true).notNull(),
-  startDate: timestamp("startDate"),
-  endDate: timestamp("endDate"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  startDate: timestamp("startDate", { mode: "date" }),
+  endDate: timestamp("endDate", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = typeof projects.$inferInsert;
 
-/**
- * Transparency documents
- */
-export const transparencyDocuments = mysqlTable("transparencyDocuments", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Transparency Documents ───────────────────────────────────────────────────
+export const transparencyDocuments = pgTable("transparencyDocuments", {
+  id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  category: mysqlEnum("category", ["financial", "institutional", "reports", "other"]).notNull(),
+  category: transparencyCategoryEnum("category").notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileType: varchar("fileType", { length: 50 }),
-  fileSize: int("fileSize"), // Size in bytes
-  year: int("year"),
-  month: int("month"),
+  fileSize: integer("fileSize"),
+  year: integer("year"),
+  month: integer("month"),
   published: boolean("published").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type TransparencyDocument = typeof transparencyDocuments.$inferSelect;
 export type InsertTransparencyDocument = typeof transparencyDocuments.$inferInsert;
 
-/**
- * Job applications (Trabalhe Conosco)
- */
-export const jobApplications = mysqlTable("jobApplications", {
-  id: int("id").autoincrement().primaryKey(),
+// ─── Job Applications ─────────────────────────────────────────────────────────
+export const jobApplications = pgTable("jobApplications", {
+  id: serial("id").primaryKey(),
   fullName: varchar("fullName", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull(),
   phone: varchar("phone", { length: 50 }).notNull(),
@@ -231,19 +232,19 @@ export const jobApplications = mysqlTable("jobApplications", {
   state: varchar("state", { length: 2 }).notNull(),
   zipCode: varchar("zipCode", { length: 10 }).notNull(),
   position: varchar("position", { length: 255 }).notNull(),
-  unitId: int("unitId").references(() => units.id),
+  unitId: integer("unitId").references(() => units.id),
   education: varchar("education", { length: 255 }).notNull(),
   experience: text("experience"),
   skills: text("skills"),
   availability: varchar("availability", { length: 100 }),
   resumeUrl: text("resumeUrl"),
   coverLetter: text("coverLetter"),
-  status: mysqlEnum("status", ["new", "reviewing", "interview", "approved", "rejected"]).default("new").notNull(),
-  reviewedAt: timestamp("reviewedAt"),
-  reviewedBy: int("reviewedBy").references(() => users.id),
+  status: jobStatusEnum("status").default("new").notNull(),
+  reviewedAt: timestamp("reviewedAt", { mode: "date" }),
+  reviewedBy: integer("reviewedBy").references(() => users.id),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 export type JobApplication = typeof jobApplications.$inferSelect;

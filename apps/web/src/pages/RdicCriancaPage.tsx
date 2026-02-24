@@ -64,6 +64,7 @@ interface RdicSalvo {
   periodo: string;
   anoLetivo?: number;
   bimestre: number;
+  anoLetivo: number;
   dimensoes: DimensaoAvaliacao[];
   observacaoGeral: string;
   proximosPassos: string;
