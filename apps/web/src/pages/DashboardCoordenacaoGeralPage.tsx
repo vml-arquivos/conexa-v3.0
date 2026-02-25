@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { LoadingState } from '../components/ui/LoadingState';
@@ -57,6 +58,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const [coberturaGeral, setCoberturaGeral] = useState<CentralCoverage | null>(null);
   const [loadingCoberturaGeral, setLoadingCoberturaGeral] = useState(false);
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
+  const apiCache = useApiCache(60_000);
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -70,8 +72,10 @@ export default function DashboardCoordenacaoGeralPage() {
     setLoadingCoberturaGeral(true);
     try {
       const hoje = new Date().toISOString().split('T')[0];
-      const res = await http.get('/reports/central/coverage', { params: { startDate: hoje, endDate: hoje } });
-      setCoberturaGeral(res.data);
+      const data = await apiCache.get('/reports/central/coverage', { startDate: hoje, endDate: hoje }, () =>
+        http.get('/reports/central/coverage', { params: { startDate: hoje, endDate: hoje } }).then(r => r.data)
+      );
+      setCoberturaGeral(data as CentralCoverage);
     } catch {
       // mantém null — UI mostra estado vazio
     } finally {
@@ -638,7 +642,7 @@ export default function DashboardCoordenacaoGeralPage() {
             <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura da rede...</div>
           ) : coberturaGeral ? (
             <>
-              {/* KPI global */}
+              {/* Indicadores da Rede */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-blue-700">{coberturaGeral.totalComRegistro}</p>

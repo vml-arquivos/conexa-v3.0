@@ -1,10 +1,11 @@
 /**
  * Dashboard Central — Análises
  * Acesso: Coordenadora Geral (Bruna Vaz) e Psicóloga Central (Carla)
- * Funcionalidades: KPIs, gráficos, filtros, exportação CSV
+ * Funcionalidades: Indicadores, gráficos, filtros, exportação CSV
  * Somente leitura — sem edição de cadastros operacionais
  */
 import { useState, useEffect, useCallback } from 'react';
+import { IndicatorsCards } from '../components/ui/IndicatorsCards';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -23,7 +24,7 @@ interface FiltrosCentral {
   periodo: '7d' | '30d' | '90d' | '180d' | '365d';
 }
 
-interface KpiCard {
+interface IndicatorCard {
   titulo: string;
   valor: number | string;
   variacao?: number;
@@ -73,7 +74,7 @@ export function DashboardCentralPage() {
   const [dadosMensais, setDadosMensais] = useState<DadosMensais[]>([]);
   const [dadosUnidades, setDadosUnidades] = useState<DadosUnidade[]>([]);
   const [dadosAlertas, setDadosAlertas] = useState<DadosAlerta[]>([]);
-  const [kpis, setKpis] = useState({ totalAlunos: 0, totalProfessores: 0, totalAlertas: 0, coberturaDiario: 0 });
+  const [indicators, setIndicators] = useState({ totalAlunos: 0, totalProfessores: 0, totalAlertas: 0, coberturaDiario: 0 });
 
   // Carregar unidades acessíveis
   useEffect(() => {
@@ -96,7 +97,7 @@ export function DashboardCentralPage() {
 
       if (dashRes.status === 'fulfilled') {
         const d = dashRes.value.data;
-        setKpis({
+        setIndicators({
           totalAlunos: d.totalAlunos ?? 0,
           totalProfessores: d.totalProfessores ?? 0,
           totalAlertas: d.totalAlertas ?? 0,
@@ -118,7 +119,7 @@ export function DashboardCentralPage() {
   }, [filtros]);
 
   const gerarDadosDemo = () => {
-    setKpis({ totalAlunos: 142, totalProfessores: 18, totalAlertas: 7, coberturaDiario: 87 });
+    setIndicators({ totalAlunos: 142, totalProfessores: 18, totalAlertas: 7, coberturaDiario: 87 });
     setDadosMensais([
       { mes: 'Set', registros: 312, presencas: 289, alertas: 4 },
       { mes: 'Out', registros: 345, presencas: 310, alertas: 6 },
@@ -158,28 +159,28 @@ export function DashboardCentralPage() {
 
   // ─── Cards KPI ─────────────────────────────────────────────────────────────
 
-  const cardsKpi: KpiCard[] = [
+  const cardsIndicadores: IndicatorCard[] = [
     {
       titulo: 'Total de Alunos',
-      valor: kpis.totalAlunos,
+      valor: indicators.totalAlunos,
       icone: <Users className="h-6 w-6" />,
       cor: 'bg-blue-50 text-blue-600 border-blue-100',
     },
     {
       titulo: 'Professores Ativos',
-      valor: kpis.totalProfessores,
+      valor: indicators.totalProfessores,
       icone: <GraduationCap className="h-6 w-6" />,
       cor: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     {
       titulo: 'Alertas Ativos',
-      valor: kpis.totalAlertas,
+      valor: indicators.totalAlertas,
       icone: <AlertTriangle className="h-6 w-6" />,
       cor: 'bg-amber-50 text-amber-600 border-amber-100',
     },
     {
       titulo: 'Cobertura do Diário',
-      valor: `${kpis.coberturaDiario}%`,
+      valor: `${indicators.coberturaDiario}%`,
       icone: <TrendingUp className="h-6 w-6" />,
       cor: 'bg-purple-50 text-purple-600 border-purple-100',
     },
@@ -264,20 +265,19 @@ export function DashboardCentralPage() {
         </div>
       )}
 
-      {/* Cards KPI */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {cardsKpi.map((card, i) => (
-          <div key={i} className={`bg-white border rounded-xl p-4 ${card.cor.split(' ').slice(-1)[0]}`}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{card.titulo}</span>
-              <div className={`p-2 rounded-lg ${card.cor.split(' ').slice(0, 2).join(' ')}`}>
-                {card.icone}
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{card.valor}</p>
-          </div>
-        ))}
-      </div>
+      {/* Indicadores da Rede */}
+      <IndicatorsCards
+        title="Indicadores da Rede"
+        loading={carregando}
+        error={!!erro && indicators.totalAlunos === 0}
+        onRefresh={carregarDados}
+        items={[
+          { label: 'Total de Alunos',     value: indicators.totalAlunos,     tone: 'info' },
+          { label: 'Professores Ativos',  value: indicators.totalProfessores, tone: 'success' },
+          { label: 'Alertas Ativos',      value: indicators.totalAlertas,    tone: indicators.totalAlertas > 0 ? 'warning' : 'default' },
+          { label: 'Cobertura do Diário', value: `${indicators.coberturaDiario}%`, tone: indicators.coberturaDiario >= 80 ? 'success' : indicators.coberturaDiario >= 50 ? 'warning' : 'danger' },
+        ]}
+      />
 
       {/* Gráficos — linha 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

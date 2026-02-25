@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -65,6 +66,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [cobertura, setCobertura] = useState<CoberturaData | null>(null);
   const [pendencias, setPendencias] = useState<PendenciasData | null>(null);
   const [loadingCobertura, setLoadingCobertura] = useState(false);
+  const apiCache = useApiCache(60_000);
   const navigate = useNavigate();
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
@@ -82,12 +84,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     setLoadingCobertura(true);
     try {
       const hoje = new Date().toISOString().split('T')[0];
-      const [covRes, pendRes] = await Promise.allSettled([
-        http.get('/reports/unit/coverage', { params: { startDate: hoje, endDate: hoje } }),
-        http.get('/reports/unit/pendings', { params: { daysWithout: 1 } }),
+      const [covData, pendData] = await Promise.all([
+        apiCache.get('/reports/unit/coverage', { startDate: hoje, endDate: hoje }, () =>
+          http.get('/reports/unit/coverage', { params: { startDate: hoje, endDate: hoje } }).then(r => r.data)
+        ),
+        apiCache.get('/reports/unit/pendings', { daysWithout: 1 }, () =>
+          http.get('/reports/unit/pendings', { params: { daysWithout: 1 } }).then(r => r.data)
+        ),
       ]);
-      if (covRes.status === 'fulfilled') setCobertura(covRes.value.data);
-      if (pendRes.status === 'fulfilled') setPendencias(pendRes.value.data);
+      setCobertura(covData as CoberturaData);
+      setPendencias(pendData as PendenciasData);
     } catch {
       toast.error('Erro ao carregar cobertura');
     } finally {
@@ -619,7 +625,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura...</div>
           ) : (
             <>
-              {/* KPI geral */}
+              {/* Indicadores da Unidade */}
               {cobertura && (
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">

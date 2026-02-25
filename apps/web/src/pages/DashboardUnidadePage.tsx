@@ -4,6 +4,7 @@
  * Funcionalidades: pendências, alertas, materiais, planejamentos, CRUD operacional
  */
 import { useState, useEffect, useCallback } from 'react';
+import { IndicatorsCards } from '../components/ui/IndicatorsCards';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -60,7 +61,7 @@ export function DashboardUnidadePage() {
   const [alertas, setAlertas] = useState<AlertaAluno[]>([]);
   const [requisicoes, setRequisicoes] = useState<RequisicaoMaterial[]>([]);
   const [dadosMateriais, setDadosMateriais] = useState<DadosMateriais[]>([]);
-  const [kpis, setKpis] = useState({ totalAlunos: 0, totalTurmas: 0, requisicoesAbertas: 0, alertasAtivos: 0 });
+  const [indicators, setIndicators] = useState({ totalAlunos: 0, totalTurmas: 0, requisicoesAbertas: 0, alertasAtivos: 0 });
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
@@ -82,7 +83,7 @@ export function DashboardUnidadePage() {
           status: (r.status as string) ?? 'SOLICITADO',
           criadoEm: (r.requestedDate as string) ?? new Date().toISOString(),
         })));
-        setKpis(k => ({ ...k, requisicoesAbertas: reqs.filter((r: Record<string, unknown>) => r.status === 'SOLICITADO').length }));
+        setIndicators(k => ({ ...k, requisicoesAbertas: reqs.filter((r: Record<string, unknown>) => r.status === 'SOLICITADO').length }));
       }
 
       // Dados de demonstração para pendências e alertas
@@ -96,7 +97,7 @@ export function DashboardUnidadePage() {
   }, []);
 
   const gerarDadosDemo = () => {
-    setKpis({ totalAlunos: 78, totalTurmas: 6, requisicoesAbertas: 3, alertasAtivos: 2 });
+    setIndicators({ totalAlunos: 78, totalTurmas: 6, requisicoesAbertas: 3, alertasAtivos: 2 });
     setPendencias([
       { turma: 'Berçário I', professor: 'Ana Paula', diariosPendentes: 2, relatoriosPendentes: 1, planejamentoPendente: false },
       { turma: 'Berçário II', professor: 'Maria José', diariosPendentes: 0, relatoriosPendentes: 0, planejamentoPendente: false },
@@ -195,34 +196,19 @@ export function DashboardUnidadePage() {
         </div>
       )}
 
-      {/* Cards KPI — Skeleton quando carregando */}
-      {carregando ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1,2,3,4].map(n => (
-            <div key={n} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
-              <div className="h-3 bg-gray-200 rounded w-2/3 mb-3" />
-              <div className="h-7 bg-gray-200 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-      ) : (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { titulo: 'Total de Alunos', valor: kpis.totalAlunos, icone: <Users className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50' },
-          { titulo: 'Turmas Ativas', valor: kpis.totalTurmas, icone: <BookOpen className="h-5 w-5" />, cor: 'text-emerald-600 bg-emerald-50' },
-          { titulo: 'Requisições Abertas', valor: kpis.requisicoesAbertas, icone: <ShoppingCart className="h-5 w-5" />, cor: 'text-amber-600 bg-amber-50' },
-          { titulo: 'Alertas Ativos', valor: kpis.alertasAtivos, icone: <AlertTriangle className="h-5 w-5" />, cor: 'text-red-600 bg-red-50' },
-        ].map((card, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{card.titulo}</span>
-              <div className={`p-1.5 rounded-lg ${card.cor}`}>{card.icone}</div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{card.valor}</p>
-          </div>
-        ))}
-      </div>
-      )}
+      {/* Indicadores da Unidade */}
+      <IndicatorsCards
+        title="Indicadores da Unidade"
+        loading={carregando}
+        error={!!erro && indicators.totalAlunos === 0}
+        onRefresh={carregarDados}
+        items={[
+          { label: 'Total de Alunos',       value: indicators.totalAlunos,        tone: 'info' },
+          { label: 'Turmas Ativas',          value: indicators.totalTurmas,        tone: 'success' },
+          { label: 'Requisições Abertas',   value: indicators.requisicoesAbertas, tone: indicators.requisicoesAbertas > 0 ? 'warning' : 'default' },
+          { label: 'Alertas Ativos',         value: indicators.alertasAtivos,      tone: indicators.alertasAtivos > 0 ? 'danger' : 'default' },
+        ]}
+      />
 
       {/* Gráfico de materiais por categoria */}
       {dadosMateriais.length > 0 && (

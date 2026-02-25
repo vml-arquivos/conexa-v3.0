@@ -10,6 +10,7 @@
  * 5. Salva o RDIC no banco
  */
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -279,6 +280,8 @@ function IndicadorRow({
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function RdicCriancaPage() {
   const { user } = useAuth() as any;
+  const [searchParams] = useSearchParams();
+  const preselectedChildId = searchParams.get('childId');
   const [loading, setLoading] = useState(true);
   const [turma, setTurma] = useState<Turma | null>(null);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
@@ -313,7 +316,18 @@ export default function RdicCriancaPage() {
       const res = await http.get('/teachers/dashboard');
       if (res.data?.hasClassroom) {
         setTurma(res.data.classroom);
-        setAlunos(res.data.alunos ?? []);
+        const lista: Aluno[] = res.data.alunos ?? [];
+        setAlunos(lista);
+        // Pré-selecionar criança se childId veio na URL
+        if (preselectedChildId) {
+          const aluno = lista.find(a => a.id === preselectedChildId);
+          if (aluno) {
+            setAlunoSelecionado(aluno);
+            setEtapa('formulario');
+            const rdicsRes = await http.get('/rdic', { params: { childId: aluno.id } }).catch(() => ({ data: [] }));
+            setRdicsDoAluno(Array.isArray(rdicsRes.data) ? rdicsRes.data : rdicsRes.data?.data ?? []);
+          }
+        }
       }
     } catch {
       toast.error('Não foi possível carregar a turma.');

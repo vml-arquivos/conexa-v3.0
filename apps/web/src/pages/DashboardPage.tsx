@@ -124,7 +124,7 @@ export function DashboardPage() {
       // Roles não-professor precisam de classroomId
       if (!isProfessor) {
         if (!classroomId) {
-          setTeacherError('Selecione uma turma para visualizar os KPIs.');
+          setTeacherError('Selecione uma turma para visualizar os Indicadores.');
           setTeacherLoading(false);
           return;
         }
@@ -231,7 +231,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* KPIs */}
+          {/* Indicadores */}
           {unitData && (
             <div>
               <p className="text-sm text-gray-600 mb-3">
@@ -276,7 +276,7 @@ export function DashboardPage() {
           {!unitData && !unitLoading && !unitError && (
             <div className="text-center py-8 text-gray-400">
               <p className="text-lg">Selecione o período e clique em &quot;Carregar Painel&quot;</p>
-              <p className="text-sm mt-1">Os KPIs da unidade serão exibidos aqui.</p>
+              <p className="text-sm mt-1">Os Indicadores da Unidade serão exibidos aqui.</p>
             </div>
           )}
         </div>
@@ -286,7 +286,7 @@ export function DashboardPage() {
       {canViewTeacherDashboard && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-2xl font-semibold mb-4 text-green-700">
-            Dashboard do Professor (KPIs do dia)
+            Dashboard do Professor (Indicadores do dia)
           </h2>
 
           {/* Formulário com Selects */}
@@ -352,7 +352,7 @@ export function DashboardPage() {
                 disabled={teacherLoading}
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 text-sm font-medium"
               >
-                {teacherLoading ? 'Carregando...' : 'Carregar KPIs'}
+                {teacherLoading ? 'Carregando...' : 'Carregar Indicadores'}
               </button>
             </div>
           </div>
@@ -364,7 +364,7 @@ export function DashboardPage() {
             </div>
           )}
 
-          {/* KPIs por Turma */}
+          {/* Indicadores por Turma */}
           {teacherData && (
             <div>
               <p className="text-sm text-gray-600 mb-3">
@@ -420,10 +420,10 @@ export function DashboardPage() {
             <div className="text-center py-8 text-gray-400">
               <p className="text-lg">
                 {isProfessor
-                  ? 'Clique em "Carregar KPIs" para ver os dados do dia'
-                  : 'Selecione uma unidade e turma, depois clique em "Carregar KPIs"'}
+                  ? 'Clique em "Carregar Indicadores" para ver os dados do dia'
+                  : 'Selecione uma unidade e turma, depois clique em "Carregar Indicadores"'}
               </p>
-              <p className="text-sm mt-1">Os KPIs por turma serão exibidos aqui.</p>
+              <p className="text-sm mt-1">Os Indicadores por turma serão exibidos aqui.</p>
             </div>
           )}
         </div>

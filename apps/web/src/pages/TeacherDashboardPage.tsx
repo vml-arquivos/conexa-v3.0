@@ -465,7 +465,7 @@ export default function TeacherDashboardPage() {
                     return (
                       <button
                         key={aluno.id}
-                        onClick={() => navigate('/app/rdic-crianca')}
+                        onClick={() => navigate(`/app/rdic-crianca?childId=${aluno.id}`)}
                         className="w-full flex items-center gap-3 p-3 bg-white border-2 border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all text-left"
                       >
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
