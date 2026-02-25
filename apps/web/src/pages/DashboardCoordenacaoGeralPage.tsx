@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Users, TrendingUp, ShoppingCart,
   BookOpen, ClipboardList, CheckCircle, AlertCircle,
-  ChevronRight, BarChart2, Network, Star, Layers, Calendar, ArrowRight,
+  ChevronRight, BarChart2, Network, Star, Layers, Calendar, ArrowRight, RefreshCw,
 } from 'lucide-react';
 import { LOOKUP_DIARIO_2026, CAMPOS_EXPERIENCIA, SEGMENTOS, type SegmentoKey } from '../data/lookupDiario2026';
 
@@ -43,10 +43,41 @@ export default function DashboardCoordenacaoGeralPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardGeral>(DEMO);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
-  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'|'cobertura'>('visao');
+  // Aba Cobertura Multiunidade
+  interface CoberturaUnidade {
+    unitId: string; unitName: string;
+    totalCriancas: number; totalComRegistro: number; percentual: number;
+  }
+  interface CentralCoverage {
+    startDate: string; endDate: string;
+    totalCriancas: number; totalComRegistro: number; percentualGeral: number;
+    unidades: CoberturaUnidade[];
+  }
+  const [coberturaGeral, setCoberturaGeral] = useState<CentralCoverage | null>(null);
+  const [loadingCoberturaGeral, setLoadingCoberturaGeral] = useState(false);
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
 
   useEffect(() => { loadDashboard(); }, []);
+
+  useEffect(() => {
+    if (abaAtiva === 'cobertura' && !coberturaGeral) {
+      carregarCoberturaGeral();
+    }
+  }, [abaAtiva]);
+
+  async function carregarCoberturaGeral() {
+    setLoadingCoberturaGeral(true);
+    try {
+      const hoje = new Date().toISOString().split('T')[0];
+      const res = await http.get('/reports/central/coverage', { params: { startDate: hoje, endDate: hoje } });
+      setCoberturaGeral(res.data);
+    } catch {
+      // mantém null — UI mostra estado vazio
+    } finally {
+      setLoadingCoberturaGeral(false);
+    }
+  }
 
   async function loadDashboard() {
     try {
@@ -94,6 +125,7 @@ export default function DashboardCoordenacaoGeralPage() {
     { id:'observacoes', label:'Observacoes Individuais', icon:<ClipboardList className="h-4 w-4"/> },
     { id:'psicologia', label:'Desenvolvimento Psicológico', icon:<Network className="h-4 w-4"/> },
     { id:'matriz', label:'Matriz 2026', icon:<Layers className="h-4 w-4"/> },
+    { id:'cobertura', label:'Cobertura', icon:<BarChart2 className="h-4 w-4"/> },
   ] as const;
   const filtros = [
     { id:'todas', label:'Todas', count:(dashboard.unidades ?? []).length },
@@ -587,6 +619,130 @@ export default function DashboardCoordenacaoGeralPage() {
           </div>
         </div>
       )}
+      {/* ABA: COBERTURA MULTIUNIDADE */}
+      {abaAtiva === 'cobertura' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-700">Cobertura de Registros — Rede</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Crianças com pelo menos 1 DiaryEvent hoje, por unidade</p>
+            </div>
+            <button
+              onClick={() => { setCoberturaGeral(null); carregarCoberturaGeral(); }}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Atualizar">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+
+          {loadingCoberturaGeral ? (
+            <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura da rede...</div>
+          ) : coberturaGeral ? (
+            <>
+              {/* KPI global */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">{coberturaGeral.totalComRegistro}</p>
+                  <p className="text-xs text-blue-500 mt-1">Com registro hoje</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-700">{coberturaGeral.totalCriancas}</p>
+                  <p className="text-xs text-gray-500 mt-1">Total na rede</p>
+                </div>
+                <div className={`border rounded-xl p-4 text-center ${
+                  coberturaGeral.percentualGeral >= 80 ? 'bg-green-50 border-green-200' :
+                  coberturaGeral.percentualGeral >= 50 ? 'bg-yellow-50 border-yellow-200' :
+                  'bg-red-50 border-red-200'
+                }`}>
+                  <p className={`text-2xl font-bold ${
+                    coberturaGeral.percentualGeral >= 80 ? 'text-green-700' :
+                    coberturaGeral.percentualGeral >= 50 ? 'text-yellow-700' : 'text-red-700'
+                  }`}>{coberturaGeral.percentualGeral}%</p>
+                  <p className="text-xs text-gray-500 mt-1">Cobertura geral</p>
+                </div>
+              </div>
+
+              {/* Barra global */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Cobertura da rede hoje</span>
+                  <span className="text-sm font-bold text-gray-600">{coberturaGeral.percentualGeral}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className={`h-3 rounded-full transition-all duration-700 ${
+                      coberturaGeral.percentualGeral >= 80 ? 'bg-green-500' :
+                      coberturaGeral.percentualGeral >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${coberturaGeral.percentualGeral}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Comparativo por unidade — ranking */}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Comparativo por unidade</p>
+                {[...coberturaGeral.unidades]
+                  .sort((a, b) => b.percentual - a.percentual)
+                  .map((u, idx) => (
+                    <div key={u.unitId} className="bg-white border border-gray-200 rounded-xl p-3">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          idx === 0 ? 'bg-yellow-400 text-white' :
+                          idx === 1 ? 'bg-gray-300 text-white' :
+                          idx === 2 ? 'bg-orange-400 text-white' : 'bg-gray-100 text-gray-600'
+                        }`}>{idx + 1}</span>
+                        <span className="flex-1 font-medium text-sm text-gray-800">{u.unitName}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          u.percentual >= 80 ? 'bg-green-100 text-green-700' :
+                          u.percentual >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{u.totalComRegistro}/{u.totalCriancas} · {u.percentual}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full ${
+                            u.percentual >= 80 ? 'bg-green-500' :
+                            u.percentual >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${u.percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+
+              {/* Alerta unidades críticas */}
+              {coberturaGeral.unidades.filter(u => u.percentual < 50).length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <p className="text-sm font-semibold text-red-700">Unidades com cobertura crítica (&lt;50%)</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {coberturaGeral.unidades
+                      .filter(u => u.percentual < 50)
+                      .map(u => (
+                        <div key={u.unitId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2">
+                          <span className="text-sm font-medium text-gray-800">{u.unitName}</span>
+                          <span className="text-xs font-bold text-red-600">{u.percentual}%</span>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-xl">
+              <BarChart2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Nenhum dado de cobertura disponível</p>
+              <p className="text-xs text-gray-300 mt-1">Verifique se há crianças e turmas cadastradas</p>
+            </div>
+          )}
+        </div>
+      )}
+
     </PageShell>
   );
 }

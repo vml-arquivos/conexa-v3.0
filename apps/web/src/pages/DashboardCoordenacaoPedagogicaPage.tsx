@@ -9,7 +9,7 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
   Eye, ThumbsUp, MessageSquare, TrendingUp,
-  Bell, Star, Brain, GraduationCap, Plus,
+  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate } from 'react-router-dom';
@@ -51,13 +51,49 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'>('inicio');
+  // Aba Cobertura
+  interface CoberturaData {
+    unitId: string; startDate: string; endDate: string;
+    totalCriancas: number; totalComRegistro: number; percentualGeral: number;
+    turmas: Array<{ classroomId: string; classroomName: string; totalCriancas: number; criancasComRegistro: number; percentual: number }>;
+  }
+  interface PendenciasData {
+    totalPendentes: number;
+    pendentes: Array<{ childId: string; nome: string; classroomId: string; classroomName: string }>;
+  }
+  const [cobertura, setCobertura] = useState<CoberturaData | null>(null);
+  const [pendencias, setPendencias] = useState<PendenciasData | null>(null);
+  const [loadingCobertura, setLoadingCobertura] = useState(false);
   const navigate = useNavigate();
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  useEffect(() => {
+    if (abaAtiva === 'cobertura' && !cobertura) {
+      carregarCobertura();
+    }
+  }, [abaAtiva]);
+
+  async function carregarCobertura() {
+    setLoadingCobertura(true);
+    try {
+      const hoje = new Date().toISOString().split('T')[0];
+      const [covRes, pendRes] = await Promise.allSettled([
+        http.get('/reports/unit/coverage', { params: { startDate: hoje, endDate: hoje } }),
+        http.get('/reports/unit/pendings', { params: { daysWithout: 1 } }),
+      ]);
+      if (covRes.status === 'fulfilled') setCobertura(covRes.value.data);
+      if (pendRes.status === 'fulfilled') setPendencias(pendRes.value.data);
+    } catch {
+      toast.error('Erro ao carregar cobertura');
+    } finally {
+      setLoadingCobertura(false);
+    }
+  }
 
   async function loadDashboard() {
     try {
@@ -176,6 +212,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
     { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
     { id: 'relatorios', label: 'Relatórios', icon: <TrendingUp className="h-4 w-4" /> },
+    { id: 'cobertura', label: 'Cobertura', icon: <BarChart2 className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -560,6 +597,135 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <p className="text-xs text-gray-400">Pedidos e gastos</p>
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ABA: COBERTURA DE REGISTROS */}
+      {abaAtiva === 'cobertura' && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-gray-700">Cobertura de Registros — Hoje</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Crianças com pelo menos 1 DiaryEvent registrado hoje</p>
+            </div>
+            <button
+              onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
+              className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Atualizar">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+
+          {loadingCobertura ? (
+            <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura...</div>
+          ) : (
+            <>
+              {/* KPI geral */}
+              {cobertura && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-blue-700">{cobertura.totalComRegistro}</p>
+                    <p className="text-xs text-blue-500 mt-1">Com registro hoje</p>
+                  </div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-700">{cobertura.totalCriancas}</p>
+                    <p className="text-xs text-gray-500 mt-1">Total de crianças</p>
+                  </div>
+                  <div className={`border rounded-xl p-4 text-center ${
+                    cobertura.percentualGeral >= 80 ? 'bg-green-50 border-green-200' :
+                    cobertura.percentualGeral >= 50 ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-red-50 border-red-200'
+                  }`}>
+                    <p className={`text-2xl font-bold ${
+                      cobertura.percentualGeral >= 80 ? 'text-green-700' :
+                      cobertura.percentualGeral >= 50 ? 'text-yellow-700' : 'text-red-700'
+                    }`}>{cobertura.percentualGeral}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Cobertura geral</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Barra de cobertura global */}
+              {cobertura && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Cobertura da unidade hoje</span>
+                    <span className="text-sm font-bold text-gray-600">{cobertura.percentualGeral}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      className={`h-3 rounded-full transition-all duration-700 ${
+                        cobertura.percentualGeral >= 80 ? 'bg-green-500' :
+                        cobertura.percentualGeral >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${cobertura.percentualGeral}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Por turma */}
+              {cobertura && cobertura.turmas.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-700">Por turma</p>
+                  {cobertura.turmas.map(t => (
+                    <div key={t.classroomId} className="bg-white border border-gray-200 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-sm text-gray-800">{t.classroomName}</span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          t.percentual >= 80 ? 'bg-green-100 text-green-700' :
+                          t.percentual >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>{t.criancasComRegistro}/{t.totalCriancas} · {t.percentual}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${
+                            t.percentual >= 80 ? 'bg-green-500' :
+                            t.percentual >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${t.percentual}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Pendências */}
+              {pendencias && pendencias.totalPendentes > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-orange-500" />
+                    <p className="text-sm font-semibold text-orange-700">
+                      {pendencias.totalPendentes} {pendencias.totalPendentes === 1 ? 'criança sem' : 'crianças sem'} registro hoje
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    {pendencias.pendentes.map(p => (
+                      <div key={p.childId} className="flex items-center gap-3 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2">
+                        <div className="w-7 h-7 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 text-xs font-bold flex-shrink-0">
+                          {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{p.nome}</p>
+                          <p className="text-xs text-gray-400">{p.classroomName}</p>
+                        </div>
+                        <span className="text-xs text-orange-500 font-medium">Sem registro</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {pendencias && pendencias.totalPendentes === 0 && (
+                <div className="text-center py-8 bg-green-50 border border-green-200 rounded-xl">
+                  <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                  <p className="font-semibold text-green-700">Todas as crianças têm registro hoje!</p>
+                  <p className="text-xs text-green-500 mt-1">Cobertura completa</p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

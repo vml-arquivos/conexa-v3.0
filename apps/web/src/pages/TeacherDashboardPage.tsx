@@ -97,7 +97,10 @@ export default function TeacherDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DashboardData | null>(null);
   const [fotoAmpliada, setFotoAmpliada] = useState<{ url: string; nome: string } | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<'turma' | 'acoes' | 'indicadores' | 'ia'>('turma');
+  const [abaAtiva, setAbaAtiva] = useState<'turma' | 'acoes' | 'indicadores' | 'ia' | 'rdic'>('turma');
+  // Aba RDIC da Turma
+  const [rdicsMap, setRdicsMap] = useState<Record<string, { count: number; ultimoStatus: string; ultimoPeriodo: string }>>({});
+  const [loadingRdics, setLoadingRdics] = useState(false);
   const [entradaDiarioIA, setEntradaDiarioIA] = useState('');
   const [analisandoIA, setAnalisandoIA] = useState(false);
   const [relatorioIA, setRelatorioIA] = useState<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] } | null>(null);
@@ -110,6 +113,39 @@ export default function TeacherDashboardPage() {
   const [savingMicrogesto, setSavingMicrogesto] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  // Carregar RDICs da turma quando aba rdic é ativada
+  useEffect(() => {
+    const lista = data?.alunos ?? [];
+    if (abaAtiva === 'rdic' && lista.length > 0 && Object.keys(rdicsMap).length === 0) {
+      carregarRdicsDaTurma();
+    }
+  }, [abaAtiva, data]);
+
+  async function carregarRdicsDaTurma() {
+    setLoadingRdics(true);
+    try {
+      const mapa: Record<string, { count: number; ultimoStatus: string; ultimoPeriodo: string }> = {};
+      await Promise.all(
+        alunos.map(async (a) => {
+          try {
+            const res = await http.get('/rdic', { params: { childId: a.id } });
+            const lista: any[] = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+            mapa[a.id] = {
+              count: lista.length,
+              ultimoStatus: lista[0]?.status ?? '',
+              ultimoPeriodo: lista[0]?.periodo ?? '',
+            };
+          } catch {
+            mapa[a.id] = { count: 0, ultimoStatus: '', ultimoPeriodo: '' };
+          }
+        }),
+      );
+      setRdicsMap(mapa);
+    } finally {
+      setLoadingRdics(false);
+    }
+  }
 
   useEffect(() => {
     if (data?.classroom?.id) {
@@ -265,8 +301,9 @@ export default function TeacherDashboardPage() {
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
             {[
               { id: 'turma', label: 'Minha Turma', icon: <Users className="h-4 w-4" /> },
+              { id: 'rdic', label: 'RDIC', icon: <Brain className="h-4 w-4" /> },
               { id: 'acoes', label: 'Ações Rápidas', icon: <Sparkles className="h-4 w-4" /> },
-              { id: 'ia', label: 'IA Pedagógica', icon: <Brain className="h-4 w-4" /> },
+              { id: 'ia', label: 'IA Pedagógica', icon: <FileText className="h-4 w-4" /> },
               { id: 'indicadores', label: 'Progresso', icon: <TrendingUp className="h-4 w-4" /> },
             ].map(tab => (
               <button key={tab.id} onClick={() => setAbaAtiva(tab.id as any)}
@@ -357,6 +394,105 @@ export default function TeacherDashboardPage() {
           {/* Recados da Coordenadora (sempre visível na aba turma) */}
           {abaAtiva === 'turma' && (
             <RecadosWidget titulo="Recados da Coordenação" />
+          )}
+
+          {/* ─── RDIC DA TURMA ─── */}
+          {abaAtiva === 'rdic' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-gray-700">RDIC da Turma — Bimestre Atual</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Cobertura de Registros de Desenvolvimento Individual</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setRdicsMap({}); carregarRdicsDaTurma(); }}
+                    className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                    title="Atualizar"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate('/app/rdic-crianca')}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Novo RDIC
+                  </Button>
+                </div>
+              </div>
+
+              {/* Barra de cobertura geral */}
+              {alunos.length > 0 && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-indigo-800">Cobertura da turma</span>
+                    <span className="text-sm font-bold text-indigo-700">
+                      {loadingRdics ? '...' : `${Object.values(rdicsMap).filter(r => r.count > 0).length} / ${alunos.length} crianças`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-indigo-200 rounded-full h-2.5">
+                    <div
+                      className="h-2.5 rounded-full bg-indigo-600 transition-all duration-500"
+                      style={{ width: loadingRdics ? '0%' : `${alunos.length > 0 ? Math.round((Object.values(rdicsMap).filter(r => r.count > 0).length / alunos.length) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-indigo-500 mt-1">
+                    {loadingRdics ? 'Carregando...' : `${alunos.length > 0 ? Math.round((Object.values(rdicsMap).filter(r => r.count > 0).length / alunos.length) * 100) : 0}% das crianças com pelo menos 1 RDIC registrado`}
+                  </p>
+                </div>
+              )}
+
+              {/* Lista por criança */}
+              {loadingRdics ? (
+                <div className="text-center py-8 text-gray-400 text-sm">Carregando RDICs...</div>
+              ) : (
+                <div className="space-y-2">
+                  {alunos.map(aluno => {
+                    const info = rdicsMap[aluno.id] ?? { count: 0, ultimoStatus: '', ultimoPeriodo: '' };
+                    const temRdic = info.count > 0;
+                    const statusColor = info.ultimoStatus === 'PUBLICADO'
+                      ? 'bg-green-100 text-green-700'
+                      : info.ultimoStatus === 'REVISAO'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : info.ultimoStatus === 'RASCUNHO'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-500';
+                    const statusLabel = info.ultimoStatus === 'PUBLICADO' ? 'Publicado'
+                      : info.ultimoStatus === 'REVISAO' ? 'Em Revisão'
+                      : info.ultimoStatus === 'RASCUNHO' ? 'Rascunho'
+                      : 'Sem RDIC';
+                    return (
+                      <button
+                        key={aluno.id}
+                        onClick={() => navigate('/app/rdic-crianca')}
+                        className="w-full flex items-center gap-3 p-3 bg-white border-2 border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all text-left"
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
+                          temRdic ? 'bg-indigo-500' : 'bg-gray-300'
+                        }`}>
+                          {aluno.photoUrl
+                            ? <img src={aluno.photoUrl} alt={aluno.firstName} className="w-10 h-10 rounded-full object-cover" />
+                            : `${aluno.firstName[0]}${aluno.lastName[0]}`
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-800 truncate">{aluno.firstName} {aluno.lastName}</p>
+                          <p className="text-xs text-gray-400">{info.ultimoPeriodo || 'Nenhum período registrado'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>{statusLabel}</span>
+                          {temRdic && (
+                            <span className="text-xs text-gray-400">{info.count} reg.</span>
+                          )}
+                          <ChevronRight className="h-4 w-4 text-gray-300" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
           {/* ─── AÇÕES RÁPIDAS ─── */}
