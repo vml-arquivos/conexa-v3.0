@@ -3,7 +3,6 @@ import {
   BookOpen,
   ClipboardList,
   BarChart2,
-  Grid,
   ShoppingCart,
   GraduationCap,
   ChevronRight,
@@ -37,88 +36,76 @@ interface MenuItem {
 }
 
 // ─── Menus por perfil ─────────────────────────────────────────────────────────
+// Regra: cada array contém apenas itens cuja rota está autorizada para o role.
+// Páginas não listadas aqui continuam existindo e acessíveis por URL direta;
+// apenas são omitidas do menu para não gerar ruído visual.
 
+// PROFESSOR / PROFESSOR_AUXILIAR ──────────────────────────────────────────────
 const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/teacher-dashboard', label: 'Painel do Professor', icon: <GraduationCap className="h-4 w-4" /> },
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
-  { path: '/app/plano-de-aula', label: 'Plano de Aula', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/planejamento-diario', label: 'Planejamento Diário', icon: <Calendar className="h-4 w-4" /> },
-  { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
-  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-ria', label: 'RDIC — Registros', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-crianca', label: 'RDIC por Criança', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
-  { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/plano-de-aula',       label: 'Plano de Aula',          icon: <BookOpen className="h-4 w-4" /> },
+  { path: '/app/planejamento-diario', label: 'Planejamento Diário',    icon: <Calendar className="h-4 w-4" /> },
+  { path: '/app/diario-de-bordo',     label: 'Diário de Bordo',        icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/rdic-crianca',        label: 'RDIC por Criança',       icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/chamada',             label: 'Chamada Diária',         icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais',   label: 'Atendimentos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica',   label: 'Matriz 2026',            icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
 ];
 
+// UNIDADE — Gestão ─────────────────────────────────────────────────────────────
 const UNIDADE_GESTAO: MenuItem[] = [
-  { path: '/app/unidade', label: 'Painel da Unidade', icon: <Home className="h-4 w-4" /> },
-  { path: '/app/coordenacao-pedagogica', label: 'Coordenação Pedagógica', icon: <Building2 className="h-4 w-4" /> },
-  { path: '/app/coordenacao', label: 'Turmas & Reuniões', icon: <Users className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/material-requests', label: 'Requisições Pendentes', icon: <ShoppingCart className="h-4 w-4" /> },
-  { path: '/app/relatorio-consumo-materiais', label: 'Consumo de Materiais', icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/dashboard-consumo-materiais', label: 'Dashboard Consumo', icon: <TrendingUp className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/painel-alergias', label: 'Alergias e Dietas', icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica',        label: 'Coord. Pedagógica',      icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao',                   label: 'Turmas & Reuniões',      icon: <Users className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/dashboard-consumo-materiais',   label: 'Dashboard Consumo',      icon: <TrendingUp className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/painel-alergias',               label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 
+// UNIDADE — Pedagógico (supervisão e aprovação, sem duplicar ferramentas do professor)
 const UNIDADE_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/plano-de-aula', label: 'Plano de Aula', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/planejamento-diario', label: 'Planejamento Diário', icon: <Calendar className="h-4 w-4" /> },
-  { path: '/app/planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
-  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-ria', label: 'RDIC — Registros', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-crianca', label: 'RDIC por Criança', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-coord', label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
-  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
-  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais', icon: <MessageCircle className="h-4 w-4" /> },
-  { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',        label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/rdic-crianca',      label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
+  { path: '/app/chamada',           label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx',               label: 'Fotos da Turma',             icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/reports',           label: 'Relatórios',                 icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
+// STAFF_CENTRAL ────────────────────────────────────────────────────────────────
 const CENTRAL_ITEMS: MenuItem[] = [
-  { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
-  { path: '/app/coordenacao-geral', label: 'Coordenação Geral', icon: <Network className="h-4 w-4" /> },
-  { path: '/app/rdic-geral', label: 'RDICs Publicados', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
-  { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/central',           label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
+  { path: '/app/coordenacao-geral', label: 'Coordenação Geral',   icon: <Network className="h-4 w-4" /> },
+  { path: '/app/rdic-geral',        label: 'RDICs Publicados',    icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026',         icon: <Layers className="h-4 w-4" /> },
+  { path: '/app/reports',           label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
+// MANTENEDORA ──────────────────────────────────────────────────────────────────
 const MANTENEDORA_ITEMS: MenuItem[] = [
-  { path: '/app/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { path: '/app/coordenacao-geral', label: 'Coordenação Geral', icon: <Network className="h-4 w-4" /> },
-  { path: '/app/central', label: 'Análises Centrais', icon: <TrendingUp className="h-4 w-4" /> },
-  { path: '/app/unidade', label: 'Gestão de Unidades', icon: <Users className="h-4 w-4" /> },
-  { path: '/app/pedidos-compra', label: 'Pedidos de Compra', icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" /> },
-  { path: '/app/reports', label: 'Relatórios', icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/dashboard',         label: 'Dashboard Global',    icon: <LayoutDashboard className="h-4 w-4" /> },
+  { path: '/app/coordenacao-geral', label: 'Coordenação Geral',   icon: <Network className="h-4 w-4" /> },
+  { path: '/app/central',           label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
+  { path: '/app/rdic-geral',        label: 'RDICs Publicados',    icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/pedidos-compra',    label: 'Pedidos de Compra',   icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026',         icon: <Layers className="h-4 w-4" /> },
+  { path: '/app/reports',           label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
+// DEVELOPER — acesso completo, sem duplicatas entre seções ─────────────────────
 const DEV_EXTRA: MenuItem[] = [
-  { path: '/app/teacher-dashboard', label: 'Painel Professor', icon: <GraduationCap className="h-4 w-4" /> },
-  { path: '/app/planejamentos', label: 'Planejamentos', icon: <FileText className="h-4 w-4" /> },
-  { path: '/app/diario-de-bordo', label: 'Diário de Bordo', icon: <ClipboardList className="h-4 w-4" /> },
-  { path: '/app/rdic-ria', label: 'RDIC — Registros', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-crianca', label: 'RDIC por Criança', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-coord', label: 'RDIC — Revisão (Coord)', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
-  { path: '/app/rdic-geral', label: 'RDICs Publicados (Geral)', icon: <Brain className="h-4 w-4" />, badge: 'Geral' },
-  { path: '/app/chamada', label: 'Chamada Diária', icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx', label: 'Fotos da Turma (RDX)', icon: <Camera className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026', icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/coordenacao-pedagogica', label: 'Coord. Pedagógica', icon: <Building2 className="h-4 w-4" /> },
-  { path: '/app/coordenacao', label: 'Turmas & Reuniões', icon: <Users className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/coordenacao-geral', label: 'Coord. Geral', icon: <Network className="h-4 w-4" /> },
-  { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
+  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',      icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/rdic-ria',             label: 'RDIC — Registros (RIA)',    icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/planejamentos',        label: 'Planejamentos',             icon: <FileText className="h-4 w-4" /> },
+  { path: '/app/configuracoes',        label: 'Configurações',             icon: <Settings className="h-4 w-4" /> },
 ];
 
 // ─── Item de menu ─────────────────────────────────────────────────────────────
@@ -169,29 +156,33 @@ export function Sidebar() {
   const { user } = useAuth();
   const userRoles = normalizeRoles(user);
 
-  const isProfessor = userRoles.some(r => r === 'PROFESSOR' || r === 'PROFESSOR_AUXILIAR');
-  const isUnidade = userRoles.some(r => r === 'UNIDADE' || r.startsWith('UNIDADE_'));
-  const isCentral = userRoles.some(r => r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_'));
-  const isMantenedora = userRoles.some(r => r === 'MANTENEDORA' || r.startsWith('MANTENEDORA_'));
-  const isDeveloper = userRoles.includes('DEVELOPER');
+  const isProfessor    = userRoles.some(r => r === 'PROFESSOR' || r === 'PROFESSOR_AUXILIAR');
+  const isUnidade      = userRoles.some(r => r === 'UNIDADE' || r.startsWith('UNIDADE_'));
+  const isCentral      = userRoles.some(r => r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_'));
+  const isMantenedora  = userRoles.some(r => r === 'MANTENEDORA' || r.startsWith('MANTENEDORA_'));
+  const isDeveloper    = userRoles.includes('DEVELOPER');
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
 
-  const perfilLabel = isDeveloper ? 'Desenvolvedor'
+  const perfilLabel = isDeveloper   ? 'Desenvolvedor'
     : isMantenedora ? 'Mantenedora'
-    : isCentral ? 'Equipe Central'
-    : isUnidade ? 'Unidade'
-    : isProfessor ? 'Professor(a)'
+    : isCentral     ? 'Equipe Central'
+    : isUnidade     ? 'Unidade'
+    : isProfessor   ? 'Professor(a)'
     : 'Usuário';
 
-  // Item de configurações e perfil (disponível para todos)
+  // Itens de rodapé (todos os perfis)
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
-  const perfilItem: MenuItem = { path: '/app/meu-perfil', label: 'Meu Perfil', icon: <UserCircle className="h-4 w-4" /> };
+  const perfilItem: MenuItem = { path: '/app/meu-perfil',    label: 'Meu Perfil',    icon: <UserCircle className="h-4 w-4" /> };
+
+  // Itens de administração (Unidade, Central, Mantenedora, Developer)
   const adminItems: MenuItem[] = [
     { path: '/app/admin/usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> },
-    { path: '/app/admin/turmas', label: 'Turmas', icon: <GraduationCap className="h-4 w-4" /> },
-    ...(isMantenedora || isCentral || isDeveloper ? [{ path: '/app/admin/unidades', label: 'Unidades', icon: <Building2 className="h-4 w-4" /> }] : []),
+    { path: '/app/admin/turmas',   label: 'Turmas',   icon: <GraduationCap className="h-4 w-4" /> },
+    ...(isMantenedora || isCentral || isDeveloper
+      ? [{ path: '/app/admin/unidades', label: 'Unidades', icon: <Building2 className="h-4 w-4" /> }]
+      : []),
   ];
 
   return (
@@ -222,39 +213,52 @@ export function Sidebar() {
 
       {/* Navegação */}
       <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
+
+        {/* DEVELOPER: vê todas as seções + extras de dev */}
         {isDeveloper && (
           <>
-            <NavSection titulo="Professor" items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} />
-            <NavSection titulo="Unidade" items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]} isActive={isActive} />
-            <NavSection titulo="Central" items={CENTRAL_ITEMS} isActive={isActive} />
-            <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} />
-            <NavSection titulo="Dev" items={DEV_EXTRA} isActive={isActive} />
+            <NavSection titulo="Professor"   items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} />
+            <NavSection titulo="Unidade"     items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} />
+            <NavSection titulo="Central"     items={CENTRAL_ITEMS}                                      isActive={isActive} />
+            <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS}                                  isActive={isActive} />
+            <NavSection titulo="Dev — Extras" items={DEV_EXTRA}                                         isActive={isActive} />
           </>
         )}
+
+        {/* MANTENEDORA */}
         {!isDeveloper && isMantenedora && (
           <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} />
         )}
+
+        {/* STAFF_CENTRAL */}
         {!isDeveloper && isCentral && (
           <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} />
         )}
+
+        {/* UNIDADE */}
         {!isDeveloper && isUnidade && (
           <>
-            <NavSection titulo="Gestão" items={UNIDADE_GESTAO} isActive={isActive} />
-            <NavSection titulo="Pedagógico" items={UNIDADE_PEDAGOGICO} isActive={isActive} />
+            <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      isActive={isActive} />
+            <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  isActive={isActive} />
           </>
         )}
+
+        {/* PROFESSOR / PROFESSOR_AUXILIAR (sem role de unidade) */}
         {!isDeveloper && !isUnidade && isProfessor && (
           <>
-            <NavSection titulo="Pedagógico" items={PROFESSOR_PRINCIPAL} isActive={isActive} />
+            <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   isActive={isActive} />
             <NavSection titulo="Ferramentas" items={PROFESSOR_FERRAMENTAS} isActive={isActive} />
           </>
         )}
+
+        {/* Fallback: usuário sem role reconhecida */}
         {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} isActive={isActive} />
         )}
+
       </nav>
 
-      {/* Rodapé com configurações */}
+      {/* Rodapé */}
       <div className="p-3 border-t border-gray-800 space-y-1">
         {(isUnidade || isCentral || isMantenedora || isDeveloper) && (
           <NavSection titulo="Administração" items={adminItems} isActive={isActive} />
