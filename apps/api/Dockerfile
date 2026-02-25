@@ -13,11 +13,11 @@ RUN apt-get update -y \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev
+RUN npm ci --include=dev --ignore-scripts
 
 COPY . .
 
-RUN npx prisma generate
+RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
 
 # Remove devDependencies, mas mantém o Prisma Client gerado dentro do node_modules
