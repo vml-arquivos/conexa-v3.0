@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http from '../api/http';
+import { createMicrogestureEvent, fetchRegisteredChildrenToday, type MicrogestureKind } from '../services/microgestures';
 import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 
@@ -100,8 +101,46 @@ export default function TeacherDashboardPage() {
   const [entradaDiarioIA, setEntradaDiarioIA] = useState('');
   const [analisandoIA, setAnalisandoIA] = useState(false);
   const [relatorioIA, setRelatorioIA] = useState<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] } | null>(null);
+  // Indicador de registro por criança (childId -> true se já tem evento hoje)
+  const [registradosHoje, setRegistradosHoje] = useState<Set<string>>(new Set());
+  // Modal de microgesto rápido
+  const [modalCrianca, setModalCrianca] = useState<{ id: string; nome: string } | null>(null);
+  const [microgestoRapido, setMicrogestoRapido] = useState<MicrogestureKind>('OBSERVACAO');
+  const [microgestoTexto, setMicrogestoTexto] = useState('');
+  const [savingMicrogesto, setSavingMicrogesto] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  useEffect(() => {
+    if (data?.classroom?.id) {
+      fetchRegisteredChildrenToday(data.classroom.id).then(setRegistradosHoje);
+    }
+  }, [data?.classroom?.id]);
+
+  async function registrarMicrogestoRapido() {
+    if (!modalCrianca) return;
+    if (!data?.classroom?.id) { toast.error('Turma não identificada'); return; }
+    setSavingMicrogesto(true);
+    try {
+      await createMicrogestureEvent({
+        childId: modalCrianca.id,
+        classroomId: data.classroom.id,
+        kind: microgestoRapido,
+        payload: { texto: microgestoTexto || undefined },
+        eventDate: new Date().toISOString(),
+      });
+      toast.success(`Registrado com sucesso para ${modalCrianca.nome.split(' ')[0]}!`);
+      setRegistradosHoje(prev => new Set([...prev, modalCrianca.id]));
+      setModalCrianca(null);
+      setMicrogestoTexto('');
+      setMicrogestoRapido('OBSERVACAO');
+    } catch (err: unknown) {
+      const e = err as Error;
+      toast.error(e?.message || 'Erro ao salvar microgesto');
+    } finally {
+      setSavingMicrogesto(false);
+    }
+  }
 
   async function loadDashboard() {
     try {
@@ -282,15 +321,26 @@ export default function TeacherDashboardPage() {
                         {aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : '-'}
                       </span>
 
+                      {/* Indicador de registro hoje */}
+                      <span className={`mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        registradosHoje.has(aluno.id)
+                          ? 'bg-green-100 text-green-600'
+                          : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {registradosHoje.has(aluno.id) ? '✓ Registrado' : 'Sem registro'}
+                      </span>
+
                       {/* Ações rápidas por criança */}
                       <div className="flex gap-1 mt-2">
+                        <button
+                          onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
+                          title="Registrar microgesto"
+                          className="p-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-all">
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
                         <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
                           className="p-1.5 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-all">
                           <Brain className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => navigate('/app/diario-de-bordo')} title="Diário"
-                          className="p-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-all">
-                          <Edit3 className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => navigate('/app/rdx')} title="Fotos"
                           className="p-1.5 rounded-lg bg-pink-50 text-pink-500 hover:bg-pink-100 transition-all">
@@ -541,6 +591,69 @@ export default function TeacherDashboardPage() {
               </Card>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal de microgesto rápido */}
+      {modalCrianca && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setModalCrianca(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="font-bold text-gray-800">Registrar para {modalCrianca.nome.split(' ')[0]}</p>
+              <button onClick={() => setModalCrianca(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { kind: 'SONO_OK',            label: 'Dormiu bem',   emoji: '😴' },
+                { kind: 'SONO_RUIM',          label: 'Sono agitado', emoji: '😫' },
+                { kind: 'ALIMENTACAO_BEM',    label: 'Comeu bem',    emoji: '🍽️' },
+                { kind: 'ALIMENTACAO_RECUSOU',label: 'Recusou',      emoji: '🙅' },
+                { kind: 'HUMOR_CALMO',        label: 'Calmo',        emoji: '😊' },
+                { kind: 'HUMOR_CHOROSO',      label: 'Choroso',      emoji: '😢' },
+                { kind: 'HUMOR_IRRITADO',     label: 'Irritado',     emoji: '😠' },
+                { kind: 'HIGIENE_TROCA',      label: 'Troca',        emoji: '🧤' },
+                { kind: 'OBSERVACAO',         label: 'Observação',   emoji: '👁️' },
+              ] as Array<{ kind: MicrogestureKind; label: string; emoji: string }>).map(opt => (
+                <button
+                  key={opt.kind}
+                  onClick={() => setMicrogestoRapido(opt.kind)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                    microgestoRapido === opt.kind
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <span className="text-xl">{opt.emoji}</span>
+                  <span className="text-xs text-center leading-tight text-gray-700">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">Observação (opcional)</label>
+              <input
+                type="text"
+                placeholder="Detalhe adicional..."
+                value={microgestoTexto}
+                onChange={e => setMicrogestoTexto(e.target.value)}
+                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+              />
+            </div>
+
+            <Button
+              onClick={registrarMicrogestoRapido}
+              disabled={savingMicrogesto}
+              className="w-full"
+            >
+              {savingMicrogesto
+                ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+                : <><CheckCircle className="h-4 w-4 mr-2" /> Registrar</>
+              }
+            </Button>
+          </div>
         </div>
       )}
 

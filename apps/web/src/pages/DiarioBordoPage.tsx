@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -9,6 +9,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { toast } from 'sonner';
 import http from '../api/http';
+import { createMicrogestureEvent, type MicrogestureKind } from '../services/microgestures';
 import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
@@ -214,6 +215,7 @@ export default function DiarioBordoPage() {
   // Dados da turma e professor
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
+  const [savingMicrogesto, setSavingMicrogesto] = useState(false);
 
   // Observações individuais
   const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
@@ -340,28 +342,77 @@ export default function DiarioBordoPage() {
     }));
   }
 
-  function adicionarMicrogesto() {
+  const adicionarMicrogesto = useCallback(async () => {
     if (!microgestoForm.descricao.trim()) { toast.error('Descreva o microgesto'); return; }
 
     // Montar nomes e fotos das crianças selecionadas
     const criancasSel = criancas.filter(c => microgestoForm.criancasSelecionadas.includes(c.id));
     const criancaNome = criancasSel.map(c => c.firstName).join(', ');
     const criancaFoto = criancasSel[0]?.photoUrl;
+    const criancaIdSel = criancasSel[0]?.id;
 
-    const novo: Microgesto = {
-      id: Date.now().toString(),
-      tipo: microgestoForm.tipo,
-      descricao: microgestoForm.descricao,
-      campo: microgestoForm.campo,
-      horario: microgestoForm.horario,
-      criancaId: criancasSel[0]?.id,
-      criancaNome: criancaNome || undefined,
-      criancaFoto: criancaFoto,
-    };
-    setForm(f => ({ ...f, microgestos: [...f.microgestos, novo] }));
-    setMicrogestoForm({ tipo: 'ESCUTA', descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
-    toast.success('Microgesto adicionado');
-  }
+    // Bloquear se não houver criança selecionada
+    if (!criancaIdSel) {
+      toast.error('Selecione uma criança antes de registrar o microgesto.');
+      return;
+    }
+    // Bloquear se não houver turma identificada
+    if (!classroomId) {
+      toast.error('Turma não identificada. Recarregue a página e tente novamente.');
+      return;
+    }
+
+    setSavingMicrogesto(true);
+    try {
+      // Mapear tipo do microgesto pedagógico para MicrogestureKind
+      // Tipos pedagógicos (ESCUTA, MEDIACAO, etc.) são salvos como OBSERVACAO no backend
+      const kindMap: Record<string, MicrogestureKind> = {
+        ESCUTA: 'OBSERVACAO',
+        MEDIACAO: 'OBSERVACAO',
+        PROVOCACAO: 'OBSERVACAO',
+        ACOLHIMENTO: 'OBSERVACAO',
+        OBSERVACAO: 'OBSERVACAO',
+        ENCORAJAMENTO: 'OBSERVACAO',
+        DOCUMENTACAO: 'OBSERVACAO',
+        INTENCIONALIDADE: 'OBSERVACAO',
+      };
+      const kind: MicrogestureKind = kindMap[microgestoForm.tipo] ?? 'OBSERVACAO';
+
+      const horarioInfo = microgestoForm.horario ? ` [${microgestoForm.horario}]` : '';
+      const campoInfo = microgestoForm.campo ? ` | Campo: ${microgestoForm.campo}` : '';
+      const tipoLabel = TIPOS_MICROGESTO.find(t => t.id === microgestoForm.tipo)?.label ?? microgestoForm.tipo;
+
+      await createMicrogestureEvent({
+        childId: criancaIdSel,
+        classroomId,
+        kind,
+        payload: {
+          texto: `[${tipoLabel}]${horarioInfo}${campoInfo} — ${microgestoForm.descricao}`,
+        },
+        eventDate: new Date().toISOString(),
+      });
+
+      // Adicionar também ao estado local para exibição imediata na lista do diário
+      const novo: Microgesto = {
+        id: Date.now().toString(),
+        tipo: microgestoForm.tipo,
+        descricao: microgestoForm.descricao,
+        campo: microgestoForm.campo,
+        horario: microgestoForm.horario,
+        criancaId: criancaIdSel,
+        criancaNome: criancaNome || undefined,
+        criancaFoto: criancaFoto,
+      };
+      setForm(f => ({ ...f, microgestos: [...f.microgestos, novo] }));
+      setMicrogestoForm({ tipo: 'ESCUTA', descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
+      toast.success('Registrado com sucesso!');
+    } catch (err: unknown) {
+      const e = err as Error;
+      toast.error(e?.message || 'Erro ao salvar microgesto');
+    } finally {
+      setSavingMicrogesto(false);
+    }
+  }, [microgestoForm, criancas, classroomId]);
 
   function removerMicrogesto(id: string) {
     setForm(f => ({ ...f, microgestos: f.microgestos.filter(m => m.id !== id) }));
@@ -753,8 +804,10 @@ export default function DiarioBordoPage() {
                   />
                 </div>
 
-                <Button onClick={adicionarMicrogesto} variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-100">
-                  <Plus className="h-4 w-4 mr-2" /> Adicionar Microgesto
+                <Button onClick={adicionarMicrogesto} disabled={savingMicrogesto} variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-100">
+                  {savingMicrogesto
+                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+                    : <><Plus className="h-4 w-4 mr-2" /> Adicionar Microgesto</>}
                 </Button>
               </div>
 

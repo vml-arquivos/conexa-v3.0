@@ -5,7 +5,7 @@ import { normalizeRoles } from '../app/RoleProtectedRoute';
 
 /**
  * Hook para redirecionar usuário após login baseado em seu role
- * - PROFESSOR → /app/teacher-dashboard
+ * - PROFESSOR / PROFESSOR_AUXILIAR → /app/teacher-dashboard
  * - Outros roles → /app/dashboard
  */
 export function useRedirectByRole() {
@@ -16,9 +16,9 @@ export function useRedirectByRole() {
     if (!user) return;
 
     const roles = normalizeRoles(user);
-    
-    // Professor vai para dashboard específico
-    if (roles.includes('PROFESSOR')) {
+
+    // Professor e auxiliar vão para dashboard específico
+    if (roles.includes('PROFESSOR') || roles.includes('PROFESSOR_AUXILIAR')) {
       navigate('/app/teacher-dashboard', { replace: true });
       return;
     }
@@ -33,7 +33,7 @@ export function useRedirectByRole() {
  * Útil para uso fora de componentes React
  */
 export function getRedirectPathByRoles(roles: string[]): string {
-  if (roles.includes('PROFESSOR')) {
+  if (roles.includes('PROFESSOR') || roles.includes('PROFESSOR_AUXILIAR')) {
     return '/app/teacher-dashboard';
   }
   return '/app/dashboard';

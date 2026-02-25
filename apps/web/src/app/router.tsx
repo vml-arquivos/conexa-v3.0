@@ -60,12 +60,13 @@ export const router = createBrowserRouter([
         path: 'dashboard',
         element: <DashboardPage />,
       },
-      // ─── Rotas legadas (mantidas para compatibilidade) ─────────────────────
+      // ─── Rotas legadas (mantidas para compatibilidade, sem exposição no menu) ─
       {
         path: 'plannings',
         element: <PlanningsPage />,
       },
       {
+        // Legada: UI primitiva sem guards de role. Mantida para links externos.
         path: 'diary',
         element: <DiaryPage />,
       },
@@ -78,12 +79,9 @@ export const router = createBrowserRouter([
         element: <ReportsPage />,
       },
       {
+        // Legada: redireciona para a rota canônica com suporte a PROFESSOR_AUXILIAR
         path: 'professor',
-        element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'DEVELOPER']}>
-            <TeacherDashboardPage />
-          </RoleProtectedRoute>
-        ),
+        element: <Navigate to="/app/teacher-dashboard" replace />,
       },
       // ─── Painel do Professor ───────────────────────────────────────────────
       {
