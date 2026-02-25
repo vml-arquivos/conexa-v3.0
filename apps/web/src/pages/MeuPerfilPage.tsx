@@ -129,7 +129,7 @@ export default function MeuPerfilPage() {
   if (!perfil) return null;
 
   const roleAtual = perfil.roles?.[0]?.roleType || '';
-  const iniciais = `${perfil.firstName[0]}${perfil.lastName[0]}`.toUpperCase();
+  const iniciais = `${perfil.firstName?.[0] ?? '?'}${perfil.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
     <PageShell title="Meu Perfil" subtitle="Gerencie suas informações pessoais e configurações de acesso">

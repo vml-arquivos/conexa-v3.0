@@ -200,7 +200,7 @@ export default function TeacherDashboardPremium() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => navigate('/app/diario-bordo')} className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                <Button onClick={() => navigate('/app/diario-de-bordo')} className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
                   <BookOpen className="h-6 w-6" />
                   <span className="text-sm">Diário de Bordo</span>
                 </Button>

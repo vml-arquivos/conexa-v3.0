@@ -195,7 +195,17 @@ export function DashboardUnidadePage() {
         </div>
       )}
 
-      {/* Cards KPI */}
+      {/* Cards KPI — Skeleton quando carregando */}
+      {carregando ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(n => (
+            <div key={n} className="bg-white border border-gray-200 rounded-xl p-4 animate-pulse">
+              <div className="h-3 bg-gray-200 rounded w-2/3 mb-3" />
+              <div className="h-7 bg-gray-200 rounded w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { titulo: 'Total de Alunos', valor: kpis.totalAlunos, icone: <Users className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50' },
@@ -212,6 +222,7 @@ export function DashboardUnidadePage() {
           </div>
         ))}
       </div>
+      )}
 
       {/* Gráfico de materiais por categoria */}
       {dadosMateriais.length > 0 && (

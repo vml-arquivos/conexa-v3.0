@@ -62,7 +62,6 @@ interface RdicSalvo {
   childId: string;
   child?: { firstName: string; lastName: string };
   periodo: string;
-  anoLetivo?: number;
   bimestre: number;
   anoLetivo: number;
   dimensoes: DimensaoAvaliacao[];

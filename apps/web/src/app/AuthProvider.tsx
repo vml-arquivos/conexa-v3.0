@@ -51,10 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Limpar todos os tokens e estado de sessão
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    sessionStorage.clear();
+    // Limpar cookie de sessão se existir (Missão 01 — cookie-parser)
+    document.cookie = 'access_token=; Max-Age=0; path=/';
     setUser(null);
-    window.location.href = '/login';
+    window.location.replace('/login');
   };
 
   return (
