@@ -85,7 +85,7 @@ export class MaterialRequestService {
     });
   }
 
-  async listMine(user: JwtPayload) {
+   async listMine(user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
     return this.prisma.materialRequest.findMany({
       where: {
@@ -93,16 +93,25 @@ export class MaterialRequestService {
         unitId: user.unitId,
         createdBy: user.sub,
       },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: true,
+      },
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
   }
-
   async list(user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
     return this.prisma.materialRequest.findMany({
       where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: true,
+      },
       orderBy: { requestedDate: 'desc' },
       take: 200,
     });
@@ -150,7 +159,10 @@ export class MaterialRequestService {
 
     const requisicoes = await this.prisma.materialRequest.findMany({
       where: where as any,
-      include: { classroom: { select: { name: true } } },
+      include: {
+        classroom: { select: { name: true } },
+        createdByUser: { select: { firstName: true, lastName: true, email: true } },
+      },
       orderBy: { requestedDate: 'desc' },
     });
 
@@ -198,6 +210,9 @@ export class MaterialRequestService {
         status: r.status,
         prioridade: r.priority,
         turma: r.classroom?.name || null,
+        professor: r.createdByUser
+          ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
+          : null,
         custoEstimado: r.estimatedCost,
         dataSolicitacao: r.requestedDate,
         dataAprovacao: r.approvedDate,
