@@ -92,6 +92,74 @@ export class AdminService {
     throw new ForbiddenException('Perfil sem permissão para importação');
   }
 
+  /**
+   * Lista usuários acessíveis pelo usuário autenticado.
+   * - DEVELOPER / MANTENEDORA: todos os usuários da mesma mantenedora (com filtro opcional por unitId)
+   * - UNIDADE: apenas usuários da própria unidade
+   */
+  async listUsers(
+    user: JwtPayload,
+    opts: { limit: number; unitId?: string },
+  ) {
+    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
+
+    const isMantenedora =
+      this.isDeveloper(user) ||
+      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA);
+
+    const whereUnitId: string | undefined = isMantenedora
+      ? (opts.unitId || undefined)
+      : (user.unitId || undefined);
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        mantenedoraId: user.mantenedoraId,
+        ...(whereUnitId ? { unitId: whereUnitId } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        unitId: true,
+        createdAt: true,
+        roles: { select: { scopeLevel: true } },
+      },
+      take: opts.limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { ok: true, total: users.length, users };
+  }
+
+  /**
+   * Lista unidades acessíveis pelo usuário autenticado.
+   * - DEVELOPER / MANTENEDORA: todas as unidades da mesma mantenedora
+   * - UNIDADE: apenas a própria unidade
+   */
+  async listUnits(user: JwtPayload) {
+    if (!user?.mantenedoraId) throw new BadRequestException('mantenedoraId ausente no token');
+
+    const isMantenedora =
+      this.isDeveloper(user) ||
+      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA);
+
+    const units = await this.prisma.unit.findMany({
+      where: {
+        mantenedoraId: user.mantenedoraId,
+        ...(isMantenedora ? {} : { id: user.unitId || undefined }),
+      },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return { ok: true, total: units.length, units };
+  }
+
   async importStructureCsv(file: Express.Multer.File, user: JwtPayload, unitIdFromQuery?: string) {
     if (!file?.buffer?.length) throw new BadRequestException('Arquivo vazio');
 
