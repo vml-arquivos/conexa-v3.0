@@ -95,6 +95,7 @@ export default function CoordenacaoPedagogicaPage() {
   const [reunioes, setReunioes] = useState<Reuniao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [loading, setLoading] = useState(false);
+  const [turmasError, setTurmasError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [filtroSegmento, setFiltroSegmento] = useState<string>('TODOS');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -124,19 +125,53 @@ export default function CoordenacaoPedagogicaPage() {
   // ─── Loaders ───────────────────────────────────────────────────────────────
   async function loadTurmas() {
     setLoading(true);
+    setTurmasError(null);
     try {
-      const res = await http.get('/classrooms?limit=50');
-      const d = res.data;
-      setTurmas(Array.isArray(d) ? d : d?.data ?? []);
-    } catch {
-      // Demo data
-      setTurmas([
-        { id: 'demo-1', name: 'Turma Girassol', segment: 'EI01', ageGroupMin: 0, ageGroupMax: 18, teacherCount: 2, childCount: 12 },
-        { id: 'demo-2', name: 'Turma Borboleta', segment: 'EI02', ageGroupMin: 19, ageGroupMax: 47, teacherCount: 2, childCount: 15 },
-        { id: 'demo-3', name: 'Turma Arco-Íris', segment: 'EI03', ageGroupMin: 48, ageGroupMax: 71, teacherCount: 2, childCount: 18 },
-        { id: 'demo-4', name: 'Turma Estrela', segment: 'EI02', ageGroupMin: 19, ageGroupMax: 47, teacherCount: 1, childCount: 14 },
-        { id: 'demo-5', name: 'Turma Lua', segment: 'EI03', ageGroupMin: 48, ageGroupMax: 71, teacherCount: 2, childCount: 16 },
+      // Endpoints corretos via lookup — sem mock
+      const [classRes, teachRes] = await Promise.allSettled([
+        http.get('/lookup/classrooms/accessible'),
+        http.get('/lookup/teachers/accessible'),
       ]);
+      const rawClassrooms: any[] = classRes.status === 'fulfilled'
+        ? (Array.isArray(classRes.value.data) ? classRes.value.data : classRes.value.data?.data ?? [])
+        : [];
+      const rawTeachers: any[] = teachRes.status === 'fulfilled'
+        ? (Array.isArray(teachRes.value.data) ? teachRes.value.data : teachRes.value.data?.data ?? [])
+        : [];
+      if (rawClassrooms.length === 0 && classRes.status === 'rejected') {
+        setTurmasError('Não foi possível carregar as turmas. Verifique sua conexão e tente novamente.');
+        setTurmas([]);
+        return;
+      }
+      // Para cada turma, busca crianças para contagem real
+      const turmasComCriancas = await Promise.all(
+        rawClassrooms.map(async (c: any) => {
+          let childCount = c.childCount ?? c._count?.enrollments ?? 0;
+          try {
+            const childRes = await http.get(`/lookup/children/accessible?classroomId=${c.id}`);
+            const children = Array.isArray(childRes.data) ? childRes.data : childRes.data?.data ?? [];
+            childCount = children.length;
+          } catch { /* mantém childCount do campo se lookup falhar */ }
+          const teacherCount = rawTeachers.filter((t: any) =>
+            t.classroomId === c.id || t.classroom?.id === c.id
+          ).length || (c.teacherCount ?? c._count?.teachers ?? 0);
+          return {
+            id: c.id,
+            name: c.name,
+            segment: c.segment ?? c.ageGroup ?? 'EI02',
+            ageGroupMin: c.ageGroupMin ?? 0,
+            ageGroupMax: c.ageGroupMax ?? 71,
+            teacherCount,
+            childCount,
+            unit: c.unit,
+            teachers: c.teachers,
+          } as Turma;
+        })
+      );
+      setTurmas(turmasComCriancas);
+    } catch {
+      setTurmasError('Não foi possível carregar as turmas. Verifique sua conexão e tente novamente.');
+      setTurmas([]);
     } finally {
       setLoading(false);
     }
@@ -324,7 +359,15 @@ export default function CoordenacaoPedagogicaPage() {
 
           {loading && <LoadingState message="Carregando turmas..." />}
 
-          {!loading && turmasFiltradas.length === 0 && (
+          {!loading && turmasError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+              <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
+              <p className="text-sm font-medium text-red-700 mb-3">{turmasError}</p>
+              <Button variant="outline" size="sm" onClick={loadTurmas}>Recarregar</Button>
+            </div>
+          )}
+
+          {!loading && !turmasError && turmasFiltradas.length === 0 && (
             <EmptyState icon={<Layers className="h-12 w-12 text-gray-300" />} title="Nenhuma turma encontrada" description="Ajuste os filtros ou cadastre novas turmas" />
           )}
 

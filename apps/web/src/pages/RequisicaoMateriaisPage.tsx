@@ -9,6 +9,18 @@ import { PageShell } from '../components/ui/PageShell';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import { ShoppingCart, Plus, Minus, Trash2, Send } from 'lucide-react';
+import http from '../api/http';
+import { createMaterialRequest } from '../api/material-request';
+
+// Tamanhos de fralda disponíveis
+const TAMANHOS_FRALDA = ['RN', 'P', 'M', 'G', 'GG', 'XG', 'XXG'];
+
+// Materiais de higiene que requerem seleção de tamanho de fralda
+const FRALDA_KEYWORDS = ['fralda', 'fraldas'];
+
+function isFraldaMaterial(name: string): boolean {
+  return FRALDA_KEYWORDS.some(k => name.toLowerCase().includes(k));
+}
 
 interface Material {
   id: string;
@@ -21,6 +33,8 @@ interface Material {
 interface CartItem {
   material: Material;
   quantity: number;
+  /** Para fraldas: tamanho selecionado (ex: "GG"). Armazenado em observations. */
+  fraldaTamanho?: string;
 }
 
 export default function RequisicaoMateriaisPage() {
@@ -39,16 +53,9 @@ export default function RequisicaoMateriaisPage() {
   async function loadMaterials() {
     try {
       setLoading(true);
-
-      const response = await fetch('/api/materials', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Erro ao carregar materiais');
-
-      const data = await response.json();
+      // Endpoint correto via http client (com token automático)
+      const res = await http.get('/materials');
+      const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
       setMaterials(data);
     } catch (err) {
       console.error('Erro ao carregar materiais:', err);
@@ -60,7 +67,6 @@ export default function RequisicaoMateriaisPage() {
 
   function addToCart(material: Material) {
     const existing = cart.find(item => item.material.id === material.id);
-
     if (existing) {
       setCart(cart.map(item =>
         item.material.id === material.id
@@ -68,9 +74,8 @@ export default function RequisicaoMateriaisPage() {
           : item
       ));
     } else {
-      setCart([...cart, { material, quantity: 1 }]);
+      setCart([...cart, { material, quantity: 1, fraldaTamanho: undefined }]);
     }
-
     toast.success(`${material.name} adicionado ao carrinho`);
   }
 
@@ -79,11 +84,14 @@ export default function RequisicaoMateriaisPage() {
       removeFromCart(materialId);
       return;
     }
-
     setCart(cart.map(item =>
-      item.material.id === materialId
-        ? { ...item, quantity }
-        : item
+      item.material.id === materialId ? { ...item, quantity } : item
+    ));
+  }
+
+  function updateFraldaTamanho(materialId: string, tamanho: string) {
+    setCart(cart.map(item =>
+      item.material.id === materialId ? { ...item, fraldaTamanho: tamanho } : item
     ));
   }
 
@@ -96,32 +104,34 @@ export default function RequisicaoMateriaisPage() {
       toast.error('Adicione pelo menos um material ao carrinho');
       return;
     }
-
     if (!justification.trim()) {
       toast.error('Informe a justificativa da requisição');
+      return;
+    }
+    // Validar tamanho de fralda obrigatório
+    const fraldaSemTamanho = cart.find(
+      item => isFraldaMaterial(item.material.name) && !item.fraldaTamanho
+    );
+    if (fraldaSemTamanho) {
+      toast.error(`Selecione o tamanho da fralda para "${fraldaSemTamanho.material.name}"`);
       return;
     }
 
     try {
       setSubmitting(true);
-
-      const response = await fetch('/api/material-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          items: cart.map(item => ({
-            materialId: item.material.id,
-            quantity: item.quantity,
-          })),
-          justification,
-        }),
+      await createMaterialRequest({
+        categoria: 'HIGIENE',
+        titulo: `Requisição — ${new Date().toLocaleDateString('pt-BR')}`,
+        justificativa: justification,
+        urgencia: 'MEDIA',
+        itens: cart.map(item => ({
+          item: item.material.name,
+          quantidade: item.quantity,
+          unidade: item.material.unit,
+          // Tamanho de fralda vai em observations via campo extra
+          ...(item.fraldaTamanho ? { observacoes: `Tamanho: ${item.fraldaTamanho}` } : {}),
+        })),
       });
-
-      if (!response.ok) throw new Error('Erro ao enviar requisição');
-
       toast.success('Requisição enviada com sucesso!');
       setCart([]);
       setJustification('');
@@ -151,56 +161,53 @@ export default function RequisicaoMateriaisPage() {
         <div className="lg:col-span-2 space-y-4">
           {/* Filtros */}
           <div className="flex gap-2">
-            <Button
-              variant={filter === 'TODOS' ? 'default' : 'outline'}
-              onClick={() => setFilter('TODOS')}
-            >
-              Todos
-            </Button>
-            <Button
-              variant={filter === 'PEDAGOGICO' ? 'default' : 'outline'}
-              onClick={() => setFilter('PEDAGOGICO')}
-            >
-              Pedagógicos
-            </Button>
-            <Button
-              variant={filter === 'HIGIENE' ? 'default' : 'outline'}
-              onClick={() => setFilter('HIGIENE')}
-            >
-              Higiene
-            </Button>
+            {(['TODOS', 'PEDAGOGICO', 'HIGIENE'] as const).map(f => (
+              <Button
+                key={f}
+                variant={filter === f ? 'default' : 'outline'}
+                onClick={() => setFilter(f)}
+              >
+                {f === 'TODOS' ? 'Todos' : f === 'PEDAGOGICO' ? 'Pedagógicos' : 'Higiene'}
+              </Button>
+            ))}
           </div>
 
           {/* Lista de Materiais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredMaterials.map(material => (
-              <Card key={material.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-semibold">{material.name}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {material.category === 'PEDAGOGICO' ? 'Pedagógico' : 'Higiene'} • {material.unit}
-                      </p>
+          {filteredMaterials.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Nenhum material encontrado nesta categoria.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredMaterials.map(material => (
+                <Card key={material.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-semibold">{material.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {material.category === 'PEDAGOGICO' ? 'Pedagógico' : 'Higiene'} • {material.unit}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  {material.description && (
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {material.description}
-                    </p>
-                  )}
-                  <Button
-                    size="sm"
-                    onClick={() => addToCart(material)}
-                    className="w-full flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Adicionar
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    {material.description && (
+                      <p className="text-sm text-muted-foreground mb-3">
+                        {material.description}
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => addToCart(material)}
+                      className="w-full flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Adicionar
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Carrinho */}
@@ -220,43 +227,76 @@ export default function RequisicaoMateriaisPage() {
               ) : (
                 <>
                   {/* Itens do Carrinho */}
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
                     {cart.map(item => (
-                      <div key={item.material.id} className="flex items-center gap-2 border-b pb-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{item.material.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.material.unit}</p>
+                      <div key={item.material.id} className="border-b pb-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.material.name}</p>
+                            <p className="text-xs text-muted-foreground">{item.material.unit}</p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0"
+                              onClick={() => updateQuantity(item.material.id, item.quantity - 1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              onChange={(e) => updateQuantity(item.material.id, parseInt(e.target.value) || 1)}
+                              className="w-14 text-center h-7 text-sm"
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 w-7 p-0"
+                              onClick={() => updateQuantity(item.material.id, item.quantity + 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => removeFromCart(item.material.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.material.id, item.quantity - 1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => updateQuantity(item.material.id, parseInt(e.target.value) || 1)}
-                            className="w-16 text-center"
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.material.id, item.quantity + 1)}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeFromCart(item.material.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+
+                        {/* Seletor de tamanho de fralda */}
+                        {isFraldaMaterial(item.material.name) && (
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1 block">
+                              Tamanho da fralda <span className="text-red-500">*</span>
+                            </Label>
+                            <div className="flex flex-wrap gap-1">
+                              {TAMANHOS_FRALDA.map(t => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => updateFraldaTamanho(item.material.id, t)}
+                                  className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${
+                                    item.fraldaTamanho === t
+                                      ? 'bg-blue-600 text-white border-blue-600'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                                  }`}
+                                >
+                                  {t}
+                                </button>
+                              ))}
+                            </div>
+                            {!item.fraldaTamanho && (
+                              <p className="text-xs text-amber-600 mt-1">Selecione o tamanho</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -42,6 +42,7 @@ interface Detalhe {
   status: string;
   prioridade: string;
   turma: string | null;
+  professor: string | null;
   custoEstimado: number | null;
   dataSolicitacao: string;
   dataAprovacao: string | null;
@@ -94,7 +95,16 @@ export default function RelatorioConsumoMateriaisPage() {
       if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio);
       if (filtros.dataFim) params.set('dataFim', filtros.dataFim);
       const res = await http.get(`/material-requests/relatorio-consumo?${params.toString()}`);
-      setRelatorio(res.data);
+      // Guards contra campos null/undefined que causam crash no .map/.entries
+      const raw = res.data ?? {};
+      setRelatorio({
+        periodo: raw.periodo ?? { inicio: null, fim: null },
+        totais: raw.totais ?? { requisicoes: 0, aprovadas: 0, pendentes: 0, rejeitadas: 0, entregues: 0, custoEstimadoTotal: 0 },
+        porCategoria: raw.porCategoria ?? {},
+        porTurma: Array.isArray(raw.porTurma) ? raw.porTurma : [],
+        porStatus: raw.porStatus ?? {},
+        detalhes: Array.isArray(raw.detalhes) ? raw.detalhes : [],
+      });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao carregar relatório');
     } finally {
@@ -307,6 +317,7 @@ export default function RelatorioConsumoMateriaisPage() {
                         <th className="text-left py-2 pr-3">Título</th>
                         <th className="text-left py-2 pr-3">Tipo</th>
                         <th className="text-left py-2 pr-3">Turma</th>
+                        <th className="text-left py-2 pr-3">Professor</th>
                         <th className="text-center py-2 px-2">Qtd</th>
                         <th className="text-center py-2 px-2">Status</th>
                         <th className="text-left py-2 px-2">Data</th>
@@ -316,9 +327,10 @@ export default function RelatorioConsumoMateriaisPage() {
                       {relatorio.detalhes.map(d => (
                         <tr key={d.id} className="border-b last:border-0 hover:bg-gray-50">
                           <td className="py-2 pr-3 font-mono text-xs text-gray-500">{d.code}</td>
-                          <td className="py-2 pr-3 text-gray-800 max-w-[200px] truncate">{d.titulo}</td>
+                          <td className="py-2 pr-3 text-gray-800 max-w-[180px] truncate">{d.titulo}</td>
                           <td className="py-2 pr-3 text-gray-600">{TIPO_LABEL[d.tipo] || d.tipo}</td>
                           <td className="py-2 pr-3 text-gray-600">{d.turma || '—'}</td>
+                          <td className="py-2 pr-3 text-gray-600">{d.professor || '—'}</td>
                           <td className="py-2 px-2 text-center text-gray-600">{d.quantidade}</td>
                           <td className="py-2 px-2 text-center">
                             <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_LABEL[d.status]?.cor || 'bg-gray-100 text-gray-600'}`}>

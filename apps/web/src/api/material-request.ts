@@ -19,6 +19,14 @@ export interface CreateMaterialRequestDto {
   urgencia: 'BAIXA' | 'MEDIA' | 'ALTA';
 }
 
+export interface MaterialRequestItemRecord {
+  id: string;
+  materialId: string;
+  materialName?: string;
+  quantity: number;
+  unit?: string;
+  observations?: string;
+}
 export interface MaterialRequest {
   id: string;
   code: string;
@@ -30,8 +38,11 @@ export interface MaterialRequest {
   urgencia?: string;
   justificativa?: string;
   itens?: MaterialRequestItem[];
+  items?: MaterialRequestItemRecord[];
   classroomId?: string;
+  classroom?: { id: string; name: string };
   createdBy: string;
+  createdByUser?: { id: string; firstName: string; lastName: string; email: string };
   requestedDate: string;
   approvedBy?: string;
   approvedDate?: string;

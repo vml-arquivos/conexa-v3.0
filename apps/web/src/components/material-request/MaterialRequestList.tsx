@@ -8,6 +8,7 @@ import {
   getStatusLabel,
   getStatusColor,
   type MaterialRequest,
+  type MaterialRequestItemRecord,
 } from '../../api/material-request';
 
 interface MaterialRequestListProps {
@@ -136,13 +137,46 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
                   <StatusBadge status={req.status} />
                 </div>
 
+                {/* Turma + Professor */}
+                {(req.classroom?.name || req.createdByUser) && (
+                  <div className="flex flex-wrap gap-3 mb-2 text-xs text-gray-600">
+                    {req.classroom?.name && (
+                      <span>
+                        <span className="font-medium text-gray-500">Turma:</span> {req.classroom.name}
+                      </span>
+                    )}
+                    {req.createdByUser && (
+                      <span>
+                        <span className="font-medium text-gray-500">Solicitante:</span>{' '}
+                        {req.createdByUser.firstName} {req.createdByUser.lastName}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Itens legíveis */}
+                {req.items && req.items.length > 0 && (
+                  <div className="mb-2 space-y-0.5">
+                    {req.items.map((item: MaterialRequestItemRecord) => (
+                      <div key={item.id} className="text-xs text-gray-600 flex items-baseline gap-1">
+                        <span className="text-gray-400">&bull;</span>
+                        <span>{item.materialName || item.materialId}</span>
+                        <span className="text-gray-400">x{item.quantity}</span>
+                        {item.observations && (
+                          <span className="text-gray-400 italic">({item.observations})</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {req.urgencia && (
                   <div className="mb-2">
                     <UrgenciaBadge urgencia={req.urgencia} />
                   </div>
                 )}
 
-                {req.description && (
+                {!req.items?.length && req.description && (
                   <p className="text-xs text-gray-600 mb-2 line-clamp-2">{req.description}</p>
                 )}
 
