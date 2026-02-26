@@ -276,7 +276,7 @@ export default function AdminUsuariosPage() {
     try {
       const [usersRes, unitsRes] = await Promise.all([
         http.get('/admin/users?limit=200'),
-        http.get('/units?limit=100'),
+        http.get('/admin/units'),
       ]);
       const u = usersRes.data;
       setUsuarios(Array.isArray(u) ? u : u?.data ?? u?.users ?? []);

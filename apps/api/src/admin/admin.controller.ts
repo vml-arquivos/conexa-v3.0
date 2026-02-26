@@ -1,7 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
   Post,
+  Put,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -12,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 
 import { AdminService } from './admin.service';
+import type { CreateUserDto, UpdateUserDto } from './admin.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -40,6 +44,35 @@ export class AdminController {
       limit: limit ? parseInt(limit, 10) : 200,
       unitId,
     });
+  }
+
+  /**
+   * POST /admin/users
+   * Cria um novo usuário com role e vínculo de unidade.
+   * RBAC: MANTENEDORA, DEVELOPER
+   */
+  @Post('users')
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  async createUser(
+    @Request() req: any,
+    @Body() body: CreateUserDto,
+  ) {
+    return this.adminService.createUser(req.user, body);
+  }
+
+  /**
+   * PUT /admin/users/:id
+   * Atualiza dados de um usuário existente.
+   * RBAC: MANTENEDORA, DEVELOPER
+   */
+  @Put('users/:id')
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  async updateUser(
+    @Request() req: any,
+    @Param('id') userId: string,
+    @Body() body: UpdateUserDto,
+  ) {
+    return this.adminService.updateUser(req.user, userId, body);
   }
 
   /**
