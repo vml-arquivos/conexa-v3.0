@@ -9,12 +9,14 @@ type LoadUnitScopesFn = (params: { userId: string }) => Promise<string[]>;
  * Regras de autorização:
  * - DEVELOPER: acesso total
  * - MANTENEDORA: acesso a todas units da mesma mantenedora
- * - STAFF_CENTRAL: acesso às units em unitScopes
+ * - STAFF_CENTRAL com unitScopes: acesso apenas às units dos escopos
+ * - STAFF_CENTRAL sem unitScopes: acesso global à mantenedora (staff de rede)
  * - UNIDADE_*: acesso apenas à própria unitId
  * - PROFESSOR: acesso apenas à própria unitId
- * 
+ *
  * @param user - Payload JWT do usuário autenticado
  * @param targetUnitId - ID da unidade que se deseja acessar
+ * @param loadUnitScopes - Função opcional para carregar escopos do banco (fallback)
  * @returns true se o usuário tem acesso, false caso contrário
  */
 export async function canAccessUnit(
@@ -64,8 +66,12 @@ export async function canAccessUnit(
       }
     }
 
-    // Se STAFF_CENTRAL sem unitScopes, negar acesso
-    return false;
+    // STAFF_CENTRAL sem nenhum unitScope configurado:
+    // Tratar como acesso global à mantenedora.
+    // Isso ocorre quando o usuário foi criado sem escopos explícitos,
+    // o que é válido para staff central de rede (acessa todas as unidades).
+    // A validação de mantenedoraId é feita no service chamador.
+    return true;
   }
 
   // 4. UNIDADE_* ou PROFESSOR: apenas a própria unitId
