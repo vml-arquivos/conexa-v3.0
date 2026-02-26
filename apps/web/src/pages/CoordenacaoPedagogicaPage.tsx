@@ -21,16 +21,25 @@ import { MATRIZ_2026 } from '../data/matrizCompleta2026';
 import type { SegmentoKey } from '../data/matrizCompleta2026';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+interface TurmaTeacher {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 interface Turma {
   id: string;
   name: string;
+  code: string;
   segment: string;
   ageGroupMin: number;
   ageGroupMax: number;
   teacherCount: number;
   childCount: number;
+  teachers: TurmaTeacher[];
+  plansCount: number;
   unit?: { name: string };
-  teachers?: { user: { firstName: string; lastName: string } }[];
 }
 
 interface Reuniao {
@@ -127,48 +136,34 @@ export default function CoordenacaoPedagogicaPage() {
     setLoading(true);
     setTurmasError(null);
     try {
-      // Endpoints corretos via lookup — sem mock
-      const [classRes, teachRes] = await Promise.allSettled([
-        http.get('/lookup/classrooms/accessible'),
-        http.get('/lookup/teachers/accessible'),
-      ]);
-      const rawClassrooms: any[] = classRes.status === 'fulfilled'
-        ? (Array.isArray(classRes.value.data) ? classRes.value.data : classRes.value.data?.data ?? [])
-        : [];
-      const rawTeachers: any[] = teachRes.status === 'fulfilled'
-        ? (Array.isArray(teachRes.value.data) ? teachRes.value.data : teachRes.value.data?.data ?? [])
-        : [];
-      if (rawClassrooms.length === 0 && classRes.status === 'rejected') {
-        setTurmasError('Não foi possível carregar as turmas. Verifique sua conexão e tente novamente.');
-        setTurmas([]);
+      // Endpoint canônico com childrenCount real e todos os professores ativos
+      const res = await http.get('/coordenacao/unit/classrooms');
+      const payload = res.data;
+      const rawClassrooms: any[] = payload?.classrooms ?? (Array.isArray(payload) ? payload : []);
+      if (rawClassrooms.length === 0 && !payload?.classrooms) {
+        // Fallback para lookup se endpoint não retornar classrooms
+        const fallback = await http.get('/lookup/classrooms/accessible').catch(() => ({ data: [] }));
+        const fb: any[] = Array.isArray(fallback.data) ? fallback.data : fallback.data?.data ?? [];
+        setTurmas(fb.map((c: any) => ({
+          id: c.id, name: c.name, code: c.code ?? '', segment: c.segment ?? 'EI02',
+          ageGroupMin: c.ageGroupMin ?? 0, ageGroupMax: c.ageGroupMax ?? 71,
+          teacherCount: 0, childCount: c._count?.enrollments ?? 0,
+          teachers: [], plansCount: 0,
+        })));
         return;
       }
-      // Para cada turma, busca crianças para contagem real
-      const turmasComCriancas = await Promise.all(
-        rawClassrooms.map(async (c: any) => {
-          let childCount = c.childCount ?? c._count?.enrollments ?? 0;
-          try {
-            const childRes = await http.get(`/lookup/children/accessible?classroomId=${c.id}`);
-            const children = Array.isArray(childRes.data) ? childRes.data : childRes.data?.data ?? [];
-            childCount = children.length;
-          } catch { /* mantém childCount do campo se lookup falhar */ }
-          const teacherCount = rawTeachers.filter((t: any) =>
-            t.classroomId === c.id || t.classroom?.id === c.id
-          ).length || (c.teacherCount ?? c._count?.teachers ?? 0);
-          return {
-            id: c.id,
-            name: c.name,
-            segment: c.segment ?? c.ageGroup ?? 'EI02',
-            ageGroupMin: c.ageGroupMin ?? 0,
-            ageGroupMax: c.ageGroupMax ?? 71,
-            teacherCount,
-            childCount,
-            unit: c.unit,
-            teachers: c.teachers,
-          } as Turma;
-        })
-      );
-      setTurmas(turmasComCriancas);
+      setTurmas(rawClassrooms.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code ?? '',
+        segment: c.segment ?? 'EI02',
+        ageGroupMin: c.ageGroupMin ?? 0,
+        ageGroupMax: c.ageGroupMax ?? 71,
+        teacherCount: (c.teachers ?? []).length,
+        childCount: c.childrenCount ?? 0,
+        teachers: (c.teachers ?? []) as TurmaTeacher[],
+        plansCount: c.plansCount ?? 0,
+      })));
     } catch {
       setTurmasError('Não foi possível carregar as turmas. Verifique sua conexão e tente novamente.');
       setTurmas([]);
@@ -388,16 +383,30 @@ export default function CoordenacaoPedagogicaPage() {
                   <div className="text-xs text-gray-500 mb-2">
                     {SEGMENTO_LABELS[turma.segment] || turma.segment}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-sm mb-2">
                     <div className="flex items-center gap-1.5 text-gray-600">
                       <Users className="h-3.5 w-3.5 text-blue-500" />
                       <span>{turma.childCount || 0} crianças</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-gray-600">
                       <GraduationCap className="h-3.5 w-3.5 text-purple-500" />
-                      <span>{turma.teacherCount || 0} professores</span>
+                      <span>{turma.teacherCount || 0} professor{turma.teacherCount !== 1 ? 'es' : ''}</span>
                     </div>
                   </div>
+                  {turma.teachers && turma.teachers.length > 0 && (
+                    <div className="text-xs text-gray-500 mb-2">
+                      <span className="font-medium text-gray-600">Prof.: </span>
+                      {turma.teachers.map(t => `${t.firstName} ${t.lastName}`).join(', ')}
+                    </div>
+                  )}
+                  {turma.teachers && turma.teachers.length === 0 && (
+                    <div className="text-xs text-amber-600 mb-2">Sem professor atribuído</div>
+                  )}
+                  {turma.plansCount > 0 && (
+                    <div className="text-xs text-green-600 mb-1">
+                      <BookOpen className="h-3 w-3 inline mr-1" />{turma.plansCount} plano{turma.plansCount !== 1 ? 's' : ''} publicado{turma.plansCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
                   <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
                     <Button size="sm" variant="outline" className="flex-1 text-xs"
                       onClick={e => { e.stopPropagation(); setTurmaSelecionada(turma); setAba('curriculo'); setFiltroSegCurriculo((turma.segment as SegmentoKey) || 'EI01'); }}>

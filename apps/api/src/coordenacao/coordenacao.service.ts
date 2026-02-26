@@ -431,6 +431,76 @@ export class CoordenacaoService {
     });
   }
 
+  // ─── TURMAS COM STATS COMPLETOS ─────────────────────────────────────────
+
+  /**
+   * GET /coordenacao/unit/classrooms
+   * Retorna turmas da unidade com childrenCount real, todos os professores ativos,
+   * plansCount (planejamentos publicados) e totalChildrenUnit para diagnóstico.
+   */
+  async getUnitClassrooms(user: JwtPayload) {
+    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+    const unitId = user.unitId;
+
+    const classrooms = await this.prisma.classroom.findMany({
+      where: { unitId, isActive: true },
+      include: {
+        enrollments: {
+          where: { status: 'ATIVA' },
+          select: { id: true },
+        },
+        teachers: {
+          where: { isActive: true },
+          include: {
+            teacher: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // Planejamentos publicados por turma
+    const classroomIds = classrooms.map((c) => c.id);
+    const plansRaw = await this.prisma.planning.groupBy({
+      by: ['classroomId'],
+      where: { classroomId: { in: classroomIds }, status: PlanningStatus.PUBLICADO },
+      _count: { id: true },
+    });
+    const plansMap = new Map(plansRaw.map((p) => [p.classroomId, p._count.id]));
+
+    // Total real de crianças com matrícula ATIVA na unidade (todas as turmas)
+    const totalChildrenUnit = await this.prisma.enrollment.count({
+      where: { classroom: { unitId }, status: 'ATIVA' },
+    });
+
+    return {
+      unitId,
+      totalChildrenUnit,
+      classrooms: classrooms.map((c) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        ageGroupMin: (c as any).ageGroupMin ?? null,
+        ageGroupMax: (c as any).ageGroupMax ?? null,
+        childrenCount: c.enrollments.length,
+        teachers: c.teachers.map((ct) => ({
+          id: ct.teacher.id,
+          firstName: ct.teacher.firstName,
+          lastName: ct.teacher.lastName,
+          email: ct.teacher.email,
+        })),
+        plansCount: plansMap.get(c.id) ?? 0,
+      })),
+    };
+  }
+
   // ─── REQUISIÇÕES ──────────────────────────────────────────────────────────
 
   async listarRequisicoes(status: string, user: JwtPayload) {

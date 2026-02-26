@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   UploadedFile,
   UseGuards,
@@ -20,6 +21,37 @@ import { RoleLevel } from '@prisma/client';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  /**
+   * GET /admin/users
+   * Lista usuários da plataforma com filtro por role.
+   * RBAC:
+   *   - DEVELOPER / MANTENEDORA: todos os usuários da mantenedora
+   *   - UNIDADE: apenas usuários da própria unidade
+   */
+  @Get('users')
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  async listUsers(
+    @Request() req: any,
+    @Query('limit') limit?: string,
+    @Query('unitId') unitId?: string,
+  ) {
+    return this.adminService.listUsers(req.user, {
+      limit: limit ? parseInt(limit, 10) : 200,
+      unitId,
+    });
+  }
+
+  /**
+   * GET /admin/units
+   * Lista unidades acessíveis pelo usuário.
+   * RBAC: MANTENEDORA, DEVELOPER (todas); UNIDADE (só a própria)
+   */
+  @Get('units')
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  async listUnits(@Request() req: any) {
+    return this.adminService.listUnits(req.user);
+  }
 
   /**
    * Importa estrutura CEPI 2026:

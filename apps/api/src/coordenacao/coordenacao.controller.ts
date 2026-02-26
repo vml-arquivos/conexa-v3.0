@@ -140,4 +140,17 @@ export class CoordenacaoController {
   listarRequisicoes(@Query('status') status: string, @CurrentUser() user: JwtPayload) {
     return this.svc.listarRequisicoes(status, user);
   }
+
+  // ─── TURMAS COM STATS COMPLETOS ────────────────────────────────────────────
+
+  /**
+   * GET /coordenacao/unit/classrooms
+   * Turmas da unidade com childrenCount real, todos os professores ativos e plansCount.
+   * RBAC: UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
+   */
+  @Get('unit/classrooms')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getUnitClassrooms(@CurrentUser() user: JwtPayload) {
+    return this.svc.getUnitClassrooms(user);
+  }
 }
