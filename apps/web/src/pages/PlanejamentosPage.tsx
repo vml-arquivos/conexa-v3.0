@@ -316,7 +316,7 @@ export default function PlanejamentosPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sc.cor}`}>{sc.icon} {sc.label}</span>
-                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{p.type}</span>
+                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ SEMANAL: 'Semanal', QUINZENAL: 'Quinzenal', MENSAL: 'Mensal', TRIMESTRAL: 'Trimestral', SEMESTRAL: 'Semestral', ANUAL: 'Anual' }[p.type] ?? p.type}</span>
                           {p.classroom && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1"><Users className="h-3 w-3" /> {p.classroom.name}</span>}
                         </div>
                         <h3 className="font-semibold text-gray-800 truncate">{p.title}</h3>
@@ -424,8 +424,9 @@ export default function PlanejamentosPage() {
                 <div>
                   <Label>Tipo</Label>
                   <select className="w-full px-3 py-2 border rounded-lg text-sm" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                    <option value="SEMANAL">Semanal</option>
-                    <option value="MENSAL">Mensal</option>
+                    <option value="SEMANAL">Semanal (1 semana)</option>
+                    <option value="QUINZENAL">Quinzenal (2 semanas)</option>
+                    <option value="MENSAL">Mensal (1 mês)</option>
                     <option value="TRIMESTRAL">Trimestral</option>
                     <option value="SEMESTRAL">Semestral</option>
                     <option value="ANUAL">Anual</option>

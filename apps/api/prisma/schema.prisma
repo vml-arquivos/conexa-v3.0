@@ -796,9 +796,11 @@ model Planning {
   // Conteúdo Pedagógico de Autoria Docente (NOVO)
   pedagogicalContent Json? // Experiências, materiais e estratégias por dia
 
+  // Ano letivo e professor
+  anoLetivo   Int?      // Ano letivo do planejamento (ex: 2026)
+  professorId String?   // ID do professor autor (redundante com createdBy para queries)
   // Status
   status PlanningStatus @default(RASCUNHO)
-
   // Timestamps
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

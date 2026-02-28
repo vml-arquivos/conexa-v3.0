@@ -249,6 +249,9 @@ export class PlanningService {
         pedagogicalContent: createDto.pedagogicalContent,
         status: PlanningStatus.RASCUNHO,
         createdBy: user.sub,
+        // Campos de rastreabilidade
+        anoLetivo: startDate.getFullYear(),
+        professorId: user.sub,
         mantenedoraId: classroom.unit.mantenedoraId,
         unitId: classroom.unitId,
       },
