@@ -8,16 +8,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 /**
- * Fluxo de aprovação do RDIC:
+ * Fluxo de aprovação do RDIC (P0):
  *
- *  PROFESSOR          → cria/edita em RASCUNHO
- *                     → envia para revisão (EM_REVISAO)
+ *  PROFESSOR          → cria/edita em RASCUNHO ou DEVOLVIDO
+ *                     → envia para revisão (→ EM_REVISAO)
  *
- *  COORD. PEDAGÓGICA  → lê, edita, corrige e aprova (FINALIZADO)
- *  (UNIDADE)          → pode devolver ao professor (volta para RASCUNHO)
+ *  COORD. UNIDADE     → lê, edita (RASCUNHO ou EM_REVISAO), salva
+ *  (UNIDADE)          → aprova (→ APROVADO)
+ *                     → devolve com comentário obrigatório (→ DEVOLVIDO)
  *
- *  COORD. GERAL       → somente leitura, somente status FINALIZADO
- *  (STAFF_CENTRAL)
+ *  STAFF_CENTRAL      → somente leitura (apenas APROVADO/PUBLICADO)
+ *                     → 403 para editar/aprovar/devolver
+ *
+ *  MANTENEDORA/DEV    → leitura completa (sem ações de aprovação)
  */
 @Injectable()
 export class RdicService {
@@ -82,22 +85,34 @@ export class RdicService {
     });
   }
 
-  // ─── Atualizar rascunho (professor — somente RASCUNHO) ────────────────────
+  // ─── Atualizar rascunho ───────────────────────────────────────────────────
   async atualizar(id: string, dto: any, user: JwtPayload) {
+    const level = user.roles[0]?.level;
+
+    // STAFF_CENTRAL: nunca pode editar
+    if (level === 'STAFF_CENTRAL') {
+      throw new ForbiddenException('Central pedagógica não pode editar RDICs.');
+    }
+
     const instancia = await this._buscarEValidar(id, user);
 
-    // Professor só pode editar RASCUNHO
-    const isProfessor = user.roles[0]?.level === 'PROFESSOR';
-    if (isProfessor && instancia.status !== 'RASCUNHO') {
-      throw new ForbiddenException(
-        'Você só pode editar o RDIC enquanto ele estiver em RASCUNHO. Solicite devolução à coordenação.',
-      );
+    // Professor só pode editar RASCUNHO ou DEVOLVIDO (e apenas o próprio)
+    if (level === 'PROFESSOR') {
+      if (!['RASCUNHO', 'DEVOLVIDO'].includes(instancia.status)) {
+        throw new ForbiddenException(
+          'Você só pode editar o RDIC enquanto estiver em RASCUNHO ou DEVOLVIDO.',
+        );
+      }
+      if (instancia.criadoPorId !== user.sub) {
+        throw new ForbiddenException('Você só pode editar seus próprios RDICs.');
+      }
     }
 
     // Coordenadora pedagógica pode editar RASCUNHO ou EM_REVISAO
-    const isUnidade = user.roles[0]?.level === 'UNIDADE';
-    if (isUnidade && !['RASCUNHO', 'EM_REVISAO'].includes(instancia.status)) {
-      throw new ForbiddenException('RDIC já finalizado. Não é possível editar.');
+    if (level === 'UNIDADE') {
+      if (!['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'].includes(instancia.status)) {
+        throw new ForbiddenException('RDIC já aprovado ou publicado. Não é possível editar.');
+      }
     }
 
     return this.prisma.rDIXInstancia.update({
@@ -110,22 +125,49 @@ export class RdicService {
   // ─── Enviar para revisão (professor → EM_REVISAO) ─────────────────────────
   async enviarParaRevisao(id: string, user: JwtPayload) {
     const instancia = await this._buscarEValidar(id, user);
-    if (instancia.status !== 'RASCUNHO') {
-      throw new BadRequestException('Apenas RDICs em RASCUNHO podem ser enviados para revisão.');
+    if (!['RASCUNHO', 'DEVOLVIDO'].includes(instancia.status)) {
+      throw new BadRequestException('Apenas RDICs em RASCUNHO ou DEVOLVIDO podem ser enviados para revisão.');
     }
     if (instancia.criadoPorId !== user.sub) {
       throw new ForbiddenException('Apenas o professor que criou o RDIC pode enviá-lo para revisão.');
     }
     return this.prisma.rDIXInstancia.update({
       where: { id },
-      data: { status: 'EM_REVISAO' },
+      data: {
+        status: 'EM_REVISAO',
+        submittedAt: new Date(),
+      },
     });
   }
 
-  // ─── Devolver ao professor (coord. unidade → RASCUNHO) ────────────────────
+  // ─── Aprovar (coord. unidade → APROVADO) ─────────────────────────────────
+  async aprovar(id: string, user: JwtPayload) {
+    if (user.roles[0]?.level !== 'UNIDADE') {
+      throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode aprovar o RDIC.');
+    }
+    const instancia = await this._buscarEValidar(id, user);
+    if (!['EM_REVISAO', 'RASCUNHO'].includes(instancia.status)) {
+      throw new BadRequestException('Apenas RDICs em EM_REVISAO ou RASCUNHO podem ser aprovados.');
+    }
+    return this.prisma.rDIXInstancia.update({
+      where: { id },
+      data: {
+        status: 'APROVADO',
+        conteudoFinal: instancia.conteudoFinal ?? instancia.rascunhoJson ?? undefined,
+        revisadoPorId: user.sub,
+        reviewedAt: new Date(),
+      },
+      include: { child: { select: { firstName: true, lastName: true } } },
+    });
+  }
+
+  // ─── Devolver ao professor (coord. unidade → DEVOLVIDO) ───────────────────
   async devolver(id: string, dto: { comment: string }, user: JwtPayload) {
     if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica pode devolver o RDIC.');
+    }
+    if (!dto.comment || dto.comment.trim().length < 5) {
+      throw new BadRequestException('O comentário de devolução é obrigatório (mínimo 5 caracteres).');
     }
     const instancia = await this._buscarEValidar(id, user);
     if (instancia.status !== 'EM_REVISAO') {
@@ -133,11 +175,17 @@ export class RdicService {
     }
     return this.prisma.rDIXInstancia.update({
       where: { id },
-      data: { status: 'DEVOLVIDO', reviewComment: dto.comment },
+      data: {
+        status: 'DEVOLVIDO',
+        reviewComment: dto.comment,
+        revisadoPorId: user.sub,
+        reviewedAt: new Date(),
+      },
     });
   }
 
-  // ─── Finalizar/Aprovar (coord. pedagógica unidade → FINALIZADO) ───────────
+  // ─── Finalizar/Aprovar legado (coord. pedagógica unidade → FINALIZADO) ────
+  // Mantido para compatibilidade; novos clientes devem usar /aprovar
   async finalizar(id: string, dto: any, user: JwtPayload) {
     if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode finalizar o RDIC.');
@@ -153,20 +201,20 @@ export class RdicService {
         conteudoFinal: dto.conteudoFinal ?? instancia.rascunhoJson,
         revisadoPorId: user.sub,
         finalizadoEm: new Date(),
+        reviewedAt: new Date(),
       },
       include: { child: { select: { firstName: true, lastName: true } } },
     });
   }
 
   // ─── Publicar (coord. pedagógica unidade → PUBLICADO) ────────────────────
-  // Após PUBLICADO, fica disponível para a coordenação geral (leitura)
   async publicar(id: string, user: JwtPayload) {
     if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode publicar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
-    if (instancia.status !== 'FINALIZADO') {
-      throw new BadRequestException('Apenas RDICs FINALIZADOS podem ser publicados.');
+    if (!['FINALIZADO', 'APROVADO'].includes(instancia.status)) {
+      throw new BadRequestException('Apenas RDICs FINALIZADOS ou APROVADOS podem ser publicados.');
     }
     return this.prisma.rDIXInstancia.update({
       where: { id },
@@ -177,30 +225,152 @@ export class RdicService {
     });
   }
 
+  // ─── Status de completude da turma por bimestre ───────────────────────────
+  // GET /rdic/turma/status?classroomId&periodo&anoLetivo
+  async turmaStatus(query: any, user: JwtPayload) {
+    const level = user.roles[0]?.level;
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const { classroomId, periodo, anoLetivo } = query;
+    if (!classroomId || !periodo || !anoLetivo) {
+      throw new BadRequestException('classroomId, periodo e anoLetivo são obrigatórios');
+    }
+
+    // Verificar escopo
+    const classroom = await this.prisma.classroom.findFirst({
+      where: {
+        id: classroomId,
+        unit: { mantenedoraId: user.mantenedoraId },
+        ...(level === 'PROFESSOR' || level === 'UNIDADE' ? { unitId: user.unitId! } : {}),
+      },
+    });
+    if (!classroom) throw new NotFoundException('Turma não encontrada ou fora do escopo');
+
+    // Buscar crianças com matrícula ativa na turma
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { classroomId, status: 'ATIVA' },
+      include: { child: { select: { id: true, firstName: true, lastName: true } } },
+    });
+
+    // Buscar RDICs existentes para essa turma/período/ano
+    const rdics = await this.prisma.rDIXInstancia.findMany({
+      where: {
+        classroomId,
+        periodo,
+        anoLetivo: Number(anoLetivo),
+        mantenedoraId: user.mantenedoraId,
+      },
+      select: {
+        id: true,
+        childId: true,
+        status: true,
+        submittedAt: true,
+        reviewedAt: true,
+      },
+    });
+
+    const rdicByChild = new Map(rdics.map(r => [r.childId, r]));
+    const totalCriancas = enrollments.length;
+    const criancas = enrollments.map(({ child }) => ({
+      childId: child.id,
+      nome: `${child.firstName} ${child.lastName}`,
+      rdic: rdicByChild.get(child.id) ?? null,
+      status: rdicByChild.get(child.id)?.status ?? 'PENDENTE',
+    }));
+
+    const contagem = {
+      total: totalCriancas,
+      pendente: criancas.filter(c => c.status === 'PENDENTE').length,
+      rascunho: criancas.filter(c => c.status === 'RASCUNHO').length,
+      emRevisao: criancas.filter(c => c.status === 'EM_REVISAO').length,
+      devolvido: criancas.filter(c => c.status === 'DEVOLVIDO').length,
+      aprovado: criancas.filter(c => c.status === 'APROVADO').length,
+      finalizado: criancas.filter(c => ['FINALIZADO', 'PUBLICADO'].includes(c.status)).length,
+    };
+
+    return {
+      classroomId,
+      classroomName: classroom.name,
+      periodo,
+      anoLetivo: Number(anoLetivo),
+      completude: totalCriancas > 0
+        ? Math.round(((contagem.aprovado + contagem.finalizado) / totalCriancas) * 100)
+        : 0,
+      contagem,
+      criancas,
+    };
+  }
+
+  // ─── Consolidado da turma (dados para relatório) ──────────────────────────
+  // GET /rdic/turma/consolidado?classroomId&periodo&anoLetivo
+  async turmaConsolidado(query: any, user: JwtPayload) {
+    const level = user.roles[0]?.level;
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const { classroomId, periodo, anoLetivo } = query;
+    if (!classroomId || !periodo || !anoLetivo) {
+      throw new BadRequestException('classroomId, periodo e anoLetivo são obrigatórios');
+    }
+
+    // STAFF_CENTRAL só vê APROVADO/PUBLICADO
+    const statusFilter: any =
+      level === 'STAFF_CENTRAL'
+        ? { status: { in: ['APROVADO', 'PUBLICADO', 'FINALIZADO'] as any } }
+        : {};
+
+    const rdics = await this.prisma.rDIXInstancia.findMany({
+      where: {
+        classroomId,
+        periodo,
+        anoLetivo: Number(anoLetivo),
+        mantenedoraId: user.mantenedoraId,
+        ...statusFilter,
+      },
+      include: {
+        child: { select: { id: true, firstName: true, lastName: true, dateOfBirth: true } },
+      },
+      orderBy: { criadoEm: 'desc' },
+    });
+
+    return {
+      classroomId,
+      periodo,
+      anoLetivo: Number(anoLetivo),
+      total: rdics.length,
+      rdics: rdics.map(r => ({
+        id: r.id,
+        childId: r.childId,
+        childNome: `${r.child.firstName} ${r.child.lastName}`,
+        status: r.status,
+        submittedAt: r.submittedAt,
+        reviewedAt: r.reviewedAt,
+        reviewComment: r.reviewComment,
+        conteudo: r.conteudoFinal ?? r.rascunhoJson,
+      })),
+    };
+  }
+
   // ─── Listar RDICs com controle de acesso por role ─────────────────────────
   async listar(query: any, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const level = user.roles[0]?.level;
 
     const where: any = { mantenedoraId: user.mantenedoraId };
 
     // PROFESSOR: vê apenas os RDICs que ele criou (qualquer status)
-    if (user.roles[0]?.level === 'PROFESSOR') {
+    if (level === 'PROFESSOR') {
       where.criadoPorId = user.sub;
       where.unitId = user.unitId;
     }
-
-    // UNIDADE (coord. pedagógica): vê todos da sua unidade (qualquer status)
-    else if (user.roles[0]?.level === 'UNIDADE') {
+    // UNIDADE (coord. pedagógica): vê todos da sua unidade
+    else if (level === 'UNIDADE') {
       where.unitId = user.unitId;
     }
-
-    // STAFF_CENTRAL (coord. geral): somente PUBLICADOS
-    else if (user.roles[0]?.level === 'STAFF_CENTRAL') {
-      where.status = 'PUBLICADO';
+    // STAFF_CENTRAL: somente APROVADO/PUBLICADO/FINALIZADO
+    else if (level === 'STAFF_CENTRAL') {
+      where.status = { in: ['APROVADO', 'PUBLICADO', 'FINALIZADO'] as any };
     }
-
-    // MANTENEDORA / DEVELOPER: vê tudo
-    // (sem filtro adicional)
+    // MANTENEDORA / DEVELOPER: vê tudo (sem filtro adicional)
 
     // Filtros opcionais da query
     if (query.classroomId) where.classroomId = query.classroomId;
@@ -208,6 +378,9 @@ export class RdicService {
     if (query.status) where.status = query.status;
     if (query.periodo) where.periodo = query.periodo;
     if (query.anoLetivo) where.anoLetivo = Number(query.anoLetivo);
+    if (query.unitId && (level === 'MANTENEDORA' || level === 'DEVELOPER' || level === 'STAFF_CENTRAL')) {
+      where.unitId = query.unitId;
+    }
 
     return this.prisma.rDIXInstancia.findMany({
       where,
@@ -222,11 +395,12 @@ export class RdicService {
   // ─── Detalhe de um RDIC ───────────────────────────────────────────────────
   async getById(id: string, user: JwtPayload) {
     const instancia = await this._buscarEValidar(id, user);
+    const level = user.roles[0]?.level;
 
-    // STAFF_CENTRAL só pode ler PUBLICADOS
-    if (user.roles[0]?.level === 'STAFF_CENTRAL' && instancia.status !== 'PUBLICADO') {
+    // STAFF_CENTRAL só pode ler APROVADO/PUBLICADO/FINALIZADO
+    if (level === 'STAFF_CENTRAL' && !['APROVADO', 'PUBLICADO', 'FINALIZADO'].includes(instancia.status)) {
       throw new ForbiddenException(
-        'Este RDIC ainda não foi publicado pela coordenação pedagógica da unidade.',
+        'Este RDIC ainda não foi aprovado pela coordenação pedagógica da unidade.',
       );
     }
 

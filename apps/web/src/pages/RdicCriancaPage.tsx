@@ -68,7 +68,7 @@ interface RdicSalvo {
   dimensoes: DimensaoAvaliacao[];
   observacaoGeral: string;
   proximosPassos: string;
-  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'FINALIZADO' | 'PUBLICADO' | string;
+  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'APROVADO' | 'FINALIZADO' | 'PUBLICADO' | string;
   reviewComment?: string;
   createdAt: string;
 }
@@ -926,12 +926,14 @@ export default function RdicCriancaPage() {
                             <span className="font-semibold text-gray-800">{rdic.periodo}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                               rdic.status === 'PUBLICADO'  ? 'bg-green-100 text-green-700' :
+                              rdic.status === 'APROVADO'   ? 'bg-emerald-100 text-emerald-700' :
                               rdic.status === 'FINALIZADO' ? 'bg-blue-100 text-blue-700' :
                               rdic.status === 'EM_REVISAO' ? 'bg-yellow-100 text-yellow-700' :
                               rdic.status === 'DEVOLVIDO'  ? 'bg-orange-100 text-orange-700' :
                               'bg-gray-100 text-gray-600'
                             }`}>
-                              {rdic.status === 'PUBLICADO'  ? 'Publicado' :
+                              {rdic.status === 'PUBLICADO'  ? '✓ Publicado' :
+                               rdic.status === 'APROVADO'   ? '✓ Aprovado' :
                                rdic.status === 'FINALIZADO' ? 'Finalizado' :
                                rdic.status === 'EM_REVISAO' ? 'Em Revisão' :
                                rdic.status === 'DEVOLVIDO'  ? 'Devolvido' : 'Rascunho'}
@@ -960,7 +962,7 @@ export default function RdicCriancaPage() {
                           </div>
                         </div>
                         <CheckCircle className={`h-5 w-5 flex-shrink-0 ${
-                          rdic.status === 'PUBLICADO' ? 'text-green-500' : 'text-gray-300'
+                          rdic.status === 'PUBLICADO' || rdic.status === 'APROVADO' ? 'text-green-500' : 'text-gray-300'
                         }`} />
                       </div>
                     </CardContent>

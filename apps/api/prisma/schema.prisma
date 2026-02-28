@@ -115,6 +115,7 @@ enum DiaryEventStatus {
 /// Tipo de planejamento
 enum PlanningType {
   SEMANAL
+  QUINZENAL  // Adicionado para planos quinzenais
   MENSAL
   TRIMESTRAL
   SEMESTRAL
@@ -1537,6 +1538,7 @@ enum StatusRDIX {
   RASCUNHO
   EM_REVISAO
   DEVOLVIDO
+  APROVADO   // Aprovado pela coordenação da unidade (status terminal de revisão)
   FINALIZADO
   PUBLICADO
 }
@@ -1571,9 +1573,11 @@ model RDIXInstancia {
   conteudoFinal  Json?
   criadoPorId    String     @db.VarChar(255)
   revisadoPorId  String?    @db.VarChar(255)
-  reviewComment String?
-  finalizadoEm  DateTime?
-  publicadoEm   DateTime?
+  reviewComment  String?    @db.Text
+  submittedAt    DateTime?  // Data de envio para revisão
+  reviewedAt     DateTime?  // Data da revisão
+  finalizadoEm   DateTime?
+  publicadoEm    DateTime?
   criadoEm      DateTime   @default(now())
   atualizadoEm  DateTime   @updatedAt
   mantenedora   Mantenedora  @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)

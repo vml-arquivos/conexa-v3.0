@@ -17,16 +17,19 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RdicService } from './rdic.service';
 
 /**
- * Fluxo de aprovação RDIC:
+ * Fluxo de aprovação RDIC (P0):
  *
- *  POST   /rdic                     → Professor cria (RASCUNHO)
- *  PATCH  /rdic/:id                 → Professor edita rascunho / Coord. edita em revisão
- *  PATCH  /rdic/:id/enviar-revisao  → Professor envia para revisão (RASCUNHO → EM_REVISAO)
- *  PATCH  /rdic/:id/devolver        → Coord. Unidade devolve ao professor (EM_REVISAO → RASCUNHO)
- *  PATCH  /rdic/:id/finalizar       → Coord. Unidade aprova e finaliza (EM_REVISAO → FINALIZADO)
- *  PATCH  /rdic/:id/publicar        → Coord. Unidade publica (FINALIZADO → PUBLICADO)
- *  GET    /rdic                     → Lista com filtro por role automático
- *  GET    /rdic/:id                 → Detalhe (STAFF_CENTRAL só vê PUBLICADO)
+ *  POST   /rdic                        → Professor cria (RASCUNHO)
+ *  PATCH  /rdic/:id                    → Professor edita RASCUNHO/DEVOLVIDO; Coord. edita EM_REVISAO
+ *  PATCH  /rdic/:id/enviar-revisao     → Professor envia (→ EM_REVISAO)
+ *  POST   /rdic/:id/aprovar            → Coord. Unidade aprova (→ APROVADO)
+ *  POST   /rdic/:id/devolver           → Coord. Unidade devolve com comentário (→ DEVOLVIDO)
+ *  PATCH  /rdic/:id/finalizar          → Coord. Unidade finaliza legado (→ FINALIZADO)
+ *  PATCH  /rdic/:id/publicar           → Coord. Unidade publica (→ PUBLICADO)
+ *  GET    /rdic                        → Lista com filtro por role automático
+ *  GET    /rdic/turma/status           → Completude da turma por bimestre
+ *  GET    /rdic/turma/consolidado      → Consolidado para relatório
+ *  GET    /rdic/:id                    → Detalhe (STAFF_CENTRAL só vê APROVADO/PUBLICADO)
  */
 @Controller('rdic')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +41,31 @@ export class RdicController {
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   criar(@Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.criar(dto, user);
+  }
+
+  /** Status de completude da turma por bimestre/período (DEVE vir antes de :id) */
+  @Get('turma/status')
+  @RequireRoles(
+    RoleLevel.PROFESSOR,
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  turmaStatus(@Query() query: any, @CurrentUser() user: JwtPayload) {
+    return this.svc.turmaStatus(query, user);
+  }
+
+  /** Consolidado da turma para relatório print-friendly (DEVE vir antes de :id) */
+  @Get('turma/consolidado')
+  @RequireRoles(
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  turmaConsolidado(@Query() query: any, @CurrentUser() user: JwtPayload) {
+    return this.svc.turmaConsolidado(query, user);
   }
 
   /** Listar RDICs — filtro automático por role */
@@ -66,7 +94,7 @@ export class RdicController {
     return this.svc.getById(id, user);
   }
 
-  /** Atualizar rascunho (professor em RASCUNHO / coord. em EM_REVISAO) */
+  /** Atualizar rascunho (professor em RASCUNHO/DEVOLVIDO; coord. em EM_REVISAO) */
   @Patch(':id')
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   atualizar(
@@ -84,14 +112,25 @@ export class RdicController {
     return this.svc.enviarParaRevisao(id, user);
   }
 
-  /** Coord. Pedagógica da Unidade devolve ao professor para correção */
-  @Patch(':id/devolver')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  devolver(@Param("id") id: string, @Body() dto: { comment: string }, @CurrentUser() user: JwtPayload) {
+  /** Coord. Unidade aprova o RDIC (→ APROVADO) */
+  @Post(':id/aprovar')
+  @RequireRoles(RoleLevel.UNIDADE)
+  aprovar(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.svc.aprovar(id, user);
+  }
+
+  /** Coord. Unidade devolve ao professor com comentário obrigatório (→ DEVOLVIDO) */
+  @Post(':id/devolver')
+  @RequireRoles(RoleLevel.UNIDADE)
+  devolver(
+    @Param('id') id: string,
+    @Body() dto: { comment: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
     return this.svc.devolver(id, dto, user);
   }
 
-  /** Coord. Pedagógica da Unidade finaliza/aprova o RDIC */
+  /** Coord. Unidade finaliza/aprova o RDIC (legado → FINALIZADO) */
   @Patch(':id/finalizar')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   finalizar(
@@ -102,7 +141,7 @@ export class RdicController {
     return this.svc.finalizar(id, dto, user);
   }
 
-  /** Coord. Pedagógica da Unidade publica o RDIC (libera para coord. geral) */
+  /** Coord. Unidade publica o RDIC (→ PUBLICADO, disponível para central) */
   @Patch(':id/publicar')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   publicar(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
