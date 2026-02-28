@@ -42,12 +42,17 @@ interface Planning {
   title: string;
   type: string;
   status: string;
-  weekStart?: string;
-  weekEnd?: string;
+  startDate?: string;    // campo real da API
+  endDate?: string;      // campo real da API
+  weekStart?: string;    // alias legado
+  weekEnd?: string;      // alias legado
   classroomId?: string;
-  classroom?: { name: string };
+  classroom?: { id: string; name: string };
+  createdByUser?: { firstName: string; lastName: string; email: string };
+  reviewComment?: string;
   pedagogicalContent?: any;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface Template {
@@ -136,8 +141,8 @@ export default function PlanejamentosPage() {
     setLoading(true);
     try {
       const [planRes, turmaRes, templRes] = await Promise.allSettled([
-        http.get('/plannings?limit=50'),
-        http.get('/teachers/dashboard'),
+        http.get('/plannings?limit=100'),
+        http.get('/lookup/classrooms/accessible'),
         http.get('/planning-templates'),
       ]);
       if (planRes.status === 'fulfilled') {
@@ -146,7 +151,9 @@ export default function PlanejamentosPage() {
       }
       if (turmaRes.status === 'fulfilled') {
         const d = turmaRes.value.data;
-        if (d?.classroom) setTurmas([d.classroom]);
+        // /lookup/classrooms/accessible retorna array direto
+        if (Array.isArray(d)) setTurmas(d);
+        else if (d?.classroom) setTurmas([d.classroom]);
         else if (d?.classrooms) setTurmas(d.classrooms);
       }
       if (templRes.status === 'fulfilled') {
@@ -165,14 +172,17 @@ export default function PlanejamentosPage() {
 
   async function salvarPlanejamento() {
     if (!form.title.trim()) { toast.error('Informe o título do planejamento'); return; }
+    if (!form.classroomId) { toast.error('Selecione uma turma'); return; }
+    if (!form.weekStart) { toast.error('Informe a data de início'); return; }
+    if (!form.weekEnd) { toast.error('Informe a data de término'); return; }
     setSaving(true);
     try {
       await http.post('/plannings', {
         title: form.title,
         type: form.type,
-        classroomId: form.classroomId || undefined,
-        weekStart: form.weekStart || undefined,
-        weekEnd: form.weekEnd || undefined,
+        classroomId: form.classroomId,
+        startDate: form.weekStart,   // API espera startDate
+        endDate: form.weekEnd,       // API espera endDate
         pedagogicalContent: {
           objetivos: form.objetivos,
           experiencias: form.experiencias,
@@ -182,7 +192,7 @@ export default function PlanejamentosPage() {
           codigosBNCC: form.codigosBNCC,
         },
       });
-      toast.success('Planejamento salvo!');
+      toast.success('Planejamento salvo como rascunho!');
       setAba('meus');
       loadData();
       setForm({ title: '', type: 'SEMANAL', classroomId: '', weekStart: '', weekEnd: '', objetivos: [], experiencias: [], materiais: '', observacoes: '', camposSelecionados: [], codigosBNCC: [] });
@@ -320,7 +330,7 @@ export default function PlanejamentosPage() {
                           {p.classroom && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1"><Users className="h-3 w-3" /> {p.classroom.name}</span>}
                         </div>
                         <h3 className="font-semibold text-gray-800 truncate">{p.title}</h3>
-                        {p.weekStart && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(p.weekStart).toLocaleDateString('pt-BR')}{p.weekEnd && ` — ${new Date(p.weekEnd).toLocaleDateString('pt-BR')}`}</p>}
+                        {(p.startDate || p.weekStart) && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(p.startDate ?? p.weekStart!).toLocaleDateString('pt-BR')}{(p.endDate || p.weekEnd) && ` — ${new Date(p.endDate ?? p.weekEnd!).toLocaleDateString('pt-BR')}`}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         {/* Botão Enviar para Revisão — apenas para professor em RASCUNHO ou DEVOLVIDO */}
@@ -357,6 +367,12 @@ export default function PlanejamentosPage() {
                         </button>
                       </div>
                     </div>
+                    {isExpanded && p.status === 'DEVOLVIDO' && p.reviewComment && (
+                      <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <p className="text-xs font-semibold text-orange-700 uppercase mb-1 flex items-center gap-1">Motivo da Devolução</p>
+                        <p className="text-sm text-orange-800">{p.reviewComment}</p>
+                      </div>
+                    )}
                     {isExpanded && p.pedagogicalContent && (
                       <div className="mt-4 pt-4 border-t space-y-3">
                         {p.pedagogicalContent.camposSelecionados?.length > 0 && (

@@ -10,6 +10,7 @@ import {
 
 export enum PlanningType {
   SEMANAL = 'SEMANAL',
+  QUINZENAL = 'QUINZENAL',
   MENSAL = 'MENSAL',
   TRIMESTRAL = 'TRIMESTRAL',
   SEMESTRAL = 'SEMESTRAL',

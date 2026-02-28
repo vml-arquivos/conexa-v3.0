@@ -118,14 +118,16 @@ export class LookupService {
     user: JwtPayload,
     unitId?: string,
   ): Promise<AccessibleClassroom[]> {
-    // 1. PROFESSOR: apenas turmas vinculadas
+    // 1. PROFESSOR: apenas turmas vinculadas e ativas
     const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
     if (isProfessor) {
       const classrooms = await this.prisma.classroom.findMany({
         where: {
+          isActive: true,
           teachers: {
             some: {
-              teacherId: user.sub, // user.sub é o userId
+              teacherId: user.sub,
+              isActive: true,
             },
           },
           ...(unitId && { unitId }),
@@ -159,9 +161,9 @@ export class LookupService {
           );
         }
 
-        // Retornar turmas da unit solicitada
+        // Retornar turmas da unit solicitada (apenas ativas)
         const classrooms = await this.prisma.classroom.findMany({
-          where: { unitId },
+          where: { unitId, isActive: true },
           select: {
             id: true,
             code: true,
@@ -173,11 +175,12 @@ export class LookupService {
         return classrooms;
       }
 
-      // Se unitId não foi fornecido, retornar turmas de todas as units dos scopes (com limite)
+      // Se unitId não foi fornecido, retornar turmas de todas as units dos scopes (com limite, apenas ativas)
       const uniqueUnitIds = Array.from(new Set(allUnitScopes));
       const classrooms = await this.prisma.classroom.findMany({
         where: {
           unitId: { in: uniqueUnitIds },
+          isActive: true,
         },
         select: {
           id: true,
@@ -201,7 +204,7 @@ export class LookupService {
       }
 
       const classrooms = await this.prisma.classroom.findMany({
-        where: { unitId: user.unitId },
+        where: { unitId: user.unitId, isActive: true },
         select: {
           id: true,
           code: true,
@@ -224,7 +227,7 @@ export class LookupService {
       }
 
       const classrooms = await this.prisma.classroom.findMany({
-        where: { unitId },
+        where: { unitId, isActive: true },
         select: {
           id: true,
           code: true,
