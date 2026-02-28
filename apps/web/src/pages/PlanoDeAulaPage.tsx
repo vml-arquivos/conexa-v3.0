@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor } from '../api/auth';
 import {
   BookOpen, Calendar, ChevronLeft, ChevronRight, Download,
   FileText, Filter, Layers, Search, CheckCircle2,
@@ -117,10 +119,11 @@ function CardExemplo({
 }
 
 // ─── Card de Entrada da Matriz ────────────────────────────────────────────────
-function CardEntrada({ entrada, expanded, onToggle }: {
+function CardEntrada({ entrada, expanded, onToggle, ehProfessor }: {
   entrada: EntradaComExemplos;
   expanded: boolean;
   onToggle: () => void;
+  ehProfessor?: boolean;
 }) {
   const [exemploSelecionado, setExemploSelecionado] = useState<number | null>(null);
   const [adicionadoAoPlano, setAdicionadoAoPlano] = useState(false);
@@ -203,7 +206,8 @@ function CardEntrada({ entrada, expanded, onToggle }: {
             <p className="text-sm text-amber-900 leading-relaxed">{entrada.intencionalidade}</p>
           </div>
 
-          {/* Exemplos de Atividade — Escolha */}
+          {/* Exemplos de Atividade — Visível apenas para Coordenação/Mantenedora */}
+          {!ehProfessor && (
           <div>
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-4 w-4 text-green-600" />
@@ -222,6 +226,7 @@ function CardEntrada({ entrada, expanded, onToggle }: {
               ))}
             </div>
           </div>
+          )}
 
           {/* ─── Avaliação do Professor ─── */}
           <div className="border-t border-gray-100 pt-4">
@@ -321,6 +326,8 @@ function CardEntrada({ entrada, expanded, onToggle }: {
 
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function PlanoDeAulaPage() {
+  const { user } = useAuth();
+  const ehProfessor = isProfessor(user);
   const [segmento, setSegmento] = useState<SegmentoKey>('EI01');
   const [modoVisualizacao, setModoVisualizacao] = useState<'diario' | 'lista' | 'calendario'>('diario');
   const [mesSelecionado, setMesSelecionado] = useState(() => {
@@ -506,6 +513,7 @@ export default function PlanoDeAulaPage() {
                       entrada={entrada}
                       expanded={expandedId === id}
                       onToggle={() => setExpandedId(expandedId === id ? null : id)}
+                      ehProfessor={ehProfessor}
                     />
                   );
                 })}
@@ -582,6 +590,7 @@ export default function PlanoDeAulaPage() {
                     entrada={entrada}
                     expanded={expandedId === id}
                     onToggle={() => setExpandedId(expandedId === id ? null : id)}
+                    ehProfessor={ehProfessor}
                   />
                 );
               })}

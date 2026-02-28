@@ -13,6 +13,7 @@ import { ChangeStatusDto } from './dto/change-status.dto';
 import { QueryPlanningDto } from './dto/query-planning.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { getScopedWhereForPlanning } from './planning-scope.helper';
+import { maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
 
 @Injectable()
@@ -142,7 +143,7 @@ export class PlanningService {
       description: `Planejamento criado a partir do template ${template.name} para data ${dto.date}`,
     });
 
-    return planning;
+    return maskMatrizEntryForProfessor(user, planning);
   }
 
   /**
@@ -285,7 +286,7 @@ export class PlanningService {
       planning,
     );
 
-    return planning;
+    return maskMatrizEntryForProfessor(user, planning);
   }
 
   /**
@@ -394,7 +395,7 @@ export class PlanningService {
       },
     });
 
-    return plannings;
+    return plannings.map(p => maskMatrizEntryForProfessor(user, p));
   }
 
   /**
@@ -446,7 +447,7 @@ export class PlanningService {
       }
     }
 
-    return planning;
+    return maskMatrizEntryForProfessor(user, planning);
   }
 
   /**
@@ -457,19 +458,32 @@ export class PlanningService {
     const planning = await this.findOne(id, user);
 
     // Validar se pode editar
-    if (planning.status === PlanningStatus.CONCLUIDO) {
+    if (planning.status === PlanningStatus.CONCLUIDO || planning.status === PlanningStatus.APROVADO) {
       throw new ForbiddenException(
-        'Planejamentos fechados não podem ser editados',
+        `Planejamentos com status '${planning.status}' não podem ser editados diretamente.`,
       );
     }
 
-    // Professor só pode editar DRAFT
-    if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
-      if (planning.status !== PlanningStatus.RASCUNHO) {
-        throw new ForbiddenException(
-          'Professores só podem editar planejamentos em rascunho',
-        );
-      }
+    // REGRAS DE EDIÇÃO POR STATUS E ROLE
+    const isProfessor = user.roles.some((role) => role.level === RoleLevel.PROFESSOR);
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+
+    if (isProfessor) {
+        // Professor só pode editar RASCUNHO ou DEVOLVIDO
+        if (planning.status !== PlanningStatus.RASCUNHO && planning.status !== PlanningStatus.DEVOLVIDO) {
+            throw new ForbiddenException(`Professores não podem editar planejamentos com status '${planning.status}'.`);
+        }
+    } else if (isCoordinator) {
+        // Coordenador pode editar RASCUNHO, DEVOLVIDO e EM_REVISAO
+        const statusEditaveisCoord: PlanningStatus[] = [PlanningStatus.RASCUNHO, PlanningStatus.DEVOLVIDO, PlanningStatus.EM_REVISAO];
+        if (!statusEditaveisCoord.includes(planning.status)) {
+            throw new ForbiddenException(`Coordenadores não podem editar planejamentos com status '${planning.status}'.`);
+        }
+    } else {
+        // Outros roles (STAFF_CENTRAL, MANTENEDORA, DEV) podem editar, exceto APROVADO
+        if ((planning.status as PlanningStatus) === PlanningStatus.APROVADO) {
+            throw new ForbiddenException('Planejamentos aprovados não podem ser editados. Devolva-o para permitir ajustes.');
+        }
     }
 
     // Validar datas se fornecidas
@@ -523,7 +537,7 @@ export class PlanningService {
       updatedPlanning,
     );
 
-    return updatedPlanning;
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
   }
 
   /**
@@ -612,7 +626,7 @@ export class PlanningService {
       },
     });
 
-    return updatedPlanning;
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
   }
 
   /**
@@ -669,7 +683,7 @@ export class PlanningService {
       },
     });
 
-    return updatedPlanning;
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
   }
 
   /**
@@ -819,5 +833,119 @@ export class PlanningService {
     throw new BadRequestException(
       `Transição de status inválida: ${currentStatus} → ${newStatus}`,
     );
+  }
+
+  // --- FLUXO DE REVISÃO ---
+
+  /**
+   * Envia um planejamento para revisão (RASCUNHO/DEVOLVIDO -> EM_REVISAO)
+   */
+  async submitForReview(id: string, user: JwtPayload) {
+    const planning = await this.findOne(id, user);
+
+    // 1. Validar permissão: apenas o professor que criou pode enviar
+    if (planning.createdBy !== user.sub) {
+        throw new ForbiddenException("Você não tem permissão para enviar este planejamento para revisão.");
+    }
+
+    // 2. Validar status: só pode enviar se estiver em RASCUNHO ou DEVOLVIDO
+    if (planning.status !== PlanningStatus.RASCUNHO && planning.status !== PlanningStatus.DEVOLVIDO) {
+        throw new BadRequestException(`Planejamentos com status ${planning.status} não podem ser enviados para revisão.`);
+    }
+
+    // 3. Atualizar status e registrar data de submissão
+    const updatedPlanning = await this.prisma.planning.update({
+        where: { id },
+        data: {
+            status: PlanningStatus.EM_REVISAO,
+            submittedAt: new Date(),
+        },
+    });
+
+    // 4. Registrar auditoria
+    await this.auditService.log({
+        action: AuditLogAction.SUBMIT_REVIEW,
+        entity: 'PLANNING',
+        entityId: id,
+        userId: user.sub,
+        mantenedoraId: planning.mantenedoraId,
+        unitId: planning.unitId,
+    });
+
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
+  }
+
+  /**
+   * Aprova um planejamento (EM_REVISAO -> APROVADO)
+   */
+  async approve(id: string, user: JwtPayload) {
+    // Apenas coordenação/direção pode aprovar
+    if (!user.roles.some(r => r.level === RoleLevel.UNIDADE || r.level === RoleLevel.STAFF_CENTRAL || r.level === RoleLevel.MANTENEDORA || r.level === RoleLevel.DEVELOPER)) {
+        throw new ForbiddenException("Você não tem permissão para aprovar planejamentos.");
+    }
+
+    const planning = await this.findOne(id, user); // findOne já valida o escopo da unidade/mantenedora
+
+    // Validar status
+    if (planning.status !== PlanningStatus.EM_REVISAO) {
+        throw new BadRequestException(`Apenas planejamentos com status EM_REVISAO podem ser aprovados.`);
+    }
+
+    const updatedPlanning = await this.prisma.planning.update({
+        where: { id },
+        data: {
+            status: PlanningStatus.APROVADO,
+            reviewedAt: new Date(),
+            reviewedBy: user.sub,
+        },
+    });
+
+    await this.auditService.log({
+        action: AuditLogAction.APPROVE_PLANNING,
+        entity: 'PLANNING',
+        entityId: id,
+        userId: user.sub,
+        mantenedoraId: planning.mantenedoraId,
+        unitId: planning.unitId,
+    });
+
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
+  }
+
+  /**
+   * Devolve um planejamento para correções (EM_REVISAO -> DEVOLVIDO)
+   */
+  async returnForCorrections(id: string, dto: { comment: string }, user: JwtPayload) {
+    if (!user.roles.some(r => r.level === RoleLevel.UNIDADE || r.level === RoleLevel.STAFF_CENTRAL || r.level === RoleLevel.MANTENEDORA || r.level === RoleLevel.DEVELOPER)) {
+        throw new ForbiddenException("Você não tem permissão para devolver planejamentos.");
+    }
+
+    const planning = await this.findOne(id, user);
+
+    if (planning.status !== PlanningStatus.EM_REVISAO) {
+        throw new BadRequestException(`Apenas planejamentos com status EM_REVISAO podem ser devolvidos.`);
+    }
+
+    const updatedPlanning = await this.prisma.planning.update({
+        where: { id },
+        data: {
+            status: PlanningStatus.DEVOLVIDO,
+            reviewedAt: new Date(),
+            reviewedBy: user.sub,
+            reviewComment: dto.comment,
+        },
+    });
+
+    await this.auditService.log({
+        action: AuditLogAction.RETURN_PLANNING,
+        entity: 'PLANNING',
+        entityId: id,
+        userId: user.sub,
+        mantenedoraId: planning.mantenedoraId,
+        unitId: planning.unitId,
+        changes: { comment: dto.comment },
+    });
+
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
   }
 }
