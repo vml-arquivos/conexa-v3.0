@@ -42,7 +42,7 @@ const DEMO: DashboardGeral = {
 export default function DashboardCoordenacaoGeralPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [dashboard, setDashboard] = useState<DashboardGeral>(DEMO);
+  const [dashboard, setDashboard] = useState<DashboardGeral | null>(null);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
   const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'|'cobertura'>('visao');
   // Aba Cobertura Multiunidade
@@ -120,7 +120,7 @@ export default function DashboardCoordenacaoGeralPage() {
 
   if (loading) return <LoadingState message="Carregando painel geral da rede..." />;
 
-  const unidadesFiltradas = filtro === 'todas' ? (dashboard.unidades ?? []) : (dashboard.unidades ?? []).filter(u => u.status === filtro);
+  const unidadesFiltradas = filtro === 'todas' ? (dashboard?.unidades ?? []) : (dashboard?.unidades ?? []).filter(u => u.status === filtro);
   const abas = [
     { id:'visao', label:'Visao Geral', icon:<Star className="h-4 w-4"/> },
     { id:'unidades', label:'Por Unidade', icon:<Building2 className="h-4 w-4"/> },
@@ -132,10 +132,10 @@ export default function DashboardCoordenacaoGeralPage() {
     { id:'cobertura', label:'Cobertura', icon:<BarChart2 className="h-4 w-4"/> },
   ] as const;
   const filtros = [
-    { id:'todas', label:'Todas', count:(dashboard.unidades ?? []).length },
-    { id:'otimo', label:'Otimo', count:(dashboard.unidades ?? []).filter(u=>u.status==='otimo').length },
-    { id:'atencao', label:'Atencao', count:(dashboard.unidades ?? []).filter(u=>u.status==='atencao').length },
-    { id:'critico', label:'Critico', count:(dashboard.unidades ?? []).filter(u=>u.status==='critico').length },
+    { id:'todas', label:'Todas', count:(dashboard?.unidades ?? []).length },
+    { id:'otimo', label:'Otimo', count:(dashboard?.unidades ?? []).filter(u=>u.status==='otimo').length },
+    { id:'atencao', label:'Atencao', count:(dashboard?.unidades ?? []).filter(u=>u.status==='atencao').length },
+    { id:'critico', label:'Critico', count:(dashboard?.unidades ?? []).filter(u=>u.status==='critico').length },
   ] as const;
 
   return (
@@ -153,10 +153,10 @@ export default function DashboardCoordenacaoGeralPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              {icon:<Building2 className="h-6 w-6 text-blue-600"/>,bg:'bg-blue-100',val:dashboard.totalUnidades,label:'Unidades'},
-              {icon:<Users className="h-6 w-6 text-purple-600"/>,bg:'bg-purple-100',val:dashboard.totalAlunos,label:'Criancas na rede'},
-              {icon:<Star className="h-6 w-6 text-yellow-600"/>,bg:'bg-yellow-100',val:dashboard.totalProfessores,label:'Professores'},
-              {icon:<TrendingUp className="h-6 w-6 text-green-600"/>,bg:'bg-green-100',val:`${dashboard.mediaPresenca}%`,label:'Presenca media'},
+              {icon:<Building2 className="h-6 w-6 text-blue-600"/>,bg:'bg-blue-100',val:dashboard?.totalUnidades ?? 0,label:'Unidades'},
+              {icon:<Users className="h-6 w-6 text-purple-600"/>,bg:'bg-purple-100',val:dashboard?.totalAlunos ?? 0,label:'Criancas na rede'},
+              {icon:<Star className="h-6 w-6 text-yellow-600"/>,bg:'bg-yellow-100',val:dashboard?.totalProfessores ?? 0,label:'Professores'},
+              {icon:<TrendingUp className="h-6 w-6 text-green-600"/>,bg:'bg-green-100',val:`${dashboard?.mediaPresenca ?? 0}%`,label:'Presenca media'},
             ].map((c,i)=>(
               <Card key={i} className="rounded-2xl border-2 text-center">
                 <CardContent className="pt-5 pb-4">
@@ -175,7 +175,7 @@ export default function DashboardCoordenacaoGeralPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(dashboard.unidades ?? []).map(u=>{
+              {(dashboard?.unidades ?? []).map(u=>{
                 const cfg=STATUS_CONFIG[u.status];
                 return (
                   <div key={u.id} className="flex items-center gap-3">
@@ -196,7 +196,7 @@ export default function DashboardCoordenacaoGeralPage() {
             </CardContent>
           </Card>
 
-          {(dashboard.unidades ?? []).some(u=>u.status!=='otimo') && (
+          {(dashboard?.unidades ?? []).some(u=>u.status!=='otimo') && (
             <Card className="rounded-2xl border-2 border-orange-200 bg-orange-50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2 text-orange-800">
@@ -204,7 +204,7 @@ export default function DashboardCoordenacaoGeralPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(dashboard.unidades ?? []).filter(u=>u.status!=='otimo').map(u=>(
+                {(dashboard?.unidades ?? []).filter(u=>u.status!=='otimo').map(u=>(
                   <div key={u.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-orange-200">
                     <div>
                       <p className="font-semibold text-sm">{u.nome}</p>
@@ -292,7 +292,7 @@ export default function DashboardCoordenacaoGeralPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[...(dashboard.unidades ?? [])].sort((a,b)=>b.taxaPresenca-a.taxaPresenca).map((u,idx)=>{
+              {[...(dashboard?.unidades ?? [])].sort((a,b)=>b.taxaPresenca-a.taxaPresenca).map((u,idx)=>{
                 const cfg=STATUS_CONFIG[u.status];
                 return (
                   <div key={u.id}>
@@ -318,7 +318,7 @@ export default function DashboardCoordenacaoGeralPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {(dashboard.unidades ?? []).map(u=>(
+              {(dashboard?.unidades ?? []).map(u=>(
                 <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                   <span className="text-sm font-medium">{u.nome}</span>
                   <div className="flex items-center gap-2">
@@ -483,7 +483,7 @@ export default function DashboardCoordenacaoGeralPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {dashboard.unidades.map(unidade => (
+            {(dashboard?.unidades ?? []).map(unidade => (
               <button key={unidade.id}
                 onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/turmas`)}
                 className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
@@ -519,7 +519,7 @@ export default function DashboardCoordenacaoGeralPage() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {dashboard.unidades.map(unidade => (
+            {(dashboard?.unidades ?? []).map(unidade => (
               <button key={unidade.id}
                 onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/observacoes`)}
                 className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
@@ -553,7 +553,7 @@ export default function DashboardCoordenacaoGeralPage() {
           {/* Alertas por unidade */}
           <div className="space-y-3">
             <p className="text-sm font-semibold text-gray-700">Selecione uma unidade para ver os alertas:</p>
-            {dashboard.unidades.map(unidade => (
+            {(dashboard?.unidades ?? []).map(unidade => (
               <div key={unidade.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-purple-200 transition-all">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -598,24 +598,24 @@ export default function DashboardCoordenacaoGeralPage() {
             <p className="text-sm font-semibold text-gray-700 mb-3">Indicadores Consolidados — Todas as Unidades</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-purple-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-purple-600">{dashboard.totalAlunos}</p>
+                <p className="text-2xl font-bold text-purple-600">{dashboard?.totalAlunos ?? 0}</p>
                 <p className="text-xs text-gray-500">Total de crianças</p>
               </div>
               <div className="bg-orange-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-orange-600">
-                  {dashboard.unidades.filter(u => u.status === 'critico').length}
+                  {(dashboard?.unidades ?? []).filter(u => u.status === 'critico').length}
                 </p>
                 <p className="text-xs text-gray-500">Unidades em alerta crítico</p>
               </div>
               <div className="bg-yellow-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-yellow-600">
-                  {dashboard.unidades.filter(u => u.status === 'atencao').length}
+                  {(dashboard?.unidades ?? []).filter(u => u.status === 'atencao').length}
                 </p>
                 <p className="text-xs text-gray-500">Unidades em atenção</p>
               </div>
               <div className="bg-green-50 rounded-xl p-3 text-center">
                 <p className="text-2xl font-bold text-green-600">
-                  {dashboard.unidades.filter(u => u.status === 'otimo').length}
+                  {(dashboard?.unidades ?? []).filter(u => u.status === 'otimo').length}
                 </p>
                 <p className="text-xs text-gray-500">Unidades ótimas</p>
               </div>

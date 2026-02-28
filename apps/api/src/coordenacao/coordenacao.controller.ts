@@ -79,11 +79,12 @@ export class CoordenacaoController {
   /**
    * GET /coordenacao/dashboard/unidade
    * Dashboard da coordenação pedagógica da unidade
+   * STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
    */
   @Get('dashboard/unidade')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
-  dashboardUnidade(@CurrentUser() user: JwtPayload) {
-    return this.svc.getDashboardUnidade(user);
+  dashboardUnidade(@Query('unitId') unitId: string, @CurrentUser() user: JwtPayload) {
+    return this.svc.getDashboardUnidade(user, unitId);
   }
 
   /**
@@ -101,15 +102,17 @@ export class CoordenacaoController {
   /**
    * GET /coordenacao/planejamentos
    * Listar planejamentos de todas as turmas da unidade
+   * STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
    */
   @Get('planejamentos')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   listarPlanejamentos(
     @Query('status') status: string,
     @Query('classroomId') classroomId: string,
+    @Query('unitId') unitId: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.svc.listarPlanejamentos(status, classroomId, user);
+    return this.svc.listarPlanejamentos(status, classroomId, user, unitId);
   }
 
   /**
@@ -127,6 +130,7 @@ export class CoordenacaoController {
   /**
    * GET /coordenacao/diarios
    * Listar diários de bordo de todas as turmas da unidade
+   * STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
    */
   @Get('diarios')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
@@ -134,9 +138,10 @@ export class CoordenacaoController {
     @Query('classroomId') classroomId: string,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('unitId') unitId: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.svc.listarDiarios(classroomId, startDate, endDate, user);
+    return this.svc.listarDiarios(classroomId, startDate, endDate, user, unitId);
   }
 
   // ─── REQUISIÇÕES (visão coordenação) ──────────────────────────────────────
@@ -144,11 +149,16 @@ export class CoordenacaoController {
   /**
    * GET /coordenacao/requisicoes
    * Listar requisições de materiais pendentes da unidade
+   * STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
    */
   @Get('requisicoes')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
-  listarRequisicoes(@Query('status') status: string, @CurrentUser() user: JwtPayload) {
-    return this.svc.listarRequisicoes(status, user);
+  listarRequisicoes(
+    @Query('status') status: string,
+    @Query('unitId') unitId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.listarRequisicoes(status, user, unitId);
   }
 
   // ─── TURMAS COM STATS COMPLETOS ────────────────────────────────────────────
@@ -156,11 +166,11 @@ export class CoordenacaoController {
   /**
    * GET /coordenacao/unit/classrooms
    * Turmas da unidade com childrenCount real, todos os professores ativos e plansCount.
-   * RBAC: UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
+   * STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
    */
   @Get('unit/classrooms')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
-  getUnitClassrooms(@CurrentUser() user: JwtPayload) {
-    return this.svc.getUnitClassrooms(user);
+  getUnitClassrooms(@Query('unitId') unitId: string, @CurrentUser() user: JwtPayload) {
+    return this.svc.getUnitClassrooms(user, unitId);
   }
 }

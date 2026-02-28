@@ -49,7 +49,7 @@ interface Diario {
   data: string; titulo: string;
 }
 interface TurmaResumo {
-  id: string; nome: string; totalAlunos: number; professor: string; chamadaFeita: boolean;
+  id: string; nome: string; totalAlunos: number; professor: string | null; chamadaFeita: boolean;
 }
 interface DashboardData {
   turmas: number; professores: number; alunosTotal: number;
@@ -128,7 +128,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         const raw = dashRes.value.data;
         const ind = raw?.indicadores ?? {};
         const turmasArr: TurmaResumo[] = Array.isArray(raw?.turmas) ? raw.turmas : [];
-        const professoresSet = new Set(turmasArr.map((t: TurmaResumo) => t.professor).filter((p: string) => p !== 'Não atribuído'));
+        const professoresSet = new Set(turmasArr.map((t: TurmaResumo) => t.professor).filter((p: string | null) => p !== null && p !== 'Não atribuído'));
         setDashboard({
           turmas: ind.totalTurmas ?? turmasArr.length,
           // ✅ CORRIGIDO: era `professoresSet.size || ind.totalProfessores ?? 0`
@@ -236,7 +236,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     try {
       setProcessando(id);
       // Usa o endpoint dedicado de devolução com comentário obrigatório
-      await http.patch(`/plannings/${id}/devolver`, { comment: motivo });
+      await http.post(`/plannings/${id}/devolver`, { comment: motivo });
       toast.success('Planejamento devolvido com observações');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');

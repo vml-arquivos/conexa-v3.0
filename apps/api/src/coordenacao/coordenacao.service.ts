@@ -1,10 +1,17 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlanningStatus, RequestStatus, RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 function hasRole(user: JwtPayload, ...levels: RoleLevel[]): boolean {
   return Array.isArray(user.roles) && user.roles.some((r: any) => levels.includes(r?.level));
+}
+
+/** Resolve unitId: aceita override explícito (STAFF_CENTRAL/MANTENEDORA) ou usa token do usuário */
+function resolveUnitId(user: JwtPayload, override?: string): string {
+  const unitId = override || user.unitId;
+  if (!unitId) throw new ForbiddenException('unitId é obrigatório para este papel');
+  return unitId;
 }
 
 @Injectable()
@@ -15,7 +22,6 @@ export class CoordenacaoService {
 
   async criarReuniao(dto: any, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-
     return this.prisma.coordenacaoReuniao.create({
       data: {
         mantenedoraId: user.mantenedoraId,
@@ -33,19 +39,15 @@ export class CoordenacaoService {
 
   async listarReunioes(tipo: string, status: string, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-
     const where: any = { mantenedoraId: user.mantenedoraId };
     if (tipo) where.tipo = tipo;
     if (status) where.status = status;
-
-    // Professores veem apenas reuniões publicadas da sua unidade
     if (hasRole(user, RoleLevel.PROFESSOR) && !hasRole(user, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)) {
       where.status = 'PUBLICADA';
       if (user.unitId) where.unitId = user.unitId;
     } else if (hasRole(user, RoleLevel.UNIDADE) && !hasRole(user, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)) {
       if (user.unitId) where.unitId = user.unitId;
     }
-
     return this.prisma.coordenacaoReuniao.findMany({
       where,
       include: {
@@ -60,10 +62,7 @@ export class CoordenacaoService {
   async getReuniao(id: string, user: JwtPayload) {
     const reuniao = await this.prisma.coordenacaoReuniao.findUnique({
       where: { id },
-      include: {
-        participantes: true,
-        atas: true,
-      },
+      include: { participantes: true, atas: true },
     });
     if (!reuniao) throw new NotFoundException('Reunião não encontrada');
     if (reuniao.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
@@ -74,10 +73,8 @@ export class CoordenacaoService {
     const reuniao = await this.prisma.coordenacaoReuniao.findUnique({ where: { id } });
     if (!reuniao) throw new NotFoundException('Reunião não encontrada');
     if (reuniao.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
-
     const data: any = { status: dto.status };
     if (dto.status === 'PUBLICADA') data.publicadaEm = new Date();
-
     return this.prisma.coordenacaoReuniao.update({ where: { id }, data });
   }
 
@@ -85,11 +82,8 @@ export class CoordenacaoService {
     const reuniao = await this.prisma.coordenacaoReuniao.findUnique({ where: { id } });
     if (!reuniao) throw new NotFoundException('Reunião não encontrada');
     if (reuniao.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
-
-    // Apenas UNIDADE pode editar a pauta
     const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
     if (!isCoordinator) throw new ForbiddenException('Apenas a Coordenação da Unidade pode editar a pauta.');
-
     return this.prisma.coordenacaoReuniao.update({
       where: { id },
       data: {
@@ -104,7 +98,6 @@ export class CoordenacaoService {
     const reuniao = await this.prisma.coordenacaoReuniao.findUnique({ where: { id: reuniaoId } });
     if (!reuniao) throw new NotFoundException('Reunião não encontrada');
     if (reuniao.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
-
     return this.prisma.coordenacaoAta.create({
       data: {
         reuniaoId,
@@ -116,27 +109,26 @@ export class CoordenacaoService {
     });
   }
 
-  // ─── DASHBOARD UNIDADE ────────────────────────────────────────────────────
+  // ─── DASHBOARD UNIDADE (aceita unitId override para STAFF_CENTRAL) ─────────
 
-  async getDashboardUnidade(user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+  async getDashboardUnidade(user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const unitId = resolveUnitId(user, unitIdOverride);
 
-    const unitId = user.unitId;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const startOfWeek = new Date(today);
-    const dayOfWeek = today.getDay();
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    startOfWeek.setDate(today.getDate() + diff);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayRange = { gte: today, lte: todayEnd };
 
     const [
       turmas,
       requisicoesPendentes,
       planejamentosRascunho,
       planejamentosPublicados,
+      planejamentosEmRevisao,
       diariosHoje,
       reunioesAgendadas,
-      chamadaHoje,
     ] = await Promise.all([
       this.prisma.classroom.findMany({
         where: { unitId },
@@ -149,76 +141,40 @@ export class CoordenacaoService {
           },
         },
       }),
-      this.prisma.materialRequest.count({
-        where: { unitId, status: RequestStatus.SOLICITADO },
-      }),
-      this.prisma.planning.count({
-        where: { unitId, status: PlanningStatus.RASCUNHO },
-      }),
-      this.prisma.planning.count({
-        where: { unitId, status: PlanningStatus.APROVADO,},
-      }),
-      this.prisma.diaryEvent.count({
-        where: { unitId, eventDate: { gte: today } },
-      }),
+      this.prisma.materialRequest.count({ where: { unitId, status: RequestStatus.SOLICITADO } }),
+      this.prisma.planning.count({ where: { unitId, status: PlanningStatus.RASCUNHO } }),
+      this.prisma.planning.count({ where: { unitId, status: PlanningStatus.APROVADO } }),
+      this.prisma.planning.count({ where: { unitId, status: PlanningStatus.EM_REVISAO } }),
+      this.prisma.diaryEvent.count({ where: { unitId, eventDate: todayRange } }),
       this.prisma.coordenacaoReuniao.count({
-        where: {
-          mantenedoraId: user.mantenedoraId,
-          unitId,
-          status: 'AGENDADA',
-          dataRealizacao: { gte: today },
-        },
-      }),
-      this.prisma.attendance.count({
-        where: { unitId, date: today },
+        where: { mantenedoraId: user.mantenedoraId, unitId, status: 'AGENDADA', dataRealizacao: { gte: today } },
       }),
     ]);
 
     const totalAlunos = turmas.reduce((sum, t) => sum + t.enrollments.length, 0);
 
-    // Turmas com chamada feita hoje
     const turmasComChamada = await this.prisma.attendance.groupBy({
       by: ['classroomId'],
-      where: { unitId, date: today },
+      where: { unitId, date: todayRange },
     });
 
-    // Requisições por status
     const requisicoesDetalhes = await this.prisma.materialRequest.findMany({
       where: { unitId, status: RequestStatus.SOLICITADO },
-      select: {
-        id: true,
-        title: true,
-        createdBy: true,
-        requestedDate: true,
-        classroomId: true,
-        priority: true,
-      },
+      select: { id: true, title: true, createdBy: true, requestedDate: true, classroomId: true, priority: true },
       orderBy: { requestedDate: 'desc' },
       take: 20,
     });
 
-    // Planejamentos aguardando revisão
+    // FIX Bug 4: inclui EM_REVISAO na lista de planejamentos para revisão
     const planejamentosRevisao = await this.prisma.planning.findMany({
-      where: { unitId, status: PlanningStatus.RASCUNHO },
-      select: {
-        id: true,
-        title: true,
-        createdBy: true,
-        startDate: true,
-        endDate: true,
-        classroomId: true,
-      },
+      where: { unitId, status: { in: [PlanningStatus.RASCUNHO, PlanningStatus.EM_REVISAO] } },
+      select: { id: true, title: true, createdBy: true, startDate: true, endDate: true, classroomId: true, status: true },
       orderBy: { startDate: 'asc' },
       take: 20,
     });
 
-    // Próximas reuniões
     const proximasReunioes = await this.prisma.coordenacaoReuniao.findMany({
-      where: {
-        mantenedoraId: user.mantenedoraId,
-        unitId,
-        dataRealizacao: { gte: today },
-      },
+      where: { mantenedoraId: user.mantenedoraId, unitId, dataRealizacao: { gte: today } },
       orderBy: { dataRealizacao: 'asc' },
       take: 5,
     });
@@ -231,6 +187,7 @@ export class CoordenacaoService {
         totalAlunos,
         requisicoesPendentes,
         planejamentosRascunho,
+        planejamentosEmRevisao,
         planejamentosPublicados,
         diariosHoje,
         turmasComChamadaHoje: turmasComChamada.length,
@@ -242,7 +199,7 @@ export class CoordenacaoService {
         totalAlunos: t.enrollments.length,
         professor: t.teachers[0]?.teacher
           ? `${t.teachers[0].teacher.firstName} ${t.teachers[0].teacher.lastName}`
-          : 'Não atribuído',
+          : null,
         chamadaFeita: turmasComChamada.some((c) => c.classroomId === t.id),
       })),
       requisicoesPendentesDetalhes: requisicoesDetalhes,
@@ -258,11 +215,13 @@ export class CoordenacaoService {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayRange = { gte: today, lte: todayEnd };
 
     const [
       unidades,
       totalAlunos,
-      totalProfessores,
       requisicoesPendentes,
       planejamentosRascunho,
       diariosHoje,
@@ -279,54 +238,33 @@ export class CoordenacaoService {
           },
         },
       }),
-      this.prisma.child.count({
-        where: { enrollments: { some: { classroom: { unit: { mantenedoraId: user.mantenedoraId } } } } },
+      this.prisma.enrollment.count({
+        where: { status: 'ATIVA', classroom: { unit: { mantenedoraId: user.mantenedoraId } } },
       }),
-      this.prisma.classroomTeacher.count({
-        where: { classroom: { unit: { mantenedoraId: user.mantenedoraId } } },
-      }),
-      this.prisma.materialRequest.count({
-        where: { mantenedoraId: user.mantenedoraId, status: RequestStatus.SOLICITADO },
-      }),
-      this.prisma.planning.count({
-        where: { mantenedoraId: user.mantenedoraId, status: PlanningStatus.RASCUNHO },
-      }),
-      this.prisma.diaryEvent.count({
-        where: { mantenedoraId: user.mantenedoraId, eventDate: { gte: today } },
-      }),
+      this.prisma.materialRequest.count({ where: { mantenedoraId: user.mantenedoraId, status: RequestStatus.SOLICITADO } }),
+      this.prisma.planning.count({ where: { mantenedoraId: user.mantenedoraId, status: PlanningStatus.RASCUNHO } }),
+      this.prisma.diaryEvent.count({ where: { mantenedoraId: user.mantenedoraId, eventDate: todayRange } }),
       this.prisma.coordenacaoReuniao.count({
-        where: {
-          mantenedoraId: user.mantenedoraId,
-          status: 'AGENDADA',
-          dataRealizacao: { gte: today },
-        },
+        where: { mantenedoraId: user.mantenedoraId, status: 'AGENDADA', dataRealizacao: { gte: today } },
       }),
     ]);
 
-    // Consolidado por unidade
+    // FIX Bug 3: contar professores únicos (não vínculos duplicados)
+    const todosTeacherIds = new Set(
+      unidades.flatMap((u) => u.classrooms.flatMap((c) => c.teachers.map((ct) => ct.teacherId))),
+    );
+    const totalProfessores = todosTeacherIds.size;
+
     const consolidadoUnidades = await Promise.all(
       unidades.map(async (unidade) => {
         const [reqPendentes, planRascunho, diariosUnidade, chamadaUnidade] = await Promise.all([
-          this.prisma.materialRequest.count({
-            where: { unitId: unidade.id, status: RequestStatus.SOLICITADO },
-          }),
-          this.prisma.planning.count({
-            where: { unitId: unidade.id, status: PlanningStatus.RASCUNHO },
-          }),
-          this.prisma.diaryEvent.count({
-            where: { unitId: unidade.id, eventDate: { gte: today } },
-          }),
-          this.prisma.attendance.groupBy({
-            by: ['classroomId'],
-            where: { unitId: unidade.id, date: today },
-          }),
+          this.prisma.materialRequest.count({ where: { unitId: unidade.id, status: RequestStatus.SOLICITADO } }),
+          this.prisma.planning.count({ where: { unitId: unidade.id, status: PlanningStatus.RASCUNHO } }),
+          this.prisma.diaryEvent.count({ where: { unitId: unidade.id, eventDate: todayRange } }),
+          this.prisma.attendance.groupBy({ by: ['classroomId'], where: { unitId: unidade.id, date: todayRange } }),
         ]);
-
         const totalAlunosUnidade = unidade.classrooms.reduce((sum, c) => sum + c.enrollments.length, 0);
-        const professoresUnidade = new Set(
-          unidade.classrooms.flatMap((c) => c.teachers.map((ct) => ct.teacherId)),
-        ).size;
-
+        const professoresUnidade = new Set(unidade.classrooms.flatMap((c) => c.teachers.map((ct) => ct.teacherId))).size;
         return {
           id: unidade.id,
           nome: unidade.name,
@@ -345,23 +283,14 @@ export class CoordenacaoService {
       }),
     );
 
-    // Últimas reuniões de rede
     const ultimasReunioes = await this.prisma.coordenacaoReuniao.findMany({
-      where: {
-        mantenedoraId: user.mantenedoraId,
-        tipo: 'REDE',
-      },
+      where: { mantenedoraId: user.mantenedoraId, tipo: 'REDE' },
       orderBy: { dataRealizacao: 'desc' },
       take: 5,
     });
 
-    // Próximas reuniões
     const proximasReunioes = await this.prisma.coordenacaoReuniao.findMany({
-      where: {
-        mantenedoraId: user.mantenedoraId,
-        dataRealizacao: { gte: today },
-        status: 'AGENDADA',
-      },
+      where: { mantenedoraId: user.mantenedoraId, dataRealizacao: { gte: today }, status: 'AGENDADA' },
       orderBy: { dataRealizacao: 'asc' },
       take: 5,
     });
@@ -384,16 +313,15 @@ export class CoordenacaoService {
     };
   }
 
-  // ─── PLANEJAMENTOS ────────────────────────────────────────────────────────
+  // ─── PLANEJAMENTOS (aceita unitId override) ────────────────────────────────
 
-   async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload) {
-    if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
-    const where: any = { unitId: user.unitId };
-    // Se status for passado, filtra; caso contrário retorna todos os status relevantes
+  async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const unitId = resolveUnitId(user, unitIdOverride);
+    const where: any = { unitId };
     if (status) {
       where.status = status;
     } else {
-      // Coordenadora vê todos exceto CANCELADO
       where.status = { notIn: ['CANCELADO'] };
     }
     if (classroomId) where.classroomId = classroomId;
@@ -402,57 +330,47 @@ export class CoordenacaoService {
       include: {
         classroom: { select: { id: true, name: true } },
         template: { select: { id: true, name: true } },
-        createdByUser: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: { updatedAt: 'desc' },
       take: 200,
     });
   }
 
+  // FIX Bug 5: aprovarPlanejamento agora usa DEVOLVIDO (não RASCUNHO) e salva reviewComment/reviewedBy/reviewedAt
   async aprovarPlanejamento(id: string, dto: any, user: JwtPayload) {
     const planning = await this.prisma.planning.findUnique({ where: { id } });
     if (!planning) throw new NotFoundException('Planejamento não encontrado');
-    if (planning.unitId !== user.unitId) throw new ForbiddenException("Fora do escopo");
-
-    // RBAC: Apenas UNIDADE pode aprovar
     const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
     if (!isCoordinator) {
-        throw new ForbiddenException(`Apenas a Coordenação da Unidade pode aprovar planejamentos.`);
+      throw new ForbiddenException('Apenas a Coordenação da Unidade pode aprovar planejamentos.');
     }
+    if (user.unitId && planning.unitId !== user.unitId) throw new ForbiddenException('Fora do escopo');
 
-    const novoStatus = dto.aprovar ? PlanningStatus.APROVADO : PlanningStatus.RASCUNHO;
+    const novoStatus = dto.aprovar ? PlanningStatus.APROVADO : PlanningStatus.DEVOLVIDO;
+    const updateData: any = { status: novoStatus, updatedAt: new Date() };
+    if (dto.comentario) updateData.reviewComment = dto.comentario;
+    updateData.reviewedBy = user.sub;
+    updateData.reviewedAt = new Date();
 
-    return this.prisma.planning.update({
-      where: { id },
-      data: {
-        status: novoStatus,
-        updatedAt: new Date(),
-      },
-    });
+    return this.prisma.planning.update({ where: { id }, data: updateData });
   }
 
-  // ─── DIÁRIOS ──────────────────────────────────────────────────────────────
+  // ─── DIÁRIOS (aceita unitId override) ─────────────────────────────────────
 
-  async listarDiarios(classroomId: string, startDate: string, endDate: string, user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-
-    const where: any = { unitId: user.unitId };
+  async listarDiarios(classroomId: string, startDate: string, endDate: string, user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const unitId = resolveUnitId(user, unitIdOverride);
+    const where: any = { unitId };
     if (classroomId) where.classroomId = classroomId;
     if (startDate && endDate) {
-      where.eventDate = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
+      where.eventDate = { gte: new Date(startDate), lte: new Date(endDate) };
     } else {
-      // Padrão: última semana
       const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - 7);
       where.eventDate = { gte: start, lte: end };
     }
-
     return this.prisma.diaryEvent.findMany({
       where,
       include: {
@@ -464,42 +382,24 @@ export class CoordenacaoService {
     });
   }
 
-  // ─── TURMAS COM STATS COMPLETOS ─────────────────────────────────────────
+  // ─── TURMAS COM STATS (aceita unitId override) ─────────────────────────────
 
-  /**
-   * GET /coordenacao/unit/classrooms
-   * Retorna turmas da unidade com childrenCount real, todos os professores ativos,
-   * plansCount (planejamentos publicados) e totalChildrenUnit para diagnóstico.
-   */
-  async getUnitClassrooms(user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-    const unitId = user.unitId;
+  async getUnitClassrooms(user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const unitId = resolveUnitId(user, unitIdOverride);
 
     const classrooms = await this.prisma.classroom.findMany({
       where: { unitId, isActive: true },
       include: {
-        enrollments: {
-          where: { status: 'ATIVA' },
-          select: { id: true },
-        },
+        enrollments: { where: { status: 'ATIVA' }, select: { id: true } },
         teachers: {
           where: { isActive: true },
-          include: {
-            teacher: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
+          include: { teacher: { select: { id: true, firstName: true, lastName: true, email: true } } },
         },
       },
       orderBy: { name: 'asc' },
     });
 
-    // Planejamentos publicados por turma
     const classroomIds = classrooms.map((c) => c.id);
     const plansRaw = await this.prisma.planning.groupBy({
       by: ['classroomId'],
@@ -508,7 +408,6 @@ export class CoordenacaoService {
     });
     const plansMap = new Map(plansRaw.map((p) => [p.classroomId, p._count.id]));
 
-    // Total real de crianças com matrícula ATIVA na unidade (todas as turmas)
     const totalChildrenUnit = await this.prisma.enrollment.count({
       where: { classroom: { unitId }, status: 'ATIVA' },
     });
@@ -534,15 +433,14 @@ export class CoordenacaoService {
     };
   }
 
-  // ─── REQUISIÇÕES ──────────────────────────────────────────────────────────
+  // ─── REQUISIÇÕES (aceita unitId override) ─────────────────────────────────
 
-  async listarRequisicoes(status: string, user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-
-    const where: any = { unitId: user.unitId };
+  async listarRequisicoes(status: string, user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const unitId = resolveUnitId(user, unitIdOverride);
+    const where: any = { unitId };
     if (status) where.status = status;
     else where.status = RequestStatus.SOLICITADO;
-
     return this.prisma.materialRequest.findMany({
       where,
       orderBy: { requestedDate: 'desc' },
