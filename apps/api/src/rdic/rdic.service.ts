@@ -123,8 +123,8 @@ export class RdicService {
   }
 
   // ─── Devolver ao professor (coord. unidade → RASCUNHO) ────────────────────
-  async devolver(id: string, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE' && user.roles[0]?.level !== 'DEVELOPER') {
+  async devolver(id: string, dto: { comment: string }, user: JwtPayload) {
+    if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica pode devolver o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
@@ -133,13 +133,13 @@ export class RdicService {
     }
     return this.prisma.rDIXInstancia.update({
       where: { id },
-      data: { status: 'RASCUNHO' },
+      data: { status: 'DEVOLVIDO', reviewComment: dto.comment },
     });
   }
 
   // ─── Finalizar/Aprovar (coord. pedagógica unidade → FINALIZADO) ───────────
   async finalizar(id: string, dto: any, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE' && user.roles[0]?.level !== 'DEVELOPER') {
+    if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode finalizar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
@@ -161,7 +161,7 @@ export class RdicService {
   // ─── Publicar (coord. pedagógica unidade → PUBLICADO) ────────────────────
   // Após PUBLICADO, fica disponível para a coordenação geral (leitura)
   async publicar(id: string, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE' && user.roles[0]?.level !== 'DEVELOPER') {
+    if (user.roles[0]?.level !== 'UNIDADE') {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode publicar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);

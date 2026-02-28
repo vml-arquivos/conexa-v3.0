@@ -81,6 +81,25 @@ export class CoordenacaoService {
     return this.prisma.coordenacaoReuniao.update({ where: { id }, data });
   }
 
+  async atualizarPauta(id: string, dto: any, user: JwtPayload) {
+    const reuniao = await this.prisma.coordenacaoReuniao.findUnique({ where: { id } });
+    if (!reuniao) throw new NotFoundException('Reunião não encontrada');
+    if (reuniao.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+
+    // Apenas UNIDADE pode editar a pauta
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) throw new ForbiddenException('Apenas a Coordenação da Unidade pode editar a pauta.');
+
+    return this.prisma.coordenacaoReuniao.update({
+      where: { id },
+      data: {
+        descricao: dto.descricao ?? reuniao.descricao,
+        localOuLink: dto.localOuLink ?? reuniao.localOuLink,
+        dataRealizacao: dto.dataRealizacao ? new Date(dto.dataRealizacao) : reuniao.dataRealizacao,
+      },
+    });
+  }
+
   async registrarAta(reuniaoId: string, dto: any, user: JwtPayload) {
     const reuniao = await this.prisma.coordenacaoReuniao.findUnique({ where: { id: reuniaoId } });
     if (!reuniao) throw new NotFoundException('Reunião não encontrada');
@@ -137,7 +156,7 @@ export class CoordenacaoService {
         where: { unitId, status: PlanningStatus.RASCUNHO },
       }),
       this.prisma.planning.count({
-        where: { unitId, status: PlanningStatus.PUBLICADO },
+        where: { unitId, status: PlanningStatus.APROVADO,},
       }),
       this.prisma.diaryEvent.count({
         where: { unitId, eventDate: { gte: today } },
@@ -387,9 +406,15 @@ export class CoordenacaoService {
   async aprovarPlanejamento(id: string, dto: any, user: JwtPayload) {
     const planning = await this.prisma.planning.findUnique({ where: { id } });
     if (!planning) throw new NotFoundException('Planejamento não encontrado');
-    if (planning.unitId !== user.unitId) throw new ForbiddenException('Fora do escopo');
+    if (planning.unitId !== user.unitId) throw new ForbiddenException("Fora do escopo");
 
-    const novoStatus = dto.aprovar ? PlanningStatus.PUBLICADO : PlanningStatus.RASCUNHO;
+    // RBAC: Apenas UNIDADE pode aprovar
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) {
+        throw new ForbiddenException(`Apenas a Coordenação da Unidade pode aprovar planejamentos.`);
+    }
+
+    const novoStatus = dto.aprovar ? PlanningStatus.APROVADO : PlanningStatus.RASCUNHO;
 
     return this.prisma.planning.update({
       where: { id },

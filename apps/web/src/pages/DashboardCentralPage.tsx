@@ -13,6 +13,7 @@ import {
 import {
   Users, BookOpen, AlertTriangle, TrendingUp,
   Download, Filter, RefreshCw, Building2, GraduationCap,
+  ClipboardCheck, Brain, CheckCircle, Clock, RotateCcw,
 } from 'lucide-react';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -58,6 +59,25 @@ interface Unidade {
   name: string;
 }
 
+interface PlanejamentoCentral {
+  id: string;
+  title: string;
+  createdBy: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  classroom?: { name: string; unit?: { name: string } };
+}
+
+interface RdicCentral {
+  id: string;
+  periodo: string;
+  anoLetivo: number;
+  status: string;
+  child?: { firstName: string; lastName: string };
+  classroom?: { name: string; unit?: { name: string } };
+}
+
 // ─── Cores ───────────────────────────────────────────────────────────────────
 
 const CORES_GRAFICOS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
@@ -69,6 +89,10 @@ export function DashboardCentralPage() {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [abaCentral, setAbaCentral] = useState<'graficos' | 'planejamentos' | 'rdics'>('graficos');
+  const [planejamentosCentral, setPlanejamentosCentral] = useState<PlanejamentoCentral[]>([]);
+  const [rdicsCentral, setRdicsCentral] = useState<RdicCentral[]>([]);
+  const [carregandoCentral, setCarregandoCentral] = useState(false);
 
   // Dados dos gráficos
   const [dadosMensais, setDadosMensais] = useState<DadosMensais[]>([]);
@@ -110,6 +134,20 @@ export function DashboardCentralPage() {
         // Dados de demonstração quando o endpoint ainda não existe
         gerarDadosDemo();
       }
+
+      // Carregar dados pedagógicos (somente leitura)
+      setCarregandoCentral(true);
+      const [planCentral, rdicCentral] = await Promise.allSettled([
+        http.get('/coordenacao/planejamentos', { params: { status: 'APROVADO' } }),
+        http.get('/rdic/geral'),
+      ]);
+      if (planCentral.status === 'fulfilled') {
+        setPlanejamentosCentral(Array.isArray(planCentral.value.data) ? planCentral.value.data : planCentral.value.data?.data ?? []);
+      }
+      if (rdicCentral.status === 'fulfilled') {
+        setRdicsCentral(Array.isArray(rdicCentral.value.data) ? rdicCentral.value.data : rdicCentral.value.data?.data ?? []);
+      }
+      setCarregandoCentral(false);
     } catch (e) {
       setErro(getErrorMessage(e));
       gerarDadosDemo();
@@ -408,6 +446,138 @@ export function DashboardCentralPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Central Pedagógica (somente leitura) ─────────────────────────── */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-indigo-500" />
+            Central Pedagógica — Somente Leitura
+          </h3>
+          <div className="flex gap-1">
+            {(['graficos', 'planejamentos', 'rdics'] as const).map(aba => (
+              <button
+                key={aba}
+                onClick={() => setAbaCentral(aba)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                  abaCentral === aba
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                {aba === 'graficos' ? 'Gráficos' : aba === 'planejamentos' ? `Planejamentos (${planejamentosCentral.length})` : `RDICs (${rdicsCentral.length})`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {abaCentral === 'planejamentos' && (
+          <div className="p-4">
+            {carregandoCentral ? (
+              <p className="text-sm text-gray-400 text-center py-8">Carregando planejamentos...</p>
+            ) : planejamentosCentral.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                <p className="text-sm text-gray-400">Nenhum planejamento aprovado no momento.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Título</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Professor</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Turma</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Unidade</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Período</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {planejamentosCentral.map(p => (
+                      <tr key={p.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-800 max-w-[200px] truncate">{p.title}</td>
+                        <td className="px-4 py-2 text-gray-600">{p.createdBy}</td>
+                        <td className="px-4 py-2 text-gray-600">{p.classroom?.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-gray-600">{p.classroom?.unit?.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">
+                          {p.startDate ? new Date(p.startDate).toLocaleDateString('pt-BR') : '—'}
+                          {p.endDate ? ` – ${new Date(p.endDate).toLocaleDateString('pt-BR')}` : ''}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                            <CheckCircle className="h-3 w-3" /> Aprovado
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {abaCentral === 'rdics' && (
+          <div className="p-4">
+            {carregandoCentral ? (
+              <p className="text-sm text-gray-400 text-center py-8">Carregando RDICs...</p>
+            ) : rdicsCentral.length === 0 ? (
+              <div className="text-center py-8">
+                <Brain className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                <p className="text-sm text-gray-400">Nenhum RDIC publicado no momento.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Criança</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Período</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Turma</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Unidade</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {rdicsCentral.map(r => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-800">
+                          {r.child ? `${r.child.firstName} ${r.child.lastName}` : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-gray-600">{r.periodo} / {r.anoLetivo}</td>
+                        <td className="px-4 py-2 text-gray-600">{r.classroom?.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-gray-600">{r.classroom?.unit?.name ?? '—'}</td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                            r.status === 'PUBLICADO'  ? 'bg-green-100 text-green-700' :
+                            r.status === 'FINALIZADO' ? 'bg-blue-100 text-blue-700' :
+                            r.status === 'EM_REVISAO' ? 'bg-yellow-100 text-yellow-700' :
+                            r.status === 'DEVOLVIDO'  ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {r.status === 'PUBLICADO'  ? <><CheckCircle className="h-3 w-3" /> Publicado</> :
+                             r.status === 'FINALIZADO' ? <><CheckCircle className="h-3 w-3" /> Finalizado</> :
+                             r.status === 'EM_REVISAO' ? <><Clock className="h-3 w-3" /> Em Revisão</> :
+                             r.status === 'DEVOLVIDO'  ? <><RotateCcw className="h-3 w-3" /> Devolvido</> :
+                             r.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {abaCentral === 'graficos' && (
+          <div className="p-4 text-center text-sm text-gray-400 py-8">
+            Selecione "Planejamentos" ou "RDICs" para ver os dados pedagógicos das unidades.
+          </div>
+        )}
+      </div>
 
       {/* Nota de somente leitura */}
       <div className="text-xs text-gray-400 text-center pb-2">

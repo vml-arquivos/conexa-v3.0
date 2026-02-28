@@ -87,8 +87,8 @@ export class RdicController {
   /** Coord. Pedagógica da Unidade devolve ao professor para correção */
   @Patch(':id/devolver')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  devolver(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.svc.devolver(id, user);
+  devolver(@Param("id") id: string, @Body() dto: { comment: string }, @CurrentUser() user: JwtPayload) {
+    return this.svc.devolver(id, dto, user);
   }
 
   /** Coord. Pedagógica da Unidade finaliza/aprova o RDIC */

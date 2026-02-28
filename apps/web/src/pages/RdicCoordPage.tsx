@@ -3,12 +3,13 @@
  * Tela da Coordenadora Pedagógica da Unidade para revisão, correção e aprovação de RDICs.
  *
  * Fluxo de acesso:
- *  - UNIDADE / DEVELOPER: acesso completo (ver, editar, devolver, finalizar, publicar)
+ *  - UNIDADE: acesso completo (ver, editar, devolver, finalizar, publicar)
  *  - Outros roles: bloqueado (RoleProtectedRoute no router)
  *
  * Fluxo de status:
  *  RASCUNHO → (professor envia) → EM_REVISAO → (coord. aprova) → FINALIZADO → (coord. publica) → PUBLICADO
- *                                             → (coord. devolve) → RASCUNHO
+ *                                             → (coord. devolve com comentário) → DEVOLVIDO
+ *  DEVOLVIDO → (professor corrige e reenvia) → EM_REVISAO
  */
 import { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '../components/ui/PageShell';
@@ -23,7 +24,7 @@ import http from '../api/http';
 import {
   Brain, RefreshCw, CheckCircle, AlertCircle, Clock,
   Eye, Edit3, Send, RotateCcw, BookOpen, Filter,
-  ChevronDown, ChevronUp, User, FileText, Globe,
+  ChevronDown, ChevronUp, User, FileText, Globe, XCircle,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -33,11 +34,12 @@ interface RdicItem {
   classroomId: string;
   periodo: string;
   anoLetivo: number;
-  status: 'RASCUNHO' | 'EM_REVISAO' | 'FINALIZADO' | 'PUBLICADO';
+  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'FINALIZADO' | 'PUBLICADO';
   rascunhoJson: any;
   conteudoFinal: any;
   criadoPorId: string;
   revisadoPorId?: string;
+  reviewComment?: string;
   finalizadoEm?: string;
   publicadoEm?: string;
   criadoEm: string;
@@ -46,17 +48,75 @@ interface RdicItem {
 
 // ─── Badge de status ──────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: RdicItem['status'] }) {
-  const map = {
-    RASCUNHO:   { label: 'Rascunho',      cls: 'bg-gray-100 text-gray-600',    icon: <Edit3 className="h-3 w-3" /> },
-    EM_REVISAO: { label: 'Em Revisão',    cls: 'bg-yellow-100 text-yellow-700', icon: <Clock className="h-3 w-3" /> },
-    FINALIZADO: { label: 'Finalizado',    cls: 'bg-blue-100 text-blue-700',     icon: <CheckCircle className="h-3 w-3" /> },
-    PUBLICADO:  { label: 'Publicado',     cls: 'bg-green-100 text-green-700',   icon: <Globe className="h-3 w-3" /> },
+  const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+    RASCUNHO:   { label: 'Rascunho',      cls: 'bg-gray-100 text-gray-600',      icon: <Edit3 className="h-3 w-3" /> },
+    EM_REVISAO: { label: 'Em Revisão',    cls: 'bg-yellow-100 text-yellow-700',  icon: <Clock className="h-3 w-3" /> },
+    DEVOLVIDO:  { label: 'Devolvido',     cls: 'bg-orange-100 text-orange-700',  icon: <RotateCcw className="h-3 w-3" /> },
+    FINALIZADO: { label: 'Finalizado',    cls: 'bg-blue-100 text-blue-700',      icon: <CheckCircle className="h-3 w-3" /> },
+    PUBLICADO:  { label: 'Publicado',     cls: 'bg-green-100 text-green-700',    icon: <Globe className="h-3 w-3" /> },
   };
   const s = map[status] ?? map.RASCUNHO;
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${s.cls}`}>
       {s.icon} {s.label}
     </span>
+  );
+}
+
+// ─── Modal de Devolução ───────────────────────────────────────────────────────
+function ModalDevolucao({
+  onConfirmar,
+  onCancelar,
+  salvando,
+}: {
+  onConfirmar: (comment: string) => void;
+  onCancelar: () => void;
+  salvando: boolean;
+}) {
+  const [comentario, setComentario] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+            <RotateCcw className="h-5 w-5 text-orange-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-800">Devolver ao Professor</h3>
+            <p className="text-sm text-gray-500">Informe o motivo da devolução</p>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <Label htmlFor="comentario-devolucao" className="text-sm font-medium text-gray-700">
+            Comentário para o professor <span className="text-red-500">*</span>
+          </Label>
+          <Textarea
+            id="comentario-devolucao"
+            placeholder="Ex: Faltou descrever o desenvolvimento motor no campo 'Corpo, Gestos e Movimentos'. Por favor, complemente com observações da semana de 10/02."
+            value={comentario}
+            onChange={e => setComentario(e.target.value)}
+            className="min-h-[100px] text-sm"
+          />
+          <p className="text-xs text-gray-400">{comentario.length}/500 caracteres</p>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="outline" onClick={onCancelar} disabled={salvando} className="text-sm">
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => onConfirmar(comentario)}
+            disabled={salvando || comentario.trim().length < 10}
+            className="bg-orange-600 hover:bg-orange-700 text-white text-sm flex items-center gap-2"
+          >
+            {salvando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            Confirmar Devolução
+          </Button>
+        </div>
+        {comentario.trim().length < 10 && comentario.length > 0 && (
+          <p className="text-xs text-red-500 mt-2">O comentário deve ter pelo menos 10 caracteres.</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -70,6 +130,7 @@ export default function RdicCoordPage() {
   const [conteudoEditado, setConteudoEditado] = useState<any>(null);
   const [salvando, setSalvando] = useState(false);
   const [expandido, setExpandido] = useState<string | null>(null);
+  const [modalDevolucao, setModalDevolucao] = useState<string | null>(null); // id do RDIC a devolver
 
   // ─── Carregar RDICs da unidade ─────────────────────────────────────────────
   const carregar = useCallback(async () => {
@@ -98,16 +159,19 @@ export default function RdicCoordPage() {
     setModoEdicao(false);
   }
 
-  // ─── Devolver ao professor ─────────────────────────────────────────────────
-  async function devolver(id: string) {
-    if (!confirm('Devolver este RDIC ao professor para correção?')) return;
+  // ─── Devolver ao professor (com comentário obrigatório) ───────────────────
+  async function confirmarDevolucao(id: string, comment: string) {
+    setSalvando(true);
     try {
-      await http.patch(`/rdic/${id}/devolver`);
-      toast.success('RDIC devolvido ao professor.');
+      await http.patch(`/rdic/${id}/devolver`, { comment });
+      toast.success('RDIC devolvido ao professor com comentário.');
+      setModalDevolucao(null);
       setSelecionado(null);
       await carregar();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao devolver RDIC');
+    } finally {
+      setSalvando(false);
     }
   }
 
@@ -119,7 +183,6 @@ export default function RdicCoordPage() {
       toast.success('Correções salvas com sucesso.');
       setModoEdicao(false);
       await carregar();
-      // Atualizar selecionado
       const atualizado = rdics.find(r => r.id === id);
       if (atualizado) setSelecionado({ ...atualizado, rascunhoJson: conteudoEditado });
     } catch (err: any) {
@@ -168,13 +231,34 @@ export default function RdicCoordPage() {
   if (selecionado) {
     const dados = conteudoEditado ?? selecionado.rascunhoJson ?? {};
     const nome = `${selecionado.child?.firstName ?? ''} ${selecionado.child?.lastName ?? ''}`.trim();
+    const podeEditar = selecionado.status === 'EM_REVISAO' || selecionado.status === 'RASCUNHO';
 
     return (
       <PageShell
         title={`Revisão RDIC — ${nome}`}
         subtitle={`${selecionado.periodo} / ${selecionado.anoLetivo}`}
       >
+        {/* Modal de devolução */}
+        {modalDevolucao && (
+          <ModalDevolucao
+            salvando={salvando}
+            onCancelar={() => setModalDevolucao(null)}
+            onConfirmar={(comment) => confirmarDevolucao(modalDevolucao, comment)}
+          />
+        )}
+
         <div className="space-y-6">
+          {/* Alerta de comentário de devolução anterior */}
+          {selecionado.status === 'DEVOLVIDO' && selecionado.reviewComment && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-orange-700">Devolvido pela coordenação</p>
+                <p className="text-sm text-orange-600 mt-1">{selecionado.reviewComment}</p>
+              </div>
+            </div>
+          )}
+
           {/* Cabeçalho com status e ações */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white border rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-3">
@@ -191,7 +275,7 @@ export default function RdicCoordPage() {
               <Button variant="outline" onClick={() => setSelecionado(null)} className="text-sm">
                 ← Voltar à lista
               </Button>
-              {(selecionado.status === 'EM_REVISAO' || selecionado.status === 'RASCUNHO') && !modoEdicao && (
+              {podeEditar && !modoEdicao && (
                 <Button
                   variant="outline"
                   onClick={() => setModoEdicao(true)}
@@ -210,16 +294,16 @@ export default function RdicCoordPage() {
                   Salvar Correções
                 </Button>
               )}
-              {(selecionado.status === 'EM_REVISAO' || selecionado.status === 'RASCUNHO') && (
+              {podeEditar && (
                 <Button
                   variant="outline"
-                  onClick={() => devolver(selecionado.id)}
+                  onClick={() => setModalDevolucao(selecionado.id)}
                   className="flex items-center gap-2 text-sm border-orange-300 text-orange-600"
                 >
                   <RotateCcw className="h-4 w-4" /> Devolver ao Professor
                 </Button>
               )}
-              {(selecionado.status === 'EM_REVISAO' || selecionado.status === 'RASCUNHO') && (
+              {podeEditar && (
                 <Button
                   onClick={() => finalizar(selecionado.id)}
                   disabled={salvando}
@@ -242,7 +326,6 @@ export default function RdicCoordPage() {
 
           {/* Conteúdo do RDIC */}
           <div className="grid grid-cols-1 gap-4">
-            {/* Observação Geral */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -254,79 +337,18 @@ export default function RdicCoordPage() {
                   <Textarea
                     value={dados.observacaoGeral ?? ''}
                     onChange={e => setConteudoEditado({ ...dados, observacaoGeral: e.target.value })}
-                    rows={5}
-                    className="text-sm"
-                    placeholder="Observação geral do desenvolvimento da criança..."
+                    className="min-h-[120px] text-sm"
+                    placeholder="Observação geral sobre o desenvolvimento da criança..."
                   />
                 ) : (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {dados.observacaoGeral || <span className="text-gray-400 italic">Não preenchido</span>}
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {dados.observacaoGeral || <span className="text-gray-400 italic">Sem observação geral registrada.</span>}
                   </p>
                 )}
               </CardContent>
             </Card>
 
-            {/* Próximos Passos */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Send className="h-4 w-4 text-green-500" /> Próximos Passos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {modoEdicao ? (
-                  <Textarea
-                    value={dados.proximosPassos ?? ''}
-                    onChange={e => setConteudoEditado({ ...dados, proximosPassos: e.target.value })}
-                    rows={4}
-                    className="text-sm"
-                    placeholder="Estratégias e próximos passos pedagógicos..."
-                  />
-                ) : (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {dados.proximosPassos || <span className="text-gray-400 italic">Não preenchido</span>}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Dimensões / Campos de Experiência */}
-            {Array.isArray(dados.dimensoes) && dados.dimensoes.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-500" /> Campos de Experiência BNCC
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {dados.dimensoes.map((dim: any, i: number) => (
-                      <div key={i} className="border rounded-lg p-3 bg-gray-50">
-                        <p className="font-medium text-sm text-gray-800 mb-2">{dim.nome}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Array.isArray(dim.indicadores) && dim.indicadores.map((ind: any, j: number) => (
-                            <div key={j} className="flex items-center justify-between text-xs bg-white border rounded px-2 py-1">
-                              <span className="text-gray-600 flex-1 mr-2">{ind.nome}</span>
-                              <span className={`font-semibold px-1.5 py-0.5 rounded text-xs ${
-                                ind.nivel === 'A' ? 'bg-green-100 text-green-700' :
-                                ind.nivel === 'C' ? 'bg-blue-100 text-blue-700' :
-                                ind.nivel === 'ED' ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-gray-100 text-gray-500'
-                              }`}>
-                                {ind.nivel || 'NO'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Conteúdo final (se já finalizado) */}
-            {selecionado.status === 'PUBLICADO' && selecionado.conteudoFinal && (
+            {selecionado.status === 'PUBLICADO' && (
               <Card className="border-green-200 bg-green-50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2 text-green-700">
@@ -347,10 +369,11 @@ export default function RdicCoordPage() {
   }
 
   // ─── Lista de RDICs ────────────────────────────────────────────────────────
-  const contadores = {
+  const contadores: Record<string, number> = {
     todos: rdics.length,
     RASCUNHO: rdics.filter(r => r.status === 'RASCUNHO').length,
     EM_REVISAO: rdics.filter(r => r.status === 'EM_REVISAO').length,
+    DEVOLVIDO: rdics.filter(r => r.status === 'DEVOLVIDO').length,
     FINALIZADO: rdics.filter(r => r.status === 'FINALIZADO').length,
     PUBLICADO: rdics.filter(r => r.status === 'PUBLICADO').length,
   };
@@ -360,21 +383,31 @@ export default function RdicCoordPage() {
       title="Revisão de RDICs"
       subtitle="Coordenação Pedagógica — Relatórios de Desenvolvimento Individual"
     >
+      {/* Modal de devolução (na lista) */}
+      {modalDevolucao && (
+        <ModalDevolucao
+          salvando={salvando}
+          onCancelar={() => setModalDevolucao(null)}
+          onConfirmar={(comment) => confirmarDevolucao(modalDevolucao, comment)}
+        />
+      )}
+
       <div className="space-y-6">
         {/* Resumo por status */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { key: 'EM_REVISAO', label: 'Aguardando Revisão', icon: <Clock className="h-5 w-5" />, cor: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-            { key: 'RASCUNHO',   label: 'Rascunhos',          icon: <Edit3 className="h-5 w-5" />, cor: 'text-gray-600 bg-gray-50 border-gray-200' },
-            { key: 'FINALIZADO', label: 'Finalizados',         icon: <CheckCircle className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50 border-blue-200' },
-            { key: 'PUBLICADO',  label: 'Publicados',          icon: <Globe className="h-5 w-5" />, cor: 'text-green-600 bg-green-50 border-green-200' },
+            { key: 'DEVOLVIDO',  label: 'Devolvidos',          icon: <RotateCcw className="h-5 w-5" />, cor: 'text-orange-600 bg-orange-50 border-orange-200' },
+            { key: 'RASCUNHO',   label: 'Rascunhos',           icon: <Edit3 className="h-5 w-5" />, cor: 'text-gray-600 bg-gray-50 border-gray-200' },
+            { key: 'FINALIZADO', label: 'Finalizados',          icon: <CheckCircle className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50 border-blue-200' },
+            { key: 'PUBLICADO',  label: 'Publicados',           icon: <Globe className="h-5 w-5" />, cor: 'text-green-600 bg-green-50 border-green-200' },
           ].map(item => (
             <button
               key={item.key}
               onClick={() => setFiltroStatus(filtroStatus === item.key ? 'todos' : item.key)}
               className={`border rounded-xl p-4 text-left transition-all hover:shadow-sm ${item.cor} ${filtroStatus === item.key ? 'ring-2 ring-offset-1 ring-current' : ''}`}
             >
-              <div className="flex items-center gap-2 mb-1">{item.icon}<span className="font-bold text-xl">{contadores[item.key as keyof typeof contadores]}</span></div>
+              <div className="flex items-center gap-2 mb-1">{item.icon}<span className="font-bold text-xl">{contadores[item.key] ?? 0}</span></div>
               <p className="text-xs font-medium">{item.label}</p>
             </button>
           ))}
@@ -383,7 +416,7 @@ export default function RdicCoordPage() {
         {/* Filtro de status */}
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="h-4 w-4 text-gray-400" />
-          {(['todos', 'EM_REVISAO', 'RASCUNHO', 'FINALIZADO', 'PUBLICADO'] as const).map(s => (
+          {(['todos', 'EM_REVISAO', 'DEVOLVIDO', 'RASCUNHO', 'FINALIZADO', 'PUBLICADO'] as const).map(s => (
             <button
               key={s}
               onClick={() => setFiltroStatus(s)}
@@ -393,8 +426,8 @@ export default function RdicCoordPage() {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
               }`}
             >
-              {s === 'todos' ? 'Todos' : s === 'EM_REVISAO' ? 'Em Revisão' : s === 'RASCUNHO' ? 'Rascunho' : s === 'FINALIZADO' ? 'Finalizado' : 'Publicado'}
-              {s !== 'todos' && ` (${contadores[s]})`}
+              {s === 'todos' ? 'Todos' : s === 'EM_REVISAO' ? 'Em Revisão' : s === 'DEVOLVIDO' ? 'Devolvidos' : s === 'RASCUNHO' ? 'Rascunho' : s === 'FINALIZADO' ? 'Finalizado' : 'Publicado'}
+              {s !== 'todos' && ` (${contadores[s] ?? 0})`}
             </button>
           ))}
         </div>
@@ -411,6 +444,7 @@ export default function RdicCoordPage() {
             {rdicsFiltrados.map(rdic => {
               const nome = `${rdic.child?.firstName ?? ''} ${rdic.child?.lastName ?? ''}`.trim() || 'Criança';
               const isExpanded = expandido === rdic.id;
+              const podeEditar = rdic.status === 'EM_REVISAO' || rdic.status === 'RASCUNHO';
               return (
                 <Card key={rdic.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
@@ -431,6 +465,11 @@ export default function RdicCoordPage() {
                             Aguarda revisão
                           </span>
                         )}
+                        {rdic.status === 'DEVOLVIDO' && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                            Devolvido
+                          </span>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
@@ -449,12 +488,20 @@ export default function RdicCoordPage() {
                       </div>
                     </div>
 
+                    {/* Comentário de devolução */}
+                    {rdic.status === 'DEVOLVIDO' && rdic.reviewComment && (
+                      <div className="mt-2 bg-orange-50 border border-orange-100 rounded-lg p-2 flex gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-orange-700">{rdic.reviewComment}</p>
+                      </div>
+                    )}
+
                     {/* Ações rápidas inline */}
                     {isExpanded && (
                       <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                        {(rdic.status === 'EM_REVISAO' || rdic.status === 'RASCUNHO') && (
+                        {podeEditar && (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => devolver(rdic.id)} className="text-xs text-orange-600 border-orange-200">
+                            <Button size="sm" variant="outline" onClick={() => setModalDevolucao(rdic.id)} className="text-xs text-orange-600 border-orange-200">
                               <RotateCcw className="h-3.5 w-3.5 mr-1" /> Devolver
                             </Button>
                             <Button size="sm" onClick={() => { abrirRevisao(rdic); setModoEdicao(true); }} className="text-xs bg-blue-600 text-white">

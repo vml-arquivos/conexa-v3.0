@@ -1,0 +1,33 @@
+Environment variables loaded from .env
+prisma                  : 5.22.0
+@prisma/client          : 5.22.0
+Computed binaryTarget   : debian-openssl-3.0.x
+Operating System        : linux
+Architecture            : x64
+Node.js                 : v22.13.0
+Query Engine (Node-API) : libquery-engine 605197351a3c8bdd595af2d2a9bc3025bca48ea2 (at ../../node_modules/.pnpm/@prisma+engines@5.22.0/node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node)
+Schema Engine           : schema-engine-cli 605197351a3c8bdd595af2d2a9bc3025bca48ea2 (at ../../node_modules/.pnpm/@prisma+engines@5.22.0/node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x)
+Schema Wasm             : @prisma/prisma-schema-wasm 5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2
+Default Engines Hash    : 605197351a3c8bdd595af2d2a9bc3025bca48ea2
+Studio                  : 0.503.0
+---MIGRATIONS---
+20260203000000_initial_setup
+20260203000001_add_import_audit_enums
+20260209182832_sprint1_pedagogico_lock
+20260209230000_sprint4_daily_metric_cqrs
+20260218000000_pedido_compra_solicitacao_correcao
+20260218100000_novos_modulos_premium
+20260221000000_diary_event_curriculum_optional
+20260223000000_sala_virtual_recados_observacoes
+migration_lock.toml
+---CORS---
+  const allowedOrigins = [
+    'https://app.conexa3.casadf.com.br',
+    'https://conexa3.casadf.com.br',
+    // 'https://staging.conexa3.casadf.com.br', // descomente quando existir
+  ];
+
+--
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+
