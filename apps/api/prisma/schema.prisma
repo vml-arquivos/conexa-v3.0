@@ -128,6 +128,11 @@ enum PlanningStatus {
   EM_EXECUCAO
   CONCLUIDO
   CANCELADO
+
+  // Fluxo de Revisão
+  EM_REVISAO
+  APROVADO
+  DEVOLVIDO
 }
 
 /// Status de frequência
@@ -181,6 +186,11 @@ enum AuditLogAction {
   LOGOUT
   PERMISSION_CHANGE
   ROLE_CHANGE
+
+  // Fluxo de Revisão de Planejamento
+  SUBMIT_REVIEW
+  APPROVE_PLANNING
+  RETURN_PLANNING
 }
 
 /// Entidade auditada
@@ -794,6 +804,12 @@ model Planning {
   createdBy   String?   @db.VarChar(255)
   updatedBy   String?   @db.VarChar(255)
   publishedAt DateTime?
+
+  // Fluxo de Revisão
+  submittedAt   DateTime? // Data de envio para revisão
+  reviewedAt    DateTime? // Data da revisão
+  reviewedBy    String?   // ID do usuário que revisou
+  reviewComment String?   @db.Text // Comentário da revisão (devolução)
 
   // Relações
   mantenedora      Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)

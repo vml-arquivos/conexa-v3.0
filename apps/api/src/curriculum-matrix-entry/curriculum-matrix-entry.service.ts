@@ -11,6 +11,7 @@ import { CreateCurriculumMatrixEntryDto } from './dto/create-curriculum-matrix-e
 import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-entry.dto';
 import { QueryCurriculumMatrixEntryDto } from './dto/query-curriculum-matrix-entry.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { maskMatrizEntriesForProfessor, maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 
 @Injectable()
 export class CurriculumMatrixEntryService {
@@ -150,7 +151,7 @@ export class CurriculumMatrixEntryService {
       where.campoDeExperiencia = query.campoDeExperiencia;
     }
 
-    return this.prisma.curriculumMatrixEntry.findMany({
+    const entries = await this.prisma.curriculumMatrixEntry.findMany({
       where,
       include: {
         matrix: {
@@ -167,6 +168,8 @@ export class CurriculumMatrixEntryService {
       },
       orderBy: [{ date: 'asc' }, { campoDeExperiencia: 'asc' }],
     });
+
+    return maskMatrizEntriesForProfessor(user, entries);
   }
 
   /**
@@ -205,7 +208,7 @@ export class CurriculumMatrixEntryService {
       throw new NotFoundException('Entrada da matriz não encontrada');
     }
 
-    return entry;
+    return maskMatrizEntryForProfessor(user, entry);
   }
 
   /**
