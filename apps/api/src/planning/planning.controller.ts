@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { PlanningService } from './planning.service';
 import { CreatePlanningDto } from './dto/create-planning.dto';
+import { ReturnPlanningDto } from './dto/return-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 import { QueryPlanningDto } from './dto/query-planning.dto';
@@ -174,5 +175,29 @@ export class PlanningController {
   @Patch(':id/close')
   close(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.planningService.close(id, user);
+  }
+
+  // --- FLUXO DE REVISÃO ---
+
+  @Post(":id/enviar-revisao")
+  @HttpCode(HttpStatus.OK)
+  submitForReview(@Param("id") id: string, @CurrentUser() user: JwtPayload) {
+    return this.planningService.submitForReview(id, user);
+  }
+
+  @Post(":id/aprovar")
+  @HttpCode(HttpStatus.OK)
+  approve(@Param("id") id: string, @CurrentUser() user: JwtPayload) {
+    return this.planningService.approve(id, user);
+  }
+
+  @Post(":id/devolver")
+  @HttpCode(HttpStatus.OK)
+  returnForCorrections(
+    @Param("id") id: string,
+    @Body() dto: ReturnPlanningDto,
+    @CurrentUser() user: JwtPayload
+  ) {
+    return this.planningService.returnForCorrections(id, dto, user);
   }
 }

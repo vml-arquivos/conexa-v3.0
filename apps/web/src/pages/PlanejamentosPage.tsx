@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor, isUnidade } from '../api/auth';
+import { submitPlanningForReview, approvePlanning, returnPlanning } from '../api/plannings';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -13,7 +16,8 @@ import {
   BookOpen, Calendar, Plus, Save, ChevronDown, ChevronUp,
   CheckCircle, AlertCircle, Sparkles, FileText,
   Users, Target, Lightbulb, RefreshCw, Eye, Edit3,
-  Search, Star, BookMarked, Layers,
+  Search, Star, BookMarked, Layers, Send, ThumbsUp, ThumbsDown,
+  MessageSquare, Clock,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -73,6 +77,10 @@ const STATUS_CONFIG: Record<string, { label: string; cor: string; icon: React.Re
   EM_EXECUCAO: { label: 'Em Execução', cor: 'bg-green-100 text-green-700', icon: <CheckCircle className="h-3 w-3" /> },
   CONCLUIDO: { label: 'Concluído', cor: 'bg-emerald-100 text-emerald-700', icon: <Star className="h-3 w-3" /> },
   CANCELADO: { label: 'Cancelado', cor: 'bg-red-100 text-red-600', icon: <AlertCircle className="h-3 w-3" /> },
+  // Fluxo de Revisão
+  EM_REVISAO: { label: 'Em Revisão', cor: 'bg-yellow-100 text-yellow-700', icon: <Clock className="h-3 w-3" /> },
+  APROVADO: { label: 'Aprovado', cor: 'bg-teal-100 text-teal-700', icon: <ThumbsUp className="h-3 w-3" /> },
+  DEVOLVIDO: { label: 'Devolvido', cor: 'bg-orange-100 text-orange-700', icon: <ThumbsDown className="h-3 w-3" /> },
 };
 
 // ─── Amostra da Matriz 2026 (fallback offline) ────────────────────────────────
@@ -91,7 +99,12 @@ const MATRIZ_SAMPLE: MatrizEntry[] = [
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function PlanejamentosPage() {
+  const { user } = useAuth();
+  const ehProfessor = isProfessor(user);
+  const ehCoordenador = isUnidade(user);
   const [aba, setAba] = useState<'meus' | 'novo' | 'matriz' | 'templates'>('meus');
+  const [revisaoModal, setRevisaoModal] = useState<{ planningId: string; tipo: 'devolver' } | null>(null);
+  const [comentarioRevisao, setComentarioRevisao] = useState('');
   const [plannings, setPlannings] = useState<Planning[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [turmas, setTurmas] = useState<Classroom[]>([]);
@@ -187,6 +200,42 @@ export default function PlanejamentosPage() {
     }));
   }
 
+  async function enviarParaRevisao(planningId: string) {
+    try {
+      await submitPlanningForReview(planningId);
+      toast.success('Planejamento enviado para revisão!');
+      loadData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao enviar para revisão');
+    }
+  }
+
+  async function aprovarPlanejamento(planningId: string) {
+    try {
+      await approvePlanning(planningId);
+      toast.success('Planejamento aprovado!');
+      loadData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao aprovar planejamento');
+    }
+  }
+
+  async function devolverPlanejamento() {
+    if (!revisaoModal || !comentarioRevisao.trim()) {
+      toast.error('Informe um comentário para a devolução.');
+      return;
+    }
+    try {
+      await returnPlanning(revisaoModal.planningId, comentarioRevisao);
+      toast.success('Planejamento devolvido para correções.');
+      setRevisaoModal(null);
+      setComentarioRevisao('');
+      loadData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao devolver planejamento');
+    }
+  }
+
   function adicionarObjetivoMatriz(entry: MatrizEntry) {
     setForm(f => ({
       ...f,
@@ -273,9 +322,40 @@ export default function PlanejamentosPage() {
                         <h3 className="font-semibold text-gray-800 truncate">{p.title}</h3>
                         {p.weekStart && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(p.weekStart).toLocaleDateString('pt-BR')}{p.weekEnd && ` — ${new Date(p.weekEnd).toLocaleDateString('pt-BR')}`}</p>}
                       </div>
-                      <button onClick={() => setExpandedPlanning(isExpanded ? null : p.id)} className="text-gray-400 hover:text-gray-600 p-1">
-                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* Botão Enviar para Revisão — apenas para professor em RASCUNHO ou DEVOLVIDO */}
+                        {ehProfessor && (p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO') && (
+                          <button
+                            onClick={() => enviarParaRevisao(p.id)}
+                            title="Enviar para revisão"
+                            className="flex items-center gap-1 text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Send className="h-3 w-3" /> Enviar para Revisão
+                          </button>
+                        )}
+                        {/* Botões de Coordenação — apenas para UNIDADE em EM_REVISAO */}
+                        {ehCoordenador && p.status === 'EM_REVISAO' && (
+                          <>
+                            <button
+                              onClick={() => aprovarPlanejamento(p.id)}
+                              title="Aprovar planejamento"
+                              className="flex items-center gap-1 text-xs bg-teal-600 text-white px-2 py-1 rounded-lg hover:bg-teal-700 transition-colors"
+                            >
+                              <ThumbsUp className="h-3 w-3" /> Aprovar
+                            </button>
+                            <button
+                              onClick={() => setRevisaoModal({ planningId: p.id, tipo: 'devolver' })}
+                              title="Devolver para correções"
+                              className="flex items-center gap-1 text-xs bg-orange-500 text-white px-2 py-1 rounded-lg hover:bg-orange-600 transition-colors"
+                            >
+                              <ThumbsDown className="h-3 w-3" /> Devolver
+                            </button>
+                          </>
+                        )}
+                        <button onClick={() => setExpandedPlanning(isExpanded ? null : p.id)} className="text-gray-400 hover:text-gray-600 p-1">
+                          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                        </button>
+                      </div>
                     </div>
                     {isExpanded && p.pedagogicalContent && (
                       <div className="mt-4 pt-4 border-t space-y-3">
@@ -522,6 +602,43 @@ export default function PlanejamentosPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      )}
+      {/* ─── MODAL DE DEVOLUÇÃO ─── */}
+      {revisaoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                <MessageSquare className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-800">Devolver para Correções</h3>
+                <p className="text-xs text-gray-500">Informe o motivo da devolução ao professor</p>
+              </div>
+            </div>
+            <textarea
+              className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-400"
+              rows={4}
+              placeholder="Descreva os ajustes necessários no planejamento..."
+              value={comentarioRevisao}
+              onChange={e => setComentarioRevisao(e.target.value)}
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={devolverPlanejamento}
+                className="flex-1 bg-orange-500 text-white py-2 rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors"
+              >
+                Confirmar Devolução
+              </button>
+              <button
+                onClick={() => { setRevisaoModal(null); setComentarioRevisao(''); }}
+                className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
