@@ -1,0 +1,33 @@
+20260203000000_initial_setup
+20260203000001_add_import_audit_enums
+20260209182832_sprint1_pedagogico_lock
+20260209230000_sprint4_daily_metric_cqrs
+20260218000000_pedido_compra_solicitacao_correcao
+20260218100000_novos_modulos_premium
+20260221000000_diary_event_curriculum_optional
+20260223000000_sala_virtual_recados_observacoes
+20260227200000_feat_planning_review_flow
+20260228000000_rdic_devolvido_review_comment
+migration_lock.toml
+---SCHEMA RDIC---
+283:  rdixInstancias       RDIXInstancia[]
+558:  rdixInstancias           RDIXInstancia[]
+809:  submittedAt   DateTime? // Data de envio para revisão
+812:  reviewComment String?   @db.Text // Comentário da revisão (devolução)
+1536:enum StatusRDIX {
+1555:  instancias   RDIXInstancia[]
+1560:model RDIXInstancia {
+1568:  anoLetivo      Int
+1569:  status         StatusRDIX @default(RASCUNHO)
+1574:  reviewComment String?
+1582:  @@unique([childId, classroomId, periodo, anoLetivo])
+---SCHEMA PLANNING---
+116:enum PlanningType {
+125:enum PlanningStatus {
+781:  type      PlanningType
+799:  status PlanningStatus @default(RASCUNHO)
+809:  submittedAt   DateTime? // Data de envio para revisão
+812:  reviewComment String?   @db.Text // Comentário da revisão (devolução)
+1568:  anoLetivo      Int
+1574:  reviewComment String?
+1582:  @@unique([childId, classroomId, periodo, anoLetivo])

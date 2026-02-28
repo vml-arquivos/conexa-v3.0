@@ -34,7 +34,7 @@ interface RdicItem {
   classroomId: string;
   periodo: string;
   anoLetivo: number;
-  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'FINALIZADO' | 'PUBLICADO';
+  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'APROVADO' | 'FINALIZADO' | 'PUBLICADO';
   rascunhoJson: any;
   conteudoFinal: any;
   criadoPorId: string;
@@ -49,11 +49,12 @@ interface RdicItem {
 // ─── Badge de status ──────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: RdicItem['status'] }) {
   const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-    RASCUNHO:   { label: 'Rascunho',      cls: 'bg-gray-100 text-gray-600',      icon: <Edit3 className="h-3 w-3" /> },
-    EM_REVISAO: { label: 'Em Revisão',    cls: 'bg-yellow-100 text-yellow-700',  icon: <Clock className="h-3 w-3" /> },
-    DEVOLVIDO:  { label: 'Devolvido',     cls: 'bg-orange-100 text-orange-700',  icon: <RotateCcw className="h-3 w-3" /> },
-    FINALIZADO: { label: 'Finalizado',    cls: 'bg-blue-100 text-blue-700',      icon: <CheckCircle className="h-3 w-3" /> },
-    PUBLICADO:  { label: 'Publicado',     cls: 'bg-green-100 text-green-700',    icon: <Globe className="h-3 w-3" /> },
+    RASCUNHO:   { label: 'Rascunho',      cls: 'bg-gray-100 text-gray-600',        icon: <Edit3 className="h-3 w-3" /> },
+    EM_REVISAO: { label: 'Em Revisão',    cls: 'bg-yellow-100 text-yellow-700',    icon: <Clock className="h-3 w-3" /> },
+    DEVOLVIDO:  { label: 'Devolvido',     cls: 'bg-orange-100 text-orange-700',    icon: <RotateCcw className="h-3 w-3" /> },
+    APROVADO:   { label: '✓ Aprovado',    cls: 'bg-emerald-100 text-emerald-700',  icon: <CheckCircle className="h-3 w-3" /> },
+    FINALIZADO: { label: 'Finalizado',    cls: 'bg-blue-100 text-blue-700',        icon: <CheckCircle className="h-3 w-3" /> },
+    PUBLICADO:  { label: 'Publicado',     cls: 'bg-green-100 text-green-700',      icon: <Globe className="h-3 w-3" /> },
   };
   const s = map[status] ?? map.RASCUNHO;
   return (
@@ -192,7 +193,23 @@ export default function RdicCoordPage() {
     }
   }
 
-  // ─── Finalizar (aprovar) ───────────────────────────────────────────────────
+   // ─── Aprovar RDIC (novo endpoint POST /aprovar) ──────────────────────────────
+  async function aprovar(id: string) {
+    if (!confirm('Aprovar este RDIC? O professor não poderá mais editá-lo.')) return;
+    setSalvando(true);
+    try {
+      await http.post(`/rdic/${id}/aprovar`);
+      toast.success('✓ RDIC aprovado com sucesso!');
+      setSelecionado(null);
+      await carregar();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao aprovar RDIC');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // ─── Finalizar (legado) ─────────────────────────────────────────────
   async function finalizar(id: string) {
     if (!confirm('Finalizar e aprovar este RDIC? O professor não poderá mais editá-lo.')) return;
     setSalvando(true);
@@ -305,11 +322,11 @@ export default function RdicCoordPage() {
               )}
               {podeEditar && (
                 <Button
-                  onClick={() => finalizar(selecionado.id)}
+                  onClick={() => aprovar(selecionado.id)}
                   disabled={salvando}
-                  className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="flex items-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
-                  <CheckCircle className="h-4 w-4" /> Finalizar e Aprovar
+                  <CheckCircle className="h-4 w-4" /> Aprovar RDIC
                 </Button>
               )}
               {selecionado.status === 'FINALIZADO' && (
@@ -374,6 +391,7 @@ export default function RdicCoordPage() {
     RASCUNHO: rdics.filter(r => r.status === 'RASCUNHO').length,
     EM_REVISAO: rdics.filter(r => r.status === 'EM_REVISAO').length,
     DEVOLVIDO: rdics.filter(r => r.status === 'DEVOLVIDO').length,
+    APROVADO: rdics.filter(r => r.status === 'APROVADO').length,
     FINALIZADO: rdics.filter(r => r.status === 'FINALIZADO').length,
     PUBLICADO: rdics.filter(r => r.status === 'PUBLICADO').length,
   };
@@ -398,7 +416,7 @@ export default function RdicCoordPage() {
           {[
             { key: 'EM_REVISAO', label: 'Aguardando Revisão', icon: <Clock className="h-5 w-5" />, cor: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
             { key: 'DEVOLVIDO',  label: 'Devolvidos',          icon: <RotateCcw className="h-5 w-5" />, cor: 'text-orange-600 bg-orange-50 border-orange-200' },
-            { key: 'RASCUNHO',   label: 'Rascunhos',           icon: <Edit3 className="h-5 w-5" />, cor: 'text-gray-600 bg-gray-50 border-gray-200' },
+            { key: 'APROVADO',   label: 'Aprovados',           icon: <CheckCircle className="h-5 w-5" />, cor: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
             { key: 'FINALIZADO', label: 'Finalizados',          icon: <CheckCircle className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50 border-blue-200' },
             { key: 'PUBLICADO',  label: 'Publicados',           icon: <Globe className="h-5 w-5" />, cor: 'text-green-600 bg-green-50 border-green-200' },
           ].map(item => (
@@ -416,7 +434,7 @@ export default function RdicCoordPage() {
         {/* Filtro de status */}
         <div className="flex items-center gap-2 flex-wrap">
           <Filter className="h-4 w-4 text-gray-400" />
-          {(['todos', 'EM_REVISAO', 'DEVOLVIDO', 'RASCUNHO', 'FINALIZADO', 'PUBLICADO'] as const).map(s => (
+          {(['todos', 'EM_REVISAO', 'DEVOLVIDO', 'RASCUNHO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'] as const).map(s => (
             <button
               key={s}
               onClick={() => setFiltroStatus(s)}
@@ -426,7 +444,7 @@ export default function RdicCoordPage() {
                   : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
               }`}
             >
-              {s === 'todos' ? 'Todos' : s === 'EM_REVISAO' ? 'Em Revisão' : s === 'DEVOLVIDO' ? 'Devolvidos' : s === 'RASCUNHO' ? 'Rascunho' : s === 'FINALIZADO' ? 'Finalizado' : 'Publicado'}
+              {s === 'todos' ? 'Todos' : s === 'EM_REVISAO' ? 'Em Revisão' : s === 'DEVOLVIDO' ? 'Devolvidos' : s === 'RASCUNHO' ? 'Rascunho' : s === 'APROVADO' ? 'Aprovados' : s === 'FINALIZADO' ? 'Finalizado' : 'Publicado'}
               {s !== 'todos' && ` (${contadores[s] ?? 0})`}
             </button>
           ))}
@@ -507,8 +525,8 @@ export default function RdicCoordPage() {
                             <Button size="sm" onClick={() => { abrirRevisao(rdic); setModoEdicao(true); }} className="text-xs bg-blue-600 text-white">
                               <Edit3 className="h-3.5 w-3.5 mr-1" /> Editar e Aprovar
                             </Button>
-                            <Button size="sm" onClick={() => finalizar(rdic.id)} className="text-xs bg-indigo-600 text-white">
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar Direto
+                            <Button size="sm" onClick={() => aprovar(rdic.id)} className="text-xs bg-emerald-600 text-white">
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar
                             </Button>
                           </>
                         )}
