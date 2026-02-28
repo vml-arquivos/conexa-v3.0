@@ -1,7 +1,7 @@
 /**
  * Dashboard de Unidade — Gestão Operacional
  * Acesso: Direção, Coordenação Pedagógica, Administrativo, Secretaria, Nutricionista
- * Funcionalidades: pendências, alertas, materiais, planejamentos, CRUD operacional
+ * CORRIGIDO: usa dados reais de /coordenacao/dashboard/unidade
  */
 import { useState, useEffect, useCallback } from 'react';
 import { IndicatorsCards } from '../components/ui/IndicatorsCards';
@@ -10,44 +10,44 @@ import {
 } from 'recharts';
 import {
   AlertTriangle, CheckCircle, Clock, ShoppingCart,
-  BookOpen, Users, RefreshCw, ChevronRight, Package,
+  BookOpen, RefreshCw, ChevronRight, Package,
 } from 'lucide-react';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-interface PendenciaTurma {
-  turma: string;
-  professor: string;
-  diariosPendentes: number;
-  relatoriosPendentes: number;
-  planejamentoPendente: boolean;
-}
-
-interface AlertaAluno {
-  aluno: string;
-  turma: string;
-  tipo: string;
-  descricao: string;
-  data: string;
-}
-
-interface RequisicaoMaterial {
+interface TurmaReal {
   id: string;
-  professor: string;
-  turma: string;
-  titulo: string;
-  categoria: string;
-  urgencia: string;
+  nome: string;
+  totalAlunos: number;
+  professor: string | null;
+  chamadaFeita: boolean;
+}
+
+interface RequisicaoReal {
+  id: string;
+  title: string;
+  createdBy: string;
+  requestedDate: string;
+  classroomId: string | null;
+  priority: string;
+  status?: string;
+}
+
+interface PlanejamentoReal {
+  id: string;
+  title: string;
+  createdBy: string;
+  startDate: string;
+  endDate: string;
+  classroomId: string;
   status: string;
-  criadoEm: string;
 }
 
 interface DadosMateriais {
   categoria: string;
   quantidade: number;
-  cor: string;
 }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
@@ -57,73 +57,67 @@ export function DashboardUnidadePage() {
   const [erro, setErro] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<'pendencias' | 'alertas' | 'materiais' | 'planejamentos'>('pendencias');
 
-  const [pendencias, setPendencias] = useState<PendenciaTurma[]>([]);
-  const [alertas, setAlertas] = useState<AlertaAluno[]>([]);
-  const [requisicoes, setRequisicoes] = useState<RequisicaoMaterial[]>([]);
+  const [turmas, setTurmas] = useState<TurmaReal[]>([]);
+  const [requisicoes, setRequisicoes] = useState<RequisicaoReal[]>([]);
+  const [planejamentos, setPlanejamentos] = useState<PlanejamentoReal[]>([]);
   const [dadosMateriais, setDadosMateriais] = useState<DadosMateriais[]>([]);
-  const [indicators, setIndicators] = useState({ totalAlunos: 0, totalTurmas: 0, requisicoesAbertas: 0, alertasAtivos: 0 });
+  const [indicators, setIndicators] = useState({
+    totalAlunos: 0,
+    totalTurmas: 0,
+    requisicoesAbertas: 0,
+    alertasAtivos: 0,
+  });
 
   const carregarDados = useCallback(async () => {
     setCarregando(true);
     setErro(null);
     try {
-      const [reqRes] = await Promise.allSettled([
-        http.get('/material-requests'),
-      ]);
+      const res = await http.get('/coordenacao/dashboard/unidade');
+      const raw = res.data ?? {};
+      const ind = raw.indicadores ?? {};
+      const turmasArr: TurmaReal[] = Array.isArray(raw.turmas) ? raw.turmas : [];
+      const reqArr: RequisicaoReal[] = Array.isArray(raw.requisicoesPendentesDetalhes)
+        ? raw.requisicoesPendentesDetalhes
+        : [];
+      const planArr: PlanejamentoReal[] = Array.isArray(raw.planejamentosParaRevisao)
+        ? raw.planejamentosParaRevisao
+        : [];
 
-      if (reqRes.status === 'fulfilled') {
-        const reqs = reqRes.value.data ?? [];
-        setRequisicoes(reqs.map((r: Record<string, unknown>) => ({
-          id: r.id as string,
-          professor: (r.createdBy as string) ?? 'Professor',
-          turma: (r.classroomId as string) ?? '—',
-          titulo: (r.title as string) ?? 'Material',
-          categoria: (r.type as string) ?? 'OUTRO',
-          urgencia: (r.priority as string) ?? 'normal',
-          status: (r.status as string) ?? 'SOLICITADO',
-          criadoEm: (r.requestedDate as string) ?? new Date().toISOString(),
-        })));
-        setIndicators(k => ({ ...k, requisicoesAbertas: reqs.filter((r: Record<string, unknown>) => r.status === 'SOLICITADO').length }));
-      }
+      setIndicators({
+        totalAlunos: ind.totalAlunos ?? 0,
+        totalTurmas: ind.totalTurmas ?? turmasArr.length,
+        requisicoesAbertas: ind.requisicoesPendentes ?? reqArr.length,
+        alertasAtivos: (ind.planejamentosEmRevisao ?? 0) + (ind.planejamentosRascunho ?? 0),
+      });
 
-      // Dados de demonstração para pendências e alertas
-      gerarDadosDemo();
+      setTurmas(turmasArr);
+      setRequisicoes(reqArr);
+      setPlanejamentos(planArr);
+
+      // Agrupa requisições por categoria para o gráfico
+      const categorias: Record<string, number> = {};
+      reqArr.forEach((r) => {
+        const cat = r.priority === 'alta' ? 'Urgente'
+          : r.priority === 'baixa' ? 'Baixa Prio.'
+          : 'Normal';
+        categorias[cat] = (categorias[cat] ?? 0) + 1;
+      });
+      setDadosMateriais(Object.entries(categorias).map(([categoria, quantidade]) => ({ categoria, quantidade })));
+
     } catch (e) {
       setErro(getErrorMessage(e));
-      gerarDadosDemo();
     } finally {
       setCarregando(false);
     }
   }, []);
-
-  const gerarDadosDemo = () => {
-    setIndicators({ totalAlunos: 78, totalTurmas: 6, requisicoesAbertas: 3, alertasAtivos: 2 });
-    setPendencias([
-      { turma: 'Berçário I', professor: 'Ana Paula', diariosPendentes: 2, relatoriosPendentes: 1, planejamentoPendente: false },
-      { turma: 'Berçário II', professor: 'Maria José', diariosPendentes: 0, relatoriosPendentes: 0, planejamentoPendente: false },
-      { turma: 'Maternal I', professor: 'Fernanda', diariosPendentes: 1, relatoriosPendentes: 2, planejamentoPendente: true },
-      { turma: 'Maternal II', professor: 'Carla', diariosPendentes: 0, relatoriosPendentes: 1, planejamentoPendente: false },
-      { turma: 'Jardim I', professor: 'Patrícia', diariosPendentes: 3, relatoriosPendentes: 0, planejamentoPendente: false },
-      { turma: 'Jardim II', professor: 'Simone', diariosPendentes: 0, relatoriosPendentes: 0, planejamentoPendente: false },
-    ]);
-    setAlertas([
-      { aluno: 'João Pedro', turma: 'Maternal I', tipo: 'Desenvolvimento', descricao: 'Dificuldade na coordenação motora fina observada em 3 registros consecutivos', data: '2026-02-15' },
-      { aluno: 'Maria Clara', turma: 'Berçário I', tipo: 'Alimentação', descricao: 'Recusa alimentar persistente — verificar com nutricionista', data: '2026-02-16' },
-    ]);
-    setDadosMateriais([
-      { categoria: 'Pedagógico', quantidade: 5, cor: '#3B82F6' },
-      { categoria: 'Higiene', quantidade: 3, cor: '#10B981' },
-      { categoria: 'Limpeza', quantidade: 2, cor: '#F59E0B' },
-      { categoria: 'Alimentação', quantidade: 1, cor: '#EF4444' },
-    ]);
-  };
 
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   const aprovarRequisicao = async (id: string) => {
     try {
       await http.patch(`/material-requests/${id}/review`, { decision: 'APPROVED' });
-      setRequisicoes(prev => prev.map(r => r.id === id ? { ...r, status: 'APROVADO' } : r));
+      setRequisicoes(prev => prev.filter(r => r.id !== id));
+      setIndicators(k => ({ ...k, requisicoesAbertas: Math.max(0, k.requisicoesAbertas - 1) }));
     } catch (e) {
       alert(getErrorMessage(e));
     }
@@ -132,30 +126,37 @@ export function DashboardUnidadePage() {
   const rejeitarRequisicao = async (id: string) => {
     try {
       await http.patch(`/material-requests/${id}/review`, { decision: 'REJECTED' });
-      setRequisicoes(prev => prev.map(r => r.id === id ? { ...r, status: 'REJEITADO' } : r));
+      setRequisicoes(prev => prev.filter(r => r.id !== id));
+      setIndicators(k => ({ ...k, requisicoesAbertas: Math.max(0, k.requisicoesAbertas - 1) }));
     } catch (e) {
       alert(getErrorMessage(e));
     }
   };
 
-  const corStatus = (status: string) => {
-    const mapa: Record<string, string> = {
-      SOLICITADO: 'bg-amber-100 text-amber-700',
-      APROVADO: 'bg-emerald-100 text-emerald-700',
-      REJEITADO: 'bg-red-100 text-red-700',
-      ENTREGUE: 'bg-blue-100 text-blue-700',
-    };
-    return mapa[status] ?? 'bg-gray-100 text-gray-600';
+  const labelPrioridade = (p: string) => {
+    if (p === 'alta') return '🔴 Urgente';
+    if (p === 'baixa') return 'Baixa prioridade';
+    return 'Prioridade normal';
   };
 
   const labelStatus = (status: string) => {
     const mapa: Record<string, string> = {
-      SOLICITADO: 'Aguardando',
+      RASCUNHO: 'Rascunho',
+      EM_REVISAO: 'Em Revisão',
       APROVADO: 'Aprovado',
-      REJEITADO: 'Rejeitado',
-      ENTREGUE: 'Entregue',
+      DEVOLVIDO: 'Devolvido',
     };
     return mapa[status] ?? status;
+  };
+
+  const corStatus = (status: string) => {
+    const mapa: Record<string, string> = {
+      RASCUNHO: 'bg-gray-100 text-gray-600',
+      EM_REVISAO: 'bg-yellow-100 text-yellow-700',
+      APROVADO: 'bg-emerald-100 text-emerald-700',
+      DEVOLVIDO: 'bg-orange-100 text-orange-700',
+    };
+    return mapa[status] ?? 'bg-gray-100 text-gray-600';
   };
 
   const ABAS = [
@@ -191,40 +192,36 @@ export function DashboardUnidadePage() {
 
       {/* Erro */}
       {erro && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          <strong>Aviso:</strong> {erro}. Exibindo dados de demonstração.
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+          <strong>Erro ao carregar dados:</strong> {erro}
         </div>
       )}
 
-      {/* Indicadores da Unidade */}
+      {/* Indicadores reais da Unidade */}
       <IndicatorsCards
         title="Indicadores da Unidade"
         loading={carregando}
         error={!!erro && indicators.totalAlunos === 0}
         onRefresh={carregarDados}
         items={[
-          { label: 'Total de Alunos',       value: indicators.totalAlunos,        tone: 'info' },
-          { label: 'Turmas Ativas',          value: indicators.totalTurmas,        tone: 'success' },
-          { label: 'Requisições Abertas',   value: indicators.requisicoesAbertas, tone: indicators.requisicoesAbertas > 0 ? 'warning' : 'default' },
-          { label: 'Alertas Ativos',         value: indicators.alertasAtivos,      tone: indicators.alertasAtivos > 0 ? 'danger' : 'default' },
+          { label: 'Total de Alunos',      value: indicators.totalAlunos,        tone: 'info' },
+          { label: 'Turmas Ativas',         value: indicators.totalTurmas,        tone: 'success' },
+          { label: 'Requisições Abertas',  value: indicators.requisicoesAbertas, tone: indicators.requisicoesAbertas > 0 ? 'warning' : 'default' },
+          { label: 'Planos p/ Revisar',    value: indicators.alertasAtivos,      tone: indicators.alertasAtivos > 0 ? 'danger' : 'default' },
         ]}
       />
 
-      {/* Gráfico de materiais por categoria */}
+      {/* Gráfico de requisições por prioridade */}
       {dadosMateriais.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Requisições de Materiais por Categoria</h3>
-          <ResponsiveContainer width="100%" height={160}>
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Requisições de Materiais por Prioridade</h3>
+          <ResponsiveContainer width="100%" height={120}>
             <BarChart data={dadosMateriais} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 12 }} />
-              <YAxis dataKey="categoria" type="category" tick={{ fontSize: 12 }} width={90} />
+              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+              <YAxis dataKey="categoria" type="category" tick={{ fontSize: 12 }} width={100} />
               <Tooltip />
-              <Bar dataKey="quantidade" name="Requisições" radius={[0, 4, 4, 0]}>
-                {dadosMateriais.map((entry, index) => (
-                  <rect key={index} fill={entry.cor} />
-                ))}
-              </Bar>
+              <Bar dataKey="quantidade" name="Requisições" fill="#3B82F6" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -251,70 +248,70 @@ export function DashboardUnidadePage() {
 
         <div className="p-5">
 
-          {/* Aba: Pendências */}
+          {/* Aba: Pendências — turmas com/sem chamada feita */}
           {abaAtiva === 'pendencias' && (
             <div className="space-y-3">
-              <p className="text-xs text-gray-500 mb-3">Pendências por turma — diários, relatórios e planejamentos em aberto</p>
-              {pendencias.map((p, i) => {
-                const totalPendencias = p.diariosPendentes + p.relatoriosPendentes + (p.planejamentoPendente ? 1 : 0);
-                return (
-                  <div key={i} className={`flex items-center justify-between p-3 rounded-lg border ${totalPendencias > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50'}`}>
-                    <div className="flex items-center gap-3">
-                      {totalPendencias > 0
-                        ? <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                        : <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                      }
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{p.turma}</p>
-                        <p className="text-xs text-gray-500">{p.professor}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3 text-xs">
-                      {p.diariosPendentes > 0 && (
-                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                          {p.diariosPendentes} diário{p.diariosPendentes > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {p.relatoriosPendentes > 0 && (
-                        <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
-                          {p.relatoriosPendentes} relatório{p.relatoriosPendentes > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {p.planejamentoPendente && (
-                        <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
-                          planejamento
-                        </span>
-                      )}
-                      {totalPendencias === 0 && (
-                        <span className="text-emerald-600 font-medium">Em dia</span>
-                      )}
+              <p className="text-xs text-gray-500 mb-3">
+                Chamada diária por turma — {turmas.filter(t => t.chamadaFeita).length} de {turmas.length} realizadas hoje
+              </p>
+              {carregando && turmas.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Carregando turmas...</p>
+              )}
+              {!carregando && turmas.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Nenhuma turma encontrada.</p>
+              )}
+              {turmas.map((t) => (
+                <div
+                  key={t.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    !t.chamadaFeita ? 'border-amber-200 bg-amber-50' : 'border-gray-100 bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {!t.chamadaFeita
+                      ? <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                      : <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                    }
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{t.nome}</p>
+                      <p className="text-xs text-gray-500">
+                        {t.professor ?? 'Sem professor atribuído'} · {t.totalAlunos} alunos
+                      </p>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="text-xs">
+                    {t.chamadaFeita
+                      ? <span className="text-emerald-600 font-medium">Chamada feita ✅</span>
+                      : <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Pendente</span>
+                    }
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Aba: Alertas */}
+          {/* Aba: Alertas — planejamentos em revisão */}
           {abaAtiva === 'alertas' && (
             <div className="space-y-3">
-              {alertas.length === 0 ? (
+              {planejamentos.filter(p => p.status === 'EM_REVISAO').length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <CheckCircle className="h-10 w-10 mx-auto mb-2 text-emerald-400" />
                   <p>Nenhum alerta ativo no momento</p>
                 </div>
-              ) : alertas.map((alerta, i) => (
-                <div key={i} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+              ) : planejamentos.filter(p => p.status === 'EM_REVISAO').map((p) => (
+                <div key={p.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-800">{alerta.aluno}</span>
-                        <span className="text-xs text-gray-500">— {alerta.turma}</span>
-                        <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{alerta.tipo}</span>
+                        <span className="text-sm font-semibold text-gray-800">{p.title}</span>
+                        <span className="ml-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
+                          Em Revisão
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-700">{alerta.descricao}</p>
-                      <p className="text-xs text-gray-400 mt-1">{new Date(alerta.data).toLocaleDateString('pt-BR')}</p>
+                      <p className="text-xs text-gray-500">
+                        Turma: {p.classroomId} · Período: {new Date(p.startDate).toLocaleDateString('pt-BR')} → {new Date(p.endDate).toLocaleDateString('pt-BR')}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -326,9 +323,12 @@ export function DashboardUnidadePage() {
           {abaAtiva === 'materiais' && (
             <div className="space-y-3">
               <p className="text-xs text-gray-500 mb-3">
-                Requisições enviadas pelos professores — encaminhadas preferencialmente à Coordenadora Pedagógica
+                Requisições enviadas pelos professores — encaminhadas à Coordenadora Pedagógica
               </p>
-              {requisicoes.length === 0 ? (
+              {carregando && requisicoes.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Carregando requisições...</p>
+              )}
+              {!carregando && requisicoes.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 text-gray-300" />
                   <p>Nenhuma requisição pendente</p>
@@ -338,35 +338,30 @@ export function DashboardUnidadePage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-800">{req.titulo}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${corStatus(req.status)}`}>
-                          {labelStatus(req.status)}
-                        </span>
+                        <span className="text-sm font-semibold text-gray-800">{req.title}</span>
                       </div>
                       <p className="text-xs text-gray-500">
-                        {req.professor} · {req.categoria} · {req.urgencia === 'alta' ? '🔴 Urgente' : req.urgencia === 'baixa' ? 'Baixa prioridade' : 'Prioridade normal'}
+                        {labelPrioridade(req.priority)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {new Date(req.criadoEm).toLocaleDateString('pt-BR')}
+                        {new Date(req.requestedDate).toLocaleDateString('pt-BR')}
                       </p>
                     </div>
-                    {req.status === 'SOLICITADO' && (
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => aprovarRequisicao(req.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                        >
-                          <CheckCircle className="h-3 w-3" />
-                          Aprovar
-                        </button>
-                        <button
-                          onClick={() => rejeitarRequisicao(req.id)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
-                        >
-                          Devolver
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => aprovarRequisicao(req.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                      >
+                        <CheckCircle className="h-3 w-3" />
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={() => rejeitarRequisicao(req.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                      >
+                        Devolver
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -376,18 +371,33 @@ export function DashboardUnidadePage() {
           {/* Aba: Planejamentos */}
           {abaAtiva === 'planejamentos' && (
             <div className="space-y-3">
-              <p className="text-xs text-gray-500 mb-3">Visão geral dos planejamentos por turma</p>
-              {pendencias.map((p, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
+              <p className="text-xs text-gray-500 mb-3">
+                Planejamentos por turma — {planejamentos.length} no total
+              </p>
+              {carregando && planejamentos.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-6">Carregando planejamentos...</p>
+              )}
+              {!carregando && planejamentos.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <BookOpen className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                  <p>Nenhum planejamento encontrado</p>
+                </div>
+              )}
+              {planejamentos.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
                   <div>
-                    <p className="text-sm font-medium text-gray-800">{p.turma}</p>
-                    <p className="text-xs text-gray-500">{p.professor}</p>
+                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(p.startDate).toLocaleDateString('pt-BR')} → {new Date(p.endDate).toLocaleDateString('pt-BR')}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {p.planejamentoPendente
-                      ? <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Pendente</span>
-                      : <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Atualizado</span>
-                    }
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${corStatus(p.status)}`}>
+                      {labelStatus(p.status)}
+                    </span>
                     <ChevronRight className="h-4 w-4 text-gray-400" />
                   </div>
                 </div>
