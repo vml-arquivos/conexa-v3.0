@@ -29,8 +29,20 @@ interface Requisicao {
   justificativa: string; criadoEm: string;
 }
 interface Planejamento {
-  id: string; professorNome: string; turmaNome: string;
-  semana: string; objetivos?: string;
+  id: string;
+  title: string;
+  status: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+  professorNome: string;
+  turmaNome: string;
+  templateNome?: string;
+  objectives?: string;
+  reviewComment?: string;
+  createdByUser?: { id: string; firstName: string; lastName: string; email: string };
+  classroom?: { id: string; name: string };
+  template?: { id: string; name: string; type: string };
 }
 interface Diario {
   id: string; professorNome: string; turmaNome: string;
@@ -71,6 +83,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
+  const [filtroPlanStatus, setFiltroPlanStatus] = useState<string>('TODOS');
+  const [planExpandido, setPlanExpandido] = useState<string|null>(null);
 
   useEffect(() => { loadDashboard(); }, []);
 
@@ -107,7 +121,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
         http.get('/coordenacao/dashboard/unidade'),
         http.get('/coordenacao/requisicoes'),
-        http.get('/coordenacao/planejamentos?status=EM_REVISAO'),
+        http.get('/coordenacao/planejamentos'),
         http.get('/coordenacao/diarios'),
       ]);
       if (dashRes.status === 'fulfilled') {
@@ -158,7 +172,30 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value.data) && reqRes.value.data.length > 0) {
         setRequisicoes(reqRes.value.data);
       }
-      if (planRes.status === 'fulfilled') setPlanejamentos(planRes.value.data ?? []);
+      if (planRes.status === 'fulfilled') {
+        const rawPlans: Record<string, unknown>[] = Array.isArray(planRes.value.data) ? planRes.value.data : [];
+        setPlanejamentos(rawPlans.map((p) => {
+          const user = p.createdByUser as Record<string, string> | null;
+          const classroom = p.classroom as Record<string, string> | null;
+          const template = p.template as Record<string, string> | null;
+          return {
+            id: p.id as string,
+            title: (p.title as string) ?? 'Plano de Aula',
+            status: (p.status as string) ?? 'RASCUNHO',
+            type: (p.type as string) ?? '',
+            startDate: (p.startDate as string) ?? '',
+            endDate: (p.endDate as string) ?? '',
+            professorNome: user ? `${user.firstName} ${user.lastName}`.trim() : (p.createdBy as string) ?? 'Professor',
+            turmaNome: classroom?.name ?? (p.classroomId as string) ?? '—',
+            templateNome: template?.name ?? undefined,
+            objectives: (p.objectives as string) ?? undefined,
+            reviewComment: (p.reviewComment as string) ?? undefined,
+            createdByUser: user as Planejamento['createdByUser'],
+            classroom: classroom as Planejamento['classroom'],
+            template: template as Planejamento['template'],
+          };
+        }));
+      }
       if (diarRes.status === 'fulfilled') setDiarios(diarRes.value.data ?? []);
     } catch { toast.error('Erro ao carregar painel'); }
     finally { setLoading(false); }
@@ -405,44 +442,144 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       )}
 
       {/* ABA: PLANEJAMENTOS */}
-      {abaAtiva === 'planejamentos' && (
-        <div className="space-y-4">
-          {planejamentos.length === 0 ? (
-            <div className="text-center py-16">
-              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300"/>
-              <p className="text-xl font-bold text-gray-400">Tudo revisado!</p>
+      {abaAtiva === 'planejamentos' && (() => {
+        const STATUS_PLAN_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
+          RASCUNHO:   { label: 'Rascunho',    cor: 'bg-gray-100 text-gray-600 border-gray-300',    dot: 'bg-gray-400' },
+          EM_REVISAO: { label: 'Em Revisão', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500' },
+          APROVADO:   { label: 'Aprovado',    cor: 'bg-green-100 text-green-700 border-green-300',  dot: 'bg-green-500' },
+          DEVOLVIDO:  { label: 'Devolvido',   cor: 'bg-orange-100 text-orange-700 border-orange-300', dot: 'bg-orange-500' },
+          PUBLICADO:  { label: 'Publicado',   cor: 'bg-blue-100 text-blue-700 border-blue-300',     dot: 'bg-blue-500' },
+          CONCLUIDO:  { label: 'Concluído',   cor: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500' },
+        };
+        const TIPO_PLAN: Record<string, string> = {
+          SEMANAL: 'Semanal', QUINZENAL: 'Quinzenal', MENSAL: 'Mensal', ANUAL: 'Anual',
+        };
+        const plansFiltrados = filtroPlanStatus === 'TODOS'
+          ? planejamentos
+          : planejamentos.filter(p => p.status === filtroPlanStatus);
+        const countPorStatus = planejamentos.reduce<Record<string, number>>((acc, p) => {
+          acc[p.status] = (acc[p.status] ?? 0) + 1;
+          return acc;
+        }, {});
+        return (
+          <div className="space-y-4">
+            {/* Filtros por status */}
+            <div className="flex flex-wrap gap-2">
+              {(['TODOS', 'EM_REVISAO', 'RASCUNHO', 'DEVOLVIDO', 'APROVADO'] as const).map(s => (
+                <button key={s} onClick={() => setFiltroPlanStatus(s)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    filtroPlanStatus === s
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}>
+                  {s === 'TODOS' ? `Todos (${planejamentos.length})` : `${STATUS_PLAN_CONFIG[s]?.label ?? s} (${countPorStatus[s] ?? 0})`}
+                </button>
+              ))}
+              <button onClick={() => loadDashboard()}
+                className="ml-auto px-3 py-1.5 rounded-full text-xs font-semibold border border-gray-300 bg-white text-gray-600 hover:border-blue-400 flex items-center gap-1">
+                <RefreshCw className="h-3 w-3"/>Atualizar
+              </button>
             </div>
-          ) : planejamentos.map(plan => (
-            <Card key={plan.id} className="rounded-2xl border-2">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-bold text-gray-800">{plan.professorNome}</p>
-                    <p className="text-sm text-gray-500">{plan.turmaNome} · Semana de {plan.semana}</p>
-                  </div>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium animate-pulse">Em Revisão</span>
-                </div>
-                {plan.objetivos && (
-                  <div className="p-3 bg-gray-50 rounded-xl">
-                    <p className="text-xs text-gray-500 mb-1">Objetivos da semana:</p>
-                    <p className="text-sm text-gray-700 line-clamp-3">{plan.objetivos}</p>
-                  </div>
-                )}
-                <div className="flex gap-3">
-                  <Button onClick={() => aprovarPlanejamento(plan.id)} disabled={processando === plan.id}
-                    className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 font-bold">
-                    <ThumbsUp className="h-4 w-4 mr-2"/>Aprovar
-                  </Button>
-                  <Button onClick={() => setItemParaRejeitar({ id: plan.id, tipo: 'plan' })} disabled={processando === plan.id}
-                    variant="outline" className="flex-1 h-11 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold">
-                    <MessageSquare className="h-4 w-4 mr-2"/>Devolver
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+
+            {plansFiltrados.length === 0 ? (
+              <div className="text-center py-16">
+                <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-200"/>
+                <p className="text-xl font-bold text-gray-400">Nenhum planejamento encontrado</p>
+                <p className="text-sm text-gray-400 mt-1">Os planejamentos criados pelos professores aparecerão aqui</p>
+              </div>
+            ) : plansFiltrados.map(plan => {
+              const cfg = STATUS_PLAN_CONFIG[plan.status] ?? STATUS_PLAN_CONFIG['RASCUNHO'];
+              const dataInicio = plan.startDate ? new Date(plan.startDate).toLocaleDateString('pt-BR') : '—';
+              const dataFim = plan.endDate ? new Date(plan.endDate).toLocaleDateString('pt-BR') : '—';
+              const expandido = planExpandido === plan.id;
+              return (
+                <Card key={plan.id} className={`rounded-2xl border-2 transition-all ${
+                  plan.status === 'EM_REVISAO' ? 'border-yellow-300 shadow-yellow-100 shadow-md' :
+                  plan.status === 'DEVOLVIDO'  ? 'border-orange-300' :
+                  plan.status === 'APROVADO'   ? 'border-green-300' : 'border-gray-200'
+                }`}>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Cabeçalho */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-800 truncate">{plan.title}</p>
+                        <p className="text-sm text-gray-600 font-medium">{plan.professorNome}</p>
+                        <p className="text-xs text-gray-500">
+                          {plan.turmaNome}
+                          {plan.templateNome && <span className="ml-1 text-blue-600">· {plan.templateNome}</span>}
+                          {plan.type && <span className="ml-1">· {TIPO_PLAN[plan.type] ?? plan.type}</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{dataInicio} → {dataFim}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <span className={`px-2 py-1 text-xs rounded-full font-semibold border ${cfg.cor}`}>
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`}/>{cfg.label}
+                        </span>
+                        <button onClick={() => setPlanExpandido(expandido ? null : plan.id)}
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                          <Eye className="h-3 w-3"/>{expandido ? 'Fechar' : 'Ver detalhes'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Detalhes expandidos */}
+                    {expandido && (
+                      <div className="space-y-2 border-t pt-3">
+                        {plan.objectives && (
+                          <div className="p-3 bg-gray-50 rounded-xl">
+                            <p className="text-xs text-gray-500 font-medium mb-1">Objetivos:</p>
+                            <p className="text-sm text-gray-700">{plan.objectives}</p>
+                          </div>
+                        )}
+                        {plan.reviewComment && (
+                          <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
+                            <p className="text-xs text-orange-600 font-medium mb-1">Observação de devolução:</p>
+                            <p className="text-sm text-orange-800">{plan.reviewComment}</p>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => navigate(`/planejamentos/${plan.id}`)}
+                          className="w-full py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 font-medium flex items-center justify-center gap-2">
+                          <Eye className="h-4 w-4"/>Abrir plano de aula completo
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Ações contextuais por status */}
+                    {plan.status === 'EM_REVISAO' && (
+                      <div className="flex gap-3 pt-1">
+                        <Button onClick={() => aprovarPlanejamento(plan.id)} disabled={processando === plan.id}
+                          className="flex-1 h-10 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-sm">
+                          <ThumbsUp className="h-4 w-4 mr-1.5"/>Aprovar
+                        </Button>
+                        <Button onClick={() => setItemParaRejeitar({ id: plan.id, tipo: 'plan' })} disabled={processando === plan.id}
+                          variant="outline" className="flex-1 h-10 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold text-sm">
+                          <MessageSquare className="h-4 w-4 mr-1.5"/>Devolver
+                        </Button>
+                      </div>
+                    )}
+                    {plan.status === 'DEVOLVIDO' && (
+                      <div className="p-2 bg-orange-50 rounded-xl">
+                        <p className="text-xs text-orange-600 font-medium text-center">
+                          Aguardando correções do professor
+                        </p>
+                      </div>
+                    )}
+                    {plan.status === 'APROVADO' && (
+                      <div className="p-2 bg-green-50 rounded-xl">
+                        <p className="text-xs text-green-600 font-medium text-center flex items-center justify-center gap-1">
+                          <CheckCircle className="h-3.5 w-3.5"/>Planejamento aprovado
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        );
+      })()}
+
 
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (

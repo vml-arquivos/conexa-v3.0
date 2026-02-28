@@ -386,20 +386,28 @@ export class CoordenacaoService {
 
   // ─── PLANEJAMENTOS ────────────────────────────────────────────────────────
 
-  async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-
+   async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload) {
+    if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
     const where: any = { unitId: user.unitId };
-    if (status) where.status = status;
+    // Se status for passado, filtra; caso contrário retorna todos os status relevantes
+    if (status) {
+      where.status = status;
+    } else {
+      // Coordenadora vê todos exceto CANCELADO
+      where.status = { notIn: ['CANCELADO'] };
+    }
     if (classroomId) where.classroomId = classroomId;
-
     return this.prisma.planning.findMany({
       where,
       include: {
         classroom: { select: { id: true, name: true } },
+        template: { select: { id: true, name: true } },
+        createdByUser: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
       },
-      orderBy: { startDate: 'desc' },
-      take: 100,
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
     });
   }
 
