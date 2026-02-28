@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { PlanningService } from './planning.service';
 import { CreatePlanningDto } from './dto/create-planning.dto';
+import { RequireRoles } from '../common/decorators/roles.decorator';
+import { RoleLevel } from '@prisma/client';
 import { ReturnPlanningDto } from './dto/return-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
@@ -181,18 +183,21 @@ export class PlanningController {
 
   @Post(":id/enviar-revisao")
   @HttpCode(HttpStatus.OK)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   submitForReview(@Param("id") id: string, @CurrentUser() user: JwtPayload) {
     return this.planningService.submitForReview(id, user);
   }
 
   @Post(":id/aprovar")
   @HttpCode(HttpStatus.OK)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   approve(@Param("id") id: string, @CurrentUser() user: JwtPayload) {
     return this.planningService.approve(id, user);
   }
 
   @Post(":id/devolver")
   @HttpCode(HttpStatus.OK)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   returnForCorrections(
     @Param("id") id: string,
     @Body() dto: ReturnPlanningDto,

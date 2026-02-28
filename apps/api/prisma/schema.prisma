@@ -1536,6 +1536,7 @@ model RelatorioFoto {
 enum StatusRDIX {
   RASCUNHO
   EM_REVISAO
+  DEVOLVIDO
   FINALIZADO
   PUBLICADO
 }
@@ -1570,6 +1571,7 @@ model RDIXInstancia {
   conteudoFinal  Json?
   criadoPorId    String     @db.VarChar(255)
   revisadoPorId  String?    @db.VarChar(255)
+  reviewComment String?
   finalizadoEm  DateTime?
   publicadoEm   DateTime?
   criadoEm      DateTime   @default(now())

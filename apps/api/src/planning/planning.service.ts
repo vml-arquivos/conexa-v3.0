@@ -480,9 +480,11 @@ export class PlanningService {
             throw new ForbiddenException(`Coordenadores não podem editar planejamentos com status '${planning.status}'.`);
         }
     } else {
-        // Outros roles (STAFF_CENTRAL, MANTENEDORA, DEV) podem editar, exceto APROVADO
-        if ((planning.status as PlanningStatus) === PlanningStatus.APROVADO) {
-            throw new ForbiddenException('Planejamentos aprovados não podem ser editados. Devolva-o para permitir ajustes.');
+        // Apenas DEV e MANTENEDORA podem editar livremente
+        // (status APROVADO já foi bloqueado no início do método)
+        const canEdit = user.roles.some(r => r.level === RoleLevel.DEVELOPER || r.level === RoleLevel.MANTENEDORA);
+        if (!canEdit) {
+            throw new ForbiddenException(`Seu perfil não tem permissão para editar este planejamento.`);
         }
     }
 
@@ -880,15 +882,19 @@ export class PlanningService {
    */
   async approve(id: string, user: JwtPayload) {
     // Apenas coordenação/direção pode aprovar
-    if (!user.roles.some(r => r.level === RoleLevel.UNIDADE || r.level === RoleLevel.STAFF_CENTRAL || r.level === RoleLevel.MANTENEDORA || r.level === RoleLevel.DEVELOPER)) {
-        throw new ForbiddenException("Você não tem permissão para aprovar planejamentos.");
+    const planning = await this.findOne(id, user); // findOne já valida o escopo da unidade/mantenedor
+
+    // Validar se pode aprovar
+    if (planning.status !== PlanningStatus.EM_REVISAO) {
+      throw new BadRequestException(
+        `Apenas planejamentos com status EM_REVISAO podem ser aprovados.`,
+      );
     }
 
-    const planning = await this.findOne(id, user); // findOne já valida o escopo da unidade/mantenedora
-
-    // Validar status
-    if (planning.status !== PlanningStatus.EM_REVISAO) {
-        throw new BadRequestException(`Apenas planejamentos com status EM_REVISAO podem ser aprovados.`);
+    // RBAC: Apenas UNIDADE pode aprovar
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) {
+        throw new ForbiddenException(`Apenas a Coordenação da Unidade pode aprovar planejamentos.`);
     }
 
     const updatedPlanning = await this.prisma.planning.update({
@@ -916,8 +922,10 @@ export class PlanningService {
    * Devolve um planejamento para correções (EM_REVISAO -> DEVOLVIDO)
    */
   async returnForCorrections(id: string, dto: { comment: string }, user: JwtPayload) {
-    if (!user.roles.some(r => r.level === RoleLevel.UNIDADE || r.level === RoleLevel.STAFF_CENTRAL || r.level === RoleLevel.MANTENEDORA || r.level === RoleLevel.DEVELOPER)) {
-        throw new ForbiddenException("Você não tem permissão para devolver planejamentos.");
+    // RBAC: Apenas UNIDADE pode devolver
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) {
+        throw new ForbiddenException(`Apenas a Coordenação da Unidade pode devolver planejamentos.`);
     }
 
     const planning = await this.findOne(id, user);

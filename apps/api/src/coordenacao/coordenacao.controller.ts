@@ -19,7 +19,7 @@ export class CoordenacaoController {
    * Criar nova reunião/pauta de coordenação
    */
   @Post('reunioes')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   criarReuniao(@Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.criarReuniao(dto, user);
   }
@@ -49,9 +49,19 @@ export class CoordenacaoController {
    * Atualizar status da reunião
    */
   @Patch('reunioes/:id/status')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   atualizarStatus(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.atualizarStatus(id, dto, user);
+  }
+
+  /**
+   * PATCH /coordenacao/reunioes/:id/pauta
+   * Salvar ou atualizar a pauta de uma reunião (antes de realizá-la)
+   */
+  @Patch('reunioes/:id/pauta')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  atualizarPauta(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
+    return this.svc.atualizarPauta(id, dto, user);
   }
 
   /**
@@ -59,7 +69,7 @@ export class CoordenacaoController {
    * Registrar ata de uma reunião
    */
   @Post('reunioes/:id/ata')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   registrarAta(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.registrarAta(id, dto, user);
   }
@@ -107,7 +117,7 @@ export class CoordenacaoController {
    * Aprovar ou solicitar revisão de um planejamento
    */
   @Patch('planejamentos/:id/aprovar')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   aprovarPlanejamento(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.aprovarPlanejamento(id, dto, user);
   }

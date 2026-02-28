@@ -68,7 +68,8 @@ interface RdicSalvo {
   dimensoes: DimensaoAvaliacao[];
   observacaoGeral: string;
   proximosPassos: string;
-  status: string;
+  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'FINALIZADO' | 'PUBLICADO' | string;
+  reviewComment?: string;
   createdAt: string;
 }
 
@@ -835,7 +836,7 @@ export default function RdicCriancaPage() {
                     const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
                     const ano = new Date().getFullYear();
                     const periodo = `${bimestreAtual?.label ?? `${bimestre}º Bimestre`}`;
-                    const rdic = rdics.find((r: any) => r.periodo === periodo && r.anoLetivo === ano && r.status === 'RASCUNHO');
+                    const rdic = rdics.find((r: any) => r.periodo === periodo && r.anoLetivo === ano && (r.status === 'RASCUNHO' || r.status === 'DEVOLVIDO'));
                     if (rdic) {
                       await http.patch(`/rdic/${rdic.id}/enviar-revisao`);
                       toast.success('RDIC enviado para revisão da coordenação pedagógica!');
@@ -924,14 +925,25 @@ export default function RdicCriancaPage() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-gray-800">{rdic.periodo}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              rdic.status === 'PUBLICADO' ? 'bg-green-100 text-green-700' :
-                              rdic.status === 'REVISAO' ? 'bg-yellow-100 text-yellow-700' :
+                              rdic.status === 'PUBLICADO'  ? 'bg-green-100 text-green-700' :
+                              rdic.status === 'FINALIZADO' ? 'bg-blue-100 text-blue-700' :
+                              rdic.status === 'EM_REVISAO' ? 'bg-yellow-100 text-yellow-700' :
+                              rdic.status === 'DEVOLVIDO'  ? 'bg-orange-100 text-orange-700' :
                               'bg-gray-100 text-gray-600'
                             }`}>
-                              {rdic.status === 'PUBLICADO' ? 'Publicado' : rdic.status === 'REVISAO' ? 'Em Revisão' : 'Rascunho'}
+                              {rdic.status === 'PUBLICADO'  ? 'Publicado' :
+                               rdic.status === 'FINALIZADO' ? 'Finalizado' :
+                               rdic.status === 'EM_REVISAO' ? 'Em Revisão' :
+                               rdic.status === 'DEVOLVIDO'  ? 'Devolvido' : 'Rascunho'}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 line-clamp-2">{rdic.observacaoGeral}</p>
+                          {rdic.status === 'DEVOLVIDO' && rdic.reviewComment && (
+                            <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg p-2 flex gap-2">
+                              <span className="text-xs font-semibold text-orange-700">Devolvido pela coordenação:</span>
+                              <span className="text-xs text-orange-600">{rdic.reviewComment}</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-3 mt-2">
                             <div className="flex items-center gap-1.5">
                               <div className="w-24 bg-gray-200 rounded-full h-1.5">

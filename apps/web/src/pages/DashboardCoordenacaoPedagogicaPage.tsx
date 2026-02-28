@@ -107,7 +107,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
         http.get('/coordenacao/dashboard/unidade'),
         http.get('/coordenacao/requisicoes'),
-        http.get('/coordenacao/planejamentos?status=RASCUNHO'),
+        http.get('/coordenacao/planejamentos?status=EM_REVISAO'),
         http.get('/coordenacao/diarios'),
       ]);
       if (dashRes.status === 'fulfilled') {
@@ -122,7 +122,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           professores: (professoresSet.size || ind.totalProfessores) ?? 0,
           alunosTotal: ind.totalAlunos ?? 0,
           requisicoesParaAnalisar: ind.requisicoesPendentes ?? 0,
-          planejamentosParaRevisar: ind.planejamentosRascunho ?? 0,
+          planejamentosParaRevisar: (ind.planejamentosEmRevisao ?? ind.planejamentosRascunho) ?? 0,
           diariosEstaSemana: ind.diariosHoje ?? 0,
           taxaPresencaMedia: ind.totalTurmas > 0
             ? Math.round((ind.turmasComChamadaHoje / ind.totalTurmas) * 100)
@@ -198,7 +198,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function devolverPlanejamento(id: string, motivo: string) {
     try {
       setProcessando(id);
-      await http.patch(`/coordenacao/planejamentos/${id}/aprovar`, { aprovar: false, observacao: motivo });
+      // Usa o endpoint dedicado de devolução com comentário obrigatório
+      await http.patch(`/plannings/${id}/devolver`, { comment: motivo });
       toast.success('Planejamento devolvido com observações');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');
@@ -419,7 +420,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     <p className="font-bold text-gray-800">{plan.professorNome}</p>
                     <p className="text-sm text-gray-500">{plan.turmaNome} · Semana de {plan.semana}</p>
                   </div>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium">Para revisar</span>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full font-medium animate-pulse">Em Revisão</span>
                 </div>
                 {plan.objetivos && (
                   <div className="p-3 bg-gray-50 rounded-xl">
