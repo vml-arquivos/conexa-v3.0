@@ -2,14 +2,15 @@ import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CacheStore = { get<T>(key: string): Promise<T | undefined>; set<T>(key: string, value: T, ttl?: number): Promise<T>; };
 import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private readonly cache: Cache,
+    @Inject(CACHE_MANAGER) private readonly cache: CacheStore,
   ) {}
 
   // Cache helper (key por role+scope)

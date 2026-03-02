@@ -239,7 +239,12 @@ export class PlanningService {
         startDate,
         endDate,
         // Campos legados
-        objectives: createDto.objectives ? JSON.stringify(createDto.objectives) : null,
+        // objectives pode chegar como string JSON (novo formato) ou objeto (legado)
+        objectives: createDto.objectives
+          ? typeof createDto.objectives === 'string'
+            ? createDto.objectives
+            : JSON.stringify(createDto.objectives)
+          : null,
         activities: createDto.activities,
         resources: createDto.resources,
         evaluation: createDto.evaluation,
@@ -518,11 +523,17 @@ export class PlanningService {
         // Campos de conteúdo docente
         ...(updateDto.title !== undefined && { title: updateDto.title }),
         ...(updateDto.description !== undefined && { description: updateDto.description }),
+        ...(updateDto.type !== undefined && { type: updateDto.type }),
+        ...(updateDto.classroomId !== undefined && { classroomId: updateDto.classroomId }),
         ...(updateDto.pedagogicalContent !== undefined && { pedagogicalContent: updateDto.pedagogicalContent }),
         // Campos legados
         ...(updateDto.startDate && { startDate: new Date(updateDto.startDate) }),
         ...(updateDto.endDate && { endDate: new Date(updateDto.endDate) }),
-        ...(updateDto.objectives && { objectives: JSON.stringify(updateDto.objectives) }),
+        ...(updateDto.objectives && {
+          objectives: typeof updateDto.objectives === 'string'
+            ? updateDto.objectives
+            : JSON.stringify(updateDto.objectives),
+        }),
         ...(updateDto.activities && { activities: updateDto.activities }),
         ...(updateDto.resources && { resources: updateDto.resources }),
         ...(updateDto.bnccAreas && { bnccAreas: updateDto.bnccAreas }),

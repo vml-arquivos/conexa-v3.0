@@ -51,9 +51,9 @@ export class CreatePlanningDto {
   endDate: string;
 
   // Campos legados (mantidos para compatibilidade)
-  @IsObject()
+  // objectives pode ser string JSON (novo formato) ou objeto (formato legado)
   @IsOptional()
-  objectives?: Record<string, any>;
+  objectives?: Record<string, any> | string;
 
   @IsObject()
   @IsOptional()

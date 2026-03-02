@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -100,6 +102,7 @@ function getStatusConfig(status: string) {
 
 export default function PlanoDeAulaListaPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const today = new Date();
 
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -113,24 +116,34 @@ export default function PlanoDeAulaListaPage() {
   const loadPlannings = useCallback(async () => {
     setLoading(true);
     try {
-      const startDate = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10);
-      const endDate = new Date(currentYear, currentMonth + 1, 0).toISOString().slice(0, 10);
-      const res = await http.get('/plannings', { params: { startDate, endDate, limit: 200 } });
-      const data = res.data;
-      setPlannings(Array.isArray(data) ? data : data?.data ?? data?.plannings ?? []);
-    } catch {
-      // Tenta endpoint alternativo sem filtro de data
-      try {
-        const res = await http.get('/plannings', { params: { limit: 200 } });
+      const startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
+      const endDate = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+
+      // Professor usa /plannings (filtra pelo seu próprio createdBy)
+      // Coordenação/Unidade usa /coordenacao/planejamentos (filtra por unitId)
+      if (isProfessor(user)) {
+        const res = await http.get('/plannings', { params: { startDate, endDate, limit: 200 } });
         const data = res.data;
         setPlannings(Array.isArray(data) ? data : data?.data ?? data?.plannings ?? []);
-      } catch {
-        toast.error('Erro ao carregar planejamentos');
+      } else {
+        const res = await http.get('/coordenacao/planejamentos', { params: { startDate, endDate } });
+        const data = res.data;
+        if (Array.isArray(data)) {
+          setPlannings(data);
+        } else if (Array.isArray(data?.planejamentosParaRevisao)) {
+          setPlannings(data.planejamentosParaRevisao);
+        } else if (Array.isArray(data?.data)) {
+          setPlannings(data.data);
+        } else {
+          setPlannings([]);
+        }
       }
+    } catch {
+      toast.error('Erro ao carregar planejamentos');
     } finally {
       setLoading(false);
     }
-  }, [currentYear, currentMonth]);
+  }, [currentYear, currentMonth, user]);
 
   useEffect(() => { loadPlannings(); }, [loadPlannings]);
 
@@ -394,39 +407,98 @@ export default function PlanoDeAulaListaPage() {
                 </div>
               )}
 
-              {/* Conteúdo pedagógico */}
+              {/* Conteúdo pedagógico — suporta novo formato (description/objectives) e antigo (pedagogicalContent) */}
               {(() => {
+                // Novo formato: description é JSON com activities/resources/notes
+                const rawDesc = (selectedPlanning as any).description;
+                let desc: Record<string, string> | null = null;
+                if (rawDesc) {
+                  try { desc = JSON.parse(rawDesc); } catch { /* string simples */ }
+                }
+
+                // Objetivos da Matriz 2026 (novo formato)
+                const rawObj = (selectedPlanning as any).objectives;
+                let objectives: any[] = [];
+                if (rawObj) {
+                  try { objectives = JSON.parse(rawObj); } catch { /* ignorar */ }
+                }
+
+                // Formato antigo (pedagogicalContent)
                 const pc = (selectedPlanning as any).pedagogicalContent;
-                if (!pc) return null;
+
                 return (
                   <div className="space-y-3">
-                    {pc.camposSelecionados?.length > 0 && (
+                    {/* Objetivos da Matriz 2026 */}
+                    {objectives.length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Campos de Experiência</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {pc.camposSelecionados.map((c: string) => (
-                            <span key={c} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{c}</span>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Objetivos da Matriz 2026</p>
+                        <div className="space-y-2">
+                          {objectives.map((obj: any, i: number) => (
+                            <div key={i} className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                {obj.campo_emoji && <span>{obj.campo_emoji}</span>}
+                                <span className="text-xs font-semibold text-indigo-700">{obj.campo_label}</span>
+                                <span className="ml-auto text-xs font-mono text-gray-500">{obj.codigo_bncc}</span>
+                              </div>
+                              <p className="text-xs text-gray-700">{obj.objetivo_bncc}</p>
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
-                    {pc.metodologia && (
+
+                    {/* Atividades (novo formato) */}
+                    {desc?.activities && (
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Metodologia</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.metodologia}</p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Atividades</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{desc.activities}</p>
                       </div>
                     )}
-                    {pc.recursos && (
+                    {desc?.resources && (
                       <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Recursos</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.recursos}</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{desc.resources}</p>
                       </div>
                     )}
-                    {pc.avaliacao && (
+                    {desc?.notes && (
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Avaliação</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.avaliacao}</p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Observações</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{desc.notes}</p>
                       </div>
+                    )}
+
+                    {/* Formato antigo (compatibilidade) */}
+                    {!desc && pc && (
+                      <>
+                        {pc.camposSelecionados?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Campos de Experiência</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {pc.camposSelecionados.map((c: string) => (
+                                <span key={c} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{c}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {pc.metodologia && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Metodologia</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.metodologia}</p>
+                          </div>
+                        )}
+                        {pc.recursos && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Recursos</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.recursos}</p>
+                          </div>
+                        )}
+                        {pc.avaliacao && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Avaliação</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{pc.avaliacao}</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );

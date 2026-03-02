@@ -14,6 +14,8 @@ export interface AccessibleClassroom {
   code: string;
   name: string;
   unitId: string;
+  ageGroupMin?: number | null;
+  ageGroupMax?: number | null;
 }
 
 export interface AccessibleTeacher {
@@ -137,6 +139,8 @@ export class LookupService {
           code: true,
           name: true,
           unitId: true,
+          ageGroupMin: true,
+          ageGroupMax: true,
         },
         orderBy: { name: 'asc' },
       });
