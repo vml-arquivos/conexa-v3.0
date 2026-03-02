@@ -304,7 +304,8 @@ export class PlanningService {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
       }
-      // Staff Central: acessa apenas unidades vinculadas
+      // Staff Central (Coord. Geral): acessa apenas unidades vinculadas
+      // RBAC HARD: Coord. Geral só pode ver planejamentos APROVADOS
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
@@ -312,6 +313,10 @@ export class PlanningService {
           (role) => role.level === RoleLevel.STAFF_CENTRAL,
         );
         where.unitId = { in: staffRole?.unitScopes || [] };
+        // Aplicar filtro de APROVADO apenas se não houver filtro de status explícito na query
+        if (!query.status) {
+          where.status = PlanningStatus.APROVADO;
+        }
       }
       // Unidade: acessa apenas sua unidade
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
@@ -510,6 +515,11 @@ export class PlanningService {
     const updatedPlanning = await this.prisma.planning.update({
       where: { id },
       data: {
+        // Campos de conteúdo docente
+        ...(updateDto.title !== undefined && { title: updateDto.title }),
+        ...(updateDto.description !== undefined && { description: updateDto.description }),
+        ...(updateDto.pedagogicalContent !== undefined && { pedagogicalContent: updateDto.pedagogicalContent }),
+        // Campos legados
         ...(updateDto.startDate && { startDate: new Date(updateDto.startDate) }),
         ...(updateDto.endDate && { endDate: new Date(updateDto.endDate) }),
         ...(updateDto.objectives && { objectives: JSON.stringify(updateDto.objectives) }),
@@ -736,9 +746,25 @@ export class PlanningService {
       return;
     }
 
-    // Professor não pode criar planejamentos
+    // Professor: pode criar planejamentos apenas nas suas próprias turmas
+    if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+      const isTeacherOfClassroom = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId: classroom.id,
+          teacherId: user.sub,
+          isActive: true,
+        },
+      });
+      if (!isTeacherOfClassroom) {
+        throw new ForbiddenException(
+          'Você não é professor desta turma e não pode criar planejamentos nela.',
+        );
+      }
+      return;
+    }
+
     throw new ForbiddenException(
-      'Professores não podem criar planejamentos. Apenas Coordenação e Direção.',
+      'Seu perfil não tem permissão para criar planejamentos.',
     );
   }
 

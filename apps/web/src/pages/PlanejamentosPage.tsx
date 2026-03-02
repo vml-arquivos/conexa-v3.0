@@ -252,7 +252,8 @@ export default function PlanejamentosPage() {
       objetivos: [...new Set([...f.objetivos, entry.objetivo_bncc])],
       codigosBNCC: [...new Set([...f.codigosBNCC, entry.codigo_bncc])],
       camposSelecionados: [...new Set([...f.camposSelecionados, entry.campo_id])],
-      experiencias: entry.exemplo_atividade ? [...new Set([...f.experiencias, entry.exemplo_atividade])] : f.experiencias,
+      // Não injetar exemplo_atividade nas experiências: o professor deve autoral o conteúdo
+      experiencias: f.experiencias,
     }));
     toast.success(`Objetivo ${entry.codigo_bncc} adicionado`);
     setAba('novo');
@@ -595,7 +596,8 @@ export default function PlanejamentosPage() {
                         </div>
                         <p className="text-sm font-medium text-gray-800 mb-1">{entry.objetivo_bncc}</p>
                         {entry.intencionalidade_pedagogica && <p className="text-xs text-gray-500 flex items-start gap-1"><Lightbulb className="h-3 w-3 text-yellow-500 mt-0.5 flex-shrink-0" />{entry.intencionalidade_pedagogica}</p>}
-                        {entry.exemplo_atividade && <p className="text-xs text-blue-600 mt-1 flex items-start gap-1"><Star className="h-3 w-3 mt-0.5 flex-shrink-0" />{entry.exemplo_atividade}</p>}
+                        {/* RBAC: exemplo_atividade ocultado para professores — apenas coordenação visualiza */}
+                        {!ehProfessor && entry.exemplo_atividade && <p className="text-xs text-blue-600 mt-1 flex items-start gap-1"><Star className="h-3 w-3 mt-0.5 flex-shrink-0" />{entry.exemplo_atividade}</p>}
                       </div>
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                         <span className="text-xs bg-indigo-600 text-white px-2 py-1 rounded-lg flex items-center gap-1"><Plus className="h-3 w-3" /> Usar</span>
