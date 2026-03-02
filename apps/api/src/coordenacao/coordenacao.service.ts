@@ -315,7 +315,7 @@ export class CoordenacaoService {
 
   // ─── PLANEJAMENTOS (aceita unitId override) ────────────────────────────────
 
-  async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload, unitIdOverride?: string) {
+  async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload, unitIdOverride?: string, startDate?: string, endDate?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const unitId = resolveUnitId(user, unitIdOverride);
     const where: any = { unitId };
@@ -325,6 +325,14 @@ export class CoordenacaoService {
       where.status = { notIn: ['CANCELADO'] };
     }
     if (classroomId) where.classroomId = classroomId;
+    // Filtro por período (para a Torre de Controle do professor)
+    if (startDate && endDate) {
+      where.startDate = { gte: new Date(startDate), lte: new Date(endDate) };
+    } else if (startDate) {
+      where.startDate = { gte: new Date(startDate) };
+    } else if (endDate) {
+      where.startDate = { lte: new Date(endDate) };
+    }
     return this.prisma.planning.findMany({
       where,
       include: {

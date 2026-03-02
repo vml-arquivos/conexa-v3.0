@@ -110,9 +110,11 @@ export class CoordenacaoController {
     @Query('status') status: string,
     @Query('classroomId') classroomId: string,
     @Query('unitId') unitId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.svc.listarPlanejamentos(status, classroomId, user, unitId);
+    return this.svc.listarPlanejamentos(status, classroomId, user, unitId, startDate, endDate);
   }
 
   /**

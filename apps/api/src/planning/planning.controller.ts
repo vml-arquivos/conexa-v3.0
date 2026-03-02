@@ -188,6 +188,14 @@ export class PlanningController {
     return this.planningService.submitForReview(id, user);
   }
 
+  // Alias PATCH /plannings/:id/submit (compatível com o frontend)
+  @Patch(":id/submit")
+  @HttpCode(HttpStatus.OK)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  submitForReviewPatch(@Param("id") id: string, @CurrentUser() user: JwtPayload) {
+    return this.planningService.submitForReview(id, user);
+  }
+
   @Post(":id/aprovar")
   @HttpCode(HttpStatus.OK)
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
