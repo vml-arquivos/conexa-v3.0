@@ -47,8 +47,8 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
 ];
 
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
-  { path: '/app/plano-de-aula',       label: 'Plano de Aula',          icon: <BookOpen className="h-4 w-4" /> },
-  { path: '/app/planejamento-diario', label: 'Planejamento Diário',    icon: <Calendar className="h-4 w-4" /> },
+  { path: '/app/planejamentos',       label: 'Meus Planejamentos',     icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/planejamento/novo',   label: 'Novo Planejamento',      icon: <Calendar className="h-4 w-4" /> },
   { path: '/app/diario-de-bordo',     label: 'Diário de Bordo',        icon: <ClipboardList className="h-4 w-4" /> },
   { path: '/app/rdic-crianca',        label: 'RDIC por Criança',       icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada',             label: 'Chamada Diária',         icon: <UserCheck className="h-4 w-4" /> },

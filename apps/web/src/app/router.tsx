@@ -35,6 +35,9 @@ import RdicCriancaPage from '../pages/RdicCriancaPage';
 import SalaDeAulaVirtualPage from '../pages/SalaDeAulaVirtualPage';
 import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
+// ─── Módulo de Planejamento — Oficina e Torre de Controle ─────────────────────
+import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
+import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -110,16 +113,24 @@ export const router = createBrowserRouter([
           </RoleProtectedRoute>
         ),
       },
-      // ─── Planejamentos Pedagógicos com Templates e Matriz ─────────────
+      // ─── Planejamentos — Torre de Controle (rota canônica do professor) ─────────
       {
         path: 'planejamentos',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaListaPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // Legada: PlanejamentosPage (mantida para links internos existentes)
+      {
+        path: 'planejamentos-legado',
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PlanejamentosPage />
           </RoleProtectedRoute>
         ),
-      },
-      // ─── RDIC por Criança (professor) ──────────────────────────────────────
+      },      // ─── RDIC por Criança (professor) ──────────────────────────────────────
       {
         path: 'rdic-crianca',
         element: (
@@ -332,6 +343,32 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PainelAlergiasPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Módulo de Planejamento — Oficina (criação/edição) ─────────────────
+      {
+        path: 'planejamento/novo',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaNovoPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      {
+        path: 'planejamento/:id/editar',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaNovoPage />
+          </RoleProtectedRoute>
+        ),
+      },
+      // ─── Módulo de Planejamento — Torre de Controle (lista/calendário) ────────
+      {
+        path: 'planejamentos-calendario',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaListaPage />
           </RoleProtectedRoute>
         ),
       },
