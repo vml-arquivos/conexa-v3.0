@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -109,6 +109,13 @@ export default function CoordenacaoPedagogicaPage() {
   const [filtroSegmento, setFiltroSegmento] = useState<string>('TODOS');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Planejamentos — modal de devolução
+  const [modalDevolver, setModalDevolver] = useState<{ id: string; titulo: string } | null>(null);
+  const [motivoDevolver, setMotivoDevolver] = useState('');
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [planExpandedId, setPlanExpandedId] = useState<string | null>(null);
+  const motivoRef = useRef<HTMLTextAreaElement>(null);
+
   // Modal de reunião
   const [modalReuniao, setModalReuniao] = useState(false);
   const [formReuniao, setFormReuniao] = useState({
@@ -209,11 +216,45 @@ export default function CoordenacaoPedagogicaPage() {
 
   async function loadPlanejamentos() {
     try {
-      const res = await http.get('/coordenacao/planejamentos?limit=20');
+      const res = await http.get('/coordenacao/planejamentos');
       const d = res.data;
       setPlanejamentos(Array.isArray(d) ? d : d?.data ?? []);
     } catch {
       setPlanejamentos([]);
+    }
+  }
+
+  async function aprovarPlanejamento(id: string) {
+    setSavingPlan(true);
+    try {
+      await http.post(`/plannings/${id}/aprovar`);
+      toast.success('Planejamento aprovado!');
+      loadPlanejamentos();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao aprovar planejamento');
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  async function devolverPlanejamento() {
+    if (!modalDevolver) return;
+    if (!motivoDevolver.trim() || motivoDevolver.trim().length < 5) {
+      toast.error('Informe o motivo da devolução (mínimo 5 caracteres)');
+      motivoRef.current?.focus();
+      return;
+    }
+    setSavingPlan(true);
+    try {
+      await http.post(`/plannings/${modalDevolver.id}/devolver`, { comment: motivoDevolver.trim() });
+      toast.success('Planejamento devolvido para correção');
+      setModalDevolver(null);
+      setMotivoDevolver('');
+      loadPlanejamentos();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao devolver planejamento');
+    } finally {
+      setSavingPlan(false);
     }
   }
 
@@ -290,7 +331,7 @@ export default function CoordenacaoPedagogicaPage() {
   const totalCriancas = turmas.reduce((s, t) => s + (t.childCount || 0), 0);
   const totalProfessores = turmas.reduce((s, t) => s + (t.teacherCount || 0), 0);
   const reunioesAgendadas = reunioes.filter(r => r.status === 'AGENDADA').length;
-  const planejamentosPendentes = planejamentos.filter(p => p.status === 'RASCUNHO').length;
+  const planejamentosEmRevisao = planejamentos.filter(p => p.status === 'EM_REVISAO').length;
 
   return (
     <PageShell
@@ -828,12 +869,12 @@ export default function CoordenacaoPedagogicaPage() {
           <div className="flex justify-between items-center">
             <div>
               <h3 className="font-semibold text-gray-900">Planejamentos das Turmas</h3>
-              <p className="text-sm text-gray-500">Visualize e aprove os planejamentos de todas as turmas</p>
+              <p className="text-sm text-gray-500">Visualize e aprove os planejamentos enviados pelos professores</p>
             </div>
-            {planejamentosPendentes > 0 && (
-              <Badge className="bg-orange-100 text-orange-700 border-orange-200">
+            {planejamentosEmRevisao > 0 && (
+              <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
                 <AlertCircle className="h-3 w-3 mr-1 inline" />
-                {planejamentosPendentes} pendente{planejamentosPendentes > 1 ? 's' : ''}
+                {planejamentosEmRevisao} aguardando revisão
               </Badge>
             )}
           </div>
@@ -843,38 +884,129 @@ export default function CoordenacaoPedagogicaPage() {
           )}
 
           <div className="space-y-3">
-            {planejamentos.map(plan => (
-              <Card key={plan.id} className="border shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <Badge className={`text-xs ${plan.status === 'APROVADO' ? 'bg-green-100 text-green-700' : plan.status === 'RASCUNHO' ? 'bg-gray-100 text-gray-600' : 'bg-orange-100 text-orange-700'}`}>
-                          {plan.status}
-                        </Badge>
-                        {plan.classroom && <Badge className="text-xs bg-blue-50 text-blue-700">{plan.classroom.name}</Badge>}
+            {planejamentos.map(plan => {
+              const isExpanded = planExpandedId === plan.id;
+              const statusCor: Record<string, string> = {
+                RASCUNHO: 'bg-gray-100 text-gray-600',
+                EM_REVISAO: 'bg-yellow-100 text-yellow-700',
+                APROVADO: 'bg-green-100 text-green-700',
+                DEVOLVIDO: 'bg-orange-100 text-orange-700',
+              };
+              const statusLabel: Record<string, string> = {
+                RASCUNHO: 'Rascunho',
+                EM_REVISAO: 'Em Revisão',
+                APROVADO: 'Aprovado',
+                DEVOLVIDO: 'Devolvido',
+              };
+              return (
+                <Card key={plan.id} className="border shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <Badge className={`text-xs ${statusCor[plan.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {statusLabel[plan.status] ?? plan.status}
+                          </Badge>
+                          {plan.classroom && <Badge className="text-xs bg-blue-50 text-blue-700">{plan.classroom.name}</Badge>}
+                        </div>
+                        <h4 className="font-semibold text-gray-900 truncate">{plan.title}</h4>
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}
+                          {plan.createdByUser && ` · Prof. ${plan.createdByUser.firstName} ${plan.createdByUser.lastName}`}
+                        </p>
                       </div>
-                      <h4 className="font-semibold text-gray-900">{plan.title}</h4>
-                      <p className="text-sm text-gray-500 mt-0.5">
-                        {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}
-                        {plan.createdByUser && ` · Prof. ${plan.createdByUser.firstName} ${plan.createdByUser.lastName}`}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="text-xs">
-                        <Eye className="h-3 w-3 mr-1" /> Ver
-                      </Button>
-                      {plan.status === 'RASCUNHO' && (
-                        <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700">
-                          <CheckCircle className="h-3 w-3 mr-1" /> Aprovar
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => setPlanExpandedId(isExpanded ? null : plan.id)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" /> {isExpanded ? 'Fechar' : 'Ver'}
                         </Button>
-                      )}
+                        {plan.status === 'EM_REVISAO' && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="text-xs bg-green-600 hover:bg-green-700"
+                              disabled={savingPlan}
+                              onClick={() => aprovarPlanejamento(plan.id)}
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" /> Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="text-xs bg-orange-500 hover:bg-orange-600"
+                              disabled={savingPlan}
+                              onClick={() => { setModalDevolver({ id: plan.id, titulo: plan.title }); setMotivoDevolver(''); }}
+                            >
+                              Devolver
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t space-y-2 text-sm text-gray-700">
+                        <p><span className="font-semibold">Período:</span> {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}</p>
+                        {plan.createdByUser && (
+                          <p><span className="font-semibold">Professor:</span> {plan.createdByUser.firstName} {plan.createdByUser.lastName}</p>
+                        )}
+                        {plan.classroom && (
+                          <p><span className="font-semibold">Turma:</span> {plan.classroom.name}</p>
+                        )}
+                        <p><span className="font-semibold">Status:</span> {statusLabel[plan.status] ?? plan.status}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Devolver Planejamento ─── */}
+      {modalDevolver && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <AlertCircle className="h-5 w-5" />
+                Devolver para Correção
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Informe o motivo da devolução para <strong>{modalDevolver.titulo}</strong>.
+                O professor receberá este comentário e poderá corrigir e reenviar.
+              </p>
+              <div>
+                <Label className="text-sm font-semibold">Motivo da devolução <span className="text-red-500">*</span></Label>
+                <Textarea
+                  ref={motivoRef}
+                  className="mt-1"
+                  rows={4}
+                  placeholder="Descreva o que precisa ser corrigido ou melhorado..."
+                  value={motivoDevolver}
+                  onChange={e => setMotivoDevolver(e.target.value)}
+                />
+                <p className="text-xs text-gray-400 mt-1">{motivoDevolver.length} caracteres (mínimo 5)</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setModalDevolver(null)} disabled={savingPlan}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-orange-500 hover:bg-orange-600"
+                  onClick={devolverPlanejamento}
+                  disabled={savingPlan || motivoDevolver.trim().length < 5}
+                >
+                  {savingPlan ? 'Devolvendo...' : 'Confirmar Devolução'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

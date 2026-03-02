@@ -333,14 +333,30 @@ export default function PlanejamentosPage() {
                         {(p.startDate || p.weekStart) && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(p.startDate ?? p.weekStart!).toLocaleDateString('pt-BR')}{(p.endDate || p.weekEnd) && ` — ${new Date(p.endDate ?? p.weekEnd!).toLocaleDateString('pt-BR')}`}</p>}
                       </div>
                       <div className="flex items-center gap-2">
-                        {/* Botão Enviar para Revisão — apenas para professor em RASCUNHO ou DEVOLVIDO */}
-                        {ehProfessor && (p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO') && (
+                        {/* Badge Aguardando Revisão — professor vendo plano EM_REVISAO */}
+                        {ehProfessor && p.status === 'EM_REVISAO' && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-lg font-medium">
+                            <Clock className="h-3 w-3" /> Aguardando revisão
+                          </span>
+                        )}
+                        {/* Botão Enviar para Revisão — professor em RASCUNHO */}
+                        {ehProfessor && p.status === 'RASCUNHO' && (
                           <button
                             onClick={() => enviarParaRevisao(p.id)}
                             title="Enviar para revisão"
                             className="flex items-center gap-1 text-xs bg-blue-600 text-white px-2 py-1 rounded-lg hover:bg-blue-700 transition-colors"
                           >
                             <Send className="h-3 w-3" /> Enviar para Revisão
+                          </button>
+                        )}
+                        {/* Botão Corrigir e Reenviar — professor em DEVOLVIDO */}
+                        {ehProfessor && p.status === 'DEVOLVIDO' && (
+                          <button
+                            onClick={() => enviarParaRevisao(p.id)}
+                            title="Corrigir e reenviar para revisão"
+                            className="flex items-center gap-1 text-xs bg-orange-600 text-white px-2 py-1 rounded-lg hover:bg-orange-700 transition-colors"
+                          >
+                            <Send className="h-3 w-3" /> Corrigir e Reenviar
                           </button>
                         )}
                         {/* Botões de Coordenação — apenas para UNIDADE em EM_REVISAO */}
@@ -367,10 +383,14 @@ export default function PlanejamentosPage() {
                         </button>
                       </div>
                     </div>
-                    {isExpanded && p.status === 'DEVOLVIDO' && p.reviewComment && (
+                    {/* Motivo da devolução — sempre visível para planos DEVOLVIDOS */}
+                    {p.status === 'DEVOLVIDO' && p.reviewComment && (
                       <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                        <p className="text-xs font-semibold text-orange-700 uppercase mb-1 flex items-center gap-1">Motivo da Devolução</p>
+                        <p className="text-xs font-semibold text-orange-700 uppercase mb-1 flex items-center gap-1"><ThumbsDown className="h-3 w-3" /> Motivo da Devolução</p>
                         <p className="text-sm text-orange-800">{p.reviewComment}</p>
+                        {ehProfessor && (
+                          <p className="text-xs text-orange-600 mt-2">Corrija o planejamento e clique em <strong>Corrigir e Reenviar</strong> para enviar novamente.</p>
+                        )}
                       </div>
                     )}
                     {isExpanded && p.pedagogicalContent && (
