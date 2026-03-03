@@ -178,14 +178,11 @@ export default function CoordenacaoPedagogicaPage() {
     setLoading(true);
     setTurmasError(null);
     try {
-      // Endpoint canônico com childrenCount real e todos os professores ativos
-      // STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
       const params = unitId ? { unitId } : {};
       const res = await http.get('/coordenacao/unit/classrooms', { params });
       const payload = res.data;
       const rawClassrooms: any[] = payload?.classrooms ?? (Array.isArray(payload) ? payload : []);
       if (rawClassrooms.length === 0 && !payload?.classrooms) {
-        // Fallback para lookup se endpoint não retornar classrooms
         const fallback = await http.get('/lookup/classrooms/accessible', { params: unitId ? { unitId } : {} }).catch(() => ({ data: [] }));
         const fb: any[] = Array.isArray(fallback.data) ? fallback.data : fallback.data?.data ?? [];
         setTurmas(fb.map((c: any) => ({
@@ -222,7 +219,6 @@ export default function CoordenacaoPedagogicaPage() {
       const d = res.data;
       setReunioes(Array.isArray(d) ? d : d?.data ?? []);
     } catch {
-      // Demo data
       const hoje = new Date();
       const proxSemana = new Date(hoje); proxSemana.setDate(hoje.getDate() + 7);
       const proxMes = new Date(hoje); proxMes.setDate(hoje.getDate() + 30);
@@ -315,7 +311,6 @@ export default function CoordenacaoPedagogicaPage() {
       loadReunioes();
       setFormReuniao({ tipo: 'SEMANAL', titulo: '', data: new Date().toISOString().split('T')[0], pauta: '', turmaId: '' });
     } catch (err: any) {
-      // Fallback local
       const nova: Reuniao = {
         id: Date.now().toString(),
         tipo: formReuniao.tipo,
@@ -347,7 +342,6 @@ export default function CoordenacaoPedagogicaPage() {
   }
 
   // ─── Dados do currículo ────────────────────────────────────────────────────
-  // Usa dados da API quando disponíveis; fallback para lookup local
   const objetivosCurriculoBase = matrizApiData.length > 0
     ? matrizApiData
     : (MATRIZ_2026[filtroSegCurriculo] || []).map((o: any) => ({
@@ -425,7 +419,6 @@ export default function CoordenacaoPedagogicaPage() {
       {/* ─── ABA: TURMAS ─── */}
       {aba === 'turmas' && (
         <div className="space-y-4">
-          {/* Filtros */}
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -447,7 +440,8 @@ export default function CoordenacaoPedagogicaPage() {
             <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
               <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
               <p className="text-sm font-medium text-red-700 mb-3">{turmasError}</p>
-              <Button variant="outline" size="sm" onClick={loadTurmas}>Recarregar</Button>
+              {/* ✅ CORREÇÃO: arrow function para evitar TS2322 */}
+              <Button variant="outline" size="sm" onClick={() => loadTurmas(unitIdFromQuery)}>Recarregar</Button>
             </div>
           )}
 
@@ -529,7 +523,6 @@ export default function CoordenacaoPedagogicaPage() {
             </div>
           )}
 
-          {/* Seletor de segmento */}
           <div className="flex flex-wrap gap-2">
             <span className="text-sm font-medium text-gray-700 self-center mr-1">Segmento:</span>
             {(['EI01', 'EI02', 'EI03'] as SegmentoKey[]).map(seg => (
@@ -540,7 +533,6 @@ export default function CoordenacaoPedagogicaPage() {
             ))}
           </div>
 
-          {/* Filtros de período e campo */}
           <div className="flex flex-wrap gap-3 items-end">
             <div>
               <Label className="text-xs text-gray-500 mb-1 block">Data Início</Label>
@@ -567,7 +559,6 @@ export default function CoordenacaoPedagogicaPage() {
             </div>
           </div>
 
-          {/* Lista de objetivos */}
           {matrizApiLoading ? (
             <LoadingState message="Carregando Matriz 2026 com exemplos de atividades..." />
           ) : (
@@ -605,7 +596,6 @@ export default function CoordenacaoPedagogicaPage() {
 
                     {expandedId === `c${idx}` && (
                       <div className="px-4 pb-4 border-t border-gray-100 space-y-3 pt-3">
-                        {/* Objetivo do Currículo DF */}
                         {(obj.objetivoCurriculo || obj.objetivo_curriculo_movimento) && (
                           <div>
                             <p className="text-xs font-bold text-indigo-500 uppercase tracking-wide mb-0.5">
@@ -616,7 +606,6 @@ export default function CoordenacaoPedagogicaPage() {
                             </p>
                           </div>
                         )}
-                        {/* Intencionalidade Pedagógica */}
                         {(obj.intencionalidade || obj.intencionalidade_pedagogica) && (
                           <div>
                             <p className="text-xs font-bold text-purple-500 uppercase tracking-wide mb-0.5">
@@ -627,7 +616,6 @@ export default function CoordenacaoPedagogicaPage() {
                             </p>
                           </div>
                         )}
-                        {/* Exemplo de Atividade — CARD VERDE para coordenação */}
                         {(obj.exemploAtividade || (obj.exemplos_atividades && obj.exemplos_atividades.length > 0)) && (
                           <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                             <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">
@@ -675,7 +663,6 @@ export default function CoordenacaoPedagogicaPage() {
             </Button>
           </div>
 
-          {/* Próximas reuniões */}
           <div className="space-y-3">
             {reunioes.length === 0 && (
               <EmptyState icon={<Calendar className="h-12 w-12 text-gray-300" />} title="Nenhuma reunião agendada" description="Agende a próxima reunião pedagógica" action={<Button onClick={() => setModalReuniao(true)}><Plus className="h-4 w-4 mr-2" />Agendar</Button>} />
@@ -717,7 +704,6 @@ export default function CoordenacaoPedagogicaPage() {
                           <p className="text-xs font-semibold text-gray-600 mb-1">📋 Pauta</p>
                           <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line">{reuniao.pauta}</div>
                         </div>
-
                         {reuniao.participantes && reuniao.participantes.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-600 mb-1">👥 Participantes</p>
@@ -728,14 +714,12 @@ export default function CoordenacaoPedagogicaPage() {
                             </div>
                           </div>
                         )}
-
                         {reuniao.ata && (
                           <div>
                             <p className="text-xs font-semibold text-green-700 mb-1">✅ Ata da Reunião</p>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line">{reuniao.ata}</div>
                           </div>
                         )}
-
                         {reuniao.status === 'AGENDADA' && (
                           <div className="flex gap-2 pt-2">
                             <Button size="sm" variant="outline" className="text-xs"
@@ -760,7 +744,6 @@ export default function CoordenacaoPedagogicaPage() {
       {/* ─── ABA: PAUTAS DE COORDENAÇÃO ─── */}
       {aba === 'pautas' && (
         <div className="space-y-4">
-          {/* Cabeçalho */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-semibold text-gray-900">Pautas de Coordenação</h3>
@@ -771,7 +754,6 @@ export default function CoordenacaoPedagogicaPage() {
             </Button>
           </div>
 
-          {/* Templates rápidos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -835,7 +817,6 @@ export default function CoordenacaoPedagogicaPage() {
             </div>
           </div>
 
-          {/* Lista de pautas */}
           {pautas.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
               <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -875,7 +856,6 @@ export default function CoordenacaoPedagogicaPage() {
             </div>
           )}
 
-          {/* Modal de nova pauta */}
           {modalPauta && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -928,7 +908,6 @@ export default function CoordenacaoPedagogicaPage() {
                           await http.post('/coordenacao/pautas', formPauta);
                           toast.success('Pauta criada com sucesso!');
                         } catch {
-                          // Fallback local
                           setPautas(p => [{ ...formPauta, id: Date.now().toString() }, ...p]);
                           toast.success('Pauta criada (modo local)');
                         } finally {
@@ -1000,30 +979,18 @@ export default function CoordenacaoPedagogicaPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs"
-                          onClick={() => setPlanExpandedId(isExpanded ? null : plan.id)}
-                        >
+                        <Button size="sm" variant="outline" className="text-xs"
+                          onClick={() => setPlanExpandedId(isExpanded ? null : plan.id)}>
                           <Eye className="h-3 w-3 mr-1" /> {isExpanded ? 'Fechar' : 'Ver'}
                         </Button>
                         {plan.status === 'EM_REVISAO' && (
                           <>
-                            <Button
-                              size="sm"
-                              className="text-xs bg-green-600 hover:bg-green-700"
-                              disabled={savingPlan}
-                              onClick={() => aprovarPlanejamento(plan.id)}
-                            >
+                            <Button size="sm" className="text-xs bg-green-600 hover:bg-green-700" disabled={savingPlan}
+                              onClick={() => aprovarPlanejamento(plan.id)}>
                               <CheckCircle className="h-3 w-3 mr-1" /> Aprovar
                             </Button>
-                            <Button
-                              size="sm"
-                              className="text-xs bg-orange-500 hover:bg-orange-600"
-                              disabled={savingPlan}
-                              onClick={() => { setModalDevolver({ id: plan.id, titulo: plan.title }); setMotivoDevolver(''); }}
-                            >
+                            <Button size="sm" className="text-xs bg-orange-500 hover:bg-orange-600" disabled={savingPlan}
+                              onClick={() => { setModalDevolver({ id: plan.id, titulo: plan.title }); setMotivoDevolver(''); }}>
                               Devolver
                             </Button>
                           </>
@@ -1031,24 +998,19 @@ export default function CoordenacaoPedagogicaPage() {
                       </div>
                     </div>
                     {isExpanded && (() => {
-                      // Tenta parsear o JSON V2 do planejamento
                       let v2Days: any[] | null = null;
                       try {
                         const parsed = plan.description ? JSON.parse(plan.description) : null;
-                        if (parsed?.version === 2 && Array.isArray(parsed.days)) {
-                          v2Days = parsed.days;
-                        }
+                        if (parsed?.version === 2 && Array.isArray(parsed.days)) v2Days = parsed.days;
                       } catch { /* não é V2 */ }
                       return (
                         <div className="mt-3 pt-3 border-t space-y-3 text-sm text-gray-700">
-                          {/* Metadados */}
                           <div className="grid grid-cols-2 gap-2">
                             <p><span className="font-semibold">Período:</span> {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}</p>
                             {plan.classroom && <p><span className="font-semibold">Turma:</span> {plan.classroom.name}</p>}
                             {plan.createdByUser && <p><span className="font-semibold">Professor:</span> {plan.createdByUser.firstName} {plan.createdByUser.lastName}</p>}
                             <p><span className="font-semibold">Status:</span> {statusLabel[plan.status] ?? plan.status}</p>
                           </div>
-                          {/* Dias do planejamento V2 */}
                           {v2Days && v2Days.length > 0 && (
                             <div className="space-y-3">
                               <p className="font-semibold text-gray-800 flex items-center gap-1">
@@ -1065,7 +1027,6 @@ export default function CoordenacaoPedagogicaPage() {
                                       <span className="text-xs font-semibold text-indigo-800">Dia {di + 1} — {dataBR}</span>
                                     </div>
                                     <div className="p-3 space-y-2">
-                                      {/* Objetivos da Matriz */}
                                       {(day.objectives ?? []).length > 0 && (
                                         <div className="space-y-1">
                                           <p className="text-xs font-semibold text-gray-500 uppercase">Objetivos da Matriz</p>
@@ -1073,7 +1034,6 @@ export default function CoordenacaoPedagogicaPage() {
                                             <div key={oi} className="bg-blue-50 rounded-lg p-2 border border-blue-100">
                                               {obj.codigoBNCC && <span className="text-xs font-mono text-blue-600 mr-2">{obj.codigoBNCC}</span>}
                                               <span className="text-xs text-blue-800">{obj.objetivoBNCC}</span>
-                                              {/* Exemplo de Atividade — card verde para coordenação */}
                                               {obj.exemploAtividade && obj.exemploAtividade !== obj.objetivoBNCC && (
                                                 <div className="mt-1.5 bg-green-50 border border-green-100 rounded-md p-1.5">
                                                   <p className="text-xs font-semibold text-green-600 flex items-center gap-1 mb-0.5">
@@ -1086,7 +1046,6 @@ export default function CoordenacaoPedagogicaPage() {
                                           ))}
                                         </div>
                                       )}
-                                      {/* O que o professor preencheu */}
                                       {day.teacher?.atividade && (
                                         <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
                                           <p className="text-xs font-semibold text-amber-700 uppercase mb-1">Desenvolvimento da Atividade (Professor)</p>
@@ -1111,7 +1070,6 @@ export default function CoordenacaoPedagogicaPage() {
                               })}
                             </div>
                           )}
-                          {/* Fallback: planejamento sem formato V2 */}
                           {!v2Days && plan.description && (
                             <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                               <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Conteúdo do Planejamento</p>
@@ -1146,25 +1104,15 @@ export default function CoordenacaoPedagogicaPage() {
               </p>
               <div>
                 <Label className="text-sm font-semibold">Motivo da devolução <span className="text-red-500">*</span></Label>
-                <Textarea
-                  ref={motivoRef}
-                  className="mt-1"
-                  rows={4}
+                <Textarea ref={motivoRef} className="mt-1" rows={4}
                   placeholder="Descreva o que precisa ser corrigido ou melhorado..."
-                  value={motivoDevolver}
-                  onChange={e => setMotivoDevolver(e.target.value)}
-                />
+                  value={motivoDevolver} onChange={e => setMotivoDevolver(e.target.value)} />
                 <p className="text-xs text-gray-400 mt-1">{motivoDevolver.length} caracteres (mínimo 5)</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setModalDevolver(null)} disabled={savingPlan}>
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1 bg-orange-500 hover:bg-orange-600"
-                  onClick={devolverPlanejamento}
-                  disabled={savingPlan || motivoDevolver.trim().length < 5}
-                >
+                <Button variant="outline" className="flex-1" onClick={() => setModalDevolver(null)} disabled={savingPlan}>Cancelar</Button>
+                <Button className="flex-1 bg-orange-500 hover:bg-orange-600" onClick={devolverPlanejamento}
+                  disabled={savingPlan || motivoDevolver.trim().length < 5}>
                   {savingPlan ? 'Devolvendo...' : 'Confirmar Devolução'}
                 </Button>
               </div>
@@ -1199,19 +1147,16 @@ export default function CoordenacaoPedagogicaPage() {
                   ))}
                 </div>
               </div>
-
               <div>
                 <Label className="text-sm font-semibold">Título</Label>
                 <Input className="mt-1" placeholder="Ex: Reunião Pedagógica Semanal — Semana 10"
                   value={formReuniao.titulo} onChange={e => setFormReuniao(f => ({ ...f, titulo: e.target.value }))} />
               </div>
-
               <div>
                 <Label className="text-sm font-semibold">Data</Label>
                 <Input type="date" className="mt-1" value={formReuniao.data}
                   onChange={e => setFormReuniao(f => ({ ...f, data: e.target.value }))} />
               </div>
-
               {formReuniao.tipo === 'SEMANAL' && turmas.length > 0 && (
                 <div>
                   <Label className="text-sm font-semibold">Turma (opcional)</Label>
@@ -1222,13 +1167,11 @@ export default function CoordenacaoPedagogicaPage() {
                   </select>
                 </div>
               )}
-
               <div>
                 <Label className="text-sm font-semibold">Pauta</Label>
                 <Textarea className="mt-1" rows={4} placeholder="Descreva os tópicos a serem discutidos..."
                   value={formReuniao.pauta} onChange={e => setFormReuniao(f => ({ ...f, pauta: e.target.value }))} />
               </div>
-
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1" onClick={() => setModalReuniao(false)}>Cancelar</Button>
                 <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={salvarReuniao} disabled={saving}>
