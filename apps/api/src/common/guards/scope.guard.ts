@@ -14,7 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
  * Hierarquia de escopo:
  * - DEVELOPER: Acesso total (bypass)
  * - MANTENEDORA: Acesso a todos os dados da mantenedora
- * - STAFF_CENTRAL: Acesso às unidades vinculadas via UserRoleUnitScope
+ * - STAFF_CENTRAL: Acesso a todas as unidades da mantenedora (unitScopes é restrição extra opcional)
  * - UNIDADE: Acesso apenas à sua unidade
  * - PROFESSOR: Acesso apenas às suas turmas
  *
@@ -103,12 +103,25 @@ export class ScopeGuard implements CanActivate {
       return unit?.mantenedoraId === user.mantenedoraId;
     }
 
-    // STAFF_CENTRAL tem acesso apenas às unidades vinculadas
+    // STAFF_CENTRAL tem acesso a todas as unidades da mesma mantenedora
+    // unitScopes pode ser usado como restrição extra opcional, mas não bloqueia por padrão
     if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { mantenedoraId: true },
+      });
+      if (!unit) return false;
+      // Verifica se a unidade pertence à mesma mantenedora do usuário
+      if (unit.mantenedoraId !== user.mantenedoraId) return false;
+      // Se unitScopes está preenchido, aplica como restrição adicional
       const staffCentralRole = user.roles.find(
         (role) => role.level === RoleLevel.STAFF_CENTRAL,
       );
-      return staffCentralRole?.unitScopes.includes(unitId) || false;
+      if (staffCentralRole?.unitScopes && staffCentralRole.unitScopes.length > 0) {
+        return staffCentralRole.unitScopes.includes(unitId);
+      }
+      // Sem unitScopes: acesso livre a todas as unidades da mantenedora
+      return true;
     }
 
     // UNIDADE e PROFESSOR têm acesso apenas à sua unidade

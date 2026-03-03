@@ -601,20 +601,6 @@ export default function PlanoDeAulaNovoPage() {
               )}
             </div>
 
-            {/* Título (auto-gerado, editável como apelido) */}
-            <div>
-              <Label>Título (gerado automaticamente)</Label>
-              <Input
-                placeholder="Gerado automaticamente ao selecionar turma e data"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                disabled={bloqueado}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Você pode personalizar o título se desejar.
-              </p>
-            </div>
-
             {/* Data inicial + Quantidade de dias */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -646,6 +632,20 @@ export default function PlanoDeAulaNovoPage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">Máximo 31 dias</p>
               </div>
+            </div>
+
+            {/* Título (auto-gerado, editável como apelido) */}
+            <div>
+              <Label>Título (gerado automaticamente)</Label>
+              <Input
+                placeholder="Gerado automaticamente ao selecionar turma e data"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                disabled={bloqueado}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Você pode personalizar o título se desejar.
+              </p>
             </div>
 
             {/* Aviso de datas ocupadas */}

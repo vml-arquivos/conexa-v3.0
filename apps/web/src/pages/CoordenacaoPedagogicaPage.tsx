@@ -15,7 +15,7 @@ import {
   CheckCircle, Clock, AlertCircle, Plus, Eye, FileText,
   GraduationCap, Target, Star, TrendingUp, MessageSquare,
   Download, Filter, Search, ChevronDown, ChevronUp,
-  Layers, Award, BarChart2, BookMarked, UserCheck,
+  Layers, Award, BarChart2, BookMarked, UserCheck, Sparkles,
 } from 'lucide-react';
 import { MATRIZ_2026 } from '../data/matrizCompleta2026';
 import type { SegmentoKey } from '../data/matrizCompleta2026';
@@ -61,6 +61,7 @@ interface Planejamento {
   status: string;
   startDate: string;
   endDate: string;
+  description?: string;
   classroom?: { name: string };
   createdByUser?: { firstName: string; lastName: string };
 }
@@ -1022,18 +1023,97 @@ export default function CoordenacaoPedagogicaPage() {
                         )}
                       </div>
                     </div>
-                    {isExpanded && (
-                      <div className="mt-3 pt-3 border-t space-y-2 text-sm text-gray-700">
-                        <p><span className="font-semibold">Período:</span> {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}</p>
-                        {plan.createdByUser && (
-                          <p><span className="font-semibold">Professor:</span> {plan.createdByUser.firstName} {plan.createdByUser.lastName}</p>
-                        )}
-                        {plan.classroom && (
-                          <p><span className="font-semibold">Turma:</span> {plan.classroom.name}</p>
-                        )}
-                        <p><span className="font-semibold">Status:</span> {statusLabel[plan.status] ?? plan.status}</p>
-                      </div>
-                    )}
+                    {isExpanded && (() => {
+                      // Tenta parsear o JSON V2 do planejamento
+                      let v2Days: any[] | null = null;
+                      try {
+                        const parsed = plan.description ? JSON.parse(plan.description) : null;
+                        if (parsed?.version === 2 && Array.isArray(parsed.days)) {
+                          v2Days = parsed.days;
+                        }
+                      } catch { /* não é V2 */ }
+                      return (
+                        <div className="mt-3 pt-3 border-t space-y-3 text-sm text-gray-700">
+                          {/* Metadados */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <p><span className="font-semibold">Período:</span> {new Date(plan.startDate).toLocaleDateString('pt-BR')} — {new Date(plan.endDate).toLocaleDateString('pt-BR')}</p>
+                            {plan.classroom && <p><span className="font-semibold">Turma:</span> {plan.classroom.name}</p>}
+                            {plan.createdByUser && <p><span className="font-semibold">Professor:</span> {plan.createdByUser.firstName} {plan.createdByUser.lastName}</p>}
+                            <p><span className="font-semibold">Status:</span> {statusLabel[plan.status] ?? plan.status}</p>
+                          </div>
+                          {/* Dias do planejamento V2 */}
+                          {v2Days && v2Days.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="font-semibold text-gray-800 flex items-center gap-1">
+                                <Calendar className="h-4 w-4 text-indigo-600" />
+                                Planejamento por dia ({v2Days.length} {v2Days.length === 1 ? 'dia' : 'dias'})
+                              </p>
+                              {v2Days.map((day: any, di: number) => {
+                                const [y, m, d] = (day.date ?? '').split('-');
+                                const dataBR = day.date ? `${d}/${m}/${y}` : `Dia ${di + 1}`;
+                                return (
+                                  <div key={day.date ?? di} className="border rounded-xl overflow-hidden">
+                                    <div className="bg-indigo-50 px-3 py-2 flex items-center gap-2">
+                                      <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+                                      <span className="text-xs font-semibold text-indigo-800">Dia {di + 1} — {dataBR}</span>
+                                    </div>
+                                    <div className="p-3 space-y-2">
+                                      {/* Objetivos da Matriz */}
+                                      {(day.objectives ?? []).length > 0 && (
+                                        <div className="space-y-1">
+                                          <p className="text-xs font-semibold text-gray-500 uppercase">Objetivos da Matriz</p>
+                                          {(day.objectives ?? []).map((obj: any, oi: number) => (
+                                            <div key={oi} className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+                                              {obj.codigoBNCC && <span className="text-xs font-mono text-blue-600 mr-2">{obj.codigoBNCC}</span>}
+                                              <span className="text-xs text-blue-800">{obj.objetivoBNCC}</span>
+                                              {/* Exemplo de Atividade — card verde para coordenação */}
+                                              {obj.exemploAtividade && obj.exemploAtividade !== obj.objetivoBNCC && (
+                                                <div className="mt-1.5 bg-green-50 border border-green-100 rounded-md p-1.5">
+                                                  <p className="text-xs font-semibold text-green-600 flex items-center gap-1 mb-0.5">
+                                                    <Sparkles className="h-3 w-3" /> Exemplo de Experiência / Atividade
+                                                  </p>
+                                                  <p className="text-xs text-green-800">{obj.exemploAtividade}</p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {/* O que o professor preencheu */}
+                                      {day.teacher?.atividade && (
+                                        <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
+                                          <p className="text-xs font-semibold text-amber-700 uppercase mb-1">Desenvolvimento da Atividade (Professor)</p>
+                                          <p className="text-xs text-amber-900 whitespace-pre-wrap">{day.teacher.atividade}</p>
+                                        </div>
+                                      )}
+                                      {day.teacher?.recursos && (
+                                        <div className="bg-gray-50 rounded-lg p-2 border border-gray-100">
+                                          <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Recursos e Materiais</p>
+                                          <p className="text-xs text-gray-700">{day.teacher.recursos}</p>
+                                        </div>
+                                      )}
+                                      {day.teacher?.observacoes && (
+                                        <div className="bg-purple-50 rounded-lg p-2 border border-purple-100">
+                                          <p className="text-xs font-semibold text-purple-600 uppercase mb-1">Observações</p>
+                                          <p className="text-xs text-purple-800">{day.teacher.observacoes}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {/* Fallback: planejamento sem formato V2 */}
+                          {!v2Days && plan.description && (
+                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Conteúdo do Planejamento</p>
+                              <p className="text-xs text-gray-700 whitespace-pre-wrap">{plan.description}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );

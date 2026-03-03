@@ -1,19 +1,35 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { PageShell } from '../components/ui/PageShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
+import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button';
 import {
-  MATRIZ_PEDAGOGICA_2026,
   SEGMENTOS,
   CAMPOS_EXPERIENCIA_BNCC,
-  type ObjetivoAprendizagem,
 } from '../data/matrizPedagogica2026';
 import {
-  Search, Filter, ChevronDown, ChevronUp, BookOpen,
-  Layers, Target, Calendar, Tag, Star, Download,
-  Grid, List, CheckCircle, Sparkles,
+  Search, ChevronDown, ChevronUp, BookOpen,
+  Layers, Target, Calendar, Tag, Star, Sparkles,
+  Grid, List, CheckCircle, RefreshCw,
 } from 'lucide-react';
+import http from '../api/http';
+import { useAuth } from '../app/AuthProvider';
+import { isProfessor } from '../api/auth';
+
+// ─── Tipo unificado para objetivo (API ou lookup local) ──────────────────────
+interface ObjetivoMatriz {
+  id: string;
+  segmento: string;
+  bimestre: number;
+  semana: number;
+  semana_tema: string;
+  campo_experiencia: string;
+  campo_id: string;
+  codigo_bncc: string;
+  objetivo_bncc: string;
+  exemplo_atividade?: string;
+  data?: string;
+}
 
 // ─── Mapeamento de campos de experiência ─────────────────────────────────────
 const CAMPO_MAP: Record<string, string> = {
@@ -43,7 +59,11 @@ function getCampoId(campoExperiencia: string): string {
 }
 
 // ─── Card de Objetivo ─────────────────────────────────────────────────────────
-function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: boolean }) {
+function ObjetivoCard({ obj, compact, mostrarExemplo }: {
+  obj: ObjetivoMatriz;
+  compact?: boolean;
+  mostrarExemplo?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const campoId = getCampoId(obj.campo_experiencia);
   const campoInfo = CAMPOS_EXPERIENCIA_BNCC.find(c => c.id === campoId);
@@ -54,7 +74,6 @@ function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: b
       <div className="p-3 cursor-pointer" onClick={() => !compact && setExpanded(!expanded)}>
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            {/* Badges */}
             <div className="flex flex-wrap gap-1 mb-2">
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${COR_SEGMENTO[obj.segmento] || 'bg-gray-100 text-gray-600'}`}>
                 {obj.segmento} · {segInfo?.label}
@@ -71,13 +90,9 @@ function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: b
                 </span>
               )}
             </div>
-
-            {/* Objetivo */}
             <p className={`text-sm text-gray-800 font-medium leading-snug ${!expanded && !compact ? 'line-clamp-2' : ''}`}>
               {obj.objetivo_bncc}
             </p>
-
-            {/* Tema da semana */}
             {obj.semana_tema && (
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                 <Tag className="h-3 w-3" /> {obj.semana_tema}
@@ -85,7 +100,6 @@ function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: b
               </p>
             )}
           </div>
-
           {!compact && (
             <button className="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5">
               {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -94,13 +108,15 @@ function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: b
         </div>
       </div>
 
-      {/* Detalhes expandidos */}
       {expanded && !compact && (
         <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-0 space-y-2">
-          {obj.exemplo_atividade && obj.exemplo_atividade !== obj.objetivo_bncc && (
-            <div className="bg-blue-50 rounded-lg p-2.5">
-              <p className="text-xs font-semibold text-blue-500 uppercase mb-1">Exemplo de Atividade</p>
-              <p className="text-sm text-blue-700">{obj.exemplo_atividade}</p>
+          {/* Exemplo de Atividade — visível apenas para coordenação/mantenedora */}
+          {mostrarExemplo && obj.exemplo_atividade && obj.exemplo_atividade !== obj.objetivo_bncc && (
+            <div className="bg-green-50 rounded-lg p-2.5 border border-green-100">
+              <p className="text-xs font-semibold text-green-600 uppercase mb-1 flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Exemplo de Experiência / Atividade
+              </p>
+              <p className="text-sm text-green-800">{obj.exemplo_atividade}</p>
             </div>
           )}
           <div className="flex gap-2">
@@ -119,16 +135,90 @@ function ObjetivoCard({ obj, compact }: { obj: ObjetivoAprendizagem; compact?: b
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function MatrizPedagogicaPage() {
+  const { user } = useAuth();
+  const ehProfessor = isProfessor(user);
+  const mostrarExemplo = !ehProfessor;
+
   const [busca, setBusca] = useState('');
   const [segmentoFiltro, setSegmentoFiltro] = useState<string>('');
   const [campoFiltro, setCampoFiltro] = useState<string>('');
   const [bimestreFiltro, setBimestreFiltro] = useState<number>(0);
-  const [visualizacao, setVisualizacao] = useState<'lista' | 'grade' | 'bimestre'>('lista');
+  const [visualizacao, setVisualizacao] = useState<'lista' | 'bimestre'>('lista');
   const [abaAtiva, setAbaAtiva] = useState<'matriz' | 'sobre'>('matriz');
 
-  // Filtrar objetivos
+  // Dados da API
+  const [matrizApi, setMatrizApi] = useState<ObjetivoMatriz[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [erroApi, setErroApi] = useState(false);
+
+  // Fallback: lookup local
+  const [matrizLocal, setMatrizLocal] = useState<ObjetivoMatriz[]>([]);
+
+  // Carregar lookup local como fallback
+  useEffect(() => {
+    import('../data/matrizPedagogica2026').then(m => {
+      setMatrizLocal(m.MATRIZ_PEDAGOGICA_2026.map((o: any) => ({
+        id: o.id,
+        segmento: o.segmento,
+        bimestre: o.bimestre,
+        semana: o.semana,
+        semana_tema: o.semana_tema,
+        campo_experiencia: o.campo_experiencia,
+        campo_id: getCampoId(o.campo_experiencia),
+        codigo_bncc: o.codigo_bncc,
+        objetivo_bncc: o.objetivo_bncc,
+        exemplo_atividade: o.exemplo_atividade,
+        data: o.data,
+      })));
+    });
+  }, []);
+
+  // Carregar dados da API
+  useEffect(() => {
+    if (abaAtiva !== 'matriz') return;
+    setCarregando(true);
+    setErroApi(false);
+    const startDate = '2026-02-01';
+    const endDate = '2026-12-31';
+    const params: Record<string, string> = { startDate, endDate };
+    if (segmentoFiltro) params.segment = segmentoFiltro;
+
+    http.get('/curriculum-matrix-entries/coordenacao/full', { params })
+      .then(r => {
+        const diasLetivos: any[] = r.data?.diasLetivos ?? [];
+        const objetivos: ObjetivoMatriz[] = [];
+        for (const dia of diasLetivos) {
+          for (const obj of (dia.objectives ?? [])) {
+            objetivos.push({
+              id: obj.id ?? `${dia.date}-${obj.objetivoBNCCCodigo}`,
+              segmento: r.data?.segment ?? '',
+              bimestre: obj.bimestre ?? 1,
+              semana: obj.semana ?? 1,
+              semana_tema: obj.semana ?? '',
+              campo_experiencia: obj.campoExperiencia ?? '',
+              campo_id: getCampoId(obj.campoExperiencia ?? ''),
+              codigo_bncc: obj.objetivoBNCCCodigo ?? '',
+              objetivo_bncc: obj.objetivoBNCC ?? '',
+              exemplo_atividade: obj.exemploAtividade ?? '',
+              data: dia.date,
+            });
+          }
+        }
+        if (objetivos.length > 0) {
+          setMatrizApi(objetivos);
+        } else {
+          setErroApi(true);
+        }
+      })
+      .catch(() => setErroApi(true))
+      .finally(() => setCarregando(false));
+  }, [abaAtiva, segmentoFiltro]);
+
+  // Usar API se disponível, senão fallback local
+  const matrizBase = matrizApi.length > 0 ? matrizApi : matrizLocal;
+
   const objetivosFiltrados = useMemo(() => {
-    return MATRIZ_PEDAGOGICA_2026.filter(obj => {
+    return matrizBase.filter(obj => {
       if (segmentoFiltro && obj.segmento !== segmentoFiltro) return false;
       if (campoFiltro && getCampoId(obj.campo_experiencia) !== campoFiltro) return false;
       if (bimestreFiltro && obj.bimestre !== bimestreFiltro) return false;
@@ -139,30 +229,28 @@ export default function MatrizPedagogicaPage() {
           obj.codigo_bncc.toLowerCase().includes(q) ||
           obj.campo_experiencia.toLowerCase().includes(q) ||
           obj.semana_tema.toLowerCase().includes(q) ||
-          obj.exemplo_atividade.toLowerCase().includes(q)
+          (obj.exemplo_atividade ?? '').toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [busca, segmentoFiltro, campoFiltro, bimestreFiltro]);
+  }, [matrizBase, busca, segmentoFiltro, campoFiltro, bimestreFiltro]);
 
-  // Agrupar por bimestre para visualização de grade
   const porBimestre = useMemo(() => {
-    const grupos: Record<number, ObjetivoAprendizagem[]> = { 1: [], 2: [], 3: [], 4: [] };
+    const grupos: Record<number, ObjetivoMatriz[]> = { 1: [], 2: [], 3: [], 4: [] };
     objetivosFiltrados.forEach(obj => {
       if (grupos[obj.bimestre]) grupos[obj.bimestre].push(obj);
     });
     return grupos;
   }, [objetivosFiltrados]);
 
-  // Estatísticas
   const stats = useMemo(() => {
-    const total = MATRIZ_PEDAGOGICA_2026.length;
+    const total = matrizBase.length;
     const porSeg = Object.fromEntries(
-      Object.keys(SEGMENTOS).map(s => [s, MATRIZ_PEDAGOGICA_2026.filter(o => o.segmento === s).length])
+      Object.keys(SEGMENTOS).map(s => [s, matrizBase.filter(o => o.segmento === s).length])
     );
     return { total, porSeg };
-  }, []);
+  }, [matrizBase]);
 
   return (
     <PageShell
@@ -193,16 +281,15 @@ export default function MatrizPedagogicaPage() {
               <div>
                 <h2 className="text-xl font-bold text-indigo-800 mb-2">Sequência Pedagógica Piloto 2026</h2>
                 <p className="text-gray-700 leading-relaxed">
-                  A Matriz Pedagógica do Conexa é baseada na <strong>Sequência Pedagógica Piloto 2026</strong>, 
-                  documento que organiza os objetivos de aprendizagem e desenvolvimento da Educação Infantil 
-                  alinhados à <strong>Base Nacional Comum Curricular (BNCC)</strong>, distribuídos em 4 bimestres 
+                  A Matriz Pedagógica do Conexa é baseada na <strong>Sequência Pedagógica Piloto 2026</strong>,
+                  documento que organiza os objetivos de aprendizagem e desenvolvimento da Educação Infantil
+                  alinhados à <strong>Base Nacional Comum Curricular (BNCC)</strong>, distribuídos em 4 bimestres
                   e 3 segmentos etários.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Estatísticas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Card className="border-2 border-indigo-100 text-center">
               <CardContent className="pt-4 pb-3">
@@ -213,14 +300,13 @@ export default function MatrizPedagogicaPage() {
             {Object.entries(SEGMENTOS).map(([seg, info]) => (
               <Card key={seg} className={`border-2 text-center border-${info.cor}-100`}>
                 <CardContent className="pt-4 pb-3">
-                  <p className={`text-3xl font-bold text-${info.cor}-600`}>{stats.porSeg[seg]}</p>
+                  <p className={`text-3xl font-bold text-${info.cor}-600`}>{stats.porSeg[seg] ?? 0}</p>
                   <p className="text-xs text-gray-500 mt-1">{seg} — {info.label}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* Segmentos */}
           <div className="space-y-3">
             {Object.entries(SEGMENTOS).map(([seg, info]) => (
               <Card key={seg} className="border-2 border-gray-100">
@@ -231,14 +317,13 @@ export default function MatrizPedagogicaPage() {
                       <p className="font-semibold text-gray-800">{info.label}</p>
                       <p className="text-xs text-gray-500">{info.desc}</p>
                     </div>
-                    <span className="ml-auto text-sm text-gray-400">{stats.porSeg[seg]} objetivos</span>
+                    <span className="ml-auto text-sm text-gray-400">{stats.porSeg[seg] ?? 0} objetivos</span>
                   </div>
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          {/* Campos de Experiência */}
           <div>
             <h3 className="font-semibold text-gray-700 mb-3">Campos de Experiência (BNCC)</h3>
             <div className="space-y-2">
@@ -256,6 +341,21 @@ export default function MatrizPedagogicaPage() {
       {/* ─── MATRIZ DE OBJETIVOS ─── */}
       {abaAtiva === 'matriz' && (
         <div className="space-y-4">
+          {/* Aviso de fonte */}
+          {matrizApi.length > 0 && !erroApi && (
+            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+              <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              Dados carregados da API em tempo real
+              {mostrarExemplo && <span className="ml-1 font-semibold">· Exemplos de atividades visíveis (coordenação)</span>}
+            </div>
+          )}
+          {erroApi && matrizLocal.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              <RefreshCw className="h-3.5 w-3.5 flex-shrink-0" />
+              Usando dados locais (API indisponível)
+            </div>
+          )}
+
           {/* Filtros */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-3">
             <div className="relative">
@@ -264,7 +364,6 @@ export default function MatrizPedagogicaPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {/* Segmento */}
               <div className="flex gap-1">
                 <button onClick={() => setSegmentoFiltro('')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${!segmentoFiltro ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
@@ -278,7 +377,6 @@ export default function MatrizPedagogicaPage() {
                 ))}
               </div>
 
-              {/* Bimestre */}
               <div className="flex gap-1">
                 {[0, 1, 2, 3, 4].map(b => (
                   <button key={b} onClick={() => setBimestreFiltro(b)}
@@ -289,7 +387,6 @@ export default function MatrizPedagogicaPage() {
               </div>
             </div>
 
-            {/* Campos de Experiência */}
             <div className="flex flex-wrap gap-1">
               <button onClick={() => setCampoFiltro('')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${!campoFiltro ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
@@ -307,7 +404,10 @@ export default function MatrizPedagogicaPage() {
           {/* Controles de visualização */}
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              <span className="font-semibold text-gray-700">{objetivosFiltrados.length}</span> objetivos encontrados
+              {carregando
+                ? <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3 animate-spin" /> Carregando...</span>
+                : <><span className="font-semibold text-gray-700">{objetivosFiltrados.length}</span> objetivos encontrados</>
+              }
             </p>
             <div className="flex gap-1">
               {[
@@ -325,7 +425,7 @@ export default function MatrizPedagogicaPage() {
           {/* ─── VISUALIZAÇÃO LISTA ─── */}
           {visualizacao === 'lista' && (
             <div className="space-y-2">
-              {objetivosFiltrados.length === 0 && (
+              {!carregando && objetivosFiltrados.length === 0 && (
                 <div className="text-center py-12 bg-gray-50 rounded-2xl">
                   <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-500 font-medium">Nenhum objetivo encontrado</p>
@@ -333,7 +433,7 @@ export default function MatrizPedagogicaPage() {
                 </div>
               )}
               {objetivosFiltrados.map(obj => (
-                <ObjetivoCard key={obj.id} obj={obj} />
+                <ObjetivoCard key={obj.id} obj={obj} mostrarExemplo={mostrarExemplo} />
               ))}
             </div>
           )}
@@ -355,7 +455,7 @@ export default function MatrizPedagogicaPage() {
                       <p className="text-xs text-gray-400 text-center py-4">Nenhum objetivo para este bimestre com os filtros atuais</p>
                     )}
                     {(porBimestre[bim] || []).map(obj => (
-                      <ObjetivoCard key={obj.id} obj={obj} compact />
+                      <ObjetivoCard key={obj.id} obj={obj} compact mostrarExemplo={mostrarExemplo} />
                     ))}
                   </div>
                 </div>
