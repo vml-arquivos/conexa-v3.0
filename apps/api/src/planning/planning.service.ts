@@ -116,7 +116,7 @@ export class PlanningService {
         mantenedoraId: user.mantenedoraId,
         unitId: classroom.unitId,
         classroomId: classroom.id,
-        type: 'DIARIO' as any,
+        type: 'SEMANAL',
         createdBy: user.email,
         templateId: template.id,
         curriculumMatrixId: matriz.id,
@@ -232,7 +232,7 @@ export class PlanningService {
       data: {
         title: createDto.title,
         description: createDto.description,
-        type: createDto.type,
+        type: createDto.type ?? 'SEMANAL',
         templateId: createDto.templateId,
         curriculumMatrixId: createDto.curriculumMatrixId, // NOVO
         classroomId: createDto.classroomId,
@@ -1001,5 +1001,80 @@ export class PlanningService {
     });
 
     return maskMatrizEntryForProfessor(user, updatedPlanning);
+  }
+
+  /**
+   * Verifica quais datas do range já possuem planejamentos para a turma.
+   * Retorna: { occupied: string[], nextFreeDate: string }
+   * occupied: lista de datas YYYY-MM-DD com planejamento existente
+   * nextFreeDate: próxima data livre após o range
+   */
+  async checkDates(
+    classroomId: string,
+    startDate: string,
+    numDays: number,
+    user: JwtPayload,
+  ): Promise<{ occupied: string[]; nextFreeDate: string }> {
+    if (!classroomId || !startDate) {
+      return { occupied: [], nextFreeDate: startDate };
+    }
+    // Gera lista de datas do range
+    const [y, m, d] = startDate.split('-').map(Number);
+    const dates: string[] = [];
+    for (let i = 0; i < numDays; i++) {
+      const dt = new Date(y, m - 1, d + i);
+      const yy = dt.getFullYear();
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      dates.push(`${yy}-${mm}-${dd}`);
+    }
+    const rangeStart = new Date(y, m - 1, d, 0, 0, 0);
+    const lastDate = dates[dates.length - 1].split('-').map(Number);
+    const rangeEnd = new Date(lastDate[0], lastDate[1] - 1, lastDate[2], 23, 59, 59);
+    // Busca planejamentos existentes que se sobrepõem ao range
+    const existing = await this.prisma.planning.findMany({
+      where: {
+        classroomId,
+        status: { notIn: [PlanningStatus.CANCELADO] },
+        AND: [
+          { startDate: { lte: rangeEnd } },
+          { endDate: { gte: rangeStart } },
+        ],
+      },
+      select: { startDate: true, endDate: true },
+    });
+    // Determina quais datas do range estão ocupadas
+    const occupied: string[] = [];
+    for (const dateStr of dates) {
+      const [dy, dm, dd2] = dateStr.split('-').map(Number);
+      const dt = new Date(dy, dm - 1, dd2);
+      const isOccupied = existing.some(
+        (p) => new Date(p.startDate) <= dt && new Date(p.endDate) >= dt,
+      );
+      if (isOccupied) occupied.push(dateStr);
+    }
+    // Encontra próxima data livre após o range
+    let nextFreeDate = startDate;
+    if (occupied.length > 0) {
+      // Busca próxima data livre começando após o range
+      const afterRange = new Date(lastDate[0], lastDate[1] - 1, lastDate[2] + 1);
+      let candidate = afterRange;
+      for (let i = 0; i < 365; i++) {
+        const cy = candidate.getFullYear();
+        const cm = String(candidate.getMonth() + 1).padStart(2, '0');
+        const cd = String(candidate.getDate()).padStart(2, '0');
+        const candidateStr = `${cy}-${cm}-${cd}`;
+        const candidateEnd = new Date(cy, candidate.getMonth(), candidate.getDate(), 23, 59, 59);
+        const isOccupied = existing.some(
+          (p) => new Date(p.startDate) <= candidate && new Date(p.endDate) >= candidateEnd,
+        );
+        if (!isOccupied) {
+          nextFreeDate = candidateStr;
+          break;
+        }
+        candidate = new Date(cy, candidate.getMonth(), candidate.getDate() + 1);
+      }
+    }
+    return { occupied, nextFreeDate };
   }
 }

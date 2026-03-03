@@ -78,6 +78,21 @@ export class PlanningController {
   }
 
   /**
+   * GET /plannings/check-dates?classroomId=...&startDate=YYYY-MM-DD&days=N
+   * Verifica se já existem planejamentos nas datas solicitadas para a turma.
+   * Retorna: { occupied: string[], nextFreeDate: string }
+   */
+  @Get('check-dates')
+  checkDates(
+    @Query('classroomId') classroomId: string,
+    @Query('startDate') startDate: string,
+    @Query('days') days: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.planningService.checkDates(classroomId, startDate, Number(days) || 1, user);
+  }
+
+  /**
    * GET /plannings
    * Lista planejamentos com filtros opcionais
    *

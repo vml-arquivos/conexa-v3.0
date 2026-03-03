@@ -7,11 +7,18 @@ function hasRole(user: JwtPayload, ...levels: RoleLevel[]): boolean {
   return Array.isArray(user.roles) && user.roles.some((r: any) => levels.includes(r?.level));
 }
 
-/** Resolve unitId: aceita override explícito (STAFF_CENTRAL/MANTENEDORA) ou usa token do usuário */
-function resolveUnitId(user: JwtPayload, override?: string): string {
-  const unitId = override || user.unitId;
-  if (!unitId) throw new ForbiddenException('unitId é obrigatório para este papel');
-  return unitId;
+/** Resolve unitId: aceita override explícito (STAFF_CENTRAL/MANTENEDORA) ou usa token do usuário.
+ * Para STAFF_CENTRAL/MANTENEDORA/DEVELOPER sem unitId no token e sem override, retorna null
+ * (indica busca ampla por mantenedoraId). */
+function resolveUnitId(user: JwtPayload, override?: string): string | null {
+  if (override) return override;
+  if (user.unitId) return user.unitId;
+  // STAFF_CENTRAL e acima podem não ter unitId no token — busca ampla por mantenedoraId
+  const isStaffOrAbove = Array.isArray(user.roles) && user.roles.some(
+    (r: any) => ['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].includes(r?.level),
+  );
+  if (isStaffOrAbove) return null;
+  throw new ForbiddenException('unitId é obrigatório para este papel');
 }
 
 @Injectable()
@@ -113,7 +120,9 @@ export class CoordenacaoService {
 
   async getDashboardUnidade(user: JwtPayload, unitIdOverride?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-    const unitId = resolveUnitId(user, unitIdOverride);
+    const unitIdRaw = resolveUnitId(user, unitIdOverride);
+    if (!unitIdRaw) throw new ForbiddenException('Selecione uma unidade para ver o dashboard da unidade');
+    const unitId: string = unitIdRaw;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -337,7 +346,8 @@ export class CoordenacaoService {
   async listarPlanejamentos(status: string, classroomId: string, user: JwtPayload, unitIdOverride?: string, startDate?: string, endDate?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const unitId = resolveUnitId(user, unitIdOverride);
-    const where: any = { unitId };
+    // STAFF_CENTRAL sem unitId: busca por mantenedoraId (todas as unidades)
+    const where: any = unitId ? { unitId } : { mantenedoraId: user.mantenedoraId };
     if (status) {
       where.status = status;
     } else {
@@ -395,7 +405,8 @@ export class CoordenacaoService {
   async listarDiarios(classroomId: string, startDate: string, endDate: string, user: JwtPayload, unitIdOverride?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const unitId = resolveUnitId(user, unitIdOverride);
-    const where: any = { unitId };
+    // STAFF_CENTRAL sem unitId: busca por mantenedoraId (todas as unidades)
+    const where: any = unitId ? { unitId } : { mantenedoraId: user.mantenedoraId };
     if (classroomId) where.classroomId = classroomId;
     if (startDate && endDate) {
       where.eventDate = { gte: new Date(startDate), lte: new Date(endDate) };
@@ -420,10 +431,11 @@ export class CoordenacaoService {
 
   async getUnitClassrooms(user: JwtPayload, unitIdOverride?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-    const unitId = resolveUnitId(user, unitIdOverride);
-
+    const unitIdRaw = resolveUnitId(user, unitIdOverride);
+    if (!unitIdRaw) throw new ForbiddenException('Selecione uma unidade para ver as turmas');
+    const unitId: string = unitIdRaw;
     const classrooms = await this.prisma.classroom.findMany({
-      where: { unitId, isActive: true },
+      where: { unitId: unitId, isActive: true },
       include: {
         enrollments: { where: { status: 'ATIVA' }, select: { id: true } },
         teachers: {
@@ -472,7 +484,8 @@ export class CoordenacaoService {
   async listarRequisicoes(status: string, user: JwtPayload, unitIdOverride?: string) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const unitId = resolveUnitId(user, unitIdOverride);
-    const where: any = { unitId };
+    // STAFF_CENTRAL sem unitId: busca por mantenedoraId (todas as unidades)
+    const where: any = unitId ? { unitId } : { mantenedoraId: user.mantenedoraId };
     if (status) where.status = status;
     else where.status = RequestStatus.SOLICITADO;
     return this.prisma.materialRequest.findMany({

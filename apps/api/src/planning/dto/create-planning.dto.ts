@@ -7,6 +7,7 @@ import {
   IsEnum,
   Length,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export enum PlanningType {
   SEMANAL = 'SEMANAL',
@@ -15,6 +16,27 @@ export enum PlanningType {
   TRIMESTRAL = 'TRIMESTRAL',
   SEMESTRAL = 'SEMESTRAL',
   ANUAL = 'ANUAL',
+}
+
+/**
+ * Normaliza o campo `type` para um valor válido do enum PlanningType.
+ * Aceita valores legados (DIARIO, PLANO, etc.) e os converte para SEMANAL.
+ * Garante que o campo nunca cause erro de validação por valor inválido.
+ */
+function normalizePlanningType(value: unknown): PlanningType {
+  if (!value) return PlanningType.SEMANAL;
+  const valid = Object.values(PlanningType) as string[];
+  if (valid.includes(value as string)) return value as PlanningType;
+  // Mapeamento de valores legados
+  const legacyMap: Record<string, PlanningType> = {
+    DIARIO: PlanningType.SEMANAL,
+    PLANO: PlanningType.SEMANAL,
+    MENSALIDADE: PlanningType.MENSAL,
+    BIMESTRAL: PlanningType.TRIMESTRAL,
+    SEMESTRAL: PlanningType.SEMESTRAL,
+    ANUAL: PlanningType.ANUAL,
+  };
+  return legacyMap[String(value).toUpperCase()] ?? PlanningType.SEMANAL;
 }
 
 export class CreatePlanningDto {
@@ -39,8 +61,14 @@ export class CreatePlanningDto {
   @IsString()
   description?: string;
 
+  /**
+   * Tipo do planejamento. Opcional — default = SEMANAL.
+   * Valores legados (DIARIO, PLANO, etc.) são normalizados automaticamente.
+   */
+  @IsOptional()
+  @Transform(({ value }) => normalizePlanningType(value))
   @IsEnum(PlanningType)
-  type: PlanningType;
+  type?: PlanningType;
 
   @IsDateString()
   @IsNotEmpty()

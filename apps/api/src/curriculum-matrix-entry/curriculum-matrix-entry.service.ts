@@ -12,6 +12,7 @@ import { UpdateCurriculumMatrixEntryDto } from './dto/update-curriculum-matrix-e
 import { QueryCurriculumMatrixEntryDto } from './dto/query-curriculum-matrix-entry.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { maskMatrizEntriesForProfessor, maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
+import { RoleLevel } from '@prisma/client';
 
 @Injectable()
 export class CurriculumMatrixEntryService {
@@ -321,7 +322,9 @@ export class CurriculumMatrixEntryService {
   /**
    * Busca as entradas da Matriz para uma turma + data específica.
    * Detecta o segmento via ageGroupMin do Classroom (sem fallback).
-   * Retorna os 4 campos obrigatórios (exemploAtividade nunca é retornado).
+   * Retorna os 4 campos obrigatórios + exemploAtividade condicionalmente por role:
+   * - PROFESSOR: sem exemploAtividade
+   * - UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER: com exemploAtividade
    * Contrato de retorno padronizado conforme spec.
    */
   async byClassroomDay(
@@ -338,6 +341,7 @@ export class CurriculumMatrixEntryService {
       objetivoBNCC: string;
       objetivoCurriculoDF: string;
       intencionalidadePedagogica: string | null;
+      exemploAtividade?: string | null;
     }>;
     message?: string;
   }> {
@@ -415,6 +419,12 @@ export class CurriculumMatrixEntryService {
       };
     }
 
+    // Determinar se o usuário pode ver exemploAtividade
+    // PROFESSOR não recebe; UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER recebem
+    const isProfessorOnly = user.roles.every(
+      (r) => r.level === RoleLevel.PROFESSOR,
+    );
+
     // 5. Buscar as entries do dia
     const entries = await this.prisma.curriculumMatrixEntry.findMany({
       where: {
@@ -430,19 +440,33 @@ export class CurriculumMatrixEntryService {
         objetivoBNCC: true,
         objetivoCurriculo: true,
         intencionalidade: true,
-        // exemploAtividade: NUNCA retornado (mascarado para todos via select)
+        // exemploAtividade: retornado condicionalmente por role
+        exemploAtividade: !isProfessorOnly,
       },
       orderBy: { campoDeExperiencia: 'asc' },
     });
 
     // 6. Mapear para o contrato padronizado
-    const objectives = entries.map((e) => ({
-      campoExperiencia: e.campoDeExperiencia as string,
-      codigoBNCC: e.objetivoBNCCCode ?? null,
-      objetivoBNCC: e.objetivoBNCC,
-      objetivoCurriculoDF: e.objetivoCurriculo,
-      intencionalidadePedagogica: e.intencionalidade ?? null,
-    }));
+    const objectives = entries.map((e) => {
+      const obj: {
+        campoExperiencia: string;
+        codigoBNCC: string | null;
+        objetivoBNCC: string;
+        objetivoCurriculoDF: string;
+        intencionalidadePedagogica: string | null;
+        exemploAtividade?: string | null;
+      } = {
+        campoExperiencia: e.campoDeExperiencia as string,
+        codigoBNCC: e.objetivoBNCCCode ?? null,
+        objetivoBNCC: e.objetivoBNCC,
+        objetivoCurriculoDF: e.objetivoCurriculo,
+        intencionalidadePedagogica: e.intencionalidade ?? null,
+      };
+      if (!isProfessorOnly && 'exemploAtividade' in e) {
+        obj.exemploAtividade = (e as any).exemploAtividade ?? null;
+      }
+      return obj;
+    });
 
     return { segment, date, classroomId, objectives };
   }

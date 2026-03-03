@@ -124,9 +124,8 @@ function formatDateBR(date: string): string {
   return `${d}/${m}/${y}`;
 }
 
-/** Infere o tipo de planejamento pelo número de dias */
+/** Infere o tipo de planejamento pelo número de dias (apenas valores válidos do enum PlanningType) */
 function inferTipo(numDays: number): string {
-  if (numDays <= 1) return 'DIARIO';
   if (numDays <= 7) return 'SEMANAL';
   if (numDays <= 31) return 'MENSAL';
   return 'TRIMESTRAL';
@@ -206,6 +205,10 @@ export default function PlanoDeAulaNovoPage() {
   const [loading, setLoading] = useState(false);
   const [planningId, setPlanningId] = useState<string | null>(id ?? null);
   const [status, setStatus] = useState<string>('RASCUNHO');
+
+  // Datas ocupadas (já existem planejamentos nessas datas)
+  const [occupiedDates, setOccupiedDates] = useState<string[]>([]);
+  const [checkingDates, setCheckingDates] = useState(false);
 
   // Cache de matriz: chave = "classroomId|YYYY-MM-DD"
   const matrizCache = useRef<Map<string, MatrizByDayResponse>>(new Map());
@@ -317,6 +320,25 @@ export default function PlanoDeAulaNovoPage() {
     }
     load();
   }, [id]);
+
+  // ─── Verifica datas ocupadas via API ────────────────────────────────────
+  useEffect(() => {
+    if (!classroomId || !startDate || numDays < 1 || isEditing) return;
+    const timer = setTimeout(async () => {
+      setCheckingDates(true);
+      try {
+        const res = await http.get('/plannings/check-dates', {
+          params: { classroomId, startDate, days: numDays },
+        });
+        setOccupiedDates(res.data?.occupied ?? []);
+      } catch {
+        setOccupiedDates([]);
+      } finally {
+        setCheckingDates(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [classroomId, startDate, numDays, isEditing]);
 
   // ─── Gera/atualiza lista de dias quando startDate ou numDays mudam ────────
   useEffect(() => {
@@ -604,6 +626,7 @@ export default function PlanoDeAulaNovoPage() {
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
                   disabled={bloqueado}
+                  className={occupiedDates.length > 0 ? 'border-amber-400' : ''}
                 />
               </div>
               <div>
@@ -624,6 +647,26 @@ export default function PlanoDeAulaNovoPage() {
                 <p className="text-xs text-gray-400 mt-1">Máximo 31 dias</p>
               </div>
             </div>
+
+            {/* Aviso de datas ocupadas */}
+            {checkingDates && (
+              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl text-gray-500 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                Verificando disponibilidade das datas...
+              </div>
+            )}
+            {!checkingDates && occupiedDates.length > 0 && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Atenção: datas já possuem planejamento</p>
+                  <p className="text-xs mt-0.5">
+                    {occupiedDates.map(d => formatDateBR(d)).join(', ')} já têm planejamento cadastrado para esta turma.
+                    Salvar irá criar um novo planejamento paralelo.
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
