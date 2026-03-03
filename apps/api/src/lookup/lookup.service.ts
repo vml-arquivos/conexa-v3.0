@@ -69,7 +69,7 @@ export class LookupService {
 
     if (hasGlobalRole) {
       const units = await this.prisma.unit.findMany({
-        where: { mantenedoraId: user.mantenedoraId },
+        where: { mantenedoraId: user.mantenedoraId, isActive: true },
         select: {
           id: true,
           code: true,

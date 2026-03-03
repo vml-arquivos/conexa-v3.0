@@ -128,6 +128,24 @@ export class AdminService {
       return;
     }
 
+    // STAFF_CENTRAL: acesso a todas as unidades da mantenedora (ou unitScopes se restrito)
+    const isStaffCentral = user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL);
+    if (isStaffCentral) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: unitId },
+        select: { mantenedoraId: true },
+      });
+      if (!unit || unit.mantenedoraId !== user.mantenedoraId) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
+      const staffRole = user.roles.find((r) => r.level === RoleLevel.STAFF_CENTRAL);
+      const scopes = staffRole?.unitScopes ?? [];
+      if (scopes.length > 0 && !scopes.includes(unitId)) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
+      return;
+    }
+
     // UNIDADE: somente sua própria unitId
     const isUnidade = user.roles.some((r) => r.level === RoleLevel.UNIDADE);
     if (isUnidade) {
@@ -174,7 +192,8 @@ export class AdminService {
 
     const isMantenedora =
       this.isDeveloper(user) ||
-      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA);
+      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA) ||
+      user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL);
 
     const whereUnitId: string | undefined = isMantenedora
       ? (opts.unitId || undefined)
@@ -240,7 +259,8 @@ export class AdminService {
 
     const isMantenedora =
       this.isDeveloper(user) ||
-      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA);
+      user.roles.some((r) => r.level === RoleLevel.MANTENEDORA) ||
+      user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL);
 
     const units = await this.prisma.unit.findMany({
       where: {

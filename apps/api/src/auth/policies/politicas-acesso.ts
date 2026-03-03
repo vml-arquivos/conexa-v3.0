@@ -40,10 +40,16 @@ export function podeAcessarUnidade(user: JwtPayload, unitId: string): boolean {
   // MANTENEDORA acessa todas as unidades da própria mantenedora
   if (user.roles.some((r) => r.level === RoleLevel.MANTENEDORA)) return true;
 
-  // STAFF_CENTRAL acessa unidades no seu escopo
+  // STAFF_CENTRAL: se unitScopes preenchido, restringe a esses escopos;
+  // se vazio (global), acessa TODAS as unidades da mantenedora.
   const staffRole = user.roles.find((r) => r.level === RoleLevel.STAFF_CENTRAL);
   if (staffRole) {
-    return (staffRole.unitScopes ?? []).includes(unitId);
+    const scopes = staffRole.unitScopes ?? [];
+    if (scopes.length > 0) {
+      return scopes.includes(unitId);
+    }
+    // Sem unitScopes: acesso global a todas as unidades da mantenedora
+    return true;
   }
 
   // UNIDADE acessa apenas a própria unidade
@@ -200,13 +206,19 @@ export function escopoUnidadeWhere(user: JwtPayload): Record<string, unknown> {
     return { mantenedoraId: user.mantenedoraId };
   }
 
-  // STAFF_CENTRAL: filtra por unidades no escopo
+  // STAFF_CENTRAL: se unitScopes preenchido, filtra por esses escopos;
+  // se vazio (global), acessa todas as unidades da mantenedora.
   const staffRole = user.roles.find((r) => r.level === RoleLevel.STAFF_CENTRAL);
   if (staffRole) {
-    return {
-      mantenedoraId: user.mantenedoraId,
-      id: { in: staffRole.unitScopes ?? [] },
-    };
+    const scopes = staffRole.unitScopes ?? [];
+    if (scopes.length > 0) {
+      return {
+        mantenedoraId: user.mantenedoraId,
+        id: { in: scopes },
+      };
+    }
+    // Sem unitScopes: acesso global — filtra apenas por mantenedora
+    return { mantenedoraId: user.mantenedoraId };
   }
 
   // UNIDADE: filtra pela própria unidade

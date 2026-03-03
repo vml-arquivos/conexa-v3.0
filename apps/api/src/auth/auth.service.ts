@@ -73,7 +73,7 @@ export class AuthService {
       unitId: user.unitId || undefined,
       roles: user.roles.map((userRole) => ({
         roleId: userRole.roleId,
-        level: userRole.scopeLevel,
+        level: userRole.role.level,  // FIX: usar role.level (RoleLevel) e não scopeLevel
         unitScopes: userRole.unitScopes.map((scope) => scope.unitId),
       })),
     };
@@ -198,9 +198,10 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Usuário não encontrado');
 
     // Buscar roles separadamente para evitar problemas de tipo
+    // FIX: usar role.level (RoleLevel real) em vez de scopeLevel
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId, isActive: true },
-      select: { scopeLevel: true },
+      include: { role: { select: { level: true } } },
     });
 
     return {
@@ -211,7 +212,7 @@ export class AuthService {
         status: user.status,
         mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
-        roles: userRoles.map((r) => r.scopeLevel),
+        roles: userRoles.map((r) => r.role.level),
       },
     };
   }
