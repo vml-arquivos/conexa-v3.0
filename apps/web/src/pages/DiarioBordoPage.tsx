@@ -15,6 +15,7 @@ import {
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star,
 } from 'lucide-react';
+import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -24,6 +25,8 @@ interface Crianca {
   photoUrl?: string;
   idade?: number;
   gender?: string;
+  allergies?: string | null;
+  medicalConditions?: string | null;
 }
 
 interface DiaryEntry {
@@ -932,14 +935,26 @@ export default function DiarioBordoPage() {
           </Card>
 
           {/* Formulário de observação */}
-          {criancaSelecionadaObs && (
+          {criancaSelecionadaObs && (() => {
+            const criancaObs = criancas.find(c => c.id === criancaSelecionadaObs);
+            return (
             <Card className="border-2 border-teal-100">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-teal-700">
                   <Plus className="h-5 w-5" />
-                  Nova Observação — {criancas.find(c => c.id === criancaSelecionadaObs)?.firstName}
+                  Nova Observação — {criancaObs?.firstName}
                 </CardTitle>
               </CardHeader>
+              {/* Alerta de Alergia */}
+              {criancaObs && (
+                <div className="px-6 pb-2">
+                  <AlergiaAlert
+                    childId={criancaObs.id}
+                    allergies={criancaObs.allergies}
+                    medicalConditions={criancaObs.medicalConditions}
+                  />
+                </div>
+              )}
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -1006,7 +1021,8 @@ export default function DiarioBordoPage() {
                 </Button>
               </CardContent>
             </Card>
-          )}
+            );
+          })()}
 
           {/* Lista de observações da criança selecionada */}
           {criancaSelecionadaObs && (

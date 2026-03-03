@@ -33,6 +33,8 @@ import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { LOOKUP_DIARIO_2026 } from '../data/lookupDiario2026';
 import type { ObjetivoDia, SegmentoKey } from '../data/lookupDiario2026';
+import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
+import { toPedagogicalISODate } from '../lib/formatDate';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -162,22 +164,16 @@ export default function PlanoDeAulaNovoPage() {
 
         if (id) {
           const planning = await getPlanning(id);
-          // Tenta recuperar dados do professor do campo description (novo formato)
-          let activities = '';
-          let resources = '';
-          let notes = '';
-          try {
-            const desc = JSON.parse((planning as any).description ?? '{}');
-            activities = desc.activities ?? '';
-            resources = desc.resources ?? '';
-            notes = desc.notes ?? '';
-          } catch {
-            // Compatibilidade com formato antigo (pedagogicalContent)
-            const pc = (planning as any).pedagogicalContent ?? {};
-            activities = pc.metodologia ?? '';
-            resources = pc.recursos ?? '';
-            notes = pc.avaliacao ?? '';
-          }
+          // Parse seguro — compatível com dados antigos e novos
+          const desc = safeJsonParse<{ activities?: string; resources?: string; notes?: string }>(
+            (planning as any).description,
+            {}
+          );
+          // Compatibilidade com formato antigo (pedagogicalContent)
+          const pc = (planning as any).pedagogicalContent ?? {};
+          const activities = desc.activities ?? pc.metodologia ?? '';
+          const resources = desc.resources ?? pc.recursos ?? '';
+          const notes = desc.notes ?? pc.avaliacao ?? '';
 
           setForm({
             title: planning.title ?? '',
@@ -235,16 +231,23 @@ export default function PlanoDeAulaNovoPage() {
 
   // ─── Build do payload para a API ──────────────────────────────────────────
   function buildPayload() {
+    // Usa toPedagogicalISODate para garantir YYYY-MM-DD no fuso America/Sao_Paulo
+    const startDateISO = form.startDate
+      ? toPedagogicalISODate(new Date(form.startDate + 'T12:00:00'))
+      : form.startDate;
+    const endDateISO = form.endDate
+      ? toPedagogicalISODate(new Date(form.endDate + 'T12:00:00'))
+      : form.endDate;
     return {
       title: form.title,
       type: inferTipo(form.startDate, form.endDate),
       classroomId: form.classroomId,
-      startDate: form.startDate,
-      endDate: form.endDate,
+      startDate: startDateISO,
+      endDate: endDateISO,
       // Objetivos da Matriz (vindos automaticamente, somente leitura)
-      objectives: JSON.stringify(objetivosDoDia),
+      objectives: safeJsonStringify(objetivosDoDia),
       // Dados de autoria do professor armazenados em description
-      description: JSON.stringify({
+      description: safeJsonStringify({
         activities: form.activities,
         resources: form.resources,
         notes: form.notes,

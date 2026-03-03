@@ -179,9 +179,28 @@ export class CoordenacaoService {
       take: 5,
     });
 
+    // Alertas acionáveis: turmas sem chamada hoje
+    const turmasSemChamadaHoje = turmas
+      .filter((t: any) => !turmasComChamada.some((c) => c.classroomId === t.id))
+      .map((t: any) => ({ id: t.id, nome: t.name }));
+
+    // Alertas acionáveis: planejamentos devolvidos parados há 3+ dias
+    const limiteDevolvido = new Date();
+    limiteDevolvido.setDate(limiteDevolvido.getDate() - 3);
+    const planejamentosParados = await this.prisma.planning.findMany({
+      where: {
+        unitId,
+        status: PlanningStatus.DEVOLVIDO,
+        updatedAt: { lt: limiteDevolvido },
+      },
+      select: { id: true, title: true, updatedAt: true },
+      take: 10,
+    });
+
     return {
       unitId,
       data: today.toISOString(),
+      alertas: { turmasSemChamadaHoje, planejamentosParados },
       indicadores: {
         totalTurmas: turmas.length,
         totalAlunos,
@@ -325,11 +344,18 @@ export class CoordenacaoService {
       where.status = { notIn: ['CANCELADO'] };
     }
     if (classroomId) where.classroomId = classroomId;
-    // Filtro por período (para a Torre de Controle do professor)
+    // Filtro por overlap de período (planejamentos que cruzam o período solicitado)
+    // Overlap: planning.startDate <= endDate AND planning.endDate >= startDate
     if (startDate && endDate) {
-      where.startDate = { gte: new Date(startDate), lte: new Date(endDate) };
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      (where as any).AND = [
+        ...((where.AND as any[]) ?? []),
+        { startDate: { lte: end } },
+        { endDate: { gte: start } },
+      ];
     } else if (startDate) {
-      where.startDate = { gte: new Date(startDate) };
+      where.endDate = { gte: new Date(startDate) };
     } else if (endDate) {
       where.startDate = { lte: new Date(endDate) };
     }

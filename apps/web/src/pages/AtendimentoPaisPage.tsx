@@ -23,6 +23,7 @@ import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 import { getAccessibleClassrooms } from '../api/lookup';
 import type { AccessibleClassroom } from '../types/lookup';
+import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 type TipoAtendimento = 'PRESENCIAL' | 'REMOTO' | 'TELEFONEMA' | 'MENSAGEM';
@@ -123,7 +124,7 @@ export function AtendimentoPaisPage() {
   const [filtroStatus, setFiltroStatus] = useState<StatusAtendimento | ''>('');
   const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
   const [turmaSelecionada, setTurmaSelecionada] = useState('');
-  const [alunos, setAlunos] = useState<{ id: string; name: string }[]>([]);
+  const [alunos, setAlunos] = useState<{ id: string; name: string; allergies?: string | null; medicalConditions?: string | null }[]>([]);
 
   // Carregar turmas
   useEffect(() => {
@@ -266,6 +267,18 @@ export function AtendimentoPaisPage() {
                 </select>
               </div>
             </div>
+
+            {/* Alerta de Alergia */}
+            {form.childId && (() => {
+              const criancaSel = alunos.find(a => a.id === form.childId);
+              return criancaSel ? (
+                <AlergiaAlert
+                  childId={criancaSel.id}
+                  allergies={criancaSel.allergies}
+                  medicalConditions={criancaSel.medicalConditions}
+                />
+              ) : null;
+            })()}
 
             {/* Dados do responsável */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

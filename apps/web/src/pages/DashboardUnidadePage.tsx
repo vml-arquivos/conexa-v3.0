@@ -50,6 +50,17 @@ interface DadosMateriais {
   quantidade: number;
 }
 
+interface TurmaSemChamada {
+  id: string;
+  name: string;
+}
+
+interface PlanejamentoParado {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function DashboardUnidadePage() {
@@ -61,6 +72,8 @@ export function DashboardUnidadePage() {
   const [requisicoes, setRequisicoes] = useState<RequisicaoReal[]>([]);
   const [planejamentos, setPlanejamentos] = useState<PlanejamentoReal[]>([]);
   const [dadosMateriais, setDadosMateriais] = useState<DadosMateriais[]>([]);
+  const [turmasSemChamada, setTurmasSemChamada] = useState<TurmaSemChamada[]>([]);
+  const [planejamentosParados, setPlanejamentosParados] = useState<PlanejamentoParado[]>([]);
   const [indicators, setIndicators] = useState({
     totalAlunos: 0,
     totalTurmas: 0,
@@ -87,12 +100,17 @@ export function DashboardUnidadePage() {
         totalAlunos: ind.totalAlunos ?? 0,
         totalTurmas: ind.totalTurmas ?? turmasArr.length,
         requisicoesAbertas: ind.requisicoesPendentes ?? reqArr.length,
-        alertasAtivos: (ind.planejamentosEmRevisao ?? 0) + (ind.planejamentosRascunho ?? 0),
+        alertasAtivos: (ind.planejamentosEmRevisao ?? 0) + (ind.planejamentosRascunho ?? 0) + (ind.totalTurmas - (ind.turmasComChamadaHoje ?? ind.totalTurmas)),
       });
 
       setTurmas(turmasArr);
       setRequisicoes(reqArr);
       setPlanejamentos(planArr);
+
+      // Alertas operacionais
+      const alertas = raw.alertas ?? {};
+      setTurmasSemChamada(Array.isArray(alertas.turmasSemChamadaHoje) ? alertas.turmasSemChamadaHoje : []);
+      setPlanejamentosParados(Array.isArray(alertas.planejamentosParados) ? alertas.planejamentosParados : []);
 
       // Agrupa requisições por categoria para o gráfico
       const categorias: Record<string, number> = {};
@@ -290,34 +308,78 @@ export function DashboardUnidadePage() {
             </div>
           )}
 
-          {/* Aba: Alertas — planejamentos em revisão */}
-          {abaAtiva === 'alertas' && (
-            <div className="space-y-3">
-              {planejamentos.filter(p => p.status === 'EM_REVISAO').length === 0 ? (
-                <div className="text-center py-8 text-gray-400">
-                  <CheckCircle className="h-10 w-10 mx-auto mb-2 text-emerald-400" />
-                  <p>Nenhum alerta ativo no momento</p>
-                </div>
-              ) : planejamentos.filter(p => p.status === 'EM_REVISAO').map((p) => (
-                <div key={p.id} className="border border-amber-200 bg-amber-50 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-800">{p.title}</span>
-                        <span className="ml-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
-                          Em Revisão
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Turma: {p.classroomId} · Período: {new Date(p.startDate).toLocaleDateString('pt-BR')} → {new Date(p.endDate).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
+          {/* Aba: Alertas — turmas sem chamada + planejamentos em revisão + parados */}
+          {abaAtiva === 'alertas' && (() => {
+            const planRevisao = planejamentos.filter(p => p.status === 'EM_REVISAO');
+            const totalAlertas = turmasSemChamada.length + planRevisao.length + planejamentosParados.length;
+            return (
+              <div className="space-y-4">
+                {totalAlertas === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <CheckCircle className="h-10 w-10 mx-auto mb-2 text-emerald-400" />
+                    <p>Nenhum alerta ativo no momento</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ) : (
+                  <>
+                    {/* Turmas sem chamada hoje */}
+                    {turmasSemChamada.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-red-600 uppercase mb-2">Turmas sem chamada hoje ({turmasSemChamada.length})</p>
+                        <div className="space-y-2">
+                          {turmasSemChamada.map(t => (
+                            <div key={t.id} className="border border-red-200 bg-red-50 rounded-lg p-3 flex items-center gap-3">
+                              <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                              <span className="text-sm font-medium text-red-800">{t.name}</span>
+                              <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Sem chamada</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Planejamentos em revisão */}
+                    {planRevisao.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-amber-600 uppercase mb-2">Planejamentos aguardando revisão ({planRevisao.length})</p>
+                        <div className="space-y-2">
+                          {planRevisao.map(p => (
+                            <div key={p.id} className="border border-amber-200 bg-amber-50 rounded-lg p-3">
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                <span className="text-sm font-medium text-gray-800">{p.title}</span>
+                                <span className="ml-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Em Revisão</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1 ml-6">
+                                {new Date(p.startDate).toLocaleDateString('pt-BR')} → {new Date(p.endDate).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Planejamentos parados (sem atualização há mais de 7 dias) */}
+                    {planejamentosParados.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Planejamentos sem atualização ({planejamentosParados.length})</p>
+                        <div className="space-y-2">
+                          {planejamentosParados.map(p => (
+                            <div key={p.id} className="border border-gray-200 bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+                              <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm text-gray-700">{p.title}</span>
+                              <span className="ml-auto text-xs text-gray-400">
+                                {new Date(p.updatedAt).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Aba: Requisições de Materiais */}
           {abaAtiva === 'materiais' && (

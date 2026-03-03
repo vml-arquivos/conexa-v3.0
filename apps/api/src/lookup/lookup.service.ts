@@ -31,6 +31,8 @@ export interface AccessibleChild {
   lastName: string;
   name: string;
   classroomId?: string;
+  allergies?: string | null;
+  medicalConditions?: string | null;
 }
 
 @Injectable()
@@ -339,6 +341,8 @@ export class LookupService {
             id: true,
             firstName: true,
             lastName: true,
+            allergies: true,         // para AlergiaAlert
+            medicalConditions: true,  // para AlergiaAlert
           },
         },
       },
@@ -355,6 +359,8 @@ export class LookupService {
       lastName: e.child.lastName,
       name: `${e.child.firstName} ${e.child.lastName}`.trim(),
       classroomId,
+      allergies: e.child.allergies ?? null,         // para AlergiaAlert
+      medicalConditions: e.child.medicalConditions ?? null, // para AlergiaAlert
     }));
   }
 

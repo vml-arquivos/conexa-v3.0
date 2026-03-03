@@ -24,6 +24,8 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import { submitPlanningForReview } from '../api/plannings';
 import type { Planning } from '../api/plannings';
+import { safeJsonParse } from '../lib/safeJson';
+import { startOfPedagogicalMonth, endOfPedagogicalMonth, formatPedagogicalDate } from '../lib/formatDate';
 
 // ─── Helpers de calendário ────────────────────────────────────────────────────
 
@@ -116,8 +118,9 @@ export default function PlanoDeAulaListaPage() {
   const loadPlannings = useCallback(async () => {
     setLoading(true);
     try {
-      const startDate = new Date(currentYear, currentMonth, 1).toISOString().split('T')[0];
-      const endDate = new Date(currentYear, currentMonth + 1, 0).toISOString().split('T')[0];
+      // Usa fuso pedagógico America/Sao_Paulo para evitar drift de data
+      const startDate = startOfPedagogicalMonth(currentYear, currentMonth);
+      const endDate = endOfPedagogicalMonth(currentYear, currentMonth);
 
       // Professor usa /plannings (filtra pelo seu próprio createdBy)
       // Coordenação/Unidade usa /coordenacao/planejamentos (filtra por unitId)
@@ -331,7 +334,7 @@ export default function PlanoDeAulaListaPage() {
                       </div>
                       <div className="flex items-center gap-3 text-xs opacity-70">
                         {p.startDate && (
-                          <span>{new Date(p.startDate).toLocaleDateString('pt-BR')}</span>
+                          <span>{formatPedagogicalDate(p.startDate)}</span>
                         )}
                         {p.type && <span>{p.type}</span>}
                       </div>
@@ -393,8 +396,8 @@ export default function PlanoDeAulaListaPage() {
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Período</p>
                   <p className="text-sm text-gray-700">
-                    {selectedPlanning.startDate && new Date(selectedPlanning.startDate).toLocaleDateString('pt-BR')}
-                    {selectedPlanning.endDate && ` — ${new Date(selectedPlanning.endDate).toLocaleDateString('pt-BR')}`}
+                    {selectedPlanning.startDate && formatPedagogicalDate(selectedPlanning.startDate)}
+                    {selectedPlanning.endDate && ` — ${formatPedagogicalDate(selectedPlanning.endDate)}`}
                   </p>
                 </div>
               )}
@@ -409,19 +412,18 @@ export default function PlanoDeAulaListaPage() {
 
               {/* Conteúdo pedagógico — suporta novo formato (description/objectives) e antigo (pedagogicalContent) */}
               {(() => {
-                // Novo formato: description é JSON com activities/resources/notes
-                const rawDesc = (selectedPlanning as any).description;
-                let desc: Record<string, string> | null = null;
-                if (rawDesc) {
-                  try { desc = JSON.parse(rawDesc); } catch { /* string simples */ }
-                }
+                // Parse seguro — compatível com dados antigos e novos
+                const desc = safeJsonParse<{ activities?: string; resources?: string; notes?: string }>(
+                  (selectedPlanning as any).description,
+                  {}
+                );
+                // Se description era string simples (dado antigo), tratar como atividades
+                const descLegacy = typeof (selectedPlanning as any).description === 'string' &&
+                  !((selectedPlanning as any).description?.startsWith('{')) ?
+                  (selectedPlanning as any).description : null;
 
                 // Objetivos da Matriz 2026 (novo formato)
-                const rawObj = (selectedPlanning as any).objectives;
-                let objectives: any[] = [];
-                if (rawObj) {
-                  try { objectives = JSON.parse(rawObj); } catch { /* ignorar */ }
-                }
+                const objectives = safeJsonParse<any[]>((selectedPlanning as any).objectives, []);
 
                 // Formato antigo (pedagogicalContent)
                 const pc = (selectedPlanning as any).pedagogicalContent;
@@ -447,11 +449,11 @@ export default function PlanoDeAulaListaPage() {
                       </div>
                     )}
 
-                    {/* Atividades (novo formato) */}
-                    {desc?.activities && (
+                    {/* Atividades (novo formato ou legado) */}
+                    {(desc?.activities || descLegacy) && (
                       <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Atividades</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{desc.activities}</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{desc?.activities ?? descLegacy}</p>
                       </div>
                     )}
                     {desc?.resources && (

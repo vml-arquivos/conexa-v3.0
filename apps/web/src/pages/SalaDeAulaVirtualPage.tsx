@@ -16,6 +16,7 @@ import {
   CheckCircle, Clock, AlertCircle, UserCircle, Trash2, Eye,
   Upload, History, TrendingUp, Brain, Heart, Activity, X, Camera,
 } from 'lucide-react';
+import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ClassroomPost {
@@ -52,6 +53,8 @@ interface Crianca {
   firstName: string;
   lastName: string;
   photoUrl?: string;
+  allergies?: string | null;
+  medicalConditions?: string | null;
 }
 
 interface ObservacaoHistorico {
@@ -786,6 +789,13 @@ export default function SalaDeAulaVirtualPage() {
                   <FileText className="h-3 w-3 mr-1" /> Diário
                 </Button>
               </div>
+
+              {/* ─── Alerta de Alergia ─── */}
+              <AlergiaAlert
+                childId={alunoSelecionado.id}
+                allergies={alunoSelecionado.allergies}
+                medicalConditions={alunoSelecionado.medicalConditions}
+              />
 
               {/* ─── Abas internas do aluno ─── */}
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">

@@ -1,3 +1,7 @@
+// TIMEZONE PEDAGÓGICO — garantia dupla de código
+// Além desta linha, setar TZ=America/Sao_Paulo nas variáveis de ambiente do serviço de API no Coolify.
+process.env.TZ = 'America/Sao_Paulo';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';

@@ -32,6 +32,8 @@ export class TeachersService {
                     dateOfBirth: true,
                     gender: true,
                     isActive: true,
+                    allergies: true,         // para AlergiaAlert
+                    medicalConditions: true,  // para AlergiaAlert
                   },
                 },
               },
@@ -100,6 +102,8 @@ export class TeachersService {
         idade: this.calculateAge(child.dateOfBirth),
         gender: child.gender,
         photoUrl: null as string | null, // campo não existe no schema atual
+        allergies: child.allergies ?? null,         // para AlergiaAlert
+        medicalConditions: child.medicalConditions ?? null, // para AlergiaAlert
       })),
       indicadores: {
         totalAlunos,
