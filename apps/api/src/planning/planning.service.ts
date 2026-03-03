@@ -327,7 +327,8 @@ export class PlanningService {
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
         where.unitId = user.unitId;
       }
-      // Professor: acessa apenas suas turmas
+      // Professor: acessa planejamentos criados por ele OU de turmas que leciona
+      // Usa OR para garantir que mesmo sem turma vinculada, o professor vê seus próprios planejamentos
       else if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
         const classrooms = await this.prisma.classroomTeacher.findMany({
           where: {
@@ -336,7 +337,12 @@ export class PlanningService {
           },
           select: { classroomId: true },
         });
-        where.classroomId = { in: classrooms.map((ct) => ct.classroomId) };
+        const classroomIds = classrooms.map((ct) => ct.classroomId);
+        // OR: planejamentos criados por este professor OU de turmas que ele leciona
+        where.OR = [
+          { createdBy: user.sub },
+          ...(classroomIds.length > 0 ? [{ classroomId: { in: classroomIds } }] : []),
+        ];
       }
     }
 

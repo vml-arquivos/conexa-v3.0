@@ -109,28 +109,69 @@ function inferTipo(startDate: string, endDate: string): string {
 
 // ─── Componente de Objetivo BNCC (somente leitura) ───────────────────────────
 
+/**
+ * ObjetivoCard — exibe os 4 campos obrigatórios da Matriz Curricular 2026 como somente leitura.
+ * 1. Campo de Experiência (+ código BNCC)
+ * 2. Objetivo da BNCC (Transcrição Literal)
+ * 3. Objetivo do Currículo em Movimento (Transcrição Literal)
+ * 4. Intencionalidade Pedagógica
+ * O campo "Exemplo de Atividade" NÃO é exibido — o professor cria o seu próprio.
+ */
 function ObjetivoCard({ objetivo }: { objetivo: ObjetivoDia }) {
-  const corMap: Record<string, string> = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-800',
-    green: 'bg-green-50 border-green-200 text-green-800',
-    orange: 'bg-orange-50 border-orange-200 text-orange-800',
-    pink: 'bg-pink-50 border-pink-200 text-pink-800',
-    purple: 'bg-purple-50 border-purple-200 text-purple-800',
-    yellow: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+  const bgMap: Record<string, string> = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    orange: 'bg-orange-50 border-orange-200',
+    pink: 'bg-pink-50 border-pink-200',
+    purple: 'bg-purple-50 border-purple-200',
+    yellow: 'bg-yellow-50 border-yellow-200',
   };
-  const cor = corMap[objetivo.campo_cor] ?? 'bg-gray-50 border-gray-200 text-gray-800';
+  const bg = bgMap[objetivo.campo_cor] ?? 'bg-gray-50 border-gray-200';
 
   return (
-    <div className={`p-3 rounded-xl border ${cor} space-y-1`}>
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className={`rounded-xl border ${bg} overflow-hidden`}>
+      {/* Cabeçalho: Campo de Experiência */}
+      <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${bg}`}>
         <span className="text-lg">{objetivo.campo_emoji}</span>
-        <span className="text-xs font-semibold uppercase tracking-wide">{objetivo.campo_label}</span>
-        <Badge variant="secondary" className="ml-auto text-xs font-mono">{objetivo.codigo_bncc}</Badge>
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-700">
+          Campo de Experiência: {objetivo.campo_label}
+        </span>
+        <Badge variant="secondary" className="ml-auto text-xs font-mono">
+          {objetivo.codigo_bncc}
+        </Badge>
       </div>
       {objetivo.semana_tema && (
-        <p className="text-xs text-gray-500 italic">Tema da semana: {objetivo.semana_tema}</p>
+        <div className="px-4 py-1 bg-white/60 border-b border-gray-100">
+          <span className="text-xs text-gray-500 italic">Tema da semana: {objetivo.semana_tema}</span>
+        </div>
       )}
-      <p className="text-sm">{objetivo.objetivo_bncc}</p>
+      <div className="px-4 py-3 space-y-3 bg-white/80">
+        {/* Campo 2: Objetivo BNCC */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Objetivo da BNCC (Transcrição Literal)
+          </p>
+          <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivo_bncc}</p>
+        </div>
+        {/* Campo 3: Objetivo Currículo em Movimento */}
+        {objetivo.objetivo_curriculo && objetivo.objetivo_curriculo !== objetivo.objetivo_bncc && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Objetivo do Currículo em Movimento — DF (Transcrição Literal)
+            </p>
+            <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivo_curriculo}</p>
+          </div>
+        )}
+        {/* Campo 4: Intencionalidade Pedagógica */}
+        {objetivo.intencionalidade && (
+          <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
+              🎯 Intencionalidade Pedagógica
+            </p>
+            <p className="text-sm text-indigo-800 leading-relaxed">{objetivo.intencionalidade}</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -430,19 +430,47 @@ export default function PlanoDeAulaListaPage() {
 
                 return (
                   <div className="space-y-3">
-                    {/* Objetivos da Matriz 2026 */}
+                    {/* Objetivos da Matriz 2026 — 4 campos obrigatórios */}
                     {objectives.length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Objetivos da Matriz 2026</p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Objetivos da Matriz Pedagógica 2026</p>
                         <div className="space-y-2">
                           {objectives.map((obj: any, i: number) => (
-                            <div key={i} className="p-2 bg-indigo-50 border border-indigo-200 rounded-lg">
-                              <div className="flex items-center gap-1.5 mb-0.5">
+                            <div key={i} className="border border-indigo-200 rounded-lg overflow-hidden">
+                              {/* Campo 1: Campo de Experiência */}
+                              <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
                                 {obj.campo_emoji && <span>{obj.campo_emoji}</span>}
-                                <span className="text-xs font-semibold text-indigo-700">{obj.campo_label}</span>
+                                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
+                                  Campo de Experiência: {obj.campo_label}
+                                </span>
                                 <span className="ml-auto text-xs font-mono text-gray-500">{obj.codigo_bncc}</span>
                               </div>
-                              <p className="text-xs text-gray-700">{obj.objetivo_bncc}</p>
+                              {obj.semana_tema && (
+                                <div className="px-3 py-1 bg-gray-50 border-b border-gray-100">
+                                  <span className="text-xs text-gray-500 italic">Tema da semana: {obj.semana_tema}</span>
+                                </div>
+                              )}
+                              <div className="px-3 py-2 space-y-2 bg-white">
+                                {/* Campo 2: Objetivo BNCC */}
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo da BNCC (Transcrição Literal)</p>
+                                  <p className="text-xs text-gray-700 leading-relaxed">{obj.objetivo_bncc}</p>
+                                </div>
+                                {/* Campo 3: Objetivo Currículo em Movimento */}
+                                {obj.objetivo_curriculo && obj.objetivo_curriculo !== obj.objetivo_bncc && (
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo do Currículo em Movimento — DF</p>
+                                    <p className="text-xs text-gray-700 leading-relaxed">{obj.objetivo_curriculo}</p>
+                                  </div>
+                                )}
+                                {/* Campo 4: Intencionalidade Pedagógica */}
+                                {obj.intencionalidade && (
+                                  <div className="bg-indigo-50 rounded px-2 py-1.5">
+                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">🎯 Intencionalidade Pedagógica</p>
+                                    <p className="text-xs text-indigo-800 leading-relaxed">{obj.intencionalidade}</p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
