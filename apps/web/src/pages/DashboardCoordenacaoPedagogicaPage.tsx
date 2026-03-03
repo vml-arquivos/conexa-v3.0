@@ -538,7 +538,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           </div>
                         )}
                         <button
-                          onClick={() => navigate(`/planejamentos/${plan.id}`)}
+                          onClick={() => navigate(`/app/planejamentos/${plan.id}`)}
                           className="w-full py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 font-medium flex items-center justify-center gap-2">
                           <Eye className="h-4 w-4"/>Abrir plano de aula completo
                         </button>

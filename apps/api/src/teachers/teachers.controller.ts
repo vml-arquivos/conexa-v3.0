@@ -23,6 +23,18 @@ export class TeachersController {
   }
 
   /**
+   * GET /teachers/me/default-classroom
+   * Retorna a turma padrão do professor para auto-preenchimento no Novo Planejamento.
+   * Se houver apenas 1 turma ativa, retorna ela diretamente.
+   * Se houver mais de 1, retorna a mais recente e a lista completa para dropdown.
+   */
+  @Get('me/default-classroom')
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
+  getDefaultClassroom(@CurrentUser() user: JwtPayload) {
+    return this.service.getDefaultClassroom(user);
+  }
+
+  /**
    * POST /teachers/planning/generate
    * Gera planejamento semanal automaticamente baseado na matriz curricular
    */

@@ -115,6 +115,55 @@ export class TeachersService {
   }
 
   /**
+   * GET /teachers/me/default-classroom
+   * Retorna a turma padrão do professor (a primeira ativa).
+   * Se tiver apenas 1 turma ativa, retorna ela automaticamente.
+   * Se tiver mais de 1, retorna a mais recente (maior createdAt).
+   */
+  async getDefaultClassroom(user: JwtPayload) {
+    const classroomTeachers = await this.prisma.classroomTeacher.findMany({
+      where: { teacherId: user.sub, isActive: true },
+      include: {
+        classroom: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            ageGroupMin: true,
+            ageGroupMax: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (classroomTeachers.length === 0) {
+      return { classroomId: null, name: null, segment: null, total: 0, classrooms: [] };
+    }
+    const primary = classroomTeachers[0].classroom;
+    const ageMin = primary.ageGroupMin ?? 0;
+    let segment: string;
+    if (ageMin >= 0 && ageMin <= 18) segment = 'EI01';
+    else if (ageMin >= 19 && ageMin <= 47) segment = 'EI02';
+    else segment = 'EI03';
+    return {
+      classroomId: primary.id,
+      name: primary.name,
+      code: primary.code,
+      segment,
+      ageGroupMin: primary.ageGroupMin,
+      ageGroupMax: primary.ageGroupMax,
+      total: classroomTeachers.length,
+      classrooms: classroomTeachers.map((ct) => ({
+        id: ct.classroom.id,
+        name: ct.classroom.name,
+        code: ct.classroom.code,
+        ageGroupMin: ct.classroom.ageGroupMin,
+        ageGroupMax: ct.classroom.ageGroupMax,
+      })),
+    };
+  }
+
+  /**
    * Calcular idade em meses
    */
   private calculateAge(dateOfBirth: Date): number {

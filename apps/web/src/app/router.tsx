@@ -41,15 +41,18 @@ import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
+import { RouteErrorBoundary } from '../components/ErrorBoundary';
 
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <Navigate to="/app/dashboard" replace />,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: '/login',
     element: <LoginPage />,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: '/app',
@@ -58,28 +61,34 @@ export const router = createBrowserRouter([
         <AppLayout />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         path: 'dashboard',
         element: <DashboardPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Rotas legadas (mantidas para compatibilidade, sem exposição no menu) ─
       {
         path: 'plannings',
         element: <PlanningsPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       {
         // Legada: UI primitiva sem guards de role. Mantida para links externos.
         path: 'diary',
         element: <DiaryPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       {
         path: 'matrices',
         element: <MatricesPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       {
         path: 'reports',
         element: <ReportsPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       {
         // Legada: redireciona para a rota canônica com suporte a PROFESSOR_AUXILIAR
@@ -94,8 +103,9 @@ export const router = createBrowserRouter([
             <TeacherDashboardPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
-         // ─── Plano de Aula com Matriz Completa 2026 ──────────────────
+      // ─── Plano de Aula com Matriz Completa 2026 ──────────────────
       {
         path: 'plano-de-aula',
         element: (
@@ -103,6 +113,7 @@ export const router = createBrowserRouter([
             <PlanoDeAulaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Planejamento Diário com Calendário Pedagógico 2026 ────────────
       {
@@ -112,6 +123,7 @@ export const router = createBrowserRouter([
             <PlanejamentoDiarioPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Planejamentos — Torre de Controle (rota canônica do professor) ─────────
       {
@@ -121,6 +133,18 @@ export const router = createBrowserRouter([
             <PlanoDeAulaListaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Planejamento individual (visualização) — rota que gerava 404 ─────────
+      // Rota adicionada para suportar links /app/planejamentos/:id
+      {
+        path: 'planejamentos/:id',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PlanoDeAulaListaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
       },
       // Legada: PlanejamentosPage (mantida para links internos existentes)
       {
@@ -130,7 +154,9 @@ export const router = createBrowserRouter([
             <PlanejamentosPage />
           </RoleProtectedRoute>
         ),
-      },      // ─── RDIC por Criança (professor) ──────────────────────────────────────
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── RDIC por Criança (professor) ──────────────────────────────────────
       {
         path: 'rdic-crianca',
         element: (
@@ -138,6 +164,7 @@ export const router = createBrowserRouter([
             <RdicCriancaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── RDIC Coordenação Pedagógica da Unidade (revisão e aprovação) ────────
       {
@@ -147,6 +174,7 @@ export const router = createBrowserRouter([
             <RdicCoordPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── RDIC Coordenação Geral (somente leitura, apenas PUBLICADOS) ────────
       {
@@ -156,6 +184,7 @@ export const router = createBrowserRouter([
             <RdicGeralPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── RDIC & RIA ────────────────────────────────────────────────────────
       {
@@ -165,6 +194,7 @@ export const router = createBrowserRouter([
             <RdicRiaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Diário de Bordo com Microgestos ──────────────────────────────────
       {
@@ -174,6 +204,7 @@ export const router = createBrowserRouter([
             <DiarioBordoPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Matriz Pedagógica 2026 ────────────────────────────────────────────
       {
@@ -183,6 +214,7 @@ export const router = createBrowserRouter([
             <MatrizPedagogicaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Configurações ────────────────────────────────────────────────────
       {
@@ -192,6 +224,7 @@ export const router = createBrowserRouter([
             <ConfiguracoesPage />
           </ProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Requisições de Materiais ─────────────────────────────────────────
       {
@@ -201,6 +234,7 @@ export const router = createBrowserRouter([
             <MaterialRequestPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Pedidos de Compra ────────────────────────────────────────────────
       {
@@ -210,6 +244,7 @@ export const router = createBrowserRouter([
             <PedidosCompraPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Dashboard Central ────────────────────────────────────────────────
       {
@@ -219,6 +254,7 @@ export const router = createBrowserRouter([
             <DashboardCentralPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Dashboard de Unidade ─────────────────────────────────────────────
       {
@@ -228,6 +264,7 @@ export const router = createBrowserRouter([
             <DashboardUnidadePage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Atendimentos aos Pais ────────────────────────────────────────────
       {
@@ -237,6 +274,7 @@ export const router = createBrowserRouter([
             <AtendimentoPaisPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Chamada Diária ───────────────────────────────────────────────────
       {
@@ -246,6 +284,7 @@ export const router = createBrowserRouter([
             <ControleFaltasPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Relatório de Fotos (RDX) ─────────────────────────────────────────
       {
@@ -255,6 +294,7 @@ export const router = createBrowserRouter([
             <RdxPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Dashboard de Coordenação Pedagógica ──────────────────────────────
       {
@@ -264,6 +304,7 @@ export const router = createBrowserRouter([
             <DashboardCoordenacaoPedagogicaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Dashboard de Coordenação Geral ───────────────────────────────────
       {
@@ -273,6 +314,7 @@ export const router = createBrowserRouter([
             <DashboardCoordenacaoGeralPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Meu Perfil (todos os usuários) ──────────────────────────────────
       {
@@ -282,6 +324,7 @@ export const router = createBrowserRouter([
             <MeuPerfilPage />
           </ProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Admin: Gestão de Usuários ────────────────────────────────────────
       {
@@ -291,6 +334,7 @@ export const router = createBrowserRouter([
             <AdminUsuariosPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Admin: Gestão de Unidades ────────────────────────────────────────
       {
@@ -300,6 +344,7 @@ export const router = createBrowserRouter([
             <AdminUnidadesPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Admin: Gestão de Turmas ──────────────────────────────────────────────────────
       {
@@ -309,6 +354,7 @@ export const router = createBrowserRouter([
             <AdminTurmasPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Coordenação Pedagógica Completa (turmas + currículo + reuniões) ────
       {
@@ -318,6 +364,7 @@ export const router = createBrowserRouter([
             <CoordenacaoPedagogicaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Relatório de Consumo de Materiais (Coordenação) ─────────────────
       {
@@ -327,6 +374,7 @@ export const router = createBrowserRouter([
             <RelatorioConsumoMateriaisPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Dashboard de Consumo de Materiais com gráficos ─────────────────────
       {
@@ -336,6 +384,7 @@ export const router = createBrowserRouter([
             <DashboardConsumoMateriaisPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Painel de Alergias e Dietas (Nutricionista) ─────────────────────
       {
@@ -345,6 +394,7 @@ export const router = createBrowserRouter([
             <PainelAlergiasPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Módulo de Planejamento — Oficina (criação/edição) ─────────────────
       {
@@ -354,6 +404,7 @@ export const router = createBrowserRouter([
             <PlanoDeAulaNovoPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       {
         path: 'planejamento/:id/editar',
@@ -362,6 +413,7 @@ export const router = createBrowserRouter([
             <PlanoDeAulaNovoPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Módulo de Planejamento — Torre de Controle (lista/calendário) ────────
       {
@@ -371,6 +423,7 @@ export const router = createBrowserRouter([
             <PlanoDeAulaListaPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
       // ─── Sala de Aula Virtual (Professor + Coordenação) ─────────────────────
       {
@@ -380,6 +433,7 @@ export const router = createBrowserRouter([
             <SalaDeAulaVirtualPage />
           </RoleProtectedRoute>
         ),
+        errorElement: <RouteErrorBoundary />,
       },
     ],
   },

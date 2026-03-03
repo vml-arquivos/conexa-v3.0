@@ -410,17 +410,70 @@ export default function PlanoDeAulaListaPage() {
                 </div>
               )}
 
-              {/* Conteúdo pedagógico — suporta novo formato (description/objectives) e antigo (pedagogicalContent) */}
+              {/* Conteúdo pedagógico — suporta V2 (por data), V1 (description) e legado (pedagogicalContent) */}
               {(() => {
+                // Tenta formato V2 (planejamento por data com lote de dias)
+                const rawDesc = (selectedPlanning as any).description;
+                const v2 = safeJsonParse<{ version?: number; days?: Array<{ date: string; objectives: any[]; teacher: { atividade: string; recursos: string; observacoes: string } }> }>(rawDesc, {});
+                const isV2 = v2?.version === 2 && Array.isArray(v2?.days);
+
+                if (isV2) {
+                  return (
+                    <div className="space-y-4">
+                      {v2.days!.map((day, idx) => (
+                        <div key={day.date} className="border border-indigo-100 rounded-xl overflow-hidden">
+                          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                            <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
+                              Dia {idx + 1} — {day.date.split('-').reverse().join('/')}
+                            </p>
+                          </div>
+                          <div className="px-4 py-3 space-y-3 bg-white">
+                            {day.objectives?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Objetivos da Matriz 2026</p>
+                                {day.objectives.map((obj: any, i: number) => (
+                                  <div key={i} className="text-xs text-gray-700 border-l-2 border-indigo-300 pl-2 mb-1">
+                                    <span className="font-semibold">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                                    {obj.codigoBNCC && <span className="ml-1 text-gray-400 font-mono">[{obj.codigoBNCC}]</span>}
+                                    <p className="mt-0.5 leading-relaxed">{obj.objetivoBNCC}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {day.teacher?.atividade && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-400 uppercase mb-0.5">Atividade</p>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{day.teacher.atividade}</p>
+                              </div>
+                            )}
+                            {day.teacher?.recursos && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-400 uppercase mb-0.5">Recursos</p>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{day.teacher.recursos}</p>
+                              </div>
+                            )}
+                            {day.teacher?.observacoes && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-400 uppercase mb-0.5">Observações</p>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{day.teacher.observacoes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
                 // Parse seguro — compatível com dados antigos e novos
                 const desc = safeJsonParse<{ activities?: string; resources?: string; notes?: string }>(
-                  (selectedPlanning as any).description,
+                  rawDesc,
                   {}
                 );
                 // Se description era string simples (dado antigo), tratar como atividades
-                const descLegacy = typeof (selectedPlanning as any).description === 'string' &&
-                  !((selectedPlanning as any).description?.startsWith('{')) ?
-                  (selectedPlanning as any).description : null;
+                const descLegacy = typeof rawDesc === 'string' &&
+                  !(rawDesc?.startsWith('{')) ?
+                  rawDesc : null;
 
                 // Objetivos da Matriz 2026 (novo formato)
                 const objectives = safeJsonParse<any[]>((selectedPlanning as any).objectives, []);

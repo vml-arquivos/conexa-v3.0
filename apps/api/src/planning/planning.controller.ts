@@ -136,6 +136,20 @@ export class PlanningController {
   }
 
   /**
+   * PATCH /plannings/:id
+   * Alias de PUT /plannings/:id — compatível com o frontend que usa http.patch
+   * Mesmas regras de acesso do PUT
+   */
+  @Patch(':id')
+  updatePatch(
+    @Param('id') id: string,
+    @Body() updateDto: UpdatePlanningDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.planningService.update(id, updateDto, user);
+  }
+
+  /**
    * PATCH /plannings/:id/status
    * Altera o status de um planejamento
    *
