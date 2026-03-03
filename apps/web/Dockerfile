@@ -11,7 +11,18 @@ RUN npm install -g pnpm@8.15.1
 WORKDIR /app
 # Copiar arquivos de workspace da raiz
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Copiar todos os packages (dependências internas do monorepo)
+# Copiar package.json de TODOS os workspaces antes do pnpm install
+# (necessário para o pnpm resolver o lockfile corretamente no monorepo)
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/site/package.json ./apps/site/package.json
+COPY apps/web/package.json ./apps/web/package.json
+COPY packages/database/package.json ./packages/database/package.json
+COPY packages/types/package.json ./packages/types/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
+COPY packages/utils/package.json ./packages/utils/package.json
+# Instalar TODAS as deps do workspace com pnpm (frozen — garante reprodutibilidade)
+RUN pnpm install --frozen-lockfile
+# Copiar o código-fonte dos packages internos (dependências do web)
 COPY packages/ ./packages/
 # Copiar o app web
 COPY apps/web/ ./apps/web/
@@ -41,8 +52,6 @@ ENV VITE_DEFAULT_THEME=${VITE_DEFAULT_THEME}
 ENV VITE_DEFAULT_LANGUAGE=${VITE_DEFAULT_LANGUAGE}
 ENV VITE_STORAGE_PREFIX=${VITE_STORAGE_PREFIX}
 ENV VITE_API_TIMEOUT=${VITE_API_TIMEOUT}
-# Instalar TODAS as deps do workspace com pnpm
-RUN pnpm install --frozen-lockfile
 # Build apenas o app web usando pnpm filter
 RUN pnpm --filter @conexa/web build
 # ---------- Runtime stage ----------
