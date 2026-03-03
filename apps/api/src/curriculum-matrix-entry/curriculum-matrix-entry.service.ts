@@ -368,10 +368,10 @@ export class CurriculumMatrixEntryService {
     }
 
     // 2. Detectar segmento via ageGroupMin (meses) — sem fallback
-    // EI01: 0–17 meses | EI02: 18–47 meses | EI03: 48–71 meses
-    const min = classroom.ageGroupMin;
+    // EI01: 0–18 meses | EI02: 19–47 meses | EI03: 48–71 meses
+    const min = classroom.ageGroupMin ?? 0;
     let segment: string | null = null;
-    if (min <= 17) segment = 'EI01';
+    if (min <= 18) segment = 'EI01';
     else if (min <= 47) segment = 'EI02';
     else if (min <= 71) segment = 'EI03';
 

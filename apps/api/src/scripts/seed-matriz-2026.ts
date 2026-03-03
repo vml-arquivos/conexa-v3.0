@@ -1,8 +1,24 @@
+/**
+ * seed-matriz-2026.ts
+ *
+ * Cria (ou garante) as três matrizes EI01, EI02, EI03 para o ano 2026
+ * e popula as entries a partir do dataset JSON.
+ *
+ * Idempotente: se a matriz/entry já existir, não duplica.
+ */
 import { PrismaClient, CampoDeExperiencia } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const prisma = new PrismaClient();
+
+const SEGMENTS = ['EI01', 'EI02', 'EI03'] as const;
+type Segment = (typeof SEGMENTS)[number];
+const SEGMENT_LABELS: Record<Segment, string> = {
+  EI01: 'Berçário (EI01)',
+  EI02: 'Maternal (EI02)',
+  EI03: 'Pré-Escola (EI03)',
+};
 
 interface MatrizEntry {
   date: string;
@@ -49,7 +65,7 @@ function findDatasetPath(filename: string): string {
 }
 
 async function main() {
-  console.log('🌱 Iniciando seed da Matriz Curricular 2026...\n');
+  console.log('🌱 Iniciando seed da Matriz Curricular 2026 (EI01/EI02/EI03)...\n');
 
   const dataPath = findDatasetPath('matriz-curricular-2026-sample.json');
   const rawData = fs.readFileSync(dataPath, 'utf-8');
@@ -58,90 +74,101 @@ async function main() {
   console.log(`📊 Metadata:`);
   console.log(`   Title: ${matrizData.metadata.title}`);
   console.log(`   Year: ${matrizData.metadata.year}`);
-  console.log(`   Version: ${matrizData.metadata.version}\n`);
+  console.log(`   Version: ${matrizData.metadata.version}`);
+  console.log(`   Entries no dataset: ${matrizData.entries.length}\n`);
 
   // Buscar mantenedora Conexa (criada pelo seed:ensure-cocris-units)
-  const mantenedora = await prisma.mantenedora.findFirst({
+  let mantenedora = await prisma.mantenedora.findFirst({
     where: { name: { contains: 'Conexa', mode: 'insensitive' } },
   });
-
   if (!mantenedora) {
-    console.error('❌ Mantenedora Conexa não encontrada. Execute seed:ensure-cocris-units primeiro.');
+    mantenedora = await prisma.mantenedora.findFirst({ where: { isActive: true } });
+  }
+  if (!mantenedora) {
+    console.error('❌ Mantenedora não encontrada. Execute seed:ensure-cocris-units primeiro.');
     process.exit(1);
   }
+  console.log(`✅ Mantenedora: ${mantenedora.name} (${mantenedora.id})\n`);
 
-  console.log(`✅ Mantenedora encontrada: ${mantenedora.name} (${mantenedora.id})\n`);
+  let totalMatricesCriadas = 0;
+  let totalEntriesCriadas = 0;
+  let totalEntriesSkipped = 0;
 
-  // Criar ou buscar matriz
-  let matriz = await prisma.curriculumMatrix.findFirst({
-    where: {
-      mantenedoraId: mantenedora.id,
-      year: matrizData.metadata.year,
-    },
-  });
+  // Para cada segmento: garantir matriz + entries
+  for (const segment of SEGMENTS) {
+    console.log(`\n📂 Processando segmento ${segment}...`);
 
-  if (!matriz) {
-    matriz = await prisma.curriculumMatrix.create({
-      data: {
-        mantenedoraId: mantenedora.id,
-        name: matrizData.metadata.title,
-        year: matrizData.metadata.year,
-        segment: 'EI01',
-        description: matrizData.metadata.description,
-        version: matrizData.metadata.version,
-      },
-    });
-    console.log(`✅ Matriz criada: ${matriz.name} (${matriz.id})\n`);
-  } else {
-    console.log(`✅ Matriz já existe: ${matriz.name} (${matriz.id})\n`);
-  }
-
-  // Processar entradas
-  let totalCreated = 0;
-  let totalSkipped = 0;
-
-  console.log(`📚 Processando ${matrizData.entries.length} entradas...`);
-
-  for (const entry of matrizData.entries) {
-    const targetDate = new Date(entry.date);
-
-    // Verificar se entrada já existe (idempotência)
-    const existing = await prisma.curriculumMatrixEntry.findFirst({
-      where: {
-        matrixId: matriz.id,
-        date: targetDate,
-      },
+    let matriz = await prisma.curriculumMatrix.findFirst({
+      where: { mantenedoraId: mantenedora.id, year: matrizData.metadata.year, segment },
     });
 
-    if (existing) {
-      totalSkipped++;
-      continue;
+    if (!matriz) {
+      const baseName = matrizData.metadata.title.replace(/EI0[123]|Berçário|Maternal|Pré-Escola/gi, '').trim();
+      matriz = await prisma.curriculumMatrix.create({
+        data: {
+          mantenedoraId: mantenedora.id,
+          name: `${baseName} — ${SEGMENT_LABELS[segment]}`,
+          year: matrizData.metadata.year,
+          segment,
+          isActive: true,
+          description: matrizData.metadata.description,
+          version: matrizData.metadata.version,
+        },
+      });
+      totalMatricesCriadas++;
+      console.log(`   ✅ Matriz criada: ${matriz.name} (${matriz.id})`);
+    } else {
+      console.log(`   ℹ️  Matriz já existe: ${matriz.name} (${matriz.id})`);
+      if (!matriz.isActive) {
+        await prisma.curriculumMatrix.update({ where: { id: matriz.id }, data: { isActive: true } });
+        console.log(`   ↳ Ativada (estava inativa)`);
+      }
     }
 
-    // Criar entrada
-    await prisma.curriculumMatrixEntry.create({
-      data: {
-        matrixId: matriz.id,
-        date: targetDate,
-        weekOfYear: entry.weekOfYear,
-        dayOfWeek: targetDate.getDay(),
-        bimester: entry.bimester,
-        campoDeExperiencia: entry.campoDeExperiencia as CampoDeExperiencia,
-        objetivoBNCC: entry.objetivoBNCC,
-        objetivoBNCCCode: entry.objetivoBNCCCode,
-        objetivoCurriculo: entry.objetivoCurriculo,
-        intencionalidade: entry.intencionalidade,
-        exemploAtividade: entry.exemploAtividade,
-      },
-    });
+    let created = 0;
+    let skipped = 0;
 
-    totalCreated++;
+    for (const entry of matrizData.entries) {
+      const targetDate = new Date(entry.date + 'T12:00:00');
+
+      const existing = await prisma.curriculumMatrixEntry.findFirst({
+        where: {
+          matrixId: matriz.id,
+          date: { gte: new Date(entry.date + 'T00:00:00'), lte: new Date(entry.date + 'T23:59:59') },
+          campoDeExperiencia: entry.campoDeExperiencia as CampoDeExperiencia,
+        },
+      });
+
+      if (existing) { skipped++; continue; }
+
+      await prisma.curriculumMatrixEntry.create({
+        data: {
+          matrixId: matriz.id,
+          date: targetDate,
+          weekOfYear: entry.weekOfYear,
+          dayOfWeek: targetDate.getDay(),
+          bimester: entry.bimester,
+          campoDeExperiencia: entry.campoDeExperiencia as CampoDeExperiencia,
+          objetivoBNCC: entry.objetivoBNCC,
+          objetivoBNCCCode: entry.objetivoBNCCCode,
+          objetivoCurriculo: entry.objetivoCurriculo,
+          intencionalidade: entry.intencionalidade,
+          exemploAtividade: entry.exemploAtividade,
+        },
+      });
+      created++;
+    }
+
+    totalEntriesCriadas += created;
+    totalEntriesSkipped += skipped;
+    console.log(`   📚 Entries criadas: ${created} | já existiam: ${skipped}`);
   }
 
   console.log(`\n📊 Resumo:`);
-  console.log(`   ✅ Entradas criadas: ${totalCreated}`);
-  console.log(`   ⏭️  Entradas já existentes: ${totalSkipped}`);
-  console.log(`\n✅ Seed da Matriz Curricular 2026 concluído com sucesso!`);
+  console.log(`   ✅ Matrizes criadas: ${totalMatricesCriadas}`);
+  console.log(`   ✅ Entries criadas: ${totalEntriesCriadas}`);
+  console.log(`   ⏭️  Entries já existentes: ${totalEntriesSkipped}`);
+  console.log(`\n✅ Seed da Matriz Curricular 2026 (EI01/EI02/EI03) concluído com sucesso!`);
 }
 
 main()
