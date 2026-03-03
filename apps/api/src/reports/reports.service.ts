@@ -205,14 +205,16 @@ export class ReportsService {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
       }
-      // Staff Central: filtrar por unitScopes
+      // Staff Central: filtrar por unitScopes (se vazio, acessa toda a mantenedora)
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
         const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
-        where.unitId = {
-          in: unitScopes.length > 0 ? unitScopes : ['__sem_escopo__'],
-        };
+        if (unitScopes.length > 0) {
+          where.unitId = { in: unitScopes };
+        } else {
+          where.mantenedoraId = user.mantenedoraId;
+        }
       }
       // Unidade: filtrar por unitId
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
@@ -299,14 +301,16 @@ export class ReportsService {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
       }
-      // Staff Central: filtrar por unitScopes
+      // Staff Central: filtrar por unitScopes (se vazio, acessa toda a mantenedora)
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
         const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
-        where.unitId = {
-          in: unitScopes.length > 0 ? unitScopes : ['__sem_escopo__'],
-        };
+        if (unitScopes.length > 0) {
+          where.unitId = { in: unitScopes };
+        } else {
+          where.mantenedoraId = user.mantenedoraId;
+        }
       }
       // Unidade: filtrar por unitId
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {

@@ -34,15 +34,20 @@ export function scopedWhereForUnit(user: JwtPayload) {
     };
   }
 
-  // STAFF_CENTRAL acessa unidades vinculadas
+  // STAFF_CENTRAL: se unitScopes preenchido, restringir; se vazio, acesso total da mantenedora
   if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
     const staffRole = user.roles.find(
       (role) => role.level === RoleLevel.STAFF_CENTRAL,
     );
-    return {
-      mantenedoraId: user.mantenedoraId,
-      unitId: { in: staffRole?.unitScopes || [] },
-    };
+    const scopes = staffRole?.unitScopes ?? [];
+    if (scopes.length > 0) {
+      return {
+        mantenedoraId: user.mantenedoraId,
+        unitId: { in: scopes },
+      };
+    }
+    // Sem restrição de unidade — acessa todas da mantenedora
+    return { mantenedoraId: user.mantenedoraId };
   }
 
   // UNIDADE acessa apenas sua unidade
@@ -126,12 +131,13 @@ export function validateScopeWithUnit<
     return record;
   }
 
-  // STAFF_CENTRAL valida unitScopes
+  // STAFF_CENTRAL: se unitScopes preenchido, validar; se vazio, acesso total da mantenedora
   if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
     const staffRole = user.roles.find(
       (role) => role.level === RoleLevel.STAFF_CENTRAL,
     );
-    if (!staffRole?.unitScopes?.includes(record.unitId)) {
+    const scopes = staffRole?.unitScopes ?? [];
+    if (scopes.length > 0 && !scopes.includes(record.unitId)) {
       notFound(resourceName);
     }
     return record;

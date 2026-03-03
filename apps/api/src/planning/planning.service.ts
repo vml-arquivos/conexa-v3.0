@@ -317,7 +317,13 @@ export class PlanningService {
         const staffRole = user.roles.find(
           (role) => role.level === RoleLevel.STAFF_CENTRAL,
         );
-        where.unitId = { in: staffRole?.unitScopes || [] };
+        const staffScopes = staffRole?.unitScopes ?? [];
+        // Se unitScopes preenchido, restringir; se vazio, acessa todas as unidades da mantenedora
+        if (staffScopes.length > 0) {
+          where.unitId = { in: staffScopes };
+        } else {
+          where.mantenedoraId = user.mantenedoraId;
+        }
         // Aplicar filtro de APROVADO apenas se não houver filtro de status explícito na query
         if (!query.status) {
           where.status = PlanningStatus.APROVADO;

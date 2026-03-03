@@ -35,6 +35,8 @@ import { RdicModule } from './rdic/rdic.module';
 import { ClassroomPostsModule } from './classroom-posts/classroom-posts.module';
 import { RecadosModule } from './recados/recados.module';
 import { DevelopmentObservationsModule } from './development-observations/development-observations.module';
+import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
+import { InsightsModule } from './insights/insights.module';
 
 @Module({
   imports: [
@@ -73,6 +75,8 @@ import { DevelopmentObservationsModule } from './development-observations/develo
     ClassroomPostsModule,
     RecadosModule,
     DevelopmentObservationsModule,
+    FeatureFlagsModule,
+    InsightsModule,
   ],
   controllers: [AppController],
   providers: [

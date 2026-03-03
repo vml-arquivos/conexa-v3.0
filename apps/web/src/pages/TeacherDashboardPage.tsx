@@ -106,6 +106,15 @@ export default function TeacherDashboardPage() {
   const [relatorioIA, setRelatorioIA] = useState<{ relatorio: string; pontosFortess: string[]; sugestoes: string[] } | null>(null);
   // Indicador de registro por criança (childId -> true se já tem evento hoje)
   const [registradosHoje, setRegistradosHoje] = useState<Set<string>>(new Set());
+
+  // ─── Widget Hoje (API /insights/teacher/today) ─────────────────────────────────
+  const [insightsHoje, setInsightsHoje] = useState<any>(null);
+  useEffect(() => {
+    http.get('/insights/teacher/today')
+      .then(r => setInsightsHoje(r.data))
+      .catch(() => setInsightsHoje(null));
+  }, []);
+
   // Modal de microgesto rápido
   const [modalCrianca, setModalCrianca] = useState<{ id: string; nome: string } | null>(null);
   const [microgestoRapido, setMicrogestoRapido] = useState<MicrogestureKind>('OBSERVACAO');
@@ -236,8 +245,8 @@ export default function TeacherDashboardPage() {
 
       {data?.hasClassroom && (
         <div className="space-y-6">
-          {/* Widget: Objetivo do Dia */}
-          {objetivosHoje.length > 0 && (
+          {/* Widget: Hoje — dados reais da API com fallback para lookup local */}
+          {(insightsHoje || objetivosHoje.length > 0) && (
             <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -245,37 +254,86 @@ export default function TeacherDashboardPage() {
                     <Star className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="font-bold text-amber-800 text-sm">Objetivo do Dia — {ddmmHoje}/2026</p>
-                    <p className="text-xs text-amber-600">{objetivosHoje[0]?.semana_tema && `Semana: "${objetivosHoje[0].semana_tema}"`}</p>
-                  </div>
-                </div>
-                <button onClick={() => navigate('/app/planejamento-diario')}
-                  className="text-xs text-amber-700 font-medium hover:text-amber-900 flex items-center gap-1">
-                  Ver calendário <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {objetivosHoje.map((obj, i) => (
-                  <div key={i} className={`rounded-xl border p-3 ${CAMPO_CORES[obj.campo_id] || 'bg-gray-50 border-gray-200 text-gray-800'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-base">{obj.campo_emoji}</span>
-                      <span className="text-xs font-bold px-2 py-0.5 bg-white/60 rounded-full">{obj.codigo_bncc}</span>
-                      <span className="text-xs opacity-70">{obj.campo_label}</span>
-                    </div>
-                    <p className="text-sm font-medium leading-snug">{obj.objetivo_bncc}</p>
-                    {obj.intencionalidade && (
-                      <p className="text-xs opacity-70 mt-1 flex items-start gap-1">
-                        <Lightbulb className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        {obj.intencionalidade}
+                    <p className="font-bold text-amber-800 text-sm">
+                      Hoje — {insightsHoje?.diaSemana ? insightsHoje.diaSemana.charAt(0).toUpperCase() + insightsHoje.diaSemana.slice(1) : ddmmHoje + '/2026'}
+                    </p>
+                    {insightsHoje?.planejamentoAtivo && (
+                      <p className="text-xs text-amber-600">
+                        Planejamento: <span className="font-semibold">{insightsHoje.planejamentoAtivo.title}</span>
                       </p>
                     )}
-                    <button onClick={() => navigate('/app/planejamento-diario')}
-                      className="mt-2 text-xs font-semibold underline underline-offset-2 opacity-80 hover:opacity-100">
-                      Criar template de planejamento →
-                    </button>
+                  </div>
+                </div>
+                <button onClick={() => navigate('/app/planejamentos')}
+                  className="text-xs text-amber-700 font-medium hover:text-amber-900 flex items-center gap-1">
+                  Ver planejamentos <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
+
+              {/* Alertas */}
+              {insightsHoje?.alertas?.planejamentosPendentes > 0 && (
+                <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <p className="text-xs text-red-700 font-medium">
+                    {insightsHoje.alertas.planejamentosPendentes} planejamento(s) em rascunho há mais de 2 dias. <button onClick={() => navigate('/app/planejamentos')} className="underline">Enviar para revisão</button>
+                  </p>
+                </div>
+              )}
+
+              {/* Presença */}
+              {insightsHoje?.presenca && (
+                <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center gap-3">
+                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <p className="text-xs text-green-700">
+                    <span className="font-semibold">{insightsHoje.presenca.presentes}</span> presentes
+                    {insightsHoje.presenca.ausentes > 0 && (
+                      <span className="text-red-600 ml-2">· <span className="font-semibold">{insightsHoje.presenca.ausentes}</span> ausentes</span>
+                    )}
+                    {insightsHoje.presenca.turma && <span className="text-gray-500 ml-2">({insightsHoje.presenca.turma})</span>}
+                  </p>
+                </div>
+              )}
+
+              {/* Objetivos do planejamento ativo ou lookup local como fallback */}
+              <div className="space-y-2">
+                {(insightsHoje?.planejamentoAtivo?.objetivosHoje?.length > 0
+                  ? insightsHoje.planejamentoAtivo.objetivosHoje
+                  : objetivosHoje.map((obj: any) => ({
+                      campoExperiencia: obj.campo_label,
+                      codigoBNCC: obj.codigo_bncc,
+                      objetivoBNCC: obj.objetivo_bncc,
+                      objetivoCurriculoDF: '',
+                      intencionalidadePedagogica: obj.intencionalidade,
+                    }))
+                ).map((obj: any, i: number) => (
+                  <div key={i} className="rounded-xl border bg-white/80 p-3">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      {obj.codigoBNCC && (
+                        <span className="text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">{obj.codigoBNCC}</span>
+                      )}
+                      <span className="text-xs text-gray-500">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                    </div>
+                    <p className="text-sm font-medium leading-snug text-gray-800">{obj.objetivoBNCC}</p>
+                    {obj.intencionalidadePedagogica && (
+                      <p className="text-xs text-indigo-600 mt-1 flex items-start gap-1">
+                        <Lightbulb className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        {obj.intencionalidadePedagogica}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {/* Sem planejamento ativo */}
+              {insightsHoje && !insightsHoje.planejamentoAtivo && objetivosHoje.length === 0 && (
+                <div className="text-center py-3">
+                  <p className="text-xs text-amber-700">Nenhum planejamento ativo para hoje.</p>
+                  <button onClick={() => navigate('/app/planejamento/novo')}
+                    className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
+                    Criar planejamento →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

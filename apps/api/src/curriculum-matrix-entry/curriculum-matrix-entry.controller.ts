@@ -93,6 +93,28 @@ export class CurriculumMatrixEntryController {
     return this.curriculumMatrixEntryService.byClassroomDay(classroomId, date, user);
   }
 
+  /**
+   * GET /curriculum-matrix-entries/by-classroom-date?classroomId=...&date=YYYY-MM-DD&days=N
+   * Retorna objetivos da Matriz para uma turma a partir de uma data, por N dias (padrão 1).
+   * exemploAtividade retornado apenas para coordenação e acima.
+   */
+  @Get('by-classroom-date')
+  byClassroomDate(
+    @Query('classroomId') classroomId: string,
+    @Query('date') date: string,
+    @Query('days') daysStr: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!classroomId || !date) {
+      throw new BadRequestException('Os parâmetros classroomId e date são obrigatórios');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('O parâmetro date deve estar no formato YYYY-MM-DD');
+    }
+    const days = Math.min(Math.max(parseInt(daysStr ?? '1', 10) || 1, 1), 31);
+    return this.curriculumMatrixEntryService.byClassroomDateRange(classroomId, date, days, user);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.curriculumMatrixEntryService.findOne(id, user);

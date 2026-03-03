@@ -543,4 +543,47 @@ export class CurriculumMatrixEntryService {
       })),
     };
   }
+
+  /**
+   * Busca objetivos da Matriz para uma turma a partir de uma data, por N dias.
+   * Retorna array de dias com objetivos, respeitando controle de exemploAtividade por role.
+   */
+  async byClassroomDateRange(
+    classroomId: string,
+    startDateStr: string,
+    days: number,
+    user: JwtPayload,
+  ) {
+    // Gerar array de datas
+    const dates: string[] = [];
+    const base = new Date(startDateStr + 'T12:00:00-03:00');
+    for (let i = 0; i < days; i++) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+
+    // Buscar objetivos para cada dia em paralelo
+    const results = await Promise.all(
+      dates.map(async (date) => {
+        const dayResult = await this.byClassroomDay(classroomId, date, user);
+        return {
+          date,
+          diaSemana: new Date(date + 'T12:00:00-03:00').toLocaleDateString('pt-BR', {
+            weekday: 'long', timeZone: 'America/Sao_Paulo',
+          }),
+          segment: dayResult.segment,
+          objectives: dayResult.objectives,
+          message: dayResult.message,
+        };
+      }),
+    );
+
+    return {
+      classroomId,
+      startDate: startDateStr,
+      days,
+      diasLetivos: results,
+    };
+  }
 }

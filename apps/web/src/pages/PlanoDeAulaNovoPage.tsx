@@ -401,14 +401,42 @@ export default function PlanoDeAulaNovoPage() {
     }
   }, []);
 
+  /** Carrega todos os dias em lote usando by-classroom-date (mais eficiente para numDays > 1) */
+  const fetchMatrizLote = useCallback(async (cid: string, start: string, n: number) => {
+    if (!cid || !start || n < 1) return;
+    setDays(prev => prev.map(d => ({ ...d, matrizLoading: true })));
+    try {
+      const res = await http.get('/curriculum-matrix-entries/by-classroom-date', {
+        params: { classroomId: cid, date: start, days: n },
+      });
+      const data = res.data as { diasLetivos: Array<{ date: string; objectives: MatrizObjective[]; message?: string }> };
+      const byDate = new Map(data.diasLetivos.map(d => [d.date, d]));
+      setDays(prev =>
+        prev.map(d => {
+          const found = byDate.get(d.date);
+          return found
+            ? { ...d, objectives: found.objectives ?? [], matrizLoading: false, matrizMessage: found.message }
+            : { ...d, matrizLoading: false };
+        })
+      );
+    } catch {
+      setDays(prev => prev.map(d => ({ ...d, matrizLoading: false, matrizMessage: 'Erro ao carregar Matriz.' })));
+    }
+  }, []);
+
   useEffect(() => {
-    if (!classroomId) return;
-    for (const day of days) {
-      if (day.objectives.length === 0 && !day.matrizLoading) {
-        fetchMatrizForDay(day.date, classroomId);
+    if (!classroomId || !startDate) return;
+    if (numDays > 1) {
+      fetchMatrizLote(classroomId, startDate, numDays);
+    } else {
+      for (const day of days) {
+        if (day.objectives.length === 0 && !day.matrizLoading) {
+          fetchMatrizForDay(day.date, classroomId);
+        }
       }
     }
-  }, [days, classroomId, fetchMatrizForDay]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days.length, classroomId, startDate, numDays]);
 
   // ─── Atualiza campo do professor por dia ─────────────────────────────────
   function updateTeacherField(date: string, field: keyof DayTeacherData, value: string) {
