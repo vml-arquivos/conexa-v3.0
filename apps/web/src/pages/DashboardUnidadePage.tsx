@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
+import { formatPedagogicalDate } from '../lib/formatDate';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -215,6 +216,29 @@ export function DashboardUnidadePage() {
         </div>
       )}
 
+      {/* Alertas operacionais no topo — turmas sem chamada e planejamentos parados */}
+      {turmasSemChamada.length > 0 && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 mb-4">
+          <p className="text-sm font-bold text-amber-800">
+            ⚠️ {turmasSemChamada.length} turma(s) sem chamada hoje
+          </p>
+          {turmasSemChamada.map((t) => (
+            <p key={t.id} className="text-xs text-amber-700 mt-1">• {t.name}</p>
+          ))}
+        </div>
+      )}
+      {planejamentosParados.length > 0 && (
+        <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-4">
+          <p className="text-sm font-bold text-red-800">
+            🔴 {planejamentosParados.length} planejamento(s) devolvido(s) sem resposta há 3+ dias
+          </p>
+          {planejamentosParados.map((p) => (
+            <p key={p.id} className="text-xs text-red-700 mt-1">
+              • {p.title} — devolvido em {formatPedagogicalDate(p.updatedAt)}
+            </p>
+          ))}
+        </div>
+      )}
       {/* Indicadores reais da Unidade */}
       <IndicatorsCards
         title="Indicadores da Unidade"
