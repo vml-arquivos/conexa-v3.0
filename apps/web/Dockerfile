@@ -14,6 +14,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # Copiar package.json de TODOS os workspaces antes do pnpm install
 # (necessário para o pnpm resolver o lockfile corretamente no monorepo)
 COPY apps/api/package.json ./apps/api/package.json
+COPY apps/api/prisma/ ./apps/api/prisma/
 COPY apps/site/package.json ./apps/site/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/database/package.json ./packages/database/package.json
