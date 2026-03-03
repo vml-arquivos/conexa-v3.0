@@ -125,7 +125,7 @@ export default function PlanoDeAulaListaPage() {
       // Professor usa /plannings (filtra pelo seu próprio createdBy)
       // Coordenação/Unidade usa /coordenacao/planejamentos (filtra por unitId)
       if (isProfessor(user)) {
-        const res = await http.get('/plannings', { params: { startDate, endDate, limit: 200 } });
+        const res = await http.get('/plannings', { params: { startDate, endDate } });
         const data = res.data;
         setPlannings(Array.isArray(data) ? data : data?.data ?? data?.plannings ?? []);
       } else {

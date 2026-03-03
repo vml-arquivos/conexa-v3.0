@@ -317,4 +317,133 @@ export class CurriculumMatrixEntryService {
     // Todos os outros níveis podem visualizar, mas apenas criar/editar é restrito
     return;
   }
+
+  /**
+   * Busca as entradas da Matriz para uma turma + data específica.
+   * Detecta o segmento via ageGroupMin do Classroom (sem fallback).
+   * Retorna os 4 campos obrigatórios (exemploAtividade nunca é retornado).
+   * Contrato de retorno padronizado conforme spec.
+   */
+  async byClassroomDay(
+    classroomId: string,
+    date: string,
+    user: JwtPayload,
+  ): Promise<{
+    segment: string | null;
+    date: string;
+    classroomId: string;
+    objectives: Array<{
+      campoExperiencia: string;
+      codigoBNCC: string | null;
+      objetivoBNCC: string;
+      objetivoCurriculoDF: string;
+      intencionalidadePedagogica: string | null;
+    }>;
+    message?: string;
+  }> {
+    // 1. Buscar a turma e validar acesso multi-tenant
+    const classroom = await this.prisma.classroom.findUnique({
+      where: { id: classroomId },
+      select: {
+        id: true,
+        ageGroupMin: true,
+        ageGroupMax: true,
+        unit: {
+          select: {
+            id: true,
+            mantenedoraId: true,
+          },
+        },
+      },
+    });
+
+    if (!classroom) {
+      return { segment: null, date, classroomId, objectives: [], message: 'Turma não encontrada' };
+    }
+
+    // Validar escopo: o usuário deve pertencer à mesma mantenedora
+    const level = user.roles[0]?.level;
+    if (level !== 'DEVELOPER' && classroom.unit.mantenedoraId !== user.mantenedoraId) {
+      return { segment: null, date, classroomId, objectives: [], message: 'Acesso negado a esta turma' };
+    }
+
+    // 2. Detectar segmento via ageGroupMin (meses) — sem fallback
+    // EI01: 0–17 meses | EI02: 18–47 meses | EI03: 48–71 meses
+    const min = classroom.ageGroupMin;
+    let segment: string | null = null;
+    if (min <= 17) segment = 'EI01';
+    else if (min <= 47) segment = 'EI02';
+    else if (min <= 71) segment = 'EI03';
+
+    if (!segment) {
+      return {
+        segment: null,
+        date,
+        classroomId,
+        objectives: [],
+        message: `Não foi possível detectar o segmento da turma (ageGroupMin=${min}). Verifique a configuração da turma.`,
+      };
+    }
+
+    // 3. Normalizar a data sem toISOString() para evitar drift UTC
+    // Parseia YYYY-MM-DD e cria intervalo do dia inteiro em horário local
+    const parts = date.split('-').map(Number);
+    const year = parts[0];
+    const month = parts[1] - 1; // 0-indexed
+    const day = parts[2];
+    const targetDateStart = new Date(year, month, day, 0, 0, 0, 0);
+    const targetDateEnd = new Date(year, month, day, 23, 59, 59, 999);
+
+    // 4. Buscar a matriz ativa do segmento no escopo da mantenedora
+    const matrix = await this.prisma.curriculumMatrix.findFirst({
+      where: {
+        mantenedoraId: classroom.unit.mantenedoraId,
+        segment,
+        isActive: true,
+      },
+      orderBy: { version: 'desc' },
+      select: { id: true, name: true, segment: true },
+    });
+
+    if (!matrix) {
+      return {
+        segment,
+        date,
+        classroomId,
+        objectives: [],
+        message: `Nenhuma matriz ativa encontrada para o segmento ${segment} desta mantenedora.`,
+      };
+    }
+
+    // 5. Buscar as entries do dia
+    const entries = await this.prisma.curriculumMatrixEntry.findMany({
+      where: {
+        matrixId: matrix.id,
+        date: {
+          gte: targetDateStart,
+          lte: targetDateEnd,
+        },
+      },
+      select: {
+        campoDeExperiencia: true,
+        objetivoBNCCCode: true,
+        objetivoBNCC: true,
+        objetivoCurriculo: true,
+        intencionalidade: true,
+        // exemploAtividade: NUNCA retornado (mascarado para todos via select)
+      },
+      orderBy: { campoDeExperiencia: 'asc' },
+    });
+
+    // 6. Mapear para o contrato padronizado
+    const objectives = entries.map((e) => ({
+      campoExperiencia: e.campoDeExperiencia as string,
+      codigoBNCC: e.objetivoBNCCCode ?? null,
+      objetivoBNCC: e.objetivoBNCC,
+      objetivoCurriculoDF: e.objetivoCurriculo,
+      intencionalidadePedagogica: e.intencionalidade ?? null,
+    }));
+
+    return { segment, date, classroomId, objectives };
+  }
 }

@@ -5,9 +5,11 @@
  * O planejamento NÃO é livre. A Matriz Pedagógica 2026 já define para cada dia
  * do ano, para cada segmento, quais campos de experiência e objetivos BNCC devem
  * ser trabalhados. O professor NÃO escolhe os campos — eles vêm automáticos da
- * matriz. O professor só desenvolve as ATIVIDADES que vai executar em sala.
+ * matriz via API. O professor só desenvolve as ATIVIDADES que vai executar em sala.
+ *
+ * Endpoint: GET /curriculum-matrix-entries/by-classroom-day?classroomId=&date=YYYY-MM-DD
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -27,12 +29,11 @@ import {
   ArrowLeft,
   AlertCircle,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
-import { LOOKUP_DIARIO_2026 } from '../data/lookupDiario2026';
-import type { ObjetivoDia, SegmentoKey } from '../data/lookupDiario2026';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { toPedagogicalISODate } from '../lib/formatDate';
 
@@ -55,6 +56,23 @@ interface FormState {
   notes: string;
 }
 
+/** Contrato de retorno do endpoint by-classroom-day */
+interface MatrizObjective {
+  campoExperiencia: string;
+  codigoBNCC: string | null;
+  objetivoBNCC: string;
+  objetivoCurriculoDF: string;
+  intencionalidadePedagogica: string | null;
+}
+
+interface MatrizByDayResponse {
+  segment: string | null;
+  date: string;
+  classroomId: string;
+  objectives: MatrizObjective[];
+  message?: string;
+}
+
 const FORM_INICIAL: FormState = {
   title: '',
   classroomId: '',
@@ -68,38 +86,12 @@ const FORM_INICIAL: FormState = {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Infere o segmento BNCC (EI01/EI02/EI03) a partir da faixa etária da turma.
- * EI01: 0–18 meses | EI02: 19–47 meses | EI03: 48–71 meses
- */
-function inferSegmento(ageGroupMin?: number | null, ageGroupMax?: number | null): SegmentoKey {
-  const mid =
-    ageGroupMin != null && ageGroupMax != null
-      ? (ageGroupMin + ageGroupMax) / 2
-      : ageGroupMin ?? ageGroupMax ?? 48;
-  if (mid <= 18) return 'EI01';
-  if (mid <= 47) return 'EI02';
-  return 'EI03';
-}
-
-/**
- * Busca os objetivos da Matriz Pedagógica 2026 para uma data e segmento.
- */
-function getObjetivosDoDia(date: Date, segmento: SegmentoKey): ObjetivoDia[] {
-  const dd = String(date.getDate()).padStart(2, '0');
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const ddmm = `${dd}/${mm}`;
-  const entrada = LOOKUP_DIARIO_2026[ddmm];
-  if (!entrada) return [];
-  return entrada[segmento] ?? [];
-}
-
-/**
  * Infere o tipo de planejamento pelo período selecionado.
  */
 function inferTipo(startDate: string, endDate: string): string {
   if (!startDate || !endDate) return 'SEMANAL';
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(startDate + 'T12:00:00');
+  const end = new Date(endDate + 'T12:00:00');
   const dias = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   if (dias <= 1) return 'DIARIO';
   if (dias <= 7) return 'SEMANAL';
@@ -107,68 +99,66 @@ function inferTipo(startDate: string, endDate: string): string {
   return 'TRIMESTRAL';
 }
 
-// ─── Componente de Objetivo BNCC (somente leitura) ───────────────────────────
+// ─── Componente de Objetivo da Matriz (somente leitura) ──────────────────────
 
 /**
  * ObjetivoCard — exibe os 4 campos obrigatórios da Matriz Curricular 2026 como somente leitura.
  * 1. Campo de Experiência (+ código BNCC)
  * 2. Objetivo da BNCC (Transcrição Literal)
- * 3. Objetivo do Currículo em Movimento (Transcrição Literal)
+ * 3. Objetivo do Currículo em Movimento — DF (Transcrição Literal)
  * 4. Intencionalidade Pedagógica
  * O campo "Exemplo de Atividade" NÃO é exibido — o professor cria o seu próprio.
  */
-function ObjetivoCard({ objetivo }: { objetivo: ObjetivoDia }) {
-  const bgMap: Record<string, string> = {
-    blue: 'bg-blue-50 border-blue-200',
-    green: 'bg-green-50 border-green-200',
-    orange: 'bg-orange-50 border-orange-200',
-    pink: 'bg-pink-50 border-pink-200',
-    purple: 'bg-purple-50 border-purple-200',
-    yellow: 'bg-yellow-50 border-yellow-200',
-  };
-  const bg = bgMap[objetivo.campo_cor] ?? 'bg-gray-50 border-gray-200';
+function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: number }) {
+  const colors = [
+    'bg-blue-50 border-blue-200',
+    'bg-green-50 border-green-200',
+    'bg-orange-50 border-orange-200',
+    'bg-pink-50 border-pink-200',
+    'bg-purple-50 border-purple-200',
+    'bg-yellow-50 border-yellow-200',
+  ];
+  const bg = colors[index % colors.length];
 
   return (
     <div className={`rounded-xl border ${bg} overflow-hidden`}>
       {/* Cabeçalho: Campo de Experiência */}
       <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${bg}`}>
-        <span className="text-lg">{objetivo.campo_emoji}</span>
         <span className="text-xs font-bold uppercase tracking-wide text-gray-700">
-          Campo de Experiência: {objetivo.campo_label}
+          Campo de Experiência: {objetivo.campoExperiencia.replace(/_/g, ' ')}
         </span>
-        <Badge variant="secondary" className="ml-auto text-xs font-mono">
-          {objetivo.codigo_bncc}
-        </Badge>
+        {objetivo.codigoBNCC && (
+          <Badge variant="secondary" className="ml-auto text-xs font-mono">
+            {objetivo.codigoBNCC}
+          </Badge>
+        )}
       </div>
-      {objetivo.semana_tema && (
-        <div className="px-4 py-1 bg-white/60 border-b border-gray-100">
-          <span className="text-xs text-gray-500 italic">Tema da semana: {objetivo.semana_tema}</span>
-        </div>
-      )}
       <div className="px-4 py-3 space-y-3 bg-white/80">
         {/* Campo 2: Objetivo BNCC */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Objetivo da BNCC (Transcrição Literal)
           </p>
-          <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivo_bncc}</p>
+          <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
         </div>
         {/* Campo 3: Objetivo Currículo em Movimento */}
-        {objetivo.objetivo_curriculo && objetivo.objetivo_curriculo !== objetivo.objetivo_bncc && (
+        {objetivo.objetivoCurriculoDF && objetivo.objetivoCurriculoDF !== objetivo.objetivoBNCC && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               Objetivo do Currículo em Movimento — DF (Transcrição Literal)
             </p>
-            <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivo_curriculo}</p>
+            <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
           </div>
         )}
         {/* Campo 4: Intencionalidade Pedagógica */}
-        {objetivo.intencionalidade && (
+        {objetivo.intencionalidadePedagogica && (
           <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
               🎯 Intencionalidade Pedagógica
             </p>
-            <p className="text-sm text-indigo-800 leading-relaxed">{objetivo.intencionalidade}</p>
+            <p className="text-sm text-indigo-800 leading-relaxed">
+              {objetivo.intencionalidadePedagogica}
+            </p>
           </div>
         )}
       </div>
@@ -190,6 +180,10 @@ export default function PlanoDeAulaNovoPage() {
   const [loading, setLoading] = useState(false);
   const [planningId, setPlanningId] = useState<string | null>(id ?? null);
   const [status, setStatus] = useState<string>('RASCUNHO');
+
+  // Estado da Matriz (carregado via API)
+  const [matrizData, setMatrizData] = useState<MatrizByDayResponse | null>(null);
+  const [matrizLoading, setMatrizLoading] = useState(false);
 
   // ─── Carrega turmas e planejamento existente ───────────────────────────────
   useEffect(() => {
@@ -237,27 +231,45 @@ export default function PlanoDeAulaNovoPage() {
     load();
   }, [id]);
 
-  // ─── Turma selecionada e segmento inferido ─────────────────────────────────
+  // ─── Busca objetivos da Matriz via API quando turma + data mudam ──────────
+  const fetchMatriz = useCallback(async (classroomId: string, date: string) => {
+    if (!classroomId || !date) {
+      setMatrizData(null);
+      return;
+    }
+    setMatrizLoading(true);
+    try {
+      const res = await http.get('/curriculum-matrix-entries/by-classroom-day', {
+        params: { classroomId, date },
+      });
+      setMatrizData(res.data as MatrizByDayResponse);
+    } catch (err: any) {
+      // Erro de rede ou 4xx — não bloqueia o formulário
+      setMatrizData({
+        segment: null,
+        date,
+        classroomId,
+        objectives: [],
+        message: err?.response?.data?.message ?? 'Erro ao carregar a Matriz Pedagógica. Tente novamente.',
+      });
+    } finally {
+      setMatrizLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (form.classroomId && form.startDate) {
+      fetchMatriz(form.classroomId, form.startDate);
+    } else {
+      setMatrizData(null);
+    }
+  }, [form.classroomId, form.startDate, fetchMatriz]);
+
+  // ─── Turma selecionada ─────────────────────────────────────────────────────
   const turmaSelecionada = useMemo(
     () => turmas.find(t => t.id === form.classroomId) ?? null,
     [turmas, form.classroomId],
   );
-
-  const segmento = useMemo(
-    () =>
-      turmaSelecionada
-        ? inferSegmento(turmaSelecionada.ageGroupMin, turmaSelecionada.ageGroupMax)
-        : null,
-    [turmaSelecionada],
-  );
-
-  // ─── Objetivos automáticos da Matriz 2026 ─────────────────────────────────
-  const objetivosDoDia = useMemo(() => {
-    if (!form.startDate || !segmento) return [];
-    // Adiciona T12:00:00 para evitar problema de fuso horário
-    const date = new Date(form.startDate + 'T12:00:00');
-    return getObjetivosDoDia(date, segmento);
-  }, [form.startDate, segmento]);
 
   // ─── Auto-gera título quando turma + data são selecionadas ────────────────
   useEffect(() => {
@@ -275,243 +287,216 @@ export default function PlanoDeAulaNovoPage() {
     // Usa toPedagogicalISODate para garantir YYYY-MM-DD no fuso America/Sao_Paulo
     const startDateISO = form.startDate
       ? toPedagogicalISODate(new Date(form.startDate + 'T12:00:00'))
-      : form.startDate;
+      : '';
     const endDateISO = form.endDate
       ? toPedagogicalISODate(new Date(form.endDate + 'T12:00:00'))
-      : form.endDate;
+      : startDateISO;
+
+    // objectives: serializa os objetivos da Matriz para registro histórico
+    const objectivesPayload = matrizData?.objectives?.length
+      ? safeJsonStringify(matrizData.objectives)
+      : null;
+
+    // description: dados do professor (atividades, recursos, notas)
+    const descriptionPayload = safeJsonStringify({
+      activities: form.activities,
+      resources: form.resources,
+      notes: form.notes,
+    });
+
     return {
       title: form.title,
-      type: inferTipo(form.startDate, form.endDate),
       classroomId: form.classroomId,
       startDate: startDateISO,
       endDate: endDateISO,
-      // Objetivos da Matriz (vindos automaticamente, somente leitura)
-      objectives: safeJsonStringify(objetivosDoDia),
-      // Dados de autoria do professor armazenados em description
-      description: safeJsonStringify({
-        activities: form.activities,
-        resources: form.resources,
-        notes: form.notes,
-      }),
+      type: inferTipo(form.startDate, form.endDate),
+      objectives: objectivesPayload,
+      description: descriptionPayload,
     };
   }
 
-  // ─── Salvar Rascunho ──────────────────────────────────────────────────────
+  // ─── Salvar rascunho ──────────────────────────────────────────────────────
   async function salvarRascunho() {
-    if (!form.title.trim()) { toast.error('Informe o título do planejamento'); return; }
-    if (!form.classroomId) { toast.error('Selecione uma turma'); return; }
-    if (!form.startDate) { toast.error('Informe a data de início'); return; }
-    if (!form.endDate) { toast.error('Informe a data de término'); return; }
-    if (!form.activities.trim()) { toast.error('Descreva as atividades a desenvolver'); return; }
-
+    if (!form.classroomId || !form.startDate) {
+      toast.error('Selecione a turma e a data de início');
+      return;
+    }
+    if (!form.activities.trim()) {
+      toast.error('Descreva as atividades a desenvolver');
+      return;
+    }
     setSaving(true);
     try {
       const payload = buildPayload();
       if (planningId) {
-        await http.put(`/plannings/${planningId}`, payload);
-        toast.success('Planejamento atualizado!');
+        await http.patch(`/plannings/${planningId}`, payload);
+        toast.success('Rascunho atualizado');
       } else {
-        const res = await http.post('/plannings', { ...payload, status: 'RASCUNHO' });
-        const newId = res.data?.id;
-        if (newId) setPlanningId(newId);
-        toast.success('Rascunho salvo com sucesso!');
+        const res = await http.post('/plannings', payload);
+        const newId = res.data?.id ?? res.data?.planning?.id;
+        if (newId) {
+          setPlanningId(newId);
+          navigate(`/planejamentos/${newId}/editar`, { replace: true });
+        }
+        toast.success('Rascunho salvo');
       }
-      setStatus('RASCUNHO');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar');
+      toast.error(err?.response?.data?.message ?? 'Erro ao salvar');
     } finally {
       setSaving(false);
     }
   }
 
-  // ─── Enviar para Revisão ──────────────────────────────────────────────────
+  // ─── Enviar para revisão ──────────────────────────────────────────────────
   async function enviarParaRevisao() {
-    if (!form.title.trim() || !form.classroomId || !form.startDate || !form.endDate) {
-      toast.error('Preencha todos os campos obrigatórios antes de enviar');
+    if (!form.classroomId || !form.startDate) {
+      toast.error('Selecione a turma e a data de início');
       return;
     }
     if (!form.activities.trim()) {
-      toast.error('Descreva as atividades a desenvolver antes de enviar');
+      toast.error('Descreva as atividades a desenvolver');
       return;
     }
-
     setSubmitting(true);
     try {
-      // 1. Salva o conteúdo primeiro
+      // Salva primeiro para garantir dados atualizados
       const payload = buildPayload();
       let currentId = planningId;
       if (currentId) {
-        await http.put(`/plannings/${currentId}`, payload);
+        await http.patch(`/plannings/${currentId}`, payload);
       } else {
-        const res = await http.post('/plannings', { ...payload, status: 'RASCUNHO' });
-        currentId = res.data?.id;
+        const res = await http.post('/plannings', payload);
+        currentId = res.data?.id ?? res.data?.planning?.id;
         if (currentId) setPlanningId(currentId);
       }
-
-      // 2. Envia para revisão via PATCH /plannings/:id/submit
       if (!currentId) throw new Error('ID do planejamento não encontrado');
       await submitPlanningForReview(currentId);
       setStatus('EM_REVISAO');
-      toast.success('Planejamento enviado para revisão da coordenadora!');
+      toast.success('Planejamento enviado para revisão!');
+      navigate('/planejamentos');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao enviar para revisão');
+      toast.error(err?.response?.data?.message ?? 'Erro ao enviar para revisão');
     } finally {
       setSubmitting(false);
     }
   }
 
+  // ─── Status badge ─────────────────────────────────────────────────────────
+  const statusConfig: Record<string, { label: string; icon: React.ReactNode; className: string }> = {
+    RASCUNHO: { label: 'Rascunho', icon: <Clock className="h-3 w-3" />, className: 'bg-gray-100 text-gray-700' },
+    EM_REVISAO: { label: 'Em Revisão', icon: <Clock className="h-3 w-3" />, className: 'bg-amber-100 text-amber-700' },
+    APROVADO: { label: 'Aprovado', icon: <CheckCircle className="h-3 w-3" />, className: 'bg-green-100 text-green-700' },
+    DEVOLVIDO: { label: 'Devolvido', icon: <AlertCircle className="h-3 w-3" />, className: 'bg-red-100 text-red-700' },
+  };
+  const statusInfo = statusConfig[status] ?? statusConfig.RASCUNHO;
   const bloqueado = status === 'EM_REVISAO' || status === 'APROVADO';
 
-  // ─── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <PageShell title="Planejamento" subtitle="Carregando...">
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
+      <PageShell title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
       </PageShell>
     );
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <PageShell
-      title={isEditing ? 'Editar Planejamento' : 'Nova Oficina de Planejamento'}
-      subtitle="Crie seu planejamento pedagógico com base na Matriz Curricular 2026"
+      title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
+      subtitle="Siga a Matriz Pedagógica 2026 e desenvolva suas atividades"
     >
-      <div className="max-w-3xl mx-auto space-y-6">
-
-        {/* Botão voltar */}
-        <button
-          onClick={() => navigate('/app/planejamentos')}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para Meus Planejamentos
-        </button>
-
-        {/* Badge de status quando bloqueado */}
-        {bloqueado && (
-          <div
-            className={`flex items-center gap-3 p-4 rounded-xl border ${
-              status === 'EM_REVISAO'
-                ? 'bg-yellow-50 border-yellow-300'
-                : 'bg-green-50 border-green-300'
-            }`}
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* ─── Cabeçalho com status ─── */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/planejamentos')}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+          </Button>
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.className}`}
           >
-            {status === 'EM_REVISAO' ? (
-              <>
-                <Clock className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-yellow-800">
-                    Aguardando revisão da coordenadora
-                  </p>
-                  <p className="text-sm text-yellow-600">
-                    Este planejamento está em análise. Edição bloqueada até o retorno.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-green-800">Planejamento aprovado!</p>
-                  <p className="text-sm text-green-600">
-                    Este planejamento foi aprovado pela coordenação.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+            {statusInfo.icon}
+            {statusInfo.label}
+          </span>
+        </div>
 
         {/* ─── Identificação ─── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <BookOpen className="h-5 w-5 text-indigo-600" />
+              <Calendar className="h-5 w-5 text-indigo-600" />
               Identificação do Planejamento
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label>
-                Título <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                placeholder="Ex: Planejamento Turma Borboletas — 10/03/2026"
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                disabled={bloqueado}
-              />
-            </div>
+            {/* Turma */}
             <div>
               <Label>
                 Turma <span className="text-red-500">*</span>
               </Label>
               <select
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:bg-gray-100"
+                className="w-full mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                 value={form.classroomId}
                 onChange={e =>
                   setForm(f => ({ ...f, classroomId: e.target.value, title: '' }))
                 }
                 disabled={bloqueado}
               >
-                <option value="">Selecione a turma</option>
+                <option value="">Selecione a turma...</option>
                 {turmas.map(t => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
               </select>
-              {turmaSelecionada && segmento && (
-                <p className="text-xs text-indigo-600 mt-1">
-                  Segmento detectado: <strong>{segmento}</strong>
-                  {turmaSelecionada.ageGroupMin != null &&
-                  turmaSelecionada.ageGroupMax != null
-                    ? ` (${turmaSelecionada.ageGroupMin}–${turmaSelecionada.ageGroupMax} meses)`
-                    : ''}
-                </p>
-              )}
+            </div>
+
+            {/* Título (auto-gerado) */}
+            <div>
+              <Label>Título</Label>
+              <Input
+                placeholder="Gerado automaticamente ao selecionar turma e data"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                disabled={bloqueado}
+              />
+            </div>
+
+            {/* Datas */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>
+                  Data de Início <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={form.startDate}
+                  onChange={e =>
+                    setForm(f => ({
+                      ...f,
+                      startDate: e.target.value,
+                      endDate: f.endDate || e.target.value,
+                    }))
+                  }
+                  disabled={bloqueado}
+                />
+              </div>
+              <div>
+                <Label>
+                  Data de Término <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={form.endDate}
+                  onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
+                  disabled={bloqueado}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* ─── Período ─── */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-5 w-5 text-indigo-600" />
-              Período
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>
-                Data de Início <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                type="date"
-                value={form.startDate}
-                onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                disabled={bloqueado}
-              />
-            </div>
-            <div>
-              <Label>
-                Data de Término <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                type="date"
-                value={form.endDate}
-                onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-                disabled={bloqueado}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ─── Objetivos da Matriz 2026 (somente leitura) ─── */}
+        {/* ─── Objetivos da Matriz 2026 (somente leitura, via API) ─── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -529,22 +514,27 @@ export default function PlanoDeAulaNovoPage() {
                 Selecione a turma e a data de início para ver os objetivos automáticos da Matriz
                 2026.
               </div>
-            ) : objetivosDoDia.length === 0 ? (
-              <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                Nenhum objetivo encontrado na Matriz 2026 para esta data e segmento ({segmento}).
-                Verifique se a data está dentro do calendário letivo 2026.
+            ) : matrizLoading ? (
+              <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-xl text-gray-500 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                Carregando objetivos da Matriz Pedagógica 2026...
               </div>
-            ) : (
+            ) : matrizData?.objectives && matrizData.objectives.length > 0 ? (
               <div className="space-y-3">
                 <p className="text-xs text-gray-500 mb-2">
                   Os campos de experiência e objetivos BNCC abaixo são definidos automaticamente
-                  pela Matriz Pedagógica 2026 para o segmento <strong>{segmento}</strong> nesta
-                  data. Eles não podem ser alterados.
+                  pela Matriz Pedagógica 2026 para o segmento{' '}
+                  <strong>{matrizData.segment}</strong> nesta data. Eles não podem ser alterados.
                 </p>
-                {objetivosDoDia.map((obj, i) => (
-                  <ObjetivoCard key={`${obj.codigo_bncc}-${i}`} objetivo={obj} />
+                {matrizData.objectives.map((obj, i) => (
+                  <ObjetivoCard key={`${obj.codigoBNCC ?? obj.campoExperiencia}-${i}`} objetivo={obj} index={i} />
                 ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {matrizData?.message ??
+                  'Nenhum objetivo encontrado na Matriz 2026 para esta data e segmento. Verifique se a data está dentro do calendário letivo 2026.'}
               </div>
             )}
           </CardContent>
@@ -561,15 +551,19 @@ export default function PlanoDeAulaNovoPage() {
           <CardContent className="space-y-4">
             <div>
               <Label>
-                Atividades a desenvolver <span className="text-red-500">*</span>
+                Desenvolvimento da Atividade <span className="text-red-500">*</span>
               </Label>
               <Textarea
-                placeholder="Descreva as atividades que você vai executar em sala com as crianças..."
-                rows={5}
+                placeholder="Descreva como você vai desenvolver a atividade em sala, seguindo a intencionalidade pedagógica da Matriz..."
+                rows={6}
                 value={form.activities}
                 onChange={e => setForm(f => ({ ...f, activities: e.target.value }))}
                 disabled={bloqueado}
               />
+              <p className="text-xs text-gray-400 mt-1">
+                Crie seu próprio desenvolvimento. Não há modelo pré-definido — siga a
+                intencionalidade pedagógica da Matriz acima.
+              </p>
             </div>
             <div>
               <Label>Recursos e materiais</Label>

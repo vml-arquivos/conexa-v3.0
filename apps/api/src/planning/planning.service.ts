@@ -200,7 +200,7 @@ export class PlanningService {
     const startDate = new Date(createDto.startDate);
     const endDate = new Date(createDto.endDate);
 
-    if (startDate >= endDate) {
+    if (startDate > endDate) {
       throw new BadRequestException(
         'A data de início deve ser anterior à data de término',
       );
@@ -516,7 +516,7 @@ export class PlanningService {
         ? new Date(updateDto.endDate)
         : planning.endDate;
 
-      if (startDate >= endDate) {
+      if (startDate > endDate) {
         throw new BadRequestException(
           'A data de início deve ser anterior à data de término',
         );

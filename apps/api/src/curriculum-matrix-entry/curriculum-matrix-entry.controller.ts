@@ -9,9 +9,9 @@ import {
   Query,
   UseGuards,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { CacheTTL } from '@nestjs/cache-manager';
-import { TenantCacheInterceptor } from '../cache/tenant-cache.interceptor';
 import { MatrixCacheInterceptor } from '../cache/matrix-cache.interceptor';
 import { CurriculumMatrixEntryService } from './curriculum-matrix-entry.service';
 import { CreateCurriculumMatrixEntryDto } from './dto/create-curriculum-matrix-entry.dto';
@@ -45,6 +45,30 @@ export class CurriculumMatrixEntryController {
   @UseInterceptors(MatrixCacheInterceptor)
   findAll(@Query() query: QueryCurriculumMatrixEntryDto, @CurrentUser() user: JwtPayload) {
     return this.curriculumMatrixEntryService.findAll(query, user);
+  }
+
+  /**
+   * GET /curriculum-matrix-entries/by-classroom-day?classroomId=...&date=YYYY-MM-DD
+   *
+   * Retorna os objetivos da Matriz 2026 para uma turma e data específica.
+   * Detecta o segmento via ageGroupMin do Classroom (sem fallback).
+   * Disponível para todos os roles autenticados (professor, coordenação, etc.).
+   * O campo exemploAtividade NUNCA é retornado.
+   */
+  @Get('by-classroom-day')
+  byClassroomDay(
+    @Query('classroomId') classroomId: string,
+    @Query('date') date: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!classroomId || !date) {
+      throw new BadRequestException('Os parâmetros classroomId e date são obrigatórios');
+    }
+    // Validar formato YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('O parâmetro date deve estar no formato YYYY-MM-DD');
+    }
+    return this.curriculumMatrixEntryService.byClassroomDay(classroomId, date, user);
   }
 
   @Get(':id')
