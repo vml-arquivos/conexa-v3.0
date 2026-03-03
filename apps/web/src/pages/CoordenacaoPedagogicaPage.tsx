@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -87,6 +88,9 @@ const STATUS_REUNIAO: Record<string, { label: string; cor: string; icon: any }> 
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function CoordenacaoPedagogicaPage() {
+  const [searchParams] = useSearchParams();
+  // unitId via query string (?unitId=xxx) — usado quando STAFF_CENTRAL navega de outra página
+  const unitIdFromQuery = searchParams.get('unitId') ?? undefined;
   const [aba, setAba] = useState<'turmas' | 'curriculo' | 'reunioes' | 'planejamentos' | 'pautas'>('turmas');
   const [pautas, setPautas] = useState<any[]>([]);
   const [modalPauta, setModalPauta] = useState(false);
@@ -143,10 +147,11 @@ export default function CoordenacaoPedagogicaPage() {
   });
 
   useEffect(() => {
-    loadTurmas();
+    loadTurmas(unitIdFromQuery);
     loadReunioes();
     loadPlanejamentos();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitIdFromQuery]);
 
   // Carregar Matriz da API quando aba curriculo é ativada ou filtros mudam
   useEffect(() => {
@@ -169,17 +174,19 @@ export default function CoordenacaoPedagogicaPage() {
   }, [aba, filtroSegCurriculo, matrizStartDate, matrizEndDate]);
 
   // ─── Loaders ───────────────────────────────────────────────────────────────
-  async function loadTurmas() {
+  async function loadTurmas(unitId?: string) {
     setLoading(true);
     setTurmasError(null);
     try {
       // Endpoint canônico com childrenCount real e todos os professores ativos
-      const res = await http.get('/coordenacao/unit/classrooms');
+      // STAFF_CENTRAL pode passar ?unitId=<id> para ver qualquer unidade
+      const params = unitId ? { unitId } : {};
+      const res = await http.get('/coordenacao/unit/classrooms', { params });
       const payload = res.data;
       const rawClassrooms: any[] = payload?.classrooms ?? (Array.isArray(payload) ? payload : []);
       if (rawClassrooms.length === 0 && !payload?.classrooms) {
         // Fallback para lookup se endpoint não retornar classrooms
-        const fallback = await http.get('/lookup/classrooms/accessible').catch(() => ({ data: [] }));
+        const fallback = await http.get('/lookup/classrooms/accessible', { params: unitId ? { unitId } : {} }).catch(() => ({ data: [] }));
         const fb: any[] = Array.isArray(fallback.data) ? fallback.data : fallback.data?.data ?? [];
         setTurmas(fb.map((c: any) => ({
           id: c.id, name: c.name, code: c.code ?? '', segment: c.segment ?? 'EI02',

@@ -9,6 +9,7 @@
  *  - Acesso restrito a STAFF_CENTRAL, MANTENEDORA e DEVELOPER (via RoleProtectedRoute).
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -40,28 +41,36 @@ interface RdicPublicado {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function RdicGeralPage() {
+  const [searchParams] = useSearchParams();
+  // unitId via query string (?unitId=xxx) — pré-filtra por unidade ao navegar do painel geral
+  const unitIdFromQuery = searchParams.get('unitId') ?? undefined;
   const [loading, setLoading] = useState(true);
   const [rdics, setRdics] = useState<RdicPublicado[]>([]);
   const [selecionado, setSelecionado] = useState<RdicPublicado | null>(null);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [filtroPeriodo, setFiltroPeriodo] = useState<string>('todos');
-
-  // ─── Carregar apenas RDICs PUBLICADOS ─────────────────────────────────────
+  const [filtroUnidade, setFiltroUnidade] = useState<string>(unitIdFromQuery ?? 'todos');
+  // ─── Carregar RDICs (PUBLICADO/APROVADO/FINALIZADO via role STAFF_CENTRAL) ────────────────────
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      // Backend filtra automaticamente por role: STAFF_CENTRAL só recebe PUBLICADOS
-      const res = await http.get('/rdic');
+      // Usa /rdic/geral que é alias para /rdic com filtro automático por role
+      const params: Record<string, string> = {};
+      if (unitIdFromQuery) params.unitId = unitIdFromQuery;
+      const res = await http.get('/rdic/geral', { params });
       setRdics(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
     } catch {
-      toast.error('Erro ao carregar RDICs publicados');
+      toast.error('Erro ao carregar RDICs');
     } finally {
       setLoading(false);
     }
-  }, []);
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitIdFromQuery]);
   useEffect(() => { carregar(); }, [carregar]);
-
+  // Sincronizar filtroUnidade com query string
+  useEffect(() => {
+    setFiltroUnidade(unitIdFromQuery ?? 'todos');
+  }, [unitIdFromQuery]);
   // ─── Períodos únicos para filtro ──────────────────────────────────────────
   const periodos = ['todos', ...Array.from(new Set(rdics.map(r => `${r.periodo} ${r.anoLetivo}`)))];
 

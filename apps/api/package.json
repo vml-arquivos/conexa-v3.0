@@ -21,7 +21,8 @@
     "seed:ensure-cocris-units": "node dist/src/scripts/ensure-cocris-units.js",
     "seed:import-arara-2026": "node dist/src/scripts/import-arara-2026.js",
     "seed:create-urgent-logins": "node dist/src/scripts/create-urgent-logins.js",
-    "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js"
+    "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js",
+    "seed:units-cocris": "node dist/src/scripts/seed_units_cocris.js"
   },
   "repository": {
     "type": "git",

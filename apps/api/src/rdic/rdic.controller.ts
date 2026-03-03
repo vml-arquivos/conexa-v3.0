@@ -81,6 +81,28 @@ export class RdicController {
     return this.svc.listar(query, user);
   }
 
+  /**
+   * GET /rdic/geral
+   * Alias para o painel central (Coordenação Geral / Psicóloga).
+   * Retorna RDICs APROVADO/PUBLICADO/FINALIZADO da mantenedora.
+   * Aceita ?unitId=<id> para filtrar por unidade.
+   * DEVE vir antes de :id para não ser capturado como param.
+   */
+  @Get('geral')
+  @RequireRoles(
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  listarGeral(@Query() query: any, @CurrentUser() user: JwtPayload) {
+    // Força filtro de status para APROVADO/PUBLICADO/FINALIZADO se não especificado
+    const queryGeral = {
+      ...query,
+      status: query.status ?? undefined, // respeita filtro explícito
+    };
+    return this.svc.listar(queryGeral, user);
+  }
+
   /** Detalhe de um RDIC */
   @Get(':id')
   @RequireRoles(

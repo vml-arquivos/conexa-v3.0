@@ -554,7 +554,7 @@ export default function DashboardCoordenacaoGeralPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(dashboard?.unidades ?? []).map(unidade => (
               <button key={unidade.id}
-                onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/turmas`)}
+                onClick={() => navigate(`/app/coordenacao?unitId=${unidade.id}`)}
                 className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -590,7 +590,7 @@ export default function DashboardCoordenacaoGeralPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(dashboard?.unidades ?? []).map(unidade => (
               <button key={unidade.id}
-                onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/observacoes`)}
+                onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
                 className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
@@ -640,13 +640,13 @@ export default function DashboardCoordenacaoGeralPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <button
-                    onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/observacoes`)}
+                    onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
                     className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
                     <Network className="h-5 w-5 text-purple-600" />
                     <span className="text-xs font-medium text-purple-700">Obs. Psicol.</span>
                   </button>
                   <button
-                    onClick={() => navigate(`/app/coordenacao/unidade/${unidade.id}/rdic`)}
+                    onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
                     className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
                     <ClipboardList className="h-5 w-5 text-indigo-600" />
                     <span className="text-xs font-medium text-indigo-700">RDICs</span>

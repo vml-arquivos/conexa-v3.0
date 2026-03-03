@@ -43,38 +43,26 @@ export class LookupService {
    * Retorna unidades acessíveis baseado no role do usuário
    * 
    * Lógica de acesso:
-   * 1. Se usuário tem unitScopes (STAFF_CENTRAL, etc): retorna units desses scopes
-   * 2. Se usuário tem role global (DEVELOPER, MANTENEDORA_*): retorna todas units da mantenedora
-   * 3. Se usuário tem unitId (UNIDADE_*, PROFESSOR): retorna apenas sua unit
+   * 1. Roles globais/centrais (DEVELOPER, MANTENEDORA, STAFF_CENTRAL): retorna TODAS as units da mantenedora
+   * 2. Se usuário tem unitScopes explícitos (sem role global): retorna apenas units dos scopes
+   * 3. UNIDADE/PROFESSOR: retorna apenas a própria unit
    */
   async getAccessibleUnits(user: JwtPayload): Promise<AccessibleUnit[]> {
-    // 1. Coletar todos os unitScopes de todas as roles
+    // Log seguro para diagnóstico
+    const roleLevels = user.roles.map((r) => r.level).join(', ');
     const allUnitScopes: string[] = [];
     for (const role of user.roles) {
       if (role.unitScopes && role.unitScopes.length > 0) {
         allUnitScopes.push(...role.unitScopes);
       }
     }
+    console.log(
+      `[LookupService.getAccessibleUnits] email=${user.email} role=${roleLevels} mantenedoraId=${user.mantenedoraId} unitScopes=${allUnitScopes.length}`,
+    );
 
-    // Se tem unitScopes, retornar units desses scopes
-    if (allUnitScopes.length > 0) {
-      const uniqueUnitIds = Array.from(new Set(allUnitScopes));
-      const units = await this.prisma.unit.findMany({
-        where: {
-          id: { in: uniqueUnitIds },
-          mantenedoraId: user.mantenedoraId, // Garantir que pertence à mesma mantenedora
-        },
-        select: {
-          id: true,
-          code: true,
-          name: true,
-        },
-        orderBy: { name: 'asc' },
-      });
-      return units;
-    }
-
-    // 2. Verificar se tem role global (DEVELOPER, MANTENEDORA_*, STAFF_CENTRAL_*)
+    // 1. Roles globais e centrais (DEVELOPER, MANTENEDORA, STAFF_CENTRAL):
+    //    Retornar TODAS as unidades da mantenedora — independente de unitScopes.
+    //    Isso garante que Coordenação Geral e Psicóloga vejam todas as unidades COCRIS.
     const hasGlobalRole = user.roles.some((role) =>
       ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL'].includes(role.level),
     );
@@ -89,11 +77,40 @@ export class LookupService {
         },
         orderBy: { name: 'asc' },
       });
+      console.log(
+        `[LookupService.getAccessibleUnits] role global/central → retornando ${units.length} unidades`,
+      );
+      return units;
+    }
+
+    // 2. Se tem unitScopes explícitos (ex: STAFF_CENTRAL com escopo restrito a unidades específicas),
+    //    retornar apenas as unidades dos scopes.
+    //    NOTA: Este bloco só é atingido se NÃO for role global (já tratado acima).
+    if (allUnitScopes.length > 0) {
+      const uniqueUnitIds = Array.from(new Set(allUnitScopes));
+      const units = await this.prisma.unit.findMany({
+        where: {
+          id: { in: uniqueUnitIds },
+          mantenedoraId: user.mantenedoraId,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+        orderBy: { name: 'asc' },
+      });
+      console.log(
+        `[LookupService.getAccessibleUnits] unitScopes → retornando ${units.length} unidades`,
+      );
       return units;
     }
 
     // 3. UNIDADE/PROFESSOR: apenas a própria unidade
     if (!user.unitId) {
+      console.log(
+        `[LookupService.getAccessibleUnits] sem unitId e sem role global → retornando []`,
+      );
       return [];
     }
 
@@ -106,6 +123,9 @@ export class LookupService {
       },
     });
 
+    console.log(
+      `[LookupService.getAccessibleUnits] UNIDADE/PROFESSOR → retornando ${unit ? 1 : 0} unidade`,
+    );
     return unit ? [unit] : [];
   }
 
@@ -222,14 +242,23 @@ export class LookupService {
       return classrooms;
     }
 
-    // 4. Roles globais (DEVELOPER, MANTENEDORA): qualquer unit
+    // 4. Roles globais (DEVELOPER, MANTENEDORA, STAFF_CENTRAL): qualquer unit da mantenedora
     const hasGlobalRole = user.roles.some((role) =>
-      ['DEVELOPER', 'MANTENEDORA'].includes(role.level),
+      ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL'].includes(role.level),
     );
 
     if (hasGlobalRole) {
       if (!unitId) {
         return []; // Requer unitId para evitar retornar todas as turmas
+      }
+
+      // Validar que a unit pertence à mantenedora do usuário
+      const unit = await this.prisma.unit.findFirst({
+        where: { id: unitId, mantenedoraId: user.mantenedoraId },
+        select: { id: true },
+      });
+      if (!unit) {
+        throw new ForbiddenException('Unidade não encontrada ou sem acesso');
       }
 
       const classrooms = await this.prisma.classroom.findMany({
@@ -239,6 +268,8 @@ export class LookupService {
           code: true,
           name: true,
           unitId: true,
+          ageGroupMin: true,
+          ageGroupMax: true,
         },
         orderBy: { name: 'asc' },
       });
