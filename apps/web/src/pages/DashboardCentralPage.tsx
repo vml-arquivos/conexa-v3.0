@@ -45,6 +45,7 @@ interface DadosUnidade {
   alunos: number;
   professores: number;
   alertas: number;
+  planejamentos?: number;
   cobertura: number;
 }
 
@@ -62,7 +63,8 @@ interface Unidade {
 interface PlanejamentoCentral {
   id: string;
   title: string;
-  createdBy: string;
+  createdBy?: string;
+  createdByUser?: { id: string; firstName: string; lastName: string; email: string };
   startDate: string;
   endDate: string;
   status: string;
@@ -414,6 +416,7 @@ export function DashboardCentralPage() {
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Alunos</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Professores</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Alertas</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Planejamentos</th>
                   <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Cobertura</th>
                 </tr>
               </thead>
@@ -428,6 +431,7 @@ export function DashboardCentralPage() {
                         {u.alertas}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center text-gray-600">{u.planejamentos ?? 0}</td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <div className="w-24 bg-gray-200 rounded-full h-2">
@@ -497,7 +501,11 @@ export function DashboardCentralPage() {
                     {planejamentosCentral.map(p => (
                       <tr key={p.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 font-medium text-gray-800 max-w-[200px] truncate">{p.title}</td>
-                        <td className="px-4 py-2 text-gray-600">{p.createdBy}</td>
+                        <td className="px-4 py-2 text-gray-600">
+                          {p.createdByUser
+                            ? `${p.createdByUser.firstName} ${p.createdByUser.lastName}`
+                            : p.createdBy ?? '—'}
+                        </td>
                         <td className="px-4 py-2 text-gray-600">{p.classroom?.name ?? '—'}</td>
                         <td className="px-4 py-2 text-gray-600">{p.classroom?.unit?.name ?? '—'}</td>
                         <td className="px-4 py-2 text-gray-500 text-xs">

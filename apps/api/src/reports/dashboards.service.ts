@@ -678,19 +678,39 @@ export class DashboardsService {
 
     const comparativoUnidades = await Promise.all(
       unidades.map(async (u) => {
-        const [alunos, alertasU] = await Promise.all([
+        const [alunos, alertasU, professoresU, planejamentosU] = await Promise.all([
           this.prisma.enrollment.count({
             where: { status: 'ATIVA', classroom: { unitId: u.id } },
-          }),
+          }).catch(() => 0),
           this.prisma.diaryEvent.count({
             where: {
               classroom: { unitId: u.id },
               createdAt: { gte: dataInicio },
               trocaFraldaStatus: { not: Prisma.DbNull },
             },
-          }),
+          }).catch(() => 0),
+          this.prisma.user.count({
+            where: {
+              roles: {
+                some: {
+                  scopeLevel: 'PROFESSOR' as any,
+                  unitScopes: { some: { unitId: u.id } },
+                },
+              },
+            },
+          }).catch(() => 0),
+          this.prisma.planning.count({
+            where: { unitId: u.id },
+          }).catch(() => 0),
         ]);
-        return { nome: u.name, alunos, professores: 0, alertas: alertasU, cobertura: alunos > 0 ? Math.min(100, Math.round((alertasU / alunos) * 100)) : 0 };
+        return {
+          nome: u.name,
+          alunos,
+          professores: professoresU,
+          alertas: alertasU,
+          planejamentos: planejamentosU,
+          cobertura: alunos > 0 ? Math.min(100, Math.round((alertasU / alunos) * 100)) : 0,
+        };
       }),
     );
 

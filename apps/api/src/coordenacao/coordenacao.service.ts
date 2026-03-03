@@ -372,7 +372,13 @@ export class CoordenacaoService {
     return this.prisma.planning.findMany({
       where,
       include: {
-        classroom: { select: { id: true, name: true } },
+        classroom: {
+          select: {
+            id: true,
+            name: true,
+            unit: { select: { id: true, name: true } },
+          },
+        },
         template: { select: { id: true, name: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
