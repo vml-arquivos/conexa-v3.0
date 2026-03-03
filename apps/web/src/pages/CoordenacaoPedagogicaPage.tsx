@@ -131,12 +131,41 @@ export default function CoordenacaoPedagogicaPage() {
   const [filtroSegCurriculo, setFiltroSegCurriculo] = useState<SegmentoKey>('EI01');
   const [filtroCampo, setFiltroCampo] = useState('TODOS');
   const [filtroBimestre, setFiltroBimestre] = useState('TODOS');
+  // Matriz via API (dados reais com exemploAtividade)
+  const [matrizApiData, setMatrizApiData] = useState<any[]>([]);
+  const [matrizApiLoading, setMatrizApiLoading] = useState(false);
+  const [matrizStartDate, setMatrizStartDate] = useState(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0];
+  });
+  const [matrizEndDate, setMatrizEndDate] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 1); d.setDate(0); return d.toISOString().split('T')[0];
+  });
 
   useEffect(() => {
     loadTurmas();
     loadReunioes();
     loadPlanejamentos();
   }, []);
+
+  // Carregar Matriz da API quando aba curriculo é ativada ou filtros mudam
+  useEffect(() => {
+    if (aba !== 'curriculo') return;
+    setMatrizApiLoading(true);
+    http.get('/curriculum-matrix-entries/coordenacao/full', {
+      params: { segment: filtroSegCurriculo, startDate: matrizStartDate, endDate: matrizEndDate },
+    }).then(res => {
+      const dias = res.data?.diasLetivos ?? [];
+      const flat: any[] = [];
+      for (const dia of dias) {
+        for (const obj of dia.objectives ?? []) {
+          flat.push({ ...obj, data: dia.date, dia_semana: dia.diaSemana });
+        }
+      }
+      setMatrizApiData(flat);
+    }).catch(() => {
+      setMatrizApiData([]);
+    }).finally(() => setMatrizApiLoading(false));
+  }, [aba, filtroSegCurriculo, matrizStartDate, matrizEndDate]);
 
   // ─── Loaders ───────────────────────────────────────────────────────────────
   async function loadTurmas() {
@@ -310,13 +339,24 @@ export default function CoordenacaoPedagogicaPage() {
   }
 
   // ─── Dados do currículo ────────────────────────────────────────────────────
-  const objetivosCurriculo = MATRIZ_2026[filtroSegCurriculo] || [];
-  const camposUnicos = [...new Set(objetivosCurriculo.map(o => o.campo_experiencia_id))];
-  const bimestresUnicos = [...new Set(objetivosCurriculo.map(o => o.bimestre))].sort();
+  // Usa dados da API quando disponíveis; fallback para lookup local
+  const objetivosCurriculoBase = matrizApiData.length > 0
+    ? matrizApiData
+    : (MATRIZ_2026[filtroSegCurriculo] || []).map((o: any) => ({
+        ...o,
+        campoExperiencia: o.campo_experiencia_id,
+        objetivoBNCC: o.objetivo_bncc,
+        objetivoCurriculo: o.objetivo_curriculo_movimento,
+        intencionalidade: o.intencionalidade_pedagogica,
+        exemploAtividade: o.exemplos_atividades?.[0]?.descricao ?? '',
+        objetivoBNCCCodigo: o.codigo_bncc,
+      }));
 
-  const objetivosFiltrados = objetivosCurriculo.filter(o => {
-    if (filtroCampo !== 'TODOS' && o.campo_experiencia_id !== filtroCampo) return false;
-    if (filtroBimestre !== 'TODOS' && String(o.bimestre) !== filtroBimestre) return false;
+  const camposUnicos = [...new Set(objetivosCurriculoBase.map((o: any) => o.campoExperiencia ?? o.campo_experiencia_id ?? ''))];
+  const bimestresUnicos: string[] = [];
+
+  const objetivosFiltrados = objetivosCurriculoBase.filter((o: any) => {
+    if (filtroCampo !== 'TODOS' && (o.campoExperiencia ?? o.campo_experiencia_id) !== filtroCampo) return false;
     return true;
   });
 
@@ -485,96 +525,132 @@ export default function CoordenacaoPedagogicaPage() {
           <div className="flex flex-wrap gap-2">
             <span className="text-sm font-medium text-gray-700 self-center mr-1">Segmento:</span>
             {(['EI01', 'EI02', 'EI03'] as SegmentoKey[]).map(seg => (
-              <button key={seg} onClick={() => { setFiltroSegCurriculo(seg); setFiltroCampo('TODOS'); setFiltroBimestre('TODOS'); }}
+              <button key={seg} onClick={() => { setFiltroSegCurriculo(seg); setFiltroCampo('TODOS'); setMatrizApiData([]); }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${filtroSegCurriculo === seg ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                {seg} <span className="text-xs opacity-75">({MATRIZ_2026[seg]?.length || 0})</span>
+                {seg}
               </button>
             ))}
           </div>
 
-          {/* Filtros de campo e bimestre */}
-          <div className="flex flex-wrap gap-3">
+          {/* Filtros de período e campo */}
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Data Início</Label>
+              <input type="date" value={matrizStartDate} onChange={e => setMatrizStartDate(e.target.value)}
+                className="text-sm border rounded-lg px-3 py-1.5 bg-white" />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Data Fim</Label>
+              <input type="date" value={matrizEndDate} onChange={e => setMatrizEndDate(e.target.value)}
+                className="text-sm border rounded-lg px-3 py-1.5 bg-white" />
+            </div>
             <div>
               <Label className="text-xs text-gray-500 mb-1 block">Campo de Experiência</Label>
               <select value={filtroCampo} onChange={e => setFiltroCampo(e.target.value)}
                 className="text-sm border rounded-lg px-3 py-1.5 bg-white">
                 <option value="TODOS">Todos os campos</option>
-                {camposUnicos.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs text-gray-500 mb-1 block">Bimestre</Label>
-              <select value={filtroBimestre} onChange={e => setFiltroBimestre(e.target.value)}
-                className="text-sm border rounded-lg px-3 py-1.5 bg-white">
-                <option value="TODOS">Todos</option>
-                {bimestresUnicos.map(b => <option key={b} value={String(b)}>{b}º Bimestre</option>)}
+                {camposUnicos.filter(Boolean).map(c => <option key={String(c)} value={String(c)}>{String(c)}</option>)}
               </select>
             </div>
             <div className="self-end">
               <Badge className="bg-blue-100 text-blue-700 border-blue-200">
-                {objetivosFiltrados.length} objetivos
+                {matrizApiLoading ? 'Carregando...' : `${objetivosFiltrados.length} objetivos`}
               </Badge>
             </div>
           </div>
 
           {/* Lista de objetivos */}
-          <div className="space-y-3">
-            {objetivosFiltrados.slice(0, 50).map((obj, idx) => (
-              <Card key={idx} className="border shadow-sm hover:shadow-md transition-shadow">
-                <CardContent className="p-0">
-                  <button className="w-full text-left p-4" onClick={() => setExpandedId(expandedId === `c${idx}` ? null : `c${idx}`)}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <Badge className="text-xs bg-gray-100 text-gray-600 font-mono">{obj.codigo_bncc}</Badge>
-                          <Badge className="text-xs bg-blue-50 text-blue-700">{obj.campo_experiencia_emoji} {obj.campo_experiencia_label}</Badge>
-                          <Badge className="text-xs bg-green-50 text-green-700">{obj.bimestre}º Bim</Badge>
-                          <span className="text-xs text-gray-400">{obj.data} — {obj.dia_semana}</span>
-                        </div>
-                        <p className="text-sm font-medium text-gray-800 line-clamp-2">{obj.objetivo_bncc}</p>
-                      </div>
-                      {expandedId === `c${idx}` ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
-                    </div>
-                  </button>
-
-                  {expandedId === `c${idx}` && (
-                    <div className="px-4 pb-4 border-t border-gray-100 space-y-3 pt-3">
-                      {obj.objetivo_curriculo_movimento && (
-                        <div>
-                          <p className="text-xs font-semibold text-purple-700 mb-1">📚 Objetivo do Currículo em Movimento</p>
-                          <p className="text-sm text-gray-700 bg-purple-50 p-2 rounded-lg">{obj.objetivo_curriculo_movimento}</p>
-                        </div>
-                      )}
-                      {obj.intencionalidade_pedagogica && (
-                        <div>
-                          <p className="text-xs font-semibold text-blue-700 mb-1">🎯 Intencionalidade Pedagógica</p>
-                          <p className="text-sm text-gray-700 bg-blue-50 p-2 rounded-lg">{obj.intencionalidade_pedagogica}</p>
-                        </div>
-                      )}
-                      {obj.exemplos_atividades && obj.exemplos_atividades.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-green-700 mb-2">✨ Exemplos de Atividades</p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {obj.exemplos_atividades.map((ex: any, i: number) => (
-                              <div key={i} className="bg-green-50 border border-green-200 rounded-lg p-2">
-                                <p className="text-xs font-semibold text-green-800 mb-1">{i + 1}. {ex.titulo}</p>
-                                <p className="text-xs text-green-700">{ex.descricao}</p>
-                              </div>
-                            ))}
+          {matrizApiLoading ? (
+            <LoadingState message="Carregando Matriz 2026 com exemplos de atividades..." />
+          ) : (
+            <div className="space-y-3">
+              {objetivosFiltrados.length === 0 && (
+                <EmptyState
+                  title="Nenhum objetivo encontrado"
+                  description="Ajuste o período ou o segmento para ver os objetivos da Matriz 2026."
+                />
+              )}
+              {objetivosFiltrados.slice(0, 100).map((obj: any, idx: number) => (
+                <Card key={obj.id ?? idx} className="border shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-0">
+                    <button className="w-full text-left p-4" onClick={() => setExpandedId(expandedId === `c${idx}` ? null : `c${idx}`)}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            {(obj.objetivoBNCCCodigo || obj.codigo_bncc) && (
+                              <Badge className="text-xs bg-gray-100 text-gray-600 font-mono">{obj.objetivoBNCCCodigo ?? obj.codigo_bncc}</Badge>
+                            )}
+                            {(obj.campoExperiencia || obj.campo_experiencia_label) && (
+                              <Badge className="text-xs bg-blue-50 text-blue-700">{obj.campoExperiencia ?? obj.campo_experiencia_label}</Badge>
+                            )}
+                            {obj.data && (
+                              <span className="text-xs text-gray-400">{obj.data} — {obj.dia_semana}</span>
+                            )}
                           </div>
+                          <p className="text-sm font-medium text-gray-800 line-clamp-2">
+                            {obj.objetivoBNCC ?? obj.objetivo_bncc}
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-            {objetivosFiltrados.length > 50 && (
-              <p className="text-center text-sm text-gray-500 py-2">
-                Mostrando 50 de {objetivosFiltrados.length} objetivos. Use os filtros para refinar.
-              </p>
-            )}
-          </div>
+                        {expandedId === `c${idx}` ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0 mt-1" />}
+                      </div>
+                    </button>
+
+                    {expandedId === `c${idx}` && (
+                      <div className="px-4 pb-4 border-t border-gray-100 space-y-3 pt-3">
+                        {/* Objetivo do Currículo DF */}
+                        {(obj.objetivoCurriculo || obj.objetivo_curriculo_movimento) && (
+                          <div>
+                            <p className="text-xs font-bold text-indigo-500 uppercase tracking-wide mb-0.5">
+                              Objetivo do Currículo em Movimento — DF (Transcrição Literal)
+                            </p>
+                            <p className="text-sm text-indigo-800 bg-indigo-50 p-2 rounded-lg">
+                              {obj.objetivoCurriculo ?? obj.objetivo_curriculo_movimento}
+                            </p>
+                          </div>
+                        )}
+                        {/* Intencionalidade Pedagógica */}
+                        {(obj.intencionalidade || obj.intencionalidade_pedagogica) && (
+                          <div>
+                            <p className="text-xs font-bold text-purple-500 uppercase tracking-wide mb-0.5">
+                              Intencionalidade Pedagógica
+                            </p>
+                            <p className="text-sm text-purple-800 bg-purple-50 p-2 rounded-lg">
+                              {obj.intencionalidade ?? obj.intencionalidade_pedagogica}
+                            </p>
+                          </div>
+                        )}
+                        {/* Exemplo de Atividade — CARD VERDE para coordenação */}
+                        {(obj.exemploAtividade || (obj.exemplos_atividades && obj.exemplos_atividades.length > 0)) && (
+                          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">
+                              💡 Exemplo de Experiência/Atividade
+                            </p>
+                            {obj.exemploAtividade ? (
+                              <p className="text-sm text-green-800">{obj.exemploAtividade}</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {obj.exemplos_atividades.map((ex: any, i: number) => (
+                                  <div key={i}>
+                                    <p className="text-xs font-semibold text-green-800">{i + 1}. {ex.titulo}</p>
+                                    <p className="text-xs text-green-700">{ex.descricao}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+              {objetivosFiltrados.length > 100 && (
+                <p className="text-center text-sm text-gray-500 py-2">
+                  Mostrando 100 de {objetivosFiltrados.length} objetivos. Refine o período para ver menos.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

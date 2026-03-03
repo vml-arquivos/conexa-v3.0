@@ -225,7 +225,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function aprovarPlanejamento(id: string) {
     try {
       setProcessando(id);
-      await http.patch(`/coordenacao/planejamentos/${id}/aprovar`, { aprovar: true });
+      await http.post(`/plannings/${id}/aprovar`);
       toast.success('Planejamento aprovado! ✅');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
     } catch { toast.error('Erro ao aprovar'); }

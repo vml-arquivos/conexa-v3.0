@@ -138,8 +138,8 @@ export function DashboardCentralPage() {
       // Carregar dados pedagógicos (somente leitura)
       setCarregandoCentral(true);
       const [planCentral, rdicCentral] = await Promise.allSettled([
-        http.get('/coordenacao/planejamentos', { params: { status: 'APROVADO' } }),
-        http.get('/rdic/geral'),
+        http.get('/coordenacao/planejamentos', { params: filtros.unidadeId ? { unitId: filtros.unidadeId } : {} }),
+        http.get('/rdic/geral', { params: filtros.unidadeId ? { unitId: filtros.unidadeId } : {} }),
       ]);
       if (planCentral.status === 'fulfilled') {
         setPlanejamentosCentral(Array.isArray(planCentral.value.data) ? planCentral.value.data : planCentral.value.data?.data ?? []);
@@ -505,8 +505,16 @@ export function DashboardCentralPage() {
                           {p.endDate ? ` – ${new Date(p.endDate).toLocaleDateString('pt-BR')}` : ''}
                         </td>
                         <td className="px-4 py-2">
-                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                            <CheckCircle className="h-3 w-3" /> Aprovado
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                            p.status === 'APROVADO' ? 'bg-green-100 text-green-700' :
+                            p.status === 'EM_REVISAO' ? 'bg-yellow-100 text-yellow-700' :
+                            p.status === 'DEVOLVIDO' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {p.status === 'APROVADO' ? 'Aprovado' :
+                             p.status === 'EM_REVISAO' ? 'Em Revisão' :
+                             p.status === 'DEVOLVIDO' ? 'Devolvido' :
+                             p.status ?? 'Rascunho'}
                           </span>
                         </td>
                       </tr>

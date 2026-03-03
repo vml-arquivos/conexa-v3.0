@@ -470,4 +470,77 @@ export class CurriculumMatrixEntryService {
 
     return { segment, date, classroomId, objectives };
   }
+
+  /**
+   * Retorna a Matriz completa com exemploAtividade para coordenação.
+   * Agrupa por data e retorna todos os campos incluindo exemploAtividade.
+   */
+  async getMatrizFullForCoord(
+    segment: string,
+    startDateStr: string,
+    endDateStr: string,
+    unitId: string,
+    user: JwtPayload,
+  ) {
+    const mantenedoraId = user.mantenedoraId;
+    if (!mantenedoraId) throw new ForbiddenException('Escopo de mantenedora ausente');
+
+    const start = new Date(startDateStr + 'T00:00:00-03:00');
+    const end = new Date(endDateStr + 'T23:59:59-03:00');
+
+    // Buscar matriz ativa para o segmento (ou todas se segment não informado)
+    const matrix = await this.prisma.curriculumMatrix.findFirst({
+      where: {
+        mantenedoraId,
+        ...(segment ? { segment } : {}),
+        isActive: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!matrix) {
+      return { segment: segment || 'todos', diasLetivos: [], aviso: 'Nenhuma matriz ativa encontrada para este segmento' };
+    }
+
+    const entries = await this.prisma.curriculumMatrixEntry.findMany({
+      where: {
+        matrixId: matrix.id,
+        date: { gte: start, lte: end },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Agrupar por data
+    const byDate: Record<string, any[]> = {};
+    for (const e of entries) {
+      const key = e.date.toISOString().split('T')[0];
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push({
+        id: e.id,
+        campoExperiencia: (e as any).campoDeExperiencia ?? '',
+        objetivoBNCCCodigo: (e as any).objetivoBNCCCode ?? '',
+        objetivoBNCC: (e as any).objetivoBNCC ?? '',
+        objetivoCurriculo: (e as any).objetivoCurriculo ?? '',
+        intencionalidade: (e as any).intencionalidade ?? '',
+        semana: (e as any).weekTheme ?? (e as any).semana ?? '',
+        // Coordenação sempre vê o exemploAtividade:
+        exemploAtividade: (e as any).exemploAtividade ?? '',
+      });
+    }
+
+    return {
+      segment: segment || matrix.segment,
+      matrixId: matrix.id,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      totalEntradas: entries.length,
+      diasLetivos: Object.entries(byDate).map(([date, objectives]) => ({
+        date,
+        diaSemana: new Date(date + 'T12:00:00-03:00').toLocaleDateString('pt-BR', {
+          weekday: 'long', timeZone: 'America/Sao_Paulo',
+        }),
+        objectives,
+      })),
+    };
+  }
 }

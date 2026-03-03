@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   BadRequestException,
 } from '@nestjs/common';
+import { RoleLevel } from '@prisma/client';
 import { CacheTTL } from '@nestjs/cache-manager';
 import { MatrixCacheInterceptor } from '../cache/matrix-cache.interceptor';
 import { CurriculumMatrixEntryService } from './curriculum-matrix-entry.service';
@@ -48,12 +49,33 @@ export class CurriculumMatrixEntryController {
   }
 
   /**
+   * GET /curriculum-matrix-entries/coordenacao/full
+   * Retorna a Matriz completa com exemploAtividade para coordenação.
+   * Acesso: UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER.
+   * Parâmetros: segment (EI01/EI02/EI03), startDate (YYYY-MM-DD), endDate (YYYY-MM-DD)
+   */
+  @Get('coordenacao/full')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getMatrizFullForCoord(
+    @Query('segment') segment: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('unitId') unitId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate e endDate são obrigatórios (YYYY-MM-DD)');
+    }
+    return this.curriculumMatrixEntryService.getMatrizFullForCoord(segment, startDate, endDate, unitId, user);
+  }
+
+  /**
    * GET /curriculum-matrix-entries/by-classroom-day?classroomId=...&date=YYYY-MM-DD
    *
    * Retorna os objetivos da Matriz 2026 para uma turma e data específica.
    * Detecta o segmento via ageGroupMin do Classroom (sem fallback).
    * Disponível para todos os roles autenticados (professor, coordenação, etc.).
-   * O campo exemploAtividade NUNCA é retornado.
+   * O campo exemploAtividade é retornado apenas para coordenação e acima.
    */
   @Get('by-classroom-day')
   byClassroomDay(
