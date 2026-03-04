@@ -68,7 +68,8 @@ export class LookupService {
     );
 
     if (hasGlobalRole) {
-      const units = await this.prisma.unit.findMany({
+      // Tentar primeiro com isActive: true
+      let units = await this.prisma.unit.findMany({
         where: { mantenedoraId: user.mantenedoraId, isActive: true },
         select: {
           id: true,
@@ -77,6 +78,24 @@ export class LookupService {
         },
         orderBy: { name: 'asc' },
       });
+
+      // Fallback: se retornar 0 unidades com isActive:true, buscar TODAS da mantenedora
+      // (cobre cenário de banco com seeds antigos que não definiram isActive explicitamente)
+      if (units.length === 0) {
+        console.warn(
+          `[LookupService.getAccessibleUnits] isActive:true retornou 0 unidades para mantenedoraId=${user.mantenedoraId} — buscando sem filtro`,
+        );
+        units = await this.prisma.unit.findMany({
+          where: { mantenedoraId: user.mantenedoraId },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+          orderBy: { name: 'asc' },
+        });
+      }
+
       console.log(
         `[LookupService.getAccessibleUnits] role global/central → retornando ${units.length} unidades`,
       );

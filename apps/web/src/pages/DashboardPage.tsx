@@ -109,7 +109,8 @@ export function DashboardPage() {
     } finally {
       setUnitLoading(false);
     }
-  }, [fromDate, toDate, unitId, isGlobalLevel]);
+  // FIX p0.1: isStaffCentral estava faltando nas dependências do useCallback
+  }, [fromDate, toDate, unitId, isGlobalLevel, isStaffCentral]);
 
   // Handler: Carregar Dashboard do Professor
   const handleLoadTeacherDashboard = useCallback(async () => {

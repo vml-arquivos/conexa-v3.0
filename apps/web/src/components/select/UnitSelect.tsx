@@ -58,13 +58,23 @@ export function UnitSelect({ value, onChange, disabled, className }: UnitSelectP
     }
   }, [fetchState.units, value, onChange, autoSelected]);
 
-  // Restaurar última unidade selecionada se existir e for válida
+  // Restaurar última unidade selecionada se existir e for válida na lista atual
+  // FIX p0.1: se lastSelectedUnit não existir na nova lista (ex: usuário trocou de mantenedora
+  // ou unidade foi removida), limpar o valor em vez de travar o select em estado inválido.
   useEffect(() => {
-    if (!value && lastSelectedUnit && fetchState.units.some(u => u.id === lastSelectedUnit)) {
-      console.log('[UnitSelect] Restaurando última unidade selecionada:', lastSelectedUnit);
-      onChange(lastSelectedUnit);
+    if (fetchState.loading) return; // aguardar carregamento
+    if (!value && lastSelectedUnit) {
+      const existsInList = fetchState.units.some(u => u.id === lastSelectedUnit);
+      if (existsInList) {
+        console.log('[UnitSelect] Restaurando última unidade selecionada:', lastSelectedUnit);
+        onChange(lastSelectedUnit);
+      } else if (lastSelectedUnit) {
+        // Unidade antiga não existe mais na lista — limpar para não travar
+        console.warn('[UnitSelect] lastSelectedUnit não encontrado na lista atual — limpando:', lastSelectedUnit);
+        setLastSelectedUnit('');
+      }
     }
-  }, [fetchState.units, value, lastSelectedUnit, onChange]);
+  }, [fetchState.units, fetchState.loading, value, lastSelectedUnit, onChange, setLastSelectedUnit]);
 
   // Salvar unidade selecionada no localStorage
   useEffect(() => {
@@ -112,7 +122,7 @@ export function UnitSelect({ value, onChange, disabled, className }: UnitSelectP
     );
   }
 
-  // Se apenas 1 unidade, mostrar como texto fixo
+  // Se apenas 1 unidade, mostrar como texto fixo (sem dropdown)
   if (units.length === 1) {
     return (
       <div className={`px-3 py-2 border border-green-200 rounded-md bg-green-50 text-green-800 text-sm font-medium ${className || ''}`}>
@@ -136,7 +146,7 @@ export function UnitSelect({ value, onChange, disabled, className }: UnitSelectP
             <span className="text-gray-400 ml-1 text-xs">({selectedUnit.code})</span>
           </span>
         ) : (
-          <span className="text-gray-400">Selecione uma unidade...</span>
+          <span className="text-gray-400">Selecione uma unidade... ({units.length} disponíveis)</span>
         )}
         <span className="float-right text-gray-400">▾</span>
       </button>
@@ -150,7 +160,7 @@ export function UnitSelect({ value, onChange, disabled, className }: UnitSelectP
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome ou código..."
+              placeholder={`Buscar entre ${units.length} unidades...`}
               className="w-full px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
               autoFocus
             />

@@ -197,12 +197,23 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('Usuário não encontrado');
 
-    // Buscar roles separadamente para evitar problemas de tipo
+    // Buscar roles com unitScopes — mesmo formato do JWT — para consistência frontend
     // FIX: usar role.level (RoleLevel real) em vez de scopeLevel
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId, isActive: true },
-      include: { role: { select: { level: true } } },
+      include: {
+        role: { select: { level: true } },
+        unitScopes: { select: { unitId: true } },
+      },
     });
+
+    // Formato rico (igual ao JWT): array de objetos com level + unitScopes
+    // O frontend (normalizeRoles) suporta ambos os formatos (string[] e objeto[])
+    const rolesRich = userRoles.map((r) => ({
+      roleId: r.roleId,
+      level: r.role.level,
+      unitScopes: r.unitScopes.map((s) => s.unitId),
+    }));
 
     return {
       user: {
@@ -212,7 +223,7 @@ export class AuthService {
         status: user.status,
         mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
-        roles: userRoles.map((r) => r.role.level),
+        roles: rolesRich,
       },
     };
   }
