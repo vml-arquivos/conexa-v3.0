@@ -485,6 +485,61 @@ export class CoordenacaoService {
     };
   }
 
+  // ─── UNIT CONTEXT SUMMARY (carregamento rápido) ────────────────────────────
+
+  /**
+   * Retorna resumo leve de uma unidade para preload do contexto central.
+   * Usado pelo frontend ao selecionar uma unidade no painel STAFF_CENTRAL.
+   */
+  async getUnitContextSummary(user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const isCentral = Array.isArray(user.roles) && user.roles.some(
+      (r: any) => ['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].includes(r?.level),
+    );
+
+    // UNIDADE: ignora override e usa token.unitId
+    const unitId = isCentral
+      ? (unitIdOverride ?? user.unitId ?? null)
+      : (user.unitId ?? null);
+
+    if (!unitId) throw new ForbiddenException('unitId é obrigatório para este endpoint');
+
+    // Validar que a unidade pertence à mantenedora do usuário
+    const unit = await this.prisma.unit.findFirst({
+      where: { id: unitId, mantenedoraId: user.mantenedoraId },
+      select: { id: true, name: true, code: true, city: true, state: true },
+    });
+    if (!unit) throw new ForbiddenException('Unidade não encontrada ou fora do escopo');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // domingo
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    const [classrooms, children, teachers, staff, plansPending, diariesThisWeek, rdicPublished] =
+      await Promise.all([
+        this.prisma.classroom.count({ where: { unitId, isActive: true } }),
+        this.prisma.enrollment.count({ where: { status: 'ATIVA', classroom: { unitId } } }),
+        this.prisma.classroomTeacher.count({ where: { isActive: true, classroom: { unitId } } }),
+        // UserRoleUnitScope: conta usuários com escopo na unidade e role UNIDADE
+        this.prisma.userRoleUnitScope.count({ where: { unitId, userRole: { role: { level: RoleLevel.UNIDADE } } } }).catch(() => 0),
+        this.prisma.planning.count({ where: { unitId, status: { in: [PlanningStatus.RASCUNHO, PlanningStatus.EM_REVISAO] } } }),
+        this.prisma.diaryEvent.count({ where: { unitId, eventDate: { gte: weekStart, lte: weekEnd } } }),
+        // ReportBase: conta RDICs gerados para a unidade
+        this.prisma.reportBase.count({ where: { unitId, reportType: 'RDIC', isGenerated: true } }).catch(() => 0),
+      ]);
+
+    return {
+      unit: { id: unit.id, name: unit.name, code: unit.code, city: unit.city, state: unit.state },
+      counts: { classrooms, children, teachers, staff },
+      recent: { plansPending, diariesThisWeek, rdicPublished },
+    };
+  }
+
   // ─── REQUISIÇÕES (aceita unitId override) ─────────────────────────────────
 
   async listarRequisicoes(status: string, user: JwtPayload, unitIdOverride?: string) {

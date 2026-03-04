@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { LoadingState } from '../components/ui/LoadingState';
 import http from '../api/http';
 import { useNavigate } from 'react-router-dom';
+import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import {
   Building2, Users, TrendingUp, ShoppingCart,
   BookOpen, ClipboardList, CheckCircle, AlertCircle,
@@ -41,6 +43,8 @@ const DEMO: DashboardGeral = {
 
 export default function DashboardCoordenacaoGeralPage() {
   const navigate = useNavigate();
+  // Contexto global de escopo de unidade
+  const { accessibleUnits: unidadesCtx, selectedUnitId: ctxUnitId, setUnit: ctxSetUnit } = useUnitScope();
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardGeral | null>(null);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
@@ -91,7 +95,7 @@ export default function DashboardCoordenacaoGeralPage() {
   });
   const [consumoDataFim, setConsumoDataFim] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-  // Unidades disponíveis para filtros
+  // Unidades disponíveis para filtros (sincronizado com contexto global)
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState<Array<{id: string; name: string}>>([]);
 
   // Aba Matriz — dados reais da API (sem lookup local)
@@ -116,11 +120,17 @@ export default function DashboardCoordenacaoGeralPage() {
 
   useEffect(() => {
     loadDashboard();
-    http.get('/lookup/units/accessible').then(r => {
-      const data = r.data;
-      setUnidadesDisponiveis(Array.isArray(data) ? data : (data?.units ?? []));
-    }).catch(() => {});
-  }, []);
+    // Usar unidades do contexto global (já carregadas pelo UnitScopeProvider)
+    if (unidadesCtx.length > 0) {
+      setUnidadesDisponiveis(unidadesCtx);
+    } else {
+      http.get('/lookup/units/accessible').then(r => {
+        const data = r.data;
+        setUnidadesDisponiveis(Array.isArray(data) ? data : (data?.units ?? []));
+      }).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unidadesCtx]);
 
   useEffect(() => {
     if (abaAtiva === 'cobertura' && !coberturaGeral) {

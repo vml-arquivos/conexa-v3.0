@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useUnitScope } from '../contexts/UnitScopeContext';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -154,15 +155,25 @@ function ModalTurma({ turma, unidades, onClose, onSave }: { turma?: Turma | null
 }
 
 export default function AdminTurmasPage() {
+  // Contexto global de escopo de unidade
+  const { accessibleUnits, selectedUnitId: ctxUnitId } = useUnitScope();
+
   const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [unidades, setUnidades] = useState<Unidade[]>([]);
+  // unidades vem do contexto global
+  const unidades: Unidade[] = accessibleUnits;
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
-  const [filtroUnidade, setFiltroUnidade] = useState('');
+  // Inicializa filtroUnidade com o unitId do contexto global (se houver)
+  const [filtroUnidade, setFiltroUnidade] = useState(ctxUnitId ?? '');
   const [filtroSegmento, setFiltroSegmento] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [turmaEditando, setTurmaEditando] = useState<Turma | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // Sincronizar filtroUnidade com contexto global quando muda
+  useEffect(() => {
+    if (ctxUnitId) setFiltroUnidade(ctxUnitId);
+  }, [ctxUnitId]);
 
   useEffect(() => { loadDados(); }, []);
 
@@ -171,23 +182,14 @@ export default function AdminTurmasPage() {
     try {
       // FIX p0.5: usar /lookup/units/accessible (fonte única, retorna todas as unidades ativas)
       // Separar turmas e unidades: turmas podem estar vazias, unidades sempre vêm do lookup
-      const [turmasRes, unitsRes] = await Promise.allSettled([
-        http.get('/classrooms?include=counts&limit=200'),
-        http.get('/lookup/units/accessible'),
-      ]);
-      if (turmasRes.status === 'fulfilled') {
-        const t = turmasRes.value.data;
+      // Unidades vem do UnitScopeContext — apenas carregamos turmas aqui
+      const turmasRes = await http.get('/classrooms?include=counts&limit=200').catch(() => null);
+      if (turmasRes) {
+        const t = turmasRes.data;
         setTurmas(Array.isArray(t) ? t : t?.data ?? t?.classrooms ?? []);
       } else {
         setTurmas([]);
         toast.error('Erro ao carregar turmas');
-      }
-      if (unitsRes.status === 'fulfilled') {
-        const u = unitsRes.value.data;
-        setUnidades(Array.isArray(u) ? u : u?.data ?? []);
-      } else {
-        setUnidades([]);
-        toast.error('Erro ao carregar unidades');
       }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao carregar dados');

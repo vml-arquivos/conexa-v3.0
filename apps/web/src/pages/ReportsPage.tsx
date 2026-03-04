@@ -6,6 +6,8 @@ import type { AccessibleClassroom } from '../types/lookup';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
+import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 
 const LABELS_PT: Record<string, string> = {
   id: 'ID', classroomId: 'Turma', startDate: 'Data de Início', endDate: 'Data de Término',
@@ -55,9 +57,13 @@ export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
 
-  // Unidades disponíveis (apenas para STAFF_CENTRAL/MANTENEDORA/DEVELOPER)
-  const [unidades, setUnidades] = useState<UnitOption[]>([]);
-  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+  // Contexto global de escopo de unidade
+  const { accessibleUnits, selectedUnitId: ctxUnitId, setUnit: ctxSetUnit } = useUnitScope();
+
+  // Unidades disponíveis (do contexto global)
+  const unidades: UnitOption[] = accessibleUnits;
+  const selectedUnitId = ctxUnitId ?? '';
+  const setSelectedUnitId = (id: string) => ctxSetUnit(id || null);
 
   // Turmas (carregadas após seleção de unidade, ou todas se UNIDADE)
   const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
@@ -70,14 +76,12 @@ export function ReportsPage() {
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
 
-  // Carregar unidades para STAFF_CENTRAL
+  // Carregar unidades para STAFF_CENTRAL (agora via contexto global)
   useEffect(() => {
     if (!isCentral) return;
-    http.get('/lookup/units/accessible')
-      .then(r => {
-        const data = r.data;
-        setUnidades(Array.isArray(data) ? data : (data?.units ?? []));
-      })
+    // unidades já vem do UnitScopeContext — nada a fazer aqui
+    void (async () => {})()
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .catch(() => {});
   }, [isCentral]);
 

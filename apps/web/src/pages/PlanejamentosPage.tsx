@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor, isUnidade } from '../api/auth';
+import { useUnitScope } from '../contexts/UnitScopeContext';
 import { submitPlanningForReview, approvePlanning, returnPlanning } from '../api/plannings';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -107,6 +108,8 @@ export default function PlanejamentosPage() {
   const { user } = useAuth();
   const ehProfessor = isProfessor(user);
   const ehCoordenador = isUnidade(user);
+  // Contexto global de escopo de unidade (para STAFF_CENTRAL)
+  const { selectedUnitId: ctxUnitId } = useUnitScope();
   const [aba, setAba] = useState<'meus' | 'novo' | 'matriz' | 'templates'>('meus');
   const [revisaoModal, setRevisaoModal] = useState<{ planningId: string; tipo: 'devolver' } | null>(null);
   const [comentarioRevisao, setComentarioRevisao] = useState('');
@@ -135,13 +138,15 @@ export default function PlanejamentosPage() {
     codigosBNCC: [] as string[],
   });
 
-  useEffect(() => { loadData(); }, []);
+  // Recarregar planejamentos quando o escopo de unidade mudar
+  useEffect(() => { loadData(); }, [ctxUnitId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     setLoading(true);
     try {
+      const planUrl = ctxUnitId ? `/plannings?limit=100&unitId=${ctxUnitId}` : '/plannings?limit=100';
       const [planRes, turmaRes, templRes] = await Promise.allSettled([
-        http.get('/plannings?limit=100'),
+        http.get(planUrl),
         http.get('/lookup/classrooms/accessible'),
         http.get('/planning-templates'),
       ]);

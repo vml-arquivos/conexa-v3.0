@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/ui/PageShell';
 import http from '../api/http';
+import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector,
@@ -70,9 +74,14 @@ const TooltipCustom = ({ active, payload, label }: any) => {
 
 // ─── Página Principal ─────────────────────────────────────────────────────────
 export default function DashboardConsumoMateriaisPage() {
+  const { user } = useAuth();
+  const roles = normalizeRoles(user);
+  const isCentral = roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
+  const { selectedUnitId: ctxUnitId } = useUnitScope();
+
   const [relatorio, setRelatorio] = useState<RelatorioConsumo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState('');  
   const [dataInicio, setDataInicio] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 3);
@@ -90,6 +99,8 @@ export default function DashboardConsumoMateriaisPage() {
       if (dataInicio) params.dataInicio = dataInicio;
       if (dataFim) params.dataFim = dataFim;
       if (classroomId) params.classroomId = classroomId;
+      // Aplicar filtro de unidade do contexto global (para STAFF_CENTRAL)
+      if (ctxUnitId) params.unitId = ctxUnitId;
       const { data } = await http.get('/material-requests/relatorio-consumo', { params });
       setRelatorio(data);
     } catch (e: any) {
@@ -106,7 +117,8 @@ export default function DashboardConsumoMateriaisPage() {
     } catch {}
   };
 
-  useEffect(() => { carregar(); carregarTurmas(); }, []);
+  // Recarregar quando o escopo de unidade mudar
+  useEffect(() => { carregar(); carregarTurmas(); }, [ctxUnitId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Dados para gráficos ───────────────────────────────────────────────────
   const dadosCategoria = relatorio
@@ -132,8 +144,17 @@ export default function DashboardConsumoMateriaisPage() {
     <PageShell
       title="Dashboard de Consumo de Materiais"
       subtitle="Análise de requisições por categoria, turma e período"
-      
     >
+      {/* ─── Seletor de unidade (apenas para STAFF_CENTRAL) ─── */}
+      {isCentral && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4 flex items-center gap-3">
+          <span className="text-sm font-medium text-indigo-700">Escopo:</span>
+          <UnitScopeSelector showNetworkOption compact />
+          {!ctxUnitId && (
+            <span className="text-xs text-indigo-500">Exibindo dados de toda a rede</span>
+          )}
+        </div>
+      )}
       {/* ─── Filtros ─── */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">

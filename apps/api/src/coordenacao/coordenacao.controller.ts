@@ -163,6 +163,20 @@ export class CoordenacaoController {
     return this.svc.listarRequisicoes(status, user, unitId);
   }
 
+  // ─── UNIT CONTEXT SUMMARY ──────────────────────────────────────────────────────────
+
+  /**
+   * GET /coordenacao/unit-context/summary?unitId=<id>
+   * Retorna resumo leve de uma unidade para preload do contexto central.
+   * STAFF_CENTRAL/MANTENEDORA/DEVELOPER: unitId obrigatório via query param.
+   * UNIDADE: usa token.unitId (ignora query param).
+   */
+  @Get('unit-context/summary')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getUnitContextSummary(@Query('unitId') unitId: string, @CurrentUser() user: JwtPayload) {
+    return this.svc.getUnitContextSummary(user, unitId);
+  }
+
   // ─── TURMAS COM STATS COMPLETOS ────────────────────────────────────────────
 
   /**

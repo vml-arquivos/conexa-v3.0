@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useUnitScope } from '../contexts/UnitScopeContext';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -42,8 +43,9 @@ interface RdicPublicado {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function RdicGeralPage() {
   const [searchParams] = useSearchParams();
-  // unitId via query string (?unitId=xxx) — pré-filtra por unidade ao navegar do painel geral
-  const unitIdFromQuery = searchParams.get('unitId') ?? undefined;
+  // unitId via query string (?unitId=xxx) ou contexto global (UnitScopeContext)
+  const { selectedUnitId: ctxUnitId } = useUnitScope();
+  const unitIdFromQuery = searchParams.get('unitId') ?? ctxUnitId ?? undefined;
   const [loading, setLoading] = useState(true);
   const [rdics, setRdics] = useState<RdicPublicado[]>([]);
   const [selecionado, setSelecionado] = useState<RdicPublicado | null>(null);
