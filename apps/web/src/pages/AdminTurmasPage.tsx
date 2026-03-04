@@ -20,12 +20,12 @@ interface Turma {
   year: number;
   maxStudents?: number;
   isActive: boolean;
-  unit?: { id: string; name: string; unitCode: string };
+  unit?: { id: string; name: string; code: string };
   teachers?: Array<{ user: { firstName: string; lastName: string } }>;
   _count?: { children: number; teachers: number };
 }
 
-interface Unidade { id: string; name: string; unitCode: string; }
+interface Unidade { id: string; name: string; code: string; }
 
 const AGE_GROUPS = [
   { value: 'EI01', label: 'EI01 — Bebês (0 a 1a 6m)', cor: 'bg-pink-100 text-pink-700' },
@@ -127,7 +127,7 @@ function ModalTurma({ turma, unidades, onClose, onSave }: { turma?: Turma | null
               <select className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={form.unitId} onChange={e => setForm(f => ({ ...f, unitId: e.target.value }))}>
                 <option value="">Selecione a unidade...</option>
-                {unidades.map(u => <option key={u.id} value={u.id}>{u.name} ({u.unitCode})</option>)}
+                {unidades.map(u => <option key={u.id} value={u.id}>{u.name} ({u.code})</option>)}
               </select>
             </div>
           </div>
@@ -169,26 +169,28 @@ export default function AdminTurmasPage() {
   async function loadDados() {
     setLoading(true);
     try {
-      const [turmasRes, unitsRes] = await Promise.all([
+      // FIX p0.5: usar /lookup/units/accessible (fonte única, retorna todas as unidades ativas)
+      // Separar turmas e unidades: turmas podem estar vazias, unidades sempre vêm do lookup
+      const [turmasRes, unitsRes] = await Promise.allSettled([
         http.get('/classrooms?include=counts&limit=200'),
-        http.get('/units?limit=100'),
+        http.get('/lookup/units/accessible'),
       ]);
-      const t = turmasRes.data;
-      setTurmas(Array.isArray(t) ? t : t?.data ?? t?.classrooms ?? []);
-      const u = unitsRes.data;
-      setUnidades(Array.isArray(u) ? u : u?.data ?? u?.units ?? []);
-    } catch {
-      setTurmas([
-        { id: '1', name: 'Turma Borboletas', ageGroup: 'EI01', year: 2026, isActive: true, unit: { id: '1', name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' }, _count: { children: 18, teachers: 2 } },
-        { id: '2', name: 'Turma Girassóis', ageGroup: 'EI02', year: 2026, isActive: true, unit: { id: '1', name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' }, _count: { children: 22, teachers: 1 } },
-        { id: '3', name: 'Turma Estrelas', ageGroup: 'EI03', year: 2026, isActive: true, unit: { id: '2', name: 'CEPI Beija-Flor', unitCode: 'BEIJA-FLO' }, _count: { children: 20, teachers: 1 } },
-        { id: '4', name: 'Turma Arco-Íris', ageGroup: 'EI02', year: 2026, isActive: true, unit: { id: '2', name: 'CEPI Beija-Flor', unitCode: 'BEIJA-FLO' }, _count: { children: 19, teachers: 2 } },
-      ]);
-      setUnidades([
-        { id: '1', name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' },
-        { id: '2', name: 'CEPI Beija-Flor', unitCode: 'BEIJA-FLO' },
-        { id: '3', name: 'CEPI Sabiá do Campo', unitCode: 'SABIA-CAM' },
-      ]);
+      if (turmasRes.status === 'fulfilled') {
+        const t = turmasRes.value.data;
+        setTurmas(Array.isArray(t) ? t : t?.data ?? t?.classrooms ?? []);
+      } else {
+        setTurmas([]);
+        toast.error('Erro ao carregar turmas');
+      }
+      if (unitsRes.status === 'fulfilled') {
+        const u = unitsRes.value.data;
+        setUnidades(Array.isArray(u) ? u : u?.data ?? []);
+      } else {
+        setUnidades([]);
+        toast.error('Erro ao carregar unidades');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao carregar dados');
     } finally { setLoading(false); }
   }
 

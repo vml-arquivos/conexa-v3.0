@@ -116,25 +116,37 @@ export function DashboardCentralPage() {
       const params: Record<string, string> = { periodo: filtros.periodo };
       if (filtros.unidadeId) params.unidadeId = filtros.unidadeId;
 
-      // Buscar dados do dashboard central
+      // FIX p0.5: usar /coordenacao/dashboard/geral (endpoint real) em vez de /dashboard/central (inexistente)
+      // Resposta: { indicadoresGerais: { totalUnidades, totalAlunos, totalProfessores, ... }, consolidadoUnidades: [...] }
       const [dashRes] = await Promise.allSettled([
-        http.get('/dashboard/central', { params }),
+        http.get('/coordenacao/dashboard/geral'),
       ]);
 
       if (dashRes.status === 'fulfilled') {
         const d = dashRes.value.data;
+        const ind = d.indicadoresGerais ?? d;
         setIndicators({
-          totalAlunos: d.totalAlunos ?? 0,
-          totalProfessores: d.totalProfessores ?? 0,
-          totalAlertas: d.totalAlertas ?? 0,
-          coberturaDiario: d.coberturaDiario ?? 0,
+          totalAlunos: ind.totalAlunos ?? 0,
+          totalProfessores: ind.totalProfessores ?? 0,
+          totalAlertas: ind.requisicoesPendentes ?? 0,
+          coberturaDiario: 0,
         });
-        setDadosMensais(d.evolucaoMensal ?? []);
-        setDadosUnidades(d.comparativoUnidades ?? []);
-        setDadosAlertas(d.distribuicaoAlertas ?? []);
+        // Mapear consolidadoUnidades → formato DadosUnidade (inclui unidades com 0 alunos)
+        const consolidado: any[] = d.consolidadoUnidades ?? [];
+        setDadosUnidades(consolidado.map((u: any) => ({
+          nome: u.nome ?? u.name ?? '',
+          alunos: u.totalAlunos ?? 0,
+          professores: u.totalProfessores ?? 0,
+          alertas: u.requisicoesPendentes ?? 0,
+          planejamentos: u.planejamentosRascunho ?? 0,
+          cobertura: u.coberturaChamada ?? 0,
+        })));
+        setDadosMensais([]);
+        setDadosAlertas([]);
       } else {
-        // Dados de demonstração quando o endpoint ainda não existe
-        gerarDadosDemo();
+        // Endpoint falhou — mostrar erro real, NÃO dados demo fictícios
+        const err = (dashRes as PromiseRejectedResult).reason;
+        setErro(getErrorMessage(err));
       }
 
       // Carregar dados pedagógicos (somente leitura)
@@ -152,7 +164,6 @@ export function DashboardCentralPage() {
       setCarregandoCentral(false);
     } catch (e) {
       setErro(getErrorMessage(e));
-      gerarDadosDemo();
     } finally {
       setCarregando(false);
     }

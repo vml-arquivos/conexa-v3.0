@@ -102,7 +102,15 @@ export default function ConfiguracoesPage() {
     pushAtivado: true,
   });
 
-  const userRole = user?.role || user?.roles?.[0] || '';
+  // FIX p0.5: user.roles pode ser array de objetos {roleId, level, unitScopes} (após fix p0.1)
+  // Extrair .level se for objeto, ou usar string diretamente
+  const extractLevel = (r: any): string => {
+    if (!r) return '';
+    if (typeof r === 'string') return r;
+    if (typeof r === 'object' && r.level) return r.level;
+    return '';
+  };
+  const userRole = user?.role || extractLevel(user?.roles?.[0]) || '';
   const isAdmin = ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE'].includes(userRole);
   const isDev = userRole === 'DEVELOPER';
 
@@ -124,7 +132,7 @@ export default function ConfiguracoesPage() {
         telefone: u.telefone || u.phone || '',
         cargo: u.cargo || '',
         photoUrl: u.photoUrl || u.photo || '',
-        role: u.role || u.roles?.[0] || '',
+        role: u.role || extractLevel(u.roles?.[0]) || '',
         unidade: u.unidade || u.classroom?.unit,
       });
     } catch {
@@ -132,7 +140,7 @@ export default function ConfiguracoesPage() {
       setPerfil({
         nome: user?.nome || `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
         email: user?.email || '',
-        role: user?.role || user?.roles?.[0] || '',
+        role: user?.role || extractLevel(user?.roles?.[0]) || '',
       });
     } finally { setLoading(false); }
   }
