@@ -9,13 +9,19 @@ export async function getDiaryByClassroom(classroomId: string, startDate: string
   return response.data;
 }
 
-export async function getDiaryByPeriod(startDate: string, endDate: string): Promise<ReportData[]> {
-  const response = await http.get('/reports/diary/by-period', { params: { startDate, endDate } });
+export async function getDiaryByPeriod(startDate: string, endDate: string, unitId?: string): Promise<ReportData[]> {
+  const params: Record<string, string> = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  if (unitId) params.unitId = unitId;
+  const response = await http.get('/reports/diary/by-period', { params });
   return response.data;
 }
 
-export async function getDiaryUnplanned(): Promise<ReportData[]> {
-  const response = await http.get('/reports/diary/unplanned');
+export async function getDiaryUnplanned(unitId?: string): Promise<ReportData[]> {
+  const params: Record<string, string> = {};
+  if (unitId) params.unitId = unitId;
+  const response = await http.get('/reports/diary/unplanned', { params });
   return response.data;
 }
 

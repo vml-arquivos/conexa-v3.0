@@ -28,9 +28,9 @@ export class MaterialRequestController {
     return this.svc.listMine(user);
   }
 
-  /** Coordenador/Direção lista todas as requisições da unidade */
+  /** Coordenador/Direção lista todas as requisições da unidade; STAFF_CENTRAL vê rede inteira */
   @Get()
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   list(@CurrentUser() user: JwtPayload) {
     return this.svc.list(user);
   }
@@ -46,15 +46,19 @@ export class MaterialRequestController {
     return this.svc.review(id, dto, user);
   }
 
-  /** Relatório de consumo de materiais por turma e período */
+  /** Relatório de consumo de materiais por turma e período
+   * STAFF_CENTRAL/MANTENEDORA/DEVELOPER: pode passar unitId (ou omitir para rede inteira)
+   * UNIDADE: sempre usa token.unitId
+   */
   @Get('relatorio-consumo')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   relatorioConsumo(
     @CurrentUser() user: JwtPayload,
     @Query('classroomId') classroomId?: string,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
+    @Query('unitId') unitId?: string,
   ) {
-    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim });
+    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId });
   }
 }

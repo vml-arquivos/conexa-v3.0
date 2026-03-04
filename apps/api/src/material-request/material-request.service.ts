@@ -39,6 +39,19 @@ function isCoordRole(user: JwtPayload): boolean {
   );
 }
 
+/** STAFF_CENTRAL, MANTENEDORA ou DEVELOPER — acesso à rede inteira */
+function isCentralRole(user: JwtPayload): boolean {
+  return (
+    Array.isArray(user.roles) &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    user.roles.some((r: any) =>
+      r?.level === RoleLevel.STAFF_CENTRAL ||
+      r?.level === RoleLevel.MANTENEDORA ||
+      r?.level === RoleLevel.DEVELOPER,
+    )
+  );
+}
+
 @Injectable()
 export class MaterialRequestService {
   constructor(private readonly prisma: PrismaService) {}
@@ -102,8 +115,24 @@ export class MaterialRequestService {
       take: 100,
     });
   }
+
   async list(user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    // STAFF_CENTRAL/MANTENEDORA/DEVELOPER: lista toda a rede
+    if (isCentralRole(user)) {
+      return this.prisma.materialRequest.findMany({
+        where: { mantenedoraId: user.mantenedoraId },
+        include: {
+          createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+          classroom: { select: { id: true, name: true } },
+          items: true,
+        },
+        orderBy: { requestedDate: 'desc' },
+        take: 500,
+      });
+    }
+    // UNIDADE: apenas sua unidade
+    if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
     return this.prisma.materialRequest.findMany({
       where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId },
@@ -136,19 +165,32 @@ export class MaterialRequestService {
 
   /**
    * Relatório de consumo de materiais por turma e período
-   * Retorna: totais por categoria, por turma, por status e lista detalhada
+   * Suporte multiunidade: STAFF_CENTRAL/MANTENEDORA/DEVELOPER podem passar unitId (ou null = rede inteira)
+   * UNIDADE: sempre usa token.unitId
    */
   async relatorioConsumo(
     user: JwtPayload,
-    params: { classroomId?: string; dataInicio?: string; dataFim?: string },
+    params: { classroomId?: string; dataInicio?: string; dataFim?: string; unitId?: string },
   ) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-    if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode acessar o relatório');
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
     const where: Record<string, unknown> = {
       mantenedoraId: user.mantenedoraId,
-      unitId: user.unitId,
     };
+
+    // Escopo de unidade: CENTRAL pode filtrar por unitId ou ver rede inteira
+    if (isCentralRole(user)) {
+      if (params.unitId) {
+        where.unitId = params.unitId;
+      }
+      // se unitId não enviado: sem filtro de unitId → rede inteira
+    } else {
+      // UNIDADE: força token.unitId, ignora unitId do client
+      if (!user.unitId) throw new ForbiddenException('Escopo inválido');
+      if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode acessar o relatório');
+      where.unitId = user.unitId;
+    }
+
     if (params.classroomId) where.classroomId = params.classroomId;
     if (params.dataInicio || params.dataFim) {
       const dateFilter: Record<string, Date> = {};
@@ -162,12 +204,14 @@ export class MaterialRequestService {
       include: {
         classroom: { select: { name: true } },
         createdByUser: { select: { firstName: true, lastName: true, email: true } },
+        unit: { select: { id: true, name: true } },
       },
       orderBy: { requestedDate: 'desc' },
     });
 
     const porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number }> = {};
     const porTurmaMap: Record<string, { nome: string; total: number; aprovados: number }> = {};
+    const porUnidadeMap: Record<string, { nome: string; total: number; aprovados: number; pendentes: number }> = {};
     const porStatus: Record<string, number> = {};
     let custoEstimadoTotal = 0;
 
@@ -184,12 +228,21 @@ export class MaterialRequestService {
         if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porTurmaMap[r.classroomId].aprovados++;
       }
 
+      // Agrupamento por unidade (útil para modo rede)
+      if (r.unitId && r.unit) {
+        if (!porUnidadeMap[r.unitId]) porUnidadeMap[r.unitId] = { nome: r.unit.name, total: 0, aprovados: 0, pendentes: 0 };
+        porUnidadeMap[r.unitId].total++;
+        if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porUnidadeMap[r.unitId].aprovados++;
+        else if (r.status === 'SOLICITADO' || r.status === 'RASCUNHO') porUnidadeMap[r.unitId].pendentes++;
+      }
+
       porStatus[r.status] = (porStatus[r.status] || 0) + 1;
       if (r.estimatedCost) custoEstimadoTotal += r.estimatedCost;
     }
 
     return {
       periodo: { inicio: params.dataInicio || null, fim: params.dataFim || null },
+      escopo: params.unitId ? 'unidade' : (isCentralRole(user) ? 'rede' : 'unidade'),
       totais: {
         requisicoes: requisicoes.length,
         aprovadas: porStatus['APROVADO'] || 0,
@@ -200,6 +253,7 @@ export class MaterialRequestService {
       },
       porCategoria,
       porTurma: Object.values(porTurmaMap),
+      porUnidade: Object.values(porUnidadeMap),
       porStatus,
       detalhes: requisicoes.map(r => ({
         id: r.id,
@@ -210,6 +264,7 @@ export class MaterialRequestService {
         status: r.status,
         prioridade: r.priority,
         turma: r.classroom?.name || null,
+        unidade: r.unit?.name || null,
         professor: r.createdByUser
           ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
           : null,

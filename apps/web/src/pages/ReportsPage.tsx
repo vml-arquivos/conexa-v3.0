@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getDiaryByClassroom, getDiaryByPeriod, getDiaryUnplanned } from '../api/reports';
 import { getAccessibleClassrooms } from '../api/lookup';
 import { getErrorMessage } from '../utils/errorMessage';
 import type { AccessibleClassroom } from '../types/lookup';
+import http from '../api/http';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 
 const LABELS_PT: Record<string, string> = {
   id: 'ID', classroomId: 'Turma', startDate: 'Data de Início', endDate: 'Data de Término',
@@ -40,27 +43,89 @@ function formatarValor(valor: unknown): string {
 
 type ReportType = 'by-classroom' | 'by-period' | 'unplanned';
 interface ReportData { [key: string]: unknown; }
+interface UnitOption { id: string; name: string; }
 
 export function ReportsPage() {
+  const { user } = useAuth();
+  const roles = normalizeRoles(user);
+  const isCentral = roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
+
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+
+  // Unidades disponíveis (apenas para STAFF_CENTRAL/MANTENEDORA/DEVELOPER)
+  const [unidades, setUnidades] = useState<UnitOption[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+
+  // Turmas (carregadas após seleção de unidade, ou todas se UNIDADE)
   const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
   const [turmasCarregando, setTurmasCarregando] = useState(false);
+
+  // Filtros dos relatórios
   const [classroomId, setClassroomId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
 
+  // Carregar unidades para STAFF_CENTRAL
   useEffect(() => {
+    if (!isCentral) return;
+    http.get('/lookup/units/accessible')
+      .then(r => {
+        const data = r.data;
+        setUnidades(Array.isArray(data) ? data : (data?.units ?? []));
+      })
+      .catch(() => {});
+  }, [isCentral]);
+
+  // Carregar turmas quando unidade é selecionada (ou ao montar para UNIDADE)
+  const carregarTurmas = useCallback(async (unitId?: string) => {
     setTurmasCarregando(true);
-    getAccessibleClassrooms()
-      .then(data => setTurmas(data))
-      .catch(() => setTurmas([]))
-      .finally(() => setTurmasCarregando(false));
+    setClassroomId('');
+    try {
+      const params: Record<string, string> = {};
+      if (unitId) params.unitId = unitId;
+      const data = await getAccessibleClassrooms();
+      // Filtrar por unidade selecionada se aplicável
+      if (unitId) {
+        setTurmas(data.filter((t: AccessibleClassroom) => (t as any).unitId === unitId || (t as any).unit?.id === unitId));
+      } else {
+        setTurmas(data);
+      }
+    } catch {
+      setTurmas([]);
+    } finally {
+      setTurmasCarregando(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!isCentral) {
+      // UNIDADE/PROFESSOR: carrega todas as turmas acessíveis
+      carregarTurmas();
+    }
+  }, [isCentral, carregarTurmas]);
+
+  const handleUnitChange = (unitId: string) => {
+    setSelectedUnitId(unitId);
+    setReportData(null);
+    setError(null);
+    if (reportType === 'by-classroom') {
+      carregarTurmas(unitId || undefined);
+    }
+  };
+
+  const handleReportTypeChange = (tipo: ReportType) => {
+    setReportType(tipo);
+    setError(null);
+    setReportData(null);
+    if (tipo === 'by-classroom') {
+      carregarTurmas(selectedUnitId || undefined);
+    }
+  };
 
   const carregarRelatorio = async () => {
     setError(null); setLoading(true); setReportData(null);
@@ -74,11 +139,14 @@ export function ReportsPage() {
         const resp = await getDiaryByClassroom(classroomId, startDate, endDate);
         data = resp as unknown as ReportData;
       } else if (reportType === 'by-period') {
-        // Período é opcional — sem validação obrigatória
-        const resp = await getDiaryByPeriod(periodoInicio, periodoFim);
+        const params: Record<string, string> = {};
+        if (periodoInicio) params.startDate = periodoInicio;
+        if (periodoFim) params.endDate = periodoFim;
+        if (selectedUnitId) params.unitId = selectedUnitId;
+        const resp = await getDiaryByPeriod(periodoInicio, periodoFim, selectedUnitId || undefined);
         data = resp as unknown as ReportData;
       } else if (reportType === 'unplanned') {
-        const resp = await getDiaryUnplanned();
+        const resp = await getDiaryUnplanned(selectedUnitId || undefined);
         data = resp as unknown as ReportData;
       } else { return; }
       setReportData(data);
@@ -86,8 +154,6 @@ export function ReportsPage() {
       setError(getErrorMessage(err, 'Erro ao carregar relatório'));
     } finally { setLoading(false); }
   };
-
-  const selecionarTipo = (tipo: ReportType) => { setReportType(tipo); setError(null); setReportData(null); };
 
   const titulos: Record<ReportType, string> = {
     'by-classroom': 'Relatório de Diário por Turma',
@@ -154,6 +220,9 @@ export function ReportsPage() {
           <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
             Período: <strong>{formatarValor(reportData.startDate)}</strong> até <strong>{formatarValor(reportData.endDate)}</strong>
             {" — "}<strong>{String(reportData.totalEvents ?? eventos.length)}</strong> evento(s) encontrado(s)
+            {selectedUnitId && unidades.find(u => u.id === selectedUnitId) && (
+              <span> · Unidade: <strong>{unidades.find(u => u.id === selectedUnitId)?.name}</strong></span>
+            )}
           </div>
           {renderizarTabela(eventos)}
         </div>
@@ -168,6 +237,9 @@ export function ReportsPage() {
           <div>
             <div className="mb-4 p-3 bg-orange-50 rounded-lg text-sm text-orange-700">
               <strong>{String(reportData.totalUnplanned ?? reportData.totalEvents ?? eventos.length)}</strong> evento(s) sem planejamento associado.
+              {selectedUnitId && unidades.find(u => u.id === selectedUnitId) && (
+                <span> · Unidade: <strong>{unidades.find(u => u.id === selectedUnitId)?.name}</strong></span>
+              )}
             </div>
             {renderizarTabela(eventos)}
           </div>
@@ -191,17 +263,48 @@ export function ReportsPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Relatórios</h1>
+      <h1 className="text-3xl font-bold mb-2">Relatórios</h1>
+      {isCentral && (
+        <p className="text-sm text-gray-500 mb-6">
+          Selecione uma unidade para filtrar os relatórios, ou deixe em branco para visualizar toda a rede.
+        </p>
+      )}
+
+      {/* Seletor de unidade — apenas para STAFF_CENTRAL/MANTENEDORA/DEVELOPER */}
+      {isCentral && unidades.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <label className="block text-sm font-semibold text-blue-800 mb-2">
+            Filtrar por Unidade
+          </label>
+          <select
+            value={selectedUnitId}
+            onChange={e => handleUnitChange(e.target.value)}
+            className="w-full sm:w-72 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <option value="">Toda a rede</option>
+            {unidades.map(u => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          {selectedUnitId && (
+            <p className="text-xs text-blue-600 mt-1">
+              Relatórios filtrados para: <strong>{unidades.find(u => u.id === selectedUnitId)?.name}</strong>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Seletor de tipo de relatório */}
       <div className="mb-6 flex flex-wrap gap-3">
-        <button onClick={() => selecionarTipo('by-classroom')}
+        <button onClick={() => handleReportTypeChange('by-classroom')}
           className={`px-5 py-2 rounded-lg font-medium transition-colors ${reportType === 'by-classroom' ? 'bg-blue-700 text-white ring-2 ring-blue-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
           Por Turma
         </button>
-        <button onClick={() => selecionarTipo('by-period')}
+        <button onClick={() => handleReportTypeChange('by-period')}
           className={`px-5 py-2 rounded-lg font-medium transition-colors ${reportType === 'by-period' ? 'bg-green-700 text-white ring-2 ring-green-400' : 'bg-green-600 text-white hover:bg-green-700'}`}>
           Por Período
         </button>
-        <button onClick={() => selecionarTipo('unplanned')}
+        <button onClick={() => handleReportTypeChange('unplanned')}
           className={`px-5 py-2 rounded-lg font-medium transition-colors ${reportType === 'unplanned' ? 'bg-purple-700 text-white ring-2 ring-purple-400' : 'bg-purple-600 text-white hover:bg-purple-700'}`}>
           Não Planejado
         </button>
@@ -216,11 +319,14 @@ export function ReportsPage() {
               <select value={classroomId} onChange={e => setClassroomId(e.target.value)}
                 disabled={turmasCarregando}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
-                <option value="">{turmasCarregando ? 'Carregando turmas...' : 'Selecione a turma'}</option>
+                <option value="">{turmasCarregando ? 'Carregando turmas...' : turmas.length === 0 ? 'Nenhuma turma encontrada' : 'Selecione a turma'}</option>
                 {turmas.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
+              {isCentral && !selectedUnitId && turmas.length > 0 && (
+                <p className="text-xs text-gray-400 mt-1">Mostrando turmas de toda a rede. Selecione uma unidade para filtrar.</p>
+              )}
               {classroomId && turmas.find(t => t.id === classroomId) && (
                 <p className="text-xs text-blue-600 mt-1">Selecionada: <strong>{turmas.find(t => t.id === classroomId)?.name}</strong></p>
               )}
@@ -258,6 +364,11 @@ export function ReportsPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
             </div>
           </div>
+          {isCentral && selectedUnitId && (
+            <p className="text-xs text-blue-600 mt-2">
+              Filtrado para unidade: <strong>{unidades.find(u => u.id === selectedUnitId)?.name ?? selectedUnitId}</strong>
+            </p>
+          )}
           <button onClick={carregarRelatorio} disabled={loading}
             className="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
             {loading ? 'Carregando...' : 'Gerar Relatório'}
@@ -269,6 +380,11 @@ export function ReportsPage() {
         <div className="bg-white rounded-xl shadow p-6 mb-6 border border-gray-100">
           <h2 className="text-lg font-semibold mb-2 text-gray-700">Eventos Não Planejados</h2>
           <p className="text-sm text-gray-500 mb-4">Lista todos os eventos do diário que não possuem planejamento pedagógico associado.</p>
+          {isCentral && selectedUnitId && (
+            <p className="text-xs text-blue-600 mb-3">
+              Filtrado para unidade: <strong>{unidades.find(u => u.id === selectedUnitId)?.name ?? selectedUnitId}</strong>
+            </p>
+          )}
           <button onClick={carregarRelatorio} disabled={loading}
             className="px-6 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors">
             {loading ? 'Carregando...' : 'Gerar Relatório'}

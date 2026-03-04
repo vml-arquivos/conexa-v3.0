@@ -44,7 +44,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardGeral | null>(null);
   const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
-  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'|'cobertura'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'|'cobertura'|'funil'|'consumo'>('visao');
   // Aba Cobertura Multiunidade
   interface CoberturaUnidade {
     unitId: string; unitName: string;
@@ -59,6 +59,40 @@ export default function DashboardCoordenacaoGeralPage() {
   const [loadingCoberturaGeral, setLoadingCoberturaGeral] = useState(false);
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
   const apiCache = useApiCache(60_000);
+
+  // Aba Funil Pedagógico
+  interface GovernanceFunnel {
+    scope: string; unitId: string | null;
+    periodo: { inicio: string | null; fim: string | null };
+    funnel: { created: number; submitted: number; approved: number; executed: number };
+  }
+  const [funil, setFunil] = useState<GovernanceFunnel | null>(null);
+  const [loadingFunil, setLoadingFunil] = useState(false);
+  const [funilStartDate, setFunilStartDate] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [funilEndDate, setFunilEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [funilUnitId, setFunilUnitId] = useState<string>('');
+
+  // Aba Consumo Rede
+  interface ConsumoRedeData {
+    escopo: string;
+    totais: { requisicoes: number; aprovadas: number; pendentes: number; rejeitadas: number; entregues: number };
+    porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number }>;
+    porUnidade: Array<{ nome: string; total: number; aprovados: number; pendentes: number }>;
+  }
+  const [consumoRede, setConsumoRede] = useState<ConsumoRedeData | null>(null);
+  const [loadingConsumoRede, setLoadingConsumoRede] = useState(false);
+  const [consumoUnitId, setConsumoUnitId] = useState<string>('');
+  const [consumoDataInicio, setConsumoDataInicio] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [consumoDataFim, setConsumoDataFim] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
+  // Unidades disponíveis para filtros
+  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState<Array<{id: string; name: string}>>([]);
 
   // Aba Matriz — dados reais da API (sem lookup local)
   interface MatrizEntry {
@@ -80,7 +114,13 @@ export default function DashboardCoordenacaoGeralPage() {
     return hoje.toISOString().split('T')[0];
   });
 
-  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => {
+    loadDashboard();
+    http.get('/lookup/units/accessible').then(r => {
+      const data = r.data;
+      setUnidadesDisponiveis(Array.isArray(data) ? data : (data?.units ?? []));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (abaAtiva === 'cobertura' && !coberturaGeral) {
@@ -89,7 +129,49 @@ export default function DashboardCoordenacaoGeralPage() {
     if (abaAtiva === 'matriz') {
       carregarMatriz(matrizDataFiltro);
     }
+    if (abaAtiva === 'funil' && !funil) {
+      carregarFunil();
+    }
+    if (abaAtiva === 'consumo' && !consumoRede) {
+      carregarConsumoRede();
+    }
   }, [abaAtiva]);
+
+  async function carregarFunil(unitId?: string, start?: string, end?: string) {
+    setLoadingFunil(true);
+    try {
+      const params: Record<string, string> = {
+        startDate: start ?? funilStartDate,
+        endDate: end ?? funilEndDate,
+      };
+      const uid = unitId ?? funilUnitId;
+      if (uid) params.unitId = uid;
+      const res = await http.get('/insights/governance/funnel', { params });
+      setFunil(res.data);
+    } catch {
+      setFunil(null);
+    } finally {
+      setLoadingFunil(false);
+    }
+  }
+
+  async function carregarConsumoRede(unitId?: string, inicio?: string, fim?: string) {
+    setLoadingConsumoRede(true);
+    try {
+      const params: Record<string, string> = {
+        dataInicio: inicio ?? consumoDataInicio,
+        dataFim: fim ?? consumoDataFim,
+      };
+      const uid = unitId ?? consumoUnitId;
+      if (uid) params.unitId = uid;
+      const res = await http.get('/material-requests/relatorio-consumo', { params });
+      setConsumoRede(res.data);
+    } catch {
+      setConsumoRede(null);
+    } finally {
+      setLoadingConsumoRede(false);
+    }
+  }
 
   async function carregarMatriz(data: string) {
     setLoadingMatriz(true);
@@ -171,6 +253,8 @@ export default function DashboardCoordenacaoGeralPage() {
     { id:'psicologia', label:'Desenvolvimento Psicológico', icon:<Network className="h-4 w-4"/> },
     { id:'matriz', label:'Matriz 2026', icon:<Layers className="h-4 w-4"/> },
     { id:'cobertura', label:'Cobertura', icon:<BarChart2 className="h-4 w-4"/> },
+    { id:'funil', label:'Funil Pedagógico', icon:<TrendingUp className="h-4 w-4"/> },
+    { id:'consumo', label:'Consumo Rede', icon:<ShoppingCart className="h-4 w-4"/> },
   ] as const;
   const filtros = [
     { id:'todas', label:'Todas', count:(dashboard?.unidades ?? []).length },
@@ -811,6 +895,177 @@ export default function DashboardCoordenacaoGeralPage() {
               <BarChart2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-400">Nenhum dado de cobertura disponível</p>
               <p className="text-xs text-gray-300 mt-1">Verifique se há crianças e turmas cadastradas</p>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* ABA: FUNIL PEDAGÓGICO */}
+      {abaAtiva === 'funil' && (
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-indigo-800 mb-1">Funil de Planejamentos Pedagógicos</p>
+              <p className="text-xs text-indigo-600">Acompanhe quantos planejamentos avançaram por cada etapa do fluxo de revisão.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select value={funilUnitId} onChange={e => setFunilUnitId(e.target.value)}
+                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">Toda a rede</option>
+                {unidadesDisponiveis.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <input type="date" value={funilStartDate} onChange={e => setFunilStartDate(e.target.value)}
+                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white" />
+              <input type="date" value={funilEndDate} onChange={e => setFunilEndDate(e.target.value)}
+                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white" />
+              <button onClick={() => { setFunil(null); carregarFunil(funilUnitId, funilStartDate, funilEndDate); }}
+                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors">
+                Aplicar
+              </button>
+            </div>
+          </div>
+
+          {loadingFunil ? (
+            <div className="text-center py-10 text-gray-400 text-sm">Carregando funil pedagógico...</div>
+          ) : funil ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Criados', val: funil.funnel.created, cor: 'bg-blue-50 border-blue-200 text-blue-700', pct: 100 },
+                  { label: 'Submetidos', val: funil.funnel.submitted, cor: 'bg-indigo-50 border-indigo-200 text-indigo-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.submitted / funil.funnel.created * 100) : 0 },
+                  { label: 'Aprovados', val: funil.funnel.approved, cor: 'bg-green-50 border-green-200 text-green-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.approved / funil.funnel.created * 100) : 0 },
+                  { label: 'Executados', val: funil.funnel.executed, cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.executed / funil.funnel.created * 100) : 0 },
+                ].map((item, idx) => (
+                  <div key={idx} className={`border rounded-2xl p-4 text-center ${item.cor}`}>
+                    <p className="text-3xl font-bold">{item.val}</p>
+                    <p className="text-xs font-medium mt-1">{item.label}</p>
+                    <p className="text-xs mt-1 opacity-70">{item.pct}% do total</p>
+                  </div>
+                ))}
+              </div>
+              {/* Barra de funil visual */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-gray-700">Conversão por etapa</p>
+                {[
+                  { label: 'Criados → Submetidos', val: funil.funnel.created > 0 ? Math.round(funil.funnel.submitted / funil.funnel.created * 100) : 0, cor: 'bg-indigo-500' },
+                  { label: 'Submetidos → Aprovados', val: funil.funnel.submitted > 0 ? Math.round(funil.funnel.approved / funil.funnel.submitted * 100) : 0, cor: 'bg-green-500' },
+                  { label: 'Aprovados → Executados', val: funil.funnel.approved > 0 ? Math.round(funil.funnel.executed / funil.funnel.approved * 100) : 0, cor: 'bg-emerald-500' },
+                ].map((bar, idx) => (
+                  <div key={idx}>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>{bar.label}</span>
+                      <span className="font-bold">{bar.val}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2.5">
+                      <div className={`h-2.5 rounded-full ${bar.cor}`} style={{ width: `${bar.val}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 text-center">
+                Escopo: {funil.scope} · Período: {funil.periodo.inicio ?? '—'} a {funil.periodo.fim ?? '—'}
+              </p>
+            </>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-xl">
+              <TrendingUp className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Nenhum dado de funil disponível</p>
+              <p className="text-xs text-gray-300 mt-1">Verifique se há planejamentos cadastrados no período</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ABA: CONSUMO REDE */}
+      {abaAtiva === 'consumo' && (
+        <div className="space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-orange-50 border border-orange-200 rounded-2xl p-4">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-orange-800 mb-1">Consumo de Materiais — Rede</p>
+              <p className="text-xs text-orange-600">Requisições de materiais consolidadas por unidade e categoria.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select value={consumoUnitId} onChange={e => setConsumoUnitId(e.target.value)}
+                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">Toda a rede</option>
+                {unidadesDisponiveis.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <input type="date" value={consumoDataInicio} onChange={e => setConsumoDataInicio(e.target.value)}
+                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white" />
+              <input type="date" value={consumoDataFim} onChange={e => setConsumoDataFim(e.target.value)}
+                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white" />
+              <button onClick={() => { setConsumoRede(null); carregarConsumoRede(consumoUnitId, consumoDataInicio, consumoDataFim); }}
+                className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors">
+                Aplicar
+              </button>
+            </div>
+          </div>
+
+          {loadingConsumoRede ? (
+            <div className="text-center py-10 text-gray-400 text-sm">Carregando consumo da rede...</div>
+          ) : consumoRede ? (
+            <>
+              {/* Cards de totais */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total', val: consumoRede.totais.requisicoes, cor: 'bg-gray-50 border-gray-200 text-gray-700' },
+                  { label: 'Aprovadas', val: consumoRede.totais.aprovadas, cor: 'bg-green-50 border-green-200 text-green-700' },
+                  { label: 'Pendentes', val: consumoRede.totais.pendentes, cor: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
+                  { label: 'Rejeitadas', val: consumoRede.totais.rejeitadas, cor: 'bg-red-50 border-red-200 text-red-700' },
+                ].map((c, i) => (
+                  <div key={i} className={`border rounded-2xl p-4 text-center ${c.cor}`}>
+                    <p className="text-3xl font-bold">{c.val}</p>
+                    <p className="text-xs font-medium mt-1">{c.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Por unidade */}
+              {consumoRede.porUnidade.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Por Unidade</p>
+                  <div className="space-y-2">
+                    {[...consumoRede.porUnidade]
+                      .sort((a, b) => b.total - a.total)
+                      .map((u, idx) => (
+                        <div key={idx} className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 w-4">{idx + 1}</span>
+                          <span className="flex-1 text-sm font-medium text-gray-800">{u.nome}</span>
+                          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{u.total} req.</span>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{u.aprovados} apr.</span>
+                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{u.pendentes} pend.</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Por categoria */}
+              {Object.keys(consumoRede.porCategoria).length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Por Categoria</p>
+                  <div className="space-y-2">
+                    {Object.entries(consumoRede.porCategoria)
+                      .sort(([,a],[,b]) => b.total - a.total)
+                      .map(([cat, data]) => (
+                        <div key={cat} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-700 capitalize">{cat.replace(/_/g, ' ').toLowerCase()}</span>
+                          <div className="flex gap-2">
+                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{data.total}</span>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{data.aprovados} apr.</span>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 rounded-xl">
+              <ShoppingCart className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Nenhum dado de consumo disponível</p>
+              <p className="text-xs text-gray-300 mt-1">Verifique se há requisições de materiais no período</p>
             </div>
           )}
         </div>

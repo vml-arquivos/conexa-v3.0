@@ -186,6 +186,7 @@ export class ReportsService {
     startDate: string,
     endDate: string,
     user: JwtPayload,
+    unitIdParam?: string,
   ) {
     if (!startDate || !endDate) {
       throw new BadRequestException('startDate e endDate são obrigatórios');
@@ -201,22 +202,27 @@ export class ReportsService {
 
     // Developer: sem filtro adicional
     if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
-      // Mantenedora: filtrar por mantenedoraId
+      // Mantenedora: filtrar por mantenedoraId; pode filtrar por unitId
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
+        if (unitIdParam) where.unitId = unitIdParam;
       }
-      // Staff Central: filtrar por unitScopes (se vazio, acessa toda a mantenedora)
+      // Staff Central: unitId param ou unitScopes (se vazio, acessa toda a mantenedora)
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
-        const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
-        if (unitScopes.length > 0) {
-          where.unitId = { in: unitScopes };
+        if (unitIdParam) {
+          where.unitId = unitIdParam;
         } else {
-          where.mantenedoraId = user.mantenedoraId;
+          const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
+          if (unitScopes.length > 0) {
+            where.unitId = { in: unitScopes };
+          } else {
+            where.mantenedoraId = user.mantenedoraId;
+          }
         }
       }
-      // Unidade: filtrar por unitId
+      // Unidade: filtrar por unitId do token (ignora unitIdParam)
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
         where.unitId = user.unitId;
       }
@@ -282,7 +288,7 @@ export class ReportsService {
   /**
    * Relatório de eventos sem planning
    */
-  async getUnplannedDiaryEvents(user: JwtPayload) {
+  async getUnplannedDiaryEvents(user: JwtPayload, unitIdParam?: string) {
     // Filtrar por escopo do usuário
     const where: any = {
       OR: [
@@ -297,22 +303,27 @@ export class ReportsService {
 
     // Developer: sem filtro adicional
     if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
-      // Mantenedora: filtrar por mantenedoraId
+      // Mantenedora: filtrar por mantenedoraId; pode filtrar por unitId
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
         where.mantenedoraId = user.mantenedoraId;
+        if (unitIdParam) where.unitId = unitIdParam;
       }
-      // Staff Central: filtrar por unitScopes (se vazio, acessa toda a mantenedora)
+      // Staff Central: unitId param ou unitScopes (se vazio, acessa toda a mantenedora)
       else if (
         user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)
       ) {
-        const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
-        if (unitScopes.length > 0) {
-          where.unitId = { in: unitScopes };
+        if (unitIdParam) {
+          where.unitId = unitIdParam;
         } else {
-          where.mantenedoraId = user.mantenedoraId;
+          const unitScopes = await this.getStaffCentralUnitScopes(user.sub);
+          if (unitScopes.length > 0) {
+            where.unitId = { in: unitScopes };
+          } else {
+            where.mantenedoraId = user.mantenedoraId;
+          }
         }
       }
-      // Unidade: filtrar por unitId
+      // Unidade: filtrar por unitId do token (ignora unitIdParam)
       else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
         where.unitId = user.unitId;
       }

@@ -47,9 +47,10 @@ export class ReportsController {
   getDiaryByPeriod(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
+    @Query('unitId') unitId: string | undefined,
     @CurrentUser() user: JwtPayload,
   ) {
-    return this.reportsService.getDiaryByPeriod(startDate, endDate, user);
+    return this.reportsService.getDiaryByPeriod(startDate, endDate, user, unitId);
   }
 
   /**
@@ -62,8 +63,11 @@ export class ReportsController {
    */
   @Get('diary/unplanned')
   @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
-  getUnplannedDiaryEvents(@CurrentUser() user: JwtPayload) {
-    return this.reportsService.getUnplannedDiaryEvents(user);
+  getUnplannedDiaryEvents(
+    @Query('unitId') unitId: string | undefined,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.reportsService.getUnplannedDiaryEvents(user, unitId);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
