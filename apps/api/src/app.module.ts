@@ -37,6 +37,7 @@ import { RecadosModule } from './recados/recados.module';
 import { DevelopmentObservationsModule } from './development-observations/development-observations.module';
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { InsightsModule } from './insights/insights.module';
+import { UnitsModule } from './units/units.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { InsightsModule } from './insights/insights.module';
     DevelopmentObservationsModule,
     FeatureFlagsModule,
     InsightsModule,
+    UnitsModule,
   ],
   controllers: [AppController],
   providers: [

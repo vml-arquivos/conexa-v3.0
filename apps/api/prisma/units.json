@@ -1,0 +1,62 @@
+[
+  {
+    "code": "RECANTO-EM",
+    "name": "CEPI Recanto das Emas",
+    "address": "Recanto das Emas, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "recanto@cocris.org.br",
+    "phone": "(61) 3468-0001",
+    "isActive": true
+  },
+  {
+    "code": "BRAZLANDIA",
+    "name": "CEPI Brazlândia",
+    "address": "Brazlândia, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "brazlandia@cocris.org.br",
+    "phone": "(61) 3468-0002",
+    "isActive": true
+  },
+  {
+    "code": "CEILANDIA",
+    "name": "CEPI Ceilândia",
+    "address": "Ceilândia, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "ceilandia@cocris.org.br",
+    "phone": "(61) 3468-0003",
+    "isActive": true
+  },
+  {
+    "code": "SAMAMBAIA",
+    "name": "CEPI Samambaia",
+    "address": "Samambaia, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "samambaia@cocris.org.br",
+    "phone": "(61) 3468-0004",
+    "isActive": true
+  },
+  {
+    "code": "PLANALTINA",
+    "name": "CEPI Planaltina",
+    "address": "Planaltina, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "planaltina@cocris.org.br",
+    "phone": "(61) 3468-0005",
+    "isActive": true
+  },
+  {
+    "code": "PARANOA",
+    "name": "CEPI Paranoá",
+    "address": "Paranoá, DF",
+    "city": "Brasília",
+    "state": "DF",
+    "email": "paranoa@cocris.org.br",
+    "phone": "(61) 3468-0006",
+    "isActive": true
+  }
+]

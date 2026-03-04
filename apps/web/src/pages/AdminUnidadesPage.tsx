@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PageShell } from '../components/ui/PageShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,16 +9,16 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import {
   Building2, Plus, Search, Edit3, Trash2, X, CheckCircle,
-  RefreshCw, MapPin, Phone, Mail, Users, BookOpen,
-  AlertCircle, MoreVertical, Eye, ChevronRight, Hash,
-  Clock, User, GraduationCap, Layers,
+  RefreshCw, MapPin, Phone, Mail, Users,
+  AlertCircle, Hash, GraduationCap, Layers,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+// FIX p0.4: campo renomeado de unitCode → code para alinhar com o schema Prisma
 interface Unidade {
   id: string;
   name: string;
-  unitCode: string;
+  code: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -37,9 +37,10 @@ interface Unidade {
 // ─── Modal de Criar/Editar Unidade ────────────────────────────────────────────
 function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; onClose: () => void; onSave: () => void }) {
   const isEdit = !!unidade;
+  // FIX p0.4: form usa "code" em vez de "unitCode"
   const [form, setForm] = useState({
     name: unidade?.name || '',
-    unitCode: unidade?.unitCode || '',
+    code: unidade?.code || '',
     email: unidade?.email || '',
     phone: unidade?.phone || '',
     address: unidade?.address || '',
@@ -52,20 +53,43 @@ function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; 
 
   async function salvar() {
     if (!form.name.trim()) { toast.error('Nome da unidade é obrigatório'); return; }
-    if (!form.unitCode.trim()) { toast.error('Código da unidade é obrigatório'); return; }
+    if (!form.code.trim()) { toast.error('Código da unidade é obrigatório'); return; }
 
     setSaving(true);
     try {
       if (isEdit) {
-        await http.put(`/units/${unidade!.id}`, form);
+        // PUT /units/:id — backend aceita PUT e PATCH
+        await http.put(`/units/${unidade!.id}`, {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          zipCode: form.zipCode,
+          isActive: form.isActive,
+          // code NÃO enviado na edição (imutável)
+        });
         toast.success('Unidade atualizada com sucesso!');
       } else {
-        await http.post('/units', form);
+        // POST /units — cria nova unidade
+        await http.post('/units', {
+          name: form.name,
+          code: form.code,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          zipCode: form.zipCode,
+          isActive: form.isActive,
+        });
         toast.success('Unidade criada com sucesso!');
       }
       onSave();
       onClose();
     } catch (err: any) {
+      // FIX p0.4: exibir erro real da API, sem fallback fictício
       toast.error(err?.response?.data?.message || `Erro ao ${isEdit ? 'atualizar' : 'criar'} unidade`);
     } finally { setSaving(false); }
   }
@@ -88,14 +112,14 @@ function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-semibold text-gray-700">Nome da Unidade *</Label>
-              <Input className="mt-1" placeholder="Ex: CEPI Arara Canindé" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              <Input className="mt-1" placeholder="Ex: CEPI Recanto das Emas" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div>
               <Label className="text-sm font-semibold text-gray-700">Código da Unidade *</Label>
               <div className="relative mt-1">
                 <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input className="pl-9 font-mono uppercase" placeholder="Ex: ARARA-CAN" value={form.unitCode}
-                  onChange={e => setForm(f => ({ ...f, unitCode: e.target.value.toUpperCase() }))}
+                <Input className="pl-9 font-mono uppercase" placeholder="Ex: RECANTO-EM" value={form.code}
+                  onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
                   disabled={isEdit} />
               </div>
               {isEdit && <p className="text-xs text-gray-400 mt-1">O código não pode ser alterado após a criação</p>}
@@ -115,7 +139,7 @@ function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; 
               <Label className="text-sm font-semibold text-gray-700">Telefone</Label>
               <div className="relative mt-1">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input className="pl-9" placeholder="(62) 3201-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+                <Input className="pl-9" placeholder="(61) 3000-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
               </div>
             </div>
           </div>
@@ -132,11 +156,11 @@ function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; 
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label className="text-sm font-semibold text-gray-700">Cidade</Label>
-              <Input className="mt-1" placeholder="Goiânia" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
+              <Input className="mt-1" placeholder="Brasília" value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
             </div>
             <div>
               <Label className="text-sm font-semibold text-gray-700">Estado</Label>
-              <Input className="mt-1 uppercase" placeholder="GO" maxLength={2} value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value.toUpperCase() }))} />
+              <Input className="mt-1 uppercase" placeholder="DF" maxLength={2} value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value.toUpperCase() }))} />
             </div>
             <div>
               <Label className="text-sm font-semibold text-gray-700">CEP</Label>
@@ -173,45 +197,55 @@ function ModalUnidade({ unidade, onClose, onSave }: { unidade?: Unidade | null; 
 export default function AdminUnidadesPage() {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [unidadeEditando, setUnidadeEditando] = useState<Unidade | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [detalheAberto, setDetalheAberto] = useState<string | null>(null);
 
   useEffect(() => { loadUnidades(); }, []);
 
   async function loadUnidades() {
     setLoading(true);
+    setLoadError(null);
     try {
+      // FIX p0.4: GET /units (endpoint real) — sem fallback fictício
       const res = await http.get('/units?include=counts&limit=100');
       const d = res.data;
       setUnidades(Array.isArray(d) ? d : d?.data ?? d?.units ?? []);
-    } catch {
-      setUnidades([
-        { id: '1', name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN', email: 'arara.caninde@cocris.org.br', phone: '(62) 3201-1001', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 12, classrooms: 4, children: 89 } },
-        { id: '2', name: 'CEPI Beija-Flor', unitCode: 'BEIJA-FLO', email: 'beija.flor@cocris.org.br', phone: '(62) 3201-1002', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 9, classrooms: 3, children: 67 } },
-        { id: '3', name: 'CEPI Sabiá do Campo', unitCode: 'SABIA-CAM', email: 'sabia.campo@cocris.org.br', phone: '(62) 3201-1003', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 8, classrooms: 3, children: 54 } },
-        { id: '4', name: 'Escola EI Coração de Cristo', unitCode: 'CORAC-CRI', email: 'coracao.cristo@cocris.org.br', phone: '(62) 3201-1004', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 10, classrooms: 4, children: 78 } },
-        { id: '5', name: 'Centro Pelicano', unitCode: 'PELICANO', email: 'pelicano@cocris.org.br', phone: '(62) 3201-1005', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 7, classrooms: 3, children: 45 } },
-        { id: '6', name: 'CEPI Flamboyant', unitCode: 'FLAMBOY', email: 'flamboyant@cocris.org.br', phone: '(62) 3201-1006', address: 'Goiânia, GO', city: 'Goiânia', state: 'GO', isActive: true, createdAt: '2026-01-01', _count: { users: 11, classrooms: 4, children: 82 } },
-      ]);
-    } finally { setLoading(false); }
+    } catch (err: any) {
+      // FIX p0.4: exibir erro real, NÃO inventar dados fictícios
+      const msg = err?.response?.data?.message || 'Erro ao carregar unidades. Verifique sua conexão.';
+      setLoadError(msg);
+      toast.error(msg);
+      setUnidades([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function excluirUnidade(id: string) {
     try {
-      await http.delete(`/units/${id}`);
-      setUnidades(prev => prev.filter(u => u.id !== id));
-      toast.success('Unidade excluída');
+      const res = await http.delete(`/units/${id}`);
+      const msg = res.data?.message || 'Unidade excluída';
+      const softDeleted = res.data?.softDeleted;
+      if (softDeleted) {
+        toast.success('Unidade desativada (possui dados vinculados)');
+        // Atualizar isActive na lista local
+        setUnidades(prev => prev.map(u => u.id === id ? { ...u, isActive: false } : u));
+      } else {
+        toast.success(msg);
+        setUnidades(prev => prev.filter(u => u.id !== id));
+      }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao excluir unidade. Verifique se não há usuários ou turmas vinculados.');
+      toast.error(err?.response?.data?.message || 'Erro ao excluir unidade.');
     }
     setConfirmDelete(null);
   }
 
+  // FIX p0.4: filtro usa "code" em vez de "unitCode"
   const unidadesFiltradas = unidades.filter(u =>
-    !busca || u.name.toLowerCase().includes(busca.toLowerCase()) || u.unitCode.toLowerCase().includes(busca.toLowerCase())
+    !busca || u.name.toLowerCase().includes(busca.toLowerCase()) || (u.code || '').toLowerCase().includes(busca.toLowerCase())
   );
 
   const totalCriancas = unidades.reduce((acc, u) => acc + (u._count?.children || 0), 0);
@@ -248,10 +282,27 @@ export default function AdminUnidadesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input className="pl-9" placeholder="Buscar por nome ou código..." value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
+        <Button onClick={loadUnidades} variant="outline" className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
         <Button onClick={() => { setUnidadeEditando(null); setModalAberto(true); }} className="bg-green-600 hover:bg-green-700 flex items-center gap-2">
           <Plus className="h-4 w-4" /> Nova Unidade
         </Button>
       </div>
+
+      {/* Estado de erro */}
+      {loadError && !loading && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Erro ao carregar unidades</p>
+            <p className="text-xs text-red-600 mt-0.5">{loadError}</p>
+          </div>
+          <Button size="sm" variant="outline" className="ml-auto text-red-600 border-red-200" onClick={loadUnidades}>
+            Tentar novamente
+          </Button>
+        </div>
+      )}
 
       {/* Grid de unidades */}
       {loading ? (
@@ -271,8 +322,9 @@ export default function AdminUnidadesPage() {
                     </div>
                     <div>
                       <p className="font-bold text-gray-900 text-sm leading-tight">{u.name}</p>
+                      {/* FIX p0.4: usar u.code em vez de u.unitCode */}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono bg-gray-100 text-gray-600 mt-0.5">
-                        <Hash className="h-3 w-3" /> {u.unitCode}
+                        <Hash className="h-3 w-3" /> {u.code}
                       </span>
                     </div>
                   </div>
@@ -347,10 +399,10 @@ export default function AdminUnidadesPage() {
               <AlertCircle className="h-7 w-7 text-red-500" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Excluir Unidade?</h3>
-            <p className="text-gray-500 text-sm mb-6">Esta ação não pode ser desfeita. Todos os dados vinculados à unidade serão afetados.</p>
+            <p className="text-gray-500 text-sm mb-6">Unidades com dados vinculados serão desativadas. Unidades vazias serão excluídas permanentemente.</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
-              <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => excluirUnidade(confirmDelete)}>Excluir</Button>
+              <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => excluirUnidade(confirmDelete)}>Confirmar</Button>
             </div>
           </div>
         </div>
