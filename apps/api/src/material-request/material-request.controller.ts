@@ -51,6 +51,16 @@ export class MaterialRequestController {
     return this.svc.list(user, { status, classroomId, type: type ?? categoria });
   }
 
+  /**
+   * Busca uma requisição pelo ID com detalhes completos.
+   * UNIDADE: apenas requisições da própria unidade.
+   */
+  @Get(':id')
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getById(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
+    return this.svc.getById(id, user);
+  }
+
   /** Coordenador aprova ou rejeita uma requisição */
   @Patch(':id/review')
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)

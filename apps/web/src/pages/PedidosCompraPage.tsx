@@ -31,7 +31,7 @@ import {
   type ItemPedidoDto,
   type StatusPedidoCompra,
 } from '../api/pedido-compra';
-import { getCatalogItems, type CatalogItem } from '../api/catalog';
+import { getMaterialsCatalog, type MaterialCatalogItem } from '../api/materials-catalog';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { useUnitScope } from '../contexts/UnitScopeContext';
@@ -51,6 +51,7 @@ const ICONES_STATUS: Record<string, React.ReactNode> = {
 const CATEGORIAS_COORD = [
   { value: 'PEDAGOGICO', label: 'Pedagógico' },
   { value: 'HIGIENE', label: 'Higiene Pessoal' },
+  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
 ];
 
 const TODAS_CATEGORIAS = ['PEDAGOGICO', 'HIGIENE', 'LIMPEZA', 'ALIMENTACAO', 'OUTRO'];
@@ -103,7 +104,7 @@ export function PedidosCompraPage() {
   // Novo pedido
   const [criandoNovo, setCriandoNovo] = useState(false);
   const [novoMes, setNovoMes] = useState(mesAtual());
-  const [novaCategoria, setNovaCategoria] = useState<'PEDAGOGICO' | 'HIGIENE'>('PEDAGOGICO');
+  const [novaCategoria, setNovaCategoria] = useState<'PEDAGOGICO' | 'HIGIENE' | 'ADMINISTRATIVO'>('PEDAGOGICO');
   const [novasLinhas, setNovasLinhas] = useState<LinhaEdicao[]>([
     { _key: gerarKey(), categoria: 'PEDAGOGICO', descricao: '', quantidade: 1 },
   ]);
@@ -111,8 +112,8 @@ export function PedidosCompraPage() {
   const [criando, setCriando] = useState(false);
   const [atualizandoStatus, setAtualizandoStatus] = useState<string | null>(null);
 
-  // Catálogo (novo endpoint /catalog/items)
-  const [catalogo, setCatalogo] = useState<CatalogItem[]>([]);
+  // Catálogo (endpoint /materials/catalog — global, sem unitId)
+  const [catalogo, setCatalogo] = useState<MaterialCatalogItem[]>([]);
   const [carregandoCatalogo, setCarregandoCatalogo] = useState(false);
 
   const mostrarMensagem = (msg: string) => {
@@ -140,14 +141,14 @@ export function PedidosCompraPage() {
   useEffect(() => {
     if (!criandoNovo) return;
     setCarregandoCatalogo(true);
-    getCatalogItems({ category: novaCategoria })
+    getMaterialsCatalog(novaCategoria as 'PEDAGOGICO' | 'HIGIENE' | 'ADMINISTRATIVO')
       .then(items => setCatalogo(items))
       .catch(() => setCatalogo([]))
       .finally(() => setCarregandoCatalogo(false));
   }, [novaCategoria, criandoNovo]);
 
   // Quando muda a categoria do novo pedido, reseta as linhas
-  const handleChangeCategoriaNovoP = (cat: 'PEDAGOGICO' | 'HIGIENE') => {
+  const handleChangeCategoriaNovoP = (cat: 'PEDAGOGICO' | 'HIGIENE' | 'ADMINISTRATIVO') => {
     setNovaCategoria(cat);
     setNovasLinhas([{ _key: gerarKey(), categoria: cat, descricao: '', quantidade: 1 }]);
   };
@@ -168,10 +169,10 @@ export function PedidosCompraPage() {
             _catalogId: item.id,
             descricao: item.name,
             unidadeMedida: item.unit,
-            _precoUnitario: item.price ?? undefined,
-            custoEstimado: item.price ?? undefined,
+            _precoUnitario: item.referencePrice ?? undefined,
+            custoEstimado: item.referencePrice ?? undefined,
             _fornecedor: item.supplier ?? undefined,
-            _semPreco: item.price === null,
+            _semPreco: item.referencePrice === null,
           }
         : l,
     ));
@@ -197,7 +198,7 @@ export function PedidosCompraPage() {
         : [{ _key: gerarKey(), categoria: 'PEDAGOGICO', descricao: '', quantidade: 1 }],
     );
     // Carrega catálogo para edição (sem filtro de categoria)
-    getCatalogItems().then(items => setCatalogo(items)).catch(() => {});
+    getMaterialsCatalog().then(items => setCatalogo(items)).catch(() => {});
   };
 
   const salvarEdicao = async (pedidoId: string) => {
@@ -242,7 +243,9 @@ export function PedidosCompraPage() {
       setCriandoNovo(false);
       setNovasLinhas([{ _key: gerarKey(), categoria: novaCategoria, descricao: '', quantidade: 1 }]);
       setNovasObs('');
-      mostrarMensagem('Pedido criado com sucesso.');
+      // Expande automaticamente o pedido recém-criado para mostrar a planilha
+      setPedidoExpandido(novo.id);
+      mostrarMensagem('Pedido criado com sucesso. Planilha visível abaixo.');
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao criar pedido.');
     } finally { setCriando(false); }
@@ -361,7 +364,7 @@ export function PedidosCompraPage() {
                             <option value="">— Selecione o produto —</option>
                             {catalogoFiltrado.map(c => (
                               <option key={c.id} value={c.id}>
-                                {c.name}{c.price !== null ? ` (${fmtBRL(c.price)})` : ' (sem preço)'}
+                                {c.name}{c.referencePrice !== null ? ` (${fmtBRL(c.referencePrice ?? 0)})` : ' (sem preço)'}
                               </option>
                             ))}
                           </select>

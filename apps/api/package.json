@@ -23,7 +23,8 @@
     "seed:create-urgent-logins": "node dist/src/scripts/create-urgent-logins.js",
     "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js",
     "seed:units-cocris": "node dist/src/scripts/seed_units_cocris.js",
-    "seed:units:cocris": "node prisma/seed-units-from-json.js"
+    "seed:units:cocris": "node prisma/seed-units-from-json.js",
+    "seed:catalog": "node scripts/seed-catalog.js"
   },
   "repository": {
     "type": "git",

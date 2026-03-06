@@ -158,6 +158,28 @@ export class MaterialRequestService {
     });
   }
 
+  /**
+   * Busca uma requisição pelo ID com todos os detalhes.
+   * UNIDADE: apenas requisições da própria unidade.
+   */
+  async getById(id: string, user: JwtPayload) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const req = await this.prisma.materialRequest.findUnique({
+      where: { id },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: { include: { material: { select: { id: true, name: true, unit: true } } } },
+      },
+    });
+    if (!req) throw new NotFoundException('Requisição não encontrada');
+    if (req.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+    if (isCoordRole(user) && !isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
+      throw new ForbiddenException('Requisição não pertence à sua unidade');
+    }
+    return req;
+  }
+
   async review(id: string, dto: ReviewMaterialRequestDto, user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode aprovar/rejeitar');

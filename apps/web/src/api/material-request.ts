@@ -94,6 +94,14 @@ export async function listUnitMaterialRequests(filters?: {
 }
 
 /**
+ * Busca uma requisição pelo ID com detalhes completos
+ */
+export async function getMaterialRequestById(id: string): Promise<MaterialRequest> {
+  const response = await http.get(`/material-requests/${id}`);
+  return response.data;
+}
+
+/**
  * Unidade aprova, rejeita ou ajusta uma requisição
  */
 export async function reviewMaterialRequest(id: string, dto: ReviewMaterialRequestDto): Promise<MaterialRequest> {
