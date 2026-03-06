@@ -86,25 +86,24 @@ export function ReportsPage() {
   }, [isCentral]);
 
   // Carregar turmas quando unidade é selecionada (ou ao montar para UNIDADE)
+  // CORREÇÃO: passa unitId diretamente para a API (não filtra localmente)
   const carregarTurmas = useCallback(async (unitId?: string) => {
     setTurmasCarregando(true);
     setClassroomId('');
     try {
-      const params: Record<string, string> = {};
-      if (unitId) params.unitId = unitId;
-      const data = await getAccessibleClassrooms();
-      // Filtrar por unidade selecionada se aplicável
-      if (unitId) {
-        setTurmas(data.filter((t: AccessibleClassroom) => (t as any).unitId === unitId || (t as any).unit?.id === unitId));
-      } else {
-        setTurmas(data);
+      // Para STAFF_CENTRAL sem unidade selecionada, não carrega turmas (evita lista enorme)
+      if (isCentral && !unitId) {
+        setTurmas([]);
+        return;
       }
+      const data = await getAccessibleClassrooms(unitId);
+      setTurmas(data);
     } catch {
       setTurmas([]);
     } finally {
       setTurmasCarregando(false);
     }
-  }, []);
+  }, [isCentral]);
 
   useEffect(() => {
     if (!isCentral) {
@@ -117,9 +116,8 @@ export function ReportsPage() {
     setSelectedUnitId(unitId);
     setReportData(null);
     setError(null);
-    if (reportType === 'by-classroom') {
-      carregarTurmas(unitId || undefined);
-    }
+    // Sempre recarregar turmas quando unidade muda (para by-classroom)
+    carregarTurmas(unitId || undefined);
   };
 
   const handleReportTypeChange = (tipo: ReportType) => {
@@ -323,7 +321,7 @@ export function ReportsPage() {
               <select value={classroomId} onChange={e => setClassroomId(e.target.value)}
                 disabled={turmasCarregando}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
-                <option value="">{turmasCarregando ? 'Carregando turmas...' : turmas.length === 0 ? 'Nenhuma turma encontrada' : 'Selecione a turma'}</option>
+                <option value="">{turmasCarregando ? 'Carregando turmas...' : turmas.length === 0 ? (isCentral && !selectedUnitId ? 'Selecione uma unidade primeiro' : 'Nenhuma turma encontrada') : 'Selecione a turma'}</option>
                 {turmas.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}

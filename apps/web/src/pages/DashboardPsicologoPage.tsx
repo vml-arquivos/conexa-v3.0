@@ -596,6 +596,7 @@ export default function DashboardPsicologoPage() {
             <SectionCard title="Atalhos de Análise" icon={<Brain className="h-4 w-4 text-purple-500" />}>
               <div className="space-y-2">
                 {[
+                  { label: 'Desenvolvimento Infantil', path: '/app/desenvolvimento-infantil', desc: 'Observações por unidade, turma e criança' },
                   { label: 'RDICs Publicados',     path: '/app/rdic-geral',  desc: 'Relatórios de desenvolvimento individuais' },
                   { label: 'Análises Centrais',    path: '/app/central',     desc: 'Indicadores e gráficos da rede' },
                   { label: 'Relatórios',           path: '/app/reports',     desc: 'Exportar dados e relatórios' },

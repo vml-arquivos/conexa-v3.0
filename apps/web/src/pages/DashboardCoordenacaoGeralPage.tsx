@@ -24,7 +24,7 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart, CheckCircle, AlertCircle,
   TrendingUp, Calendar, Network, RefreshCw, ChevronRight,
   Building2, GraduationCap, Bell, Star, Activity, BarChart2, Brain,
-  FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers,
+  FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers, Sparkles,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -405,6 +405,24 @@ export default function DashboardCoordenacaoGeralPage() {
             </div>
           )}
 
+          {/* Acesso rápido — Desenvolvimento Infantil */}
+          {!loading && (
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-purple-800">Desenvolvimento Infantil</p>
+                  <p className="text-xs text-purple-600">Acompanhe as observações de desenvolvimento por unidade, turma e criança</p>
+                </div>
+              </div>
+              <button onClick={() => navigate('/app/desenvolvimento-infantil')}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all flex-shrink-0">
+                Acessar <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           {/* Próximas reuniões */}
           {!loading && (dashboard?.proximasReunioes?.length ?? 0) > 0 && (
             <SectionCard title="Próximas Reuniões" icon={<Calendar className="h-4 w-4 text-indigo-500" />}
@@ -552,19 +570,26 @@ export default function DashboardCoordenacaoGeralPage() {
             </SectionCard>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Planejamentos', icon: <FileText className="h-5 w-5" />,  path: '/app/coordenacao' },
-              { label: 'Diários',       icon: <BookOpen className="h-5 w-5" />,   path: '/app/coordenacao' },
-              { label: 'Matriz 2026',   icon: <Brain className="h-5 w-5" />,      path: '/app/matriz-pedagogica' },
-              { label: 'Análises',      icon: <BarChart2 className="h-5 w-5" />,  path: '/app/central' },
-              { label: 'RDICs',         icon: <Eye className="h-5 w-5" />,        path: '/app/rdic-geral' },
-              { label: 'Relatórios',    icon: <TrendingUp className="h-5 w-5" />, path: '/app/reports' },
+              { label: 'Planejamentos',         icon: <FileText className="h-5 w-5" />,  path: '/app/coordenacao',                badge: '' },
+              { label: 'Diários de Bordo',      icon: <BookOpen className="h-5 w-5" />,  path: '/app/coordenacao',                badge: '' },
+              { label: 'Matriz 2026',           icon: <Brain className="h-5 w-5" />,     path: '/app/matriz-pedagogica',          badge: '' },
+              { label: 'Análises Centrais',     icon: <BarChart2 className="h-5 w-5" />, path: '/app/central',                    badge: '' },
+              { label: 'RDICs Publicados',      icon: <Eye className="h-5 w-5" />,       path: '/app/rdic-geral',                 badge: '' },
+              { label: 'Desenvolvimento Infantil', icon: <Sparkles className="h-5 w-5" />, path: '/app/desenvolvimento-infantil', badge: 'Novo' },
+              { label: 'Relatórios',            icon: <TrendingUp className="h-5 w-5" />, path: '/app/reports',                   badge: '' },
+              { label: 'Coord. Pedagógica',     icon: <Network className="h-5 w-5" />,   path: '/app/coordenacao-pedagogica',     badge: '' },
             ].map((item, i) => (
               <button key={i} onClick={() => navigate(item.path)}
-                className="flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-2xl hover:border-blue-300 hover:shadow-sm transition-all text-gray-600 hover:text-blue-700">
+                className="relative flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-2xl hover:border-blue-300 hover:shadow-sm transition-all text-gray-600 hover:text-blue-700">
+                {item.badge && (
+                  <span className="absolute top-2 right-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+                    {item.badge}
+                  </span>
+                )}
                 {item.icon}
-                <span className="text-xs font-medium">{item.label}</span>
+                <span className="text-xs font-medium text-center">{item.label}</span>
               </button>
             ))}
           </div>
@@ -578,11 +603,11 @@ export default function DashboardCoordenacaoGeralPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-500">
-              {reqPendentes > 0 ? `${reqPendentes} requisição(ões) aguardando aprovação` : 'Nenhuma requisição pendente'}
+              {reqPendentes > 0 ? `${reqPendentes} requisição(ões) pendente(s) de materiais` : 'Nenhuma requisição pendente'}
             </p>
-            <button onClick={() => navigate('/app/material-requests')}
+            <button onClick={() => navigate('/app/coordenacao-geral')}
               className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
-              Gerenciar <ArrowRight className="h-3 w-3" />
+              Ver detalhes <ArrowRight className="h-3 w-3" />
             </button>
           </div>
 

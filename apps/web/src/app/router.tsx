@@ -39,6 +39,7 @@ import RdicGeralPage from '../pages/RdicGeralPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
+import DesenvolvimentoInfantilPage from '../pages/DesenvolvimentoInfantilPage';
 // ─── Módulo de Planejamento — Oficina e Torre de Controle ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
@@ -356,6 +357,16 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <DashboardPsicologoPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Desenvolvimento Infantil ────────────────────────────────────────
+      {
+        path: 'desenvolvimento-infantil',
+        element: (
+          <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DesenvolvimentoInfantilPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

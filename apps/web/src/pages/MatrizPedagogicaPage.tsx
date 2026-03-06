@@ -10,7 +10,7 @@ import {
 import {
   Search, ChevronDown, ChevronUp, BookOpen,
   Layers, Target, Calendar, Tag, Star, Sparkles,
-  Grid, List, CheckCircle, RefreshCw,
+  Grid, List, CheckCircle, RefreshCw, GraduationCap,
 } from 'lucide-react';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
@@ -257,6 +257,20 @@ export default function MatrizPedagogicaPage() {
       title="Matriz Pedagógica 2026"
       subtitle="Sequência Pedagógica Piloto — Objetivos de Aprendizagem e Desenvolvimento (BNCC)"
     >
+      {/* Badge de perfil */}
+      <div className="flex items-center gap-2 mb-4">
+        {ehProfessor ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+            <GraduationCap className="h-3.5 w-3.5" />
+            Visão do Professor — Objetivos BNCC
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+            <Sparkles className="h-3.5 w-3.5" />
+            Visão da Coordenação — Objetivos + Exemplos de Atividades
+          </span>
+        )}
+      </div>
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">
         {[
