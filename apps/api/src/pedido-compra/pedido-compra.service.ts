@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { ConsolidarPedidoDto } from './dto/consolidar-pedido.dto';
 import { AtualizarStatusPedidoDto } from './dto/atualizar-status-pedido.dto';
+import { CriarPedidoDto, AtualizarItensPedidoDto } from './dto/criar-pedido.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import {
   podeAcessarUnidade,
@@ -402,7 +403,97 @@ export class PedidoCompraService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 4. Buscar pedido por ID
+  // 4. Criar pedido diretamente com itens (sem exigir requisições aprovadas)
+  // ─────────────────────────────────────────────────────────────────────────
+  async criar(dto: CriarPedidoDto, user: JwtPayload) {
+    garantirNaoSomenteLeitor(user);
+    const unitId = dto.unitId ?? user.unitId;
+    if (!unitId) throw new BadRequestException('unitId é obrigatório.');
+    if (!podeEditarOperacional(user, unitId)) {
+      throw new ForbiddenException('Acesso negado: sem permissão para criar pedidos desta unidade.');
+    }
+    const unit = await this.prisma.unit.findFirst({ where: { id: unitId, mantenedoraId: user.mantenedoraId } });
+    if (!unit) throw new NotFoundException('Unidade não encontrada.');
+    // Idempotente: retorna RASCUNHO existente
+    const existente = await this.prisma.pedidoCompra.findFirst({
+      where: { unitId, mantenedoraId: user.mantenedoraId, mesReferencia: dto.mesReferencia, status: StatusPedidoCompra.RASCUNHO },
+      include: { unit: { select: { id: true, name: true } }, itens: true },
+    });
+    if (existente) return existente;
+    const pedido = await this.prisma.pedidoCompra.create({
+      data: {
+        mantenedoraId: user.mantenedoraId,
+        unitId,
+        mesReferencia: dto.mesReferencia,
+        status: StatusPedidoCompra.RASCUNHO,
+        observacoes: dto.observacoes ?? null,
+        consolidadoPor: user.sub,
+        itens: {
+          create: (dto.itens ?? []).map(item => ({
+            categoria: item.categoria as any,
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            unidadeMedida: item.unidadeMedida ?? null,
+            custoEstimado: item.custoEstimado ?? null,
+            requisicaoIds: [],
+          })),
+        },
+      },
+      include: { unit: { select: { id: true, name: true } }, itens: true },
+    });
+    await this.audit.log({
+      action: AuditLogAction.CREATE, entity: 'PEDIDO_COMPRA', entityId: pedido.id,
+      userId: user.sub, mantenedoraId: user.mantenedoraId, unitId,
+      description: `Pedido criado diretamente para ${dto.mesReferencia}`,
+    });
+    return pedido;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 5. Atualizar itens de um pedido RASCUNHO (edição inline)
+  // ─────────────────────────────────────────────────────────────────────────
+  async atualizarItens(id: string, dto: AtualizarItensPedidoDto, user: JwtPayload) {
+    garantirNaoSomenteLeitor(user);
+    const pedido = await this.prisma.pedidoCompra.findFirst({ where: { id, mantenedoraId: user.mantenedoraId } });
+    if (!pedido) throw new NotFoundException('Pedido não encontrado.');
+    if (!podeEditarOperacional(user, pedido.unitId)) {
+      throw new ForbiddenException('Acesso negado: sem permissão para editar pedidos desta unidade.');
+    }
+    if (pedido.status !== StatusPedidoCompra.RASCUNHO) {
+      throw new BadRequestException('Apenas pedidos em RASCUNHO podem ter itens editados.');
+    }
+    if (dto.itens !== undefined) {
+      await this.prisma.itemPedidoCompra.deleteMany({ where: { pedidoCompraId: id } });
+      if (dto.itens.length > 0) {
+        await this.prisma.itemPedidoCompra.createMany({
+          data: dto.itens.map(item => ({
+            pedidoCompraId: id,
+            categoria: item.categoria as any,
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            unidadeMedida: item.unidadeMedida ?? null,
+            custoEstimado: item.custoEstimado ?? null,
+            requisicaoIds: [],
+          })),
+        });
+      }
+    }
+    if (dto.observacoes !== undefined) {
+      await this.prisma.pedidoCompra.update({ where: { id }, data: { observacoes: dto.observacoes } });
+    }
+    await this.audit.log({
+      action: AuditLogAction.UPDATE, entity: 'PEDIDO_COMPRA', entityId: id,
+      userId: user.sub, mantenedoraId: user.mantenedoraId, unitId: pedido.unitId,
+      description: `Itens do pedido atualizados (${dto.itens?.length ?? 0} item(ns))`,
+    });
+    return this.prisma.pedidoCompra.findFirst({
+      where: { id },
+      include: { unit: { select: { id: true, name: true } }, itens: true },
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 6. Buscar pedido por ID
   // ─────────────────────────────────────────────────────────────────────────
 
   async buscarPorId(id: string, user: JwtPayload) {

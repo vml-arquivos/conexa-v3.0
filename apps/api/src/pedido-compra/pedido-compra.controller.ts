@@ -16,12 +16,28 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { PedidoCompraService } from './pedido-compra.service';
 import { ConsolidarPedidoDto } from './dto/consolidar-pedido.dto';
 import { AtualizarStatusPedidoDto } from './dto/atualizar-status-pedido.dto';
+import { CriarPedidoDto, AtualizarItensPedidoDto } from './dto/criar-pedido.dto';
 import { RoleLevel, StatusPedidoCompra } from '@prisma/client';
 
 @Controller('pedidos-compra')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PedidoCompraController {
   constructor(private readonly svc: PedidoCompraService) {}
+
+  /**
+   * POST /pedidos-compra
+   * Cria um Pedido de Compra diretamente com itens (sem exigir requisições aprovadas).
+   * Idempotente: se já existir RASCUNHO para unidade+mês, retorna o existente.
+   * RBAC: UNIDADE, MANTENEDORA, DEVELOPER
+   */
+  @Post()
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  criar(
+    @Body() dto: CriarPedidoDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.criar(dto, user);
+  }
 
   /**
    * POST /pedidos-compra/consolidar
@@ -72,6 +88,21 @@ export class PedidoCompraController {
   )
   buscarPorId(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.svc.buscarPorId(id, user);
+  }
+
+  /**
+   * PATCH /pedidos-compra/:id/itens
+   * Substitui os itens de um pedido RASCUNHO (edição inline da planilha).
+   * RBAC: UNIDADE, MANTENEDORA, DEVELOPER
+   */
+  @Patch(':id/itens')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  atualizarItens(
+    @Param('id') id: string,
+    @Body() dto: AtualizarItensPedidoDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.atualizarItens(id, dto, user);
   }
 
   /**

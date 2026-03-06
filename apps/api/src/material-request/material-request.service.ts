@@ -23,11 +23,18 @@ function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
   return 'OUTRO' as MaterialRequestType;
 }
 
+/** PROFESSOR, Coordenadora (UNIDADE), STAFF_CENTRAL, MANTENEDORA e DEVELOPER podem criar requisições */
 function isProfessorRole(user: JwtPayload): boolean {
   return (
     Array.isArray(user.roles) &&
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    user.roles.some((r: any) => r?.level === RoleLevel.PROFESSOR || r?.level === RoleLevel.DEVELOPER)
+    user.roles.some((r: any) =>
+      r?.level === RoleLevel.PROFESSOR ||
+      r?.level === RoleLevel.UNIDADE ||
+      r?.level === RoleLevel.STAFF_CENTRAL ||
+      r?.level === RoleLevel.MANTENEDORA ||
+      r?.level === RoleLevel.DEVELOPER,
+    )
   );
 }
 

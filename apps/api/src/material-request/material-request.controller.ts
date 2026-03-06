@@ -14,16 +14,16 @@ import { ReviewMaterialRequestDto } from './dto/review-material-request.dto';
 export class MaterialRequestController {
   constructor(private readonly svc: MaterialRequestService) {}
 
-  /** Professor cria requisição — encaminhada à Coordenadora Pedagógica */
+  /** Professor ou Coordenadora cria requisição de material */
   @Post()
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   create(@Body() dto: CreateMaterialRequestDto, @CurrentUser() user: JwtPayload) {
     return this.svc.create(dto, user);
   }
 
-  /** Professor lista suas próprias requisições */
+  /** Professor/Coordenadora lista suas próprias requisições */
   @Get('minhas')
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   listMine(@CurrentUser() user: JwtPayload) {
     return this.svc.listMine(user);
   }
