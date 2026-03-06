@@ -1,1086 +1,687 @@
-import { useState, useEffect } from 'react';
-import { useApiCache } from '../hooks/useApiCache';
-import { PageShell } from '../components/ui/PageShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { LoadingState } from '../components/ui/LoadingState';
-import http from '../api/http';
+/**
+ * DashboardCoordenacaoGeralPage — Hiper Dashboard Inteligente
+ * Perfil: STAFF_CENTRAL / MANTENEDORA / DEVELOPER
+ *
+ * Dados reais via endpoints:
+ *  - GET /coordenacao/dashboard/geral
+ *  - GET /insights/governance/funnel
+ *  - GET /insights/governance/coverage
+ *  - GET /coordenacao/requisicoes
+ *  - GET /coordenacao/reunioes
+ */
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { PageShell } from '../components/ui/PageShell';
+import { useApiCache } from '../hooks/useApiCache';
 import { useUnitScope } from '../contexts/UnitScopeContext';
-import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
+import { toast } from 'sonner';
+import http from '../api/http';
 import {
-  Building2, Users, TrendingUp, ShoppingCart,
-  BookOpen, ClipboardList, CheckCircle, AlertCircle,
-  ChevronRight, BarChart2, Network, Star, Layers, Calendar, ArrowRight, RefreshCw,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
+} from 'recharts';
+import {
+  Users, BookOpen, ClipboardList, ShoppingCart, CheckCircle, AlertCircle,
+  TrendingUp, Calendar, Network, RefreshCw, ChevronRight,
+  Building2, GraduationCap, Bell, Star, Activity, BarChart2, Brain,
+  FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers,
 } from 'lucide-react';
-// lookup local REMOVIDO — aba Matriz agora usa API /curriculum-matrix-entries
 
-interface UnidadeResumo {
-  id: string; nome: string;
-  totalTurmas: number; totalAlunos: number; totalProfessores: number;
-  taxaPresenca: number; requisicoesAbertas: number;
-  planejamentosOk: boolean; diariosEstaSemana: number;
-  status: 'otimo' | 'atencao' | 'critico';
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+interface UnidadeConsolidado {
+  id: string;
+  nome: string;
+  totalAlunos: number;
+  totalProfessores: number;
+  totalTurmas: number;
+  coberturaChamada: number;
+  taxaPresenca?: number;
+  requisicoesPendentes: number;
+  planejamentosRascunho: number;
+  diariosHoje: number;
+  status?: 'otimo' | 'atencao' | 'critico';
 }
-interface DashboardGeral {
-  totalUnidades: number; totalAlunos: number; totalProfessores: number;
-  mediaPresenca: number; requisicoesAbertas: number;
-  unidades: UnidadeResumo[];
+
+interface DashboardGeralAPI {
+  mantenedoraId: string;
+  data: string;
+  indicadoresGerais: {
+    totalUnidades: number;
+    totalAlunos: number;
+    totalProfessores: number;
+    requisicoesPendentes: number;
+    planejamentosRascunho: number;
+    diariosHoje: number;
+    reunioesAgendadas: number;
+  };
+  consolidadoUnidades: UnidadeConsolidado[];
+  ultimasReunioes: Array<{ id: string; titulo: string; dataRealizacao: string; status: string }>;
+  proximasReunioes: Array<{ id: string; titulo: string; dataRealizacao: string; localOuLink?: string }>;
 }
-const STATUS_CONFIG = {
-  otimo: { label: 'Otimo', cor: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500', barCor: 'bg-green-500' },
-  atencao: { label: 'Atencao', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500', barCor: 'bg-yellow-500' },
-  critico: { label: 'Critico', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500', barCor: 'bg-red-500' },
-};
-const DEMO: DashboardGeral = {
-  totalUnidades: 4, totalAlunos: 312, totalProfessores: 28, mediaPresenca: 87, requisicoesAbertas: 5,
-  unidades: [
-    { id:'1', nome:'Unidade Centro', totalTurmas:6, totalAlunos:89, totalProfessores:8, taxaPresenca:92, requisicoesAbertas:1, planejamentosOk:true, diariosEstaSemana:12, status:'otimo' },
-    { id:'2', nome:'Unidade Norte', totalTurmas:5, totalAlunos:74, totalProfessores:7, taxaPresenca:78, requisicoesAbertas:3, planejamentosOk:false, diariosEstaSemana:8, status:'atencao' },
-    { id:'3', nome:'Unidade Sul', totalTurmas:4, totalAlunos:61, totalProfessores:6, taxaPresenca:95, requisicoesAbertas:0, planejamentosOk:true, diariosEstaSemana:9, status:'otimo' },
-    { id:'4', nome:'Unidade Leste', totalTurmas:6, totalAlunos:88, totalProfessores:7, taxaPresenca:65, requisicoesAbertas:1, planejamentosOk:false, diariosEstaSemana:4, status:'critico' },
-  ],
+
+interface GovernanceFunnel {
+  funnel: { created: number; submitted: number; approved: number; executed: number };
+}
+
+interface Requisicao {
+  id: string;
+  status: string;
+  createdAt: string;
+  category?: string;
+  classroom?: { name: string; unit?: { name: string } };
+  createdByUser?: { firstName: string; lastName: string };
+}
+
+// ─── Helpers visuais ─────────────────────────────────────────────────────────
+function calcStatus(u: UnidadeConsolidado): 'otimo' | 'atencao' | 'critico' {
+  const presenca = u.coberturaChamada ?? u.taxaPresenca ?? 0;
+  if (presenca >= 85 && u.requisicoesPendentes === 0) return 'otimo';
+  if (presenca < 50 || u.requisicoesPendentes >= 3) return 'critico';
+  return 'atencao';
+}
+
+const STATUS_CFG = {
+  otimo:   { label: 'Ótimo',   bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  dot: 'bg-green-500',  bar: 'bg-green-500' },
+  atencao: { label: 'Atenção', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-500', bar: 'bg-yellow-400' },
+  critico: { label: 'Crítico', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    dot: 'bg-red-500',    bar: 'bg-red-500' },
 };
 
+function fmt(n?: number | null): string {
+  if (n == null) return '—';
+  return n.toLocaleString('pt-BR');
+}
+
+function relDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = Math.round((d.getTime() - now.getTime()) / 86400000);
+  if (diff === 0) return 'Hoje';
+  if (diff === 1) return 'Amanhã';
+  if (diff === -1) return 'Ontem';
+  if (diff > 0) return `Em ${diff}d`;
+  return `Há ${Math.abs(diff)}d`;
+}
+
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+function KpiCard({
+  icon, label, value, helper, tone = 'default', onClick,
+}: {
+  icon: React.ReactNode; label: string; value: string | number;
+  helper?: string; tone?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  onClick?: () => void;
+}) {
+  const tones: Record<string, string> = {
+    default: 'bg-white border-gray-200 text-gray-800',
+    success: 'bg-green-50 border-green-200 text-green-800',
+    warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+    danger:  'bg-red-50 border-red-200 text-red-800',
+    info:    'bg-blue-50 border-blue-200 text-blue-800',
+  };
+  return (
+    <div
+      onClick={onClick}
+      className={`border rounded-2xl p-4 flex flex-col gap-2 shadow-sm transition-all ${tones[tone]} ${onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : ''}`}
+    >
+      <div className="flex items-center justify-between">
+        <span className="opacity-60">{icon}</span>
+        {onClick && <ChevronRight className="h-4 w-4 opacity-30" />}
+      </div>
+      <p className="text-2xl font-bold leading-none">{value}</p>
+      <p className="text-xs font-medium opacity-70">{label}</p>
+      {helper && <p className="text-xs opacity-50">{helper}</p>}
+    </div>
+  );
+}
+
+function SectionCard({ title, icon, children, action }: {
+  title: string; icon: React.ReactNode; children: React.ReactNode;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+          {icon}{title}
+        </div>
+        {action && (
+          <button onClick={action.onClick} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+            {action.label} <ArrowRight className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function SkeletonGrid({ n = 8 }: { n?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="border border-gray-200 rounded-2xl p-4 animate-pulse">
+          <div className="h-5 bg-gray-200 rounded w-1/2 mb-3" />
+          <div className="h-8 bg-gray-300 rounded w-3/4 mb-2" />
+          <div className="h-3 bg-gray-100 rounded w-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export default function DashboardCoordenacaoGeralPage() {
   const navigate = useNavigate();
-  // Contexto global de escopo de unidade
-  const { accessibleUnits: unidadesCtx, selectedUnitId: ctxUnitId, setUnit: ctxSetUnit } = useUnitScope();
+  const { accessibleUnits: unidadesCtx } = useUnitScope();
+  const apiCache = useApiCache(120_000);
+
   const [loading, setLoading] = useState(true);
-  const [dashboard, setDashboard] = useState<DashboardGeral | null>(null);
-  const [filtro, setFiltro] = useState<'todas'|'otimo'|'atencao'|'critico'>('todas');
-  const [abaAtiva, setAbaAtiva] = useState<'visao'|'unidades'|'relatorio'|'matriz'|'alunos'|'observacoes'|'psicologia'|'cobertura'|'funil'|'consumo'>('visao');
-  // Aba Cobertura Multiunidade
-  interface CoberturaUnidade {
-    unitId: string; unitName: string;
-    totalCriancas: number; totalComRegistro: number; percentual: number;
-  }
-  interface CentralCoverage {
-    startDate: string; endDate: string;
-    totalCriancas: number; totalComRegistro: number; percentualGeral: number;
-    unidades: CoberturaUnidade[];
-  }
-  const [coberturaGeral, setCoberturaGeral] = useState<CentralCoverage | null>(null);
-  const [loadingCoberturaGeral, setLoadingCoberturaGeral] = useState(false);
-  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string>('');
-  const apiCache = useApiCache(60_000);
-
-  // Aba Funil Pedagógico
-  interface GovernanceFunnel {
-    scope: string; unitId: string | null;
-    periodo: { inicio: string | null; fim: string | null };
-    funnel: { created: number; submitted: number; approved: number; executed: number };
-  }
+  const [dashboard, setDashboard] = useState<DashboardGeralAPI | null>(null);
   const [funil, setFunil] = useState<GovernanceFunnel | null>(null);
-  const [loadingFunil, setLoadingFunil] = useState(false);
-  const [funilStartDate, setFunilStartDate] = useState<string>(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
-  const [funilEndDate, setFunilEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [funilUnitId, setFunilUnitId] = useState<string>('');
+  const [coverageFields, setCoverageFields] = useState<Array<{ field: string; pct: number }>>([]);
+  const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'requisicoes' | 'reunioes'>('visao');
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'otimo' | 'atencao' | 'critico'>('todas');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Aba Consumo Rede
-  interface ConsumoRedeData {
-    escopo: string;
-    totais: { requisicoes: number; aprovadas: number; pendentes: number; rejeitadas: number; entregues: number };
-    porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number }>;
-    porUnidade: Array<{ nome: string; total: number; aprovados: number; pendentes: number }>;
-  }
-  const [consumoRede, setConsumoRede] = useState<ConsumoRedeData | null>(null);
-  const [loadingConsumoRede, setLoadingConsumoRede] = useState(false);
-  const [consumoUnitId, setConsumoUnitId] = useState<string>('');
-  const [consumoDataInicio, setConsumoDataInicio] = useState<string>(() => {
-    const d = new Date(); d.setDate(d.getDate() - 30);
-    return d.toISOString().split('T')[0];
-  });
-  const [consumoDataFim, setConsumoDataFim] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const hoje = new Date().toISOString().split('T')[0];
+  const ha30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
-  // Unidades disponíveis para filtros (sincronizado com contexto global)
-  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState<Array<{id: string; name: string}>>([]);
-
-  // Aba Matriz — dados reais da API (sem lookup local)
-  interface MatrizEntry {
-    id: string;
-    campoDeExperiencia: string;
-    objetivoBNCCCode: string | null;
-    objetivoBNCC: string;
-    objetivoCurriculo: string;
-    intencionalidade: string | null;
-    exemploAtividade: string | null;
-    date: string;
-    matrix: { id: string; name: string; year: number; segment: string };
-  }
-  const [matrizEntries, setMatrizEntries] = useState<MatrizEntry[]>([]);
-  const [loadingMatriz, setLoadingMatriz] = useState(false);
-  const [matrizSegFiltro, setMatrizSegFiltro] = useState<string>('todos');
-  const [matrizDataFiltro, setMatrizDataFiltro] = useState<string>(() => {
-    const hoje = new Date();
-    return hoje.toISOString().split('T')[0];
-  });
-
-  useEffect(() => {
-    loadDashboard();
-    // Usar unidades do contexto global (já carregadas pelo UnitScopeProvider)
-    if (unidadesCtx.length > 0) {
-      setUnidadesDisponiveis(unidadesCtx);
-    } else {
-      http.get('/lookup/units/accessible').then(r => {
-        const data = r.data;
-        setUnidadesDisponiveis(Array.isArray(data) ? data : (data?.units ?? []));
-      }).catch(() => {});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unidadesCtx]);
-
-  useEffect(() => {
-    if (abaAtiva === 'cobertura' && !coberturaGeral) {
-      carregarCoberturaGeral();
-    }
-    if (abaAtiva === 'matriz') {
-      carregarMatriz(matrizDataFiltro);
-    }
-    if (abaAtiva === 'funil' && !funil) {
-      carregarFunil();
-    }
-    if (abaAtiva === 'consumo' && !consumoRede) {
-      carregarConsumoRede();
-    }
-  }, [abaAtiva]);
-
-  async function carregarFunil(unitId?: string, start?: string, end?: string) {
-    setLoadingFunil(true);
+  const carregar = useCallback(async () => {
+    setLoading(true);
     try {
-      const params: Record<string, string> = {
-        startDate: start ?? funilStartDate,
-        endDate: end ?? funilEndDate,
-      };
-      const uid = unitId ?? funilUnitId;
-      if (uid) params.unitId = uid;
-      const res = await http.get('/insights/governance/funnel', { params });
-      setFunil(res.data);
-    } catch {
-      setFunil(null);
-    } finally {
-      setLoadingFunil(false);
-    }
-  }
-
-  async function carregarConsumoRede(unitId?: string, inicio?: string, fim?: string) {
-    setLoadingConsumoRede(true);
-    try {
-      const params: Record<string, string> = {
-        dataInicio: inicio ?? consumoDataInicio,
-        dataFim: fim ?? consumoDataFim,
-      };
-      const uid = unitId ?? consumoUnitId;
-      if (uid) params.unitId = uid;
-      const res = await http.get('/material-requests/relatorio-consumo', { params });
-      setConsumoRede(res.data);
-    } catch {
-      setConsumoRede(null);
-    } finally {
-      setLoadingConsumoRede(false);
-    }
-  }
-
-  async function carregarMatriz(data: string) {
-    setLoadingMatriz(true);
-    try {
-      // Busca entradas da matriz para os próximos 7 dias a partir da data selecionada
-      const fim = new Date(data);
-      fim.setDate(fim.getDate() + 6);
-      const endDate = fim.toISOString().split('T')[0];
-      const res = await http.get('/curriculum-matrix-entries', {
-        params: { startDate: data, endDate },
-      });
-      setMatrizEntries(Array.isArray(res.data) ? res.data : (res.data?.entries ?? []));
-    } catch {
-      setMatrizEntries([]);
-    } finally {
-      setLoadingMatriz(false);
-    }
-  }
-
-  async function carregarCoberturaGeral() {
-    setLoadingCoberturaGeral(true);
-    try {
-      const hoje = new Date().toISOString().split('T')[0];
-      const data = await apiCache.get('/reports/central/coverage', { startDate: hoje, endDate: hoje }, () =>
-        http.get('/reports/central/coverage', { params: { startDate: hoje, endDate: hoje } }).then(r => r.data)
-      );
-      setCoberturaGeral(data as CentralCoverage);
-    } catch {
-      // mantém null — UI mostra estado vazio
-    } finally {
-      setLoadingCoberturaGeral(false);
-    }
-  }
-
-  async function loadDashboard() {
-    try {
-      setLoading(true);
-      const res = await http.get('/coordenacao/dashboard/geral');
-      const d = res.data ?? {};
-      // Map API response (indicadoresGerais + consolidadoUnidades) to local shape
-      if (d.indicadoresGerais && Array.isArray(d.consolidadoUnidades)) {
-        const ind = d.indicadoresGerais;
-        const mapped: DashboardGeral = {
-          totalUnidades: ind.totalUnidades ?? 0,
-          totalAlunos: ind.totalAlunos ?? 0,
-          totalProfessores: ind.totalProfessores ?? 0,
-          mediaPresenca: 0,
-          requisicoesAbertas: ind.requisicoesPendentes ?? 0,
-          unidades: (d.consolidadoUnidades as any[]).map((u: any) => ({
-            id: u.id,
-            nome: u.nome,
-            totalTurmas: u.totalTurmas ?? 0,
-            totalAlunos: u.totalAlunos ?? 0,
-            totalProfessores: u.totalProfessores ?? 0,
-            taxaPresenca: u.coberturaChamada ?? 0,
-            requisicoesAbertas: u.requisicoesPendentes ?? 0,
-            planejamentosOk: (u.planejamentosRascunho ?? 0) === 0,
-            diariosEstaSemana: u.diariosHoje ?? 0,
-            status: u.coberturaChamada >= 90 && u.requisicoesPendentes === 0 ? 'otimo'
-                  : u.coberturaChamada < 50 || u.requisicoesPendentes >= 3 ? 'critico'
-                  : 'atencao',
-          })),
-        };
-        setDashboard(mapped);
+      const [dashRes, funilRes, covRes, reqRes] = await Promise.allSettled([
+        apiCache.get('/coordenacao/dashboard/geral', {}, () =>
+          http.get('/coordenacao/dashboard/geral').then(r => r.data)),
+        apiCache.get('/insights/governance/funnel', { startDate: ha30, endDate: hoje }, () =>
+          http.get('/insights/governance/funnel', { params: { startDate: ha30, endDate: hoje } }).then(r => r.data)),
+        apiCache.get('/insights/governance/coverage', { startDate: ha30, endDate: hoje }, () =>
+          http.get('/insights/governance/coverage', { params: { startDate: ha30, endDate: hoje } }).then(r => r.data)),
+        apiCache.get('/coordenacao/requisicoes', { status: 'SOLICITADO' }, () =>
+          http.get('/coordenacao/requisicoes', { params: { status: 'SOLICITADO' } }).then(r => r.data)),
+      ]);
+      if (dashRes.status === 'fulfilled') setDashboard(dashRes.value as DashboardGeralAPI);
+      if (funilRes.status === 'fulfilled') setFunil(funilRes.value as GovernanceFunnel);
+      if (covRes.status === 'fulfilled') {
+        const raw = covRes.value as any;
+        setCoverageFields(raw?.fields ?? raw?.coverage ?? []);
       }
-    } catch { /* mantém DEMO */ }
-    finally { setLoading(false); }
-  }
+      if (reqRes.status === 'fulfilled') {
+        const raw = reqRes.value as any;
+        setRequisicoes(Array.isArray(raw) ? raw : (raw?.requisicoes ?? raw?.data ?? []));
+      }
+    } catch {
+      toast.error('Erro ao carregar dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshKey]); // eslint-disable-line
 
-  if (loading) return <LoadingState message="Carregando painel geral da rede..." />;
+  useEffect(() => { carregar(); }, [carregar]);
 
-  const unidadesFiltradas = filtro === 'todas' ? (dashboard?.unidades ?? []) : (dashboard?.unidades ?? []).filter(u => u.status === filtro);
-  const abas = [
-    { id:'visao', label:'Visao Geral', icon:<Star className="h-4 w-4"/> },
-    { id:'unidades', label:'Por Unidade', icon:<Building2 className="h-4 w-4"/> },
-    { id:'relatorio', label:'Relatorio', icon:<BarChart2 className="h-4 w-4"/> },
-    { id:'alunos', label:'Alunos por Unidade', icon:<Users className="h-4 w-4"/> },
-    { id:'observacoes', label:'Observacoes Individuais', icon:<ClipboardList className="h-4 w-4"/> },
-    { id:'psicologia', label:'Desenvolvimento Psicológico', icon:<Network className="h-4 w-4"/> },
-    { id:'matriz', label:'Matriz 2026', icon:<Layers className="h-4 w-4"/> },
-    { id:'cobertura', label:'Cobertura', icon:<BarChart2 className="h-4 w-4"/> },
-    { id:'funil', label:'Funil Pedagógico', icon:<TrendingUp className="h-4 w-4"/> },
-    { id:'consumo', label:'Consumo Rede', icon:<ShoppingCart className="h-4 w-4"/> },
-  ] as const;
-  const filtros = [
-    { id:'todas', label:'Todas', count:(dashboard?.unidades ?? []).length },
-    { id:'otimo', label:'Otimo', count:(dashboard?.unidades ?? []).filter(u=>u.status==='otimo').length },
-    { id:'atencao', label:'Atencao', count:(dashboard?.unidades ?? []).filter(u=>u.status==='atencao').length },
-    { id:'critico', label:'Critico', count:(dashboard?.unidades ?? []).filter(u=>u.status==='critico').length },
+  // ─── Dados derivados ─────────────────────────────────────────────────────
+  const ind = dashboard?.indicadoresGerais;
+  const unidades = (dashboard?.consolidadoUnidades ?? []).map(u => ({
+    ...u,
+    _status: u.status ?? calcStatus(u),
+    _presenca: u.coberturaChamada ?? u.taxaPresenca ?? 0,
+  }));
+
+  const alertasCriticos = unidades.filter(u => u._status === 'critico').length;
+  const alertasAtencao  = unidades.filter(u => u._status === 'atencao').length;
+  const reqPendentes    = requisicoes.filter(r => r.status === 'SOLICITADO' || r.status === 'PENDENTE').length;
+
+  const unidadesFiltradas = filtroStatus === 'todas'
+    ? unidades
+    : unidades.filter(u => u._status === filtroStatus);
+
+  // Gráfico de barras — presença por unidade
+  const dadosPresenca = unidades.slice(0, 8).map(u => ({
+    nome: u.nome.split(' ').slice(-1)[0],
+    presenca: Math.round(u._presenca),
+    alunos: u.totalAlunos,
+  }));
+
+  // Pizza — status das unidades
+  const dadosPizza = [
+    { name: 'Ótimo',   value: unidades.filter(u => u._status === 'otimo').length,   fill: '#10b981' },
+    { name: 'Atenção', value: unidades.filter(u => u._status === 'atencao').length, fill: '#f59e0b' },
+    { name: 'Crítico', value: unidades.filter(u => u._status === 'critico').length, fill: '#ef4444' },
+  ].filter(d => d.value > 0);
+
+  // Funil pedagógico
+  const funilDados = funil ? [
+    { etapa: 'Criados',    valor: funil.funnel.created,   cor: '#3b82f6' },
+    { etapa: 'Enviados',   valor: funil.funnel.submitted, cor: '#8b5cf6' },
+    { etapa: 'Aprovados',  valor: funil.funnel.approved,  cor: '#10b981' },
+    { etapa: 'Executados', valor: funil.funnel.executed,  cor: '#f59e0b' },
+  ] : [];
+
+  // Radar BNCC
+  const radarDados = coverageFields.slice(0, 6).map((f: any) => ({
+    campo: (f.field ?? f.campoDeExperiencia ?? '').replace(/_/g, ' ').split(' ').slice(0, 2).join(' '),
+    cobertura: Math.round(f.pct ?? f.percentual ?? 0),
+  }));
+
+  // ─── Abas ────────────────────────────────────────────────────────────────
+  const ABAS = [
+    { id: 'visao',       label: 'Visão Geral',   icon: <BarChart2 className="h-3.5 w-3.5" /> },
+    { id: 'unidades',    label: 'Unidades',       icon: <Building2 className="h-3.5 w-3.5" /> },
+    { id: 'pedagogico',  label: 'Pedagógico',     icon: <Brain className="h-3.5 w-3.5" /> },
+    { id: 'requisicoes', label: `Requisições${reqPendentes > 0 ? ` (${reqPendentes})` : ''}`, icon: <ShoppingCart className="h-3.5 w-3.5" /> },
+    { id: 'reunioes',    label: 'Reuniões',        icon: <Calendar className="h-3.5 w-3.5" /> },
   ] as const;
 
   return (
-    <PageShell title="Coordenacao Geral da Rede" description="Acompanhe todas as unidades em um so lugar">
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
-        {abas.map(aba => (
-          <button key={aba.id} onClick={() => setAbaAtiva(aba.id as typeof abaAtiva)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${abaAtiva===aba.id?'bg-white text-blue-600 shadow-sm':'text-gray-500 hover:text-gray-700'}`}>
-            {aba.icon}{aba.label}
+    <PageShell
+      title="Coordenação Geral"
+      subtitle="Centro de inteligência da rede — dados em tempo real"
+    >
+      {/* ── Faixa de alertas ──────────────────────────────────────────── */}
+      {!loading && (alertasCriticos > 0 || alertasAtencao > 0 || reqPendentes > 0) && (
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+          <Zap className="h-4 w-4 text-orange-500 flex-shrink-0" />
+          <span className="text-xs font-semibold text-orange-700">Alertas ativos:</span>
+          {alertasCriticos > 0 && (
+            <span className="inline-flex items-center gap-1 border rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 border-red-300">
+              <Bell className="h-3 w-3" />{alertasCriticos} unidade(s) crítica(s)
+            </span>
+          )}
+          {alertasAtencao > 0 && (
+            <span className="inline-flex items-center gap-1 border rounded-full px-2.5 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-800 border-yellow-300">
+              <Bell className="h-3 w-3" />{alertasAtencao} em atenção
+            </span>
+          )}
+          {reqPendentes > 0 && (
+            <span className="inline-flex items-center gap-1 border rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 border-blue-300">
+              <Bell className="h-3 w-3" />{reqPendentes} requisição(ões) pendente(s)
+            </span>
+          )}
+          <button onClick={() => setAbaAtiva('unidades')} className="ml-auto text-xs text-orange-600 underline">
+            Ver detalhes
+          </button>
+        </div>
+      )}
+
+      {/* ── Tabs ──────────────────────────────────────────────────────── */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 overflow-x-auto">
+        {ABAS.map(a => (
+          <button
+            key={a.id}
+            onClick={() => setAbaAtiva(a.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              abaAtiva === a.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {a.icon}{a.label}
           </button>
         ))}
+        <button onClick={() => setRefreshKey(k => k + 1)} className="ml-auto p-2 text-gray-400 hover:text-gray-600 rounded-lg" title="Atualizar">
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
       </div>
 
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: VISÃO GERAL
+      ══════════════════════════════════════════════════════════════════ */}
       {abaAtiva === 'visao' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              {icon:<Building2 className="h-6 w-6 text-blue-600"/>,bg:'bg-blue-100',val:dashboard?.totalUnidades ?? 0,label:'Unidades'},
-              {icon:<Users className="h-6 w-6 text-purple-600"/>,bg:'bg-purple-100',val:dashboard?.totalAlunos ?? 0,label:'Criancas na rede'},
-              {icon:<Star className="h-6 w-6 text-yellow-600"/>,bg:'bg-yellow-100',val:dashboard?.totalProfessores ?? 0,label:'Professores'},
-              {icon:<TrendingUp className="h-6 w-6 text-green-600"/>,bg:'bg-green-100',val:`${dashboard?.mediaPresenca ?? 0}%`,label:'Presenca media'},
-            ].map((c,i)=>(
-              <Card key={i} className="rounded-2xl border-2 text-center">
-                <CardContent className="pt-5 pb-4">
-                  <div className={`w-12 h-12 ${c.bg} rounded-2xl flex items-center justify-center mx-auto mb-3`}>{c.icon}</div>
-                  <p className="text-3xl font-bold text-gray-800">{c.val}</p>
-                  <p className="text-sm text-gray-500 mt-1">{c.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <div className="space-y-5">
+          {loading ? <SkeletonGrid n={8} /> : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <KpiCard icon={<Building2 className="h-5 w-5" />} label="Unidades ativas"
+                value={fmt(ind?.totalUnidades)} tone="info" onClick={() => setAbaAtiva('unidades')} />
+              <KpiCard icon={<GraduationCap className="h-5 w-5" />} label="Total de alunos"
+                value={fmt(ind?.totalAlunos)} tone="default" />
+              <KpiCard icon={<Users className="h-5 w-5" />} label="Professores"
+                value={fmt(ind?.totalProfessores)} tone="default" />
+              <KpiCard icon={<Activity className="h-5 w-5" />} label="Diários hoje"
+                value={fmt(ind?.diariosHoje)}
+                tone={!ind?.diariosHoje ? 'warning' : 'success'}
+                helper="Registros do dia" />
+              <KpiCard icon={<ShoppingCart className="h-5 w-5" />} label="Req. pendentes"
+                value={fmt(ind?.requisicoesPendentes)}
+                tone={(ind?.requisicoesPendentes ?? 0) > 0 ? 'warning' : 'success'}
+                onClick={() => setAbaAtiva('requisicoes')} />
+              <KpiCard icon={<FileText className="h-5 w-5" />} label="Plan. em rascunho"
+                value={fmt(ind?.planejamentosRascunho)}
+                tone={(ind?.planejamentosRascunho ?? 0) > 5 ? 'warning' : 'default'}
+                onClick={() => setAbaAtiva('pedagogico')} />
+              <KpiCard icon={<Calendar className="h-5 w-5" />} label="Reuniões agendadas"
+                value={fmt(ind?.reunioesAgendadas)} tone="info"
+                onClick={() => setAbaAtiva('reunioes')} />
+              <KpiCard icon={<Shield className="h-5 w-5" />} label="Unidades críticas"
+                value={alertasCriticos}
+                tone={alertasCriticos > 0 ? 'danger' : 'success'}
+                helper={alertasCriticos === 0 ? 'Tudo OK' : 'Requerem atenção'}
+                onClick={() => setAbaAtiva('unidades')} />
+            </div>
+          )}
 
-          <Card className="rounded-2xl border-2">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Network className="h-5 w-5 text-blue-500"/>Como estao as unidades hoje?
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(dashboard?.unidades ?? []).map(u=>{
-                const cfg=STATUS_CONFIG[u.status];
-                return (
-                  <div key={u.id} className="flex items-center gap-3">
-                    <span className={`w-3 h-3 rounded-full flex-shrink-0 ${cfg.dot}`}/>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold">{u.nome}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.cor}`}>{cfg.label}</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2.5">
-                        <div className={`h-2.5 rounded-full ${cfg.barCor}`} style={{width:`${u.taxaPresenca}%`}}/>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{u.taxaPresenca}% de presenca · {u.totalAlunos} criancas</p>
+          {/* Gráficos */}
+          {!loading && unidades.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SectionCard title="Presença por Unidade" icon={<TrendingUp className="h-4 w-4 text-blue-500" />}>
+                {dadosPresenca.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={dadosPresenca} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="nome" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
+                      <Tooltip formatter={(v: number) => [`${v}%`, 'Presença']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      <Bar dataKey="presenca" radius={[4, 4, 0, 0]}>
+                        {dadosPresenca.map((e, i) => (
+                          <Cell key={i} fill={e.presenca >= 85 ? '#10b981' : e.presenca >= 70 ? '#f59e0b' : '#ef4444'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : <p className="text-xs text-gray-400 text-center py-8">Sem dados de presença</p>}
+              </SectionCard>
+
+              <SectionCard title="Status das Unidades" icon={<Target className="h-4 w-4 text-purple-500" />}>
+                {dadosPizza.length > 0 ? (
+                  <div className="flex items-center gap-4">
+                    <ResponsiveContainer width="55%" height={200}>
+                      <PieChart>
+                        <Pie data={dadosPizza} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                          {dadosPizza.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                        </Pie>
+                        <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-3 flex-1">
+                      {dadosPizza.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ background: d.fill }} />
+                            <span className="text-sm text-gray-700">{d.name}</span>
+                          </div>
+                          <span className="text-sm font-bold text-gray-800">{d.value}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+                ) : <p className="text-xs text-gray-400 text-center py-8">Sem dados</p>}
+              </SectionCard>
+            </div>
+          )}
 
-          {(dashboard?.unidades ?? []).some(u=>u.status!=='otimo') && (
-            <Card className="rounded-2xl border-2 border-orange-200 bg-orange-50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2 text-orange-800">
-                  <AlertCircle className="h-5 w-5"/>Unidades que precisam de atencao
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {(dashboard?.unidades ?? []).filter(u=>u.status!=='otimo').map(u=>(
-                  <div key={u.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-orange-200">
+          {/* Próximas reuniões */}
+          {!loading && (dashboard?.proximasReunioes?.length ?? 0) > 0 && (
+            <SectionCard title="Próximas Reuniões" icon={<Calendar className="h-4 w-4 text-indigo-500" />}
+              action={{ label: 'Ver todas', onClick: () => setAbaAtiva('reunioes') }}>
+              <div className="space-y-2">
+                {dashboard!.proximasReunioes.map(r => (
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div>
-                      <p className="font-semibold text-sm">{u.nome}</p>
-                      <div className="flex gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                        {u.taxaPresenca<80 && <span>Presenca baixa ({u.taxaPresenca}%)</span>}
-                        {!u.planejamentosOk && <span>Planejamentos pendentes</span>}
-                        {u.requisicoesAbertas>0 && <span>{u.requisicoesAbertas} pedido(s) aberto(s)</span>}
-                      </div>
+                      <p className="text-sm font-medium text-gray-800">{r.titulo}</p>
+                      {r.localOuLink && <p className="text-xs text-gray-400">{r.localOuLink}</p>}
                     </div>
-                    <button onClick={()=>{setFiltro(u.status);setAbaAtiva('unidades');}}
-                      className="flex items-center gap-1 text-blue-500 text-sm font-medium hover:text-blue-700">
-                      Ver <ChevronRight className="h-4 w-4"/>
-                    </button>
+                    <div className="text-right">
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
+                      <p className="text-xs text-gray-400 mt-0.5">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</p>
+                    </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </SectionCard>
           )}
         </div>
       )}
 
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: UNIDADES
+      ══════════════════════════════════════════════════════════════════ */}
       {abaAtiva === 'unidades' && (
         <div className="space-y-4">
           <div className="flex gap-2 flex-wrap">
-            {filtros.map(f=>(
-              <button key={f.id} onClick={()=>setFiltro(f.id as typeof filtro)}
-                className={`px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${filtro===f.id?'bg-blue-500 text-white border-blue-500':'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                {f.label} ({f.count})
+            {(['todas', 'otimo', 'atencao', 'critico'] as const).map(s => (
+              <button key={s} onClick={() => setFiltroStatus(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  filtroStatus === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                }`}>
+                {s === 'todas' ? 'Todas' : STATUS_CFG[s].label}
+                {s !== 'todas' && <span className="ml-1.5 opacity-70">({unidades.filter(u => u._status === s).length})</span>}
               </button>
             ))}
           </div>
-          {unidadesFiltradas.map(u=>{
-            const cfg=STATUS_CONFIG[u.status];
-            return (
-              <Card key={u.id} className={`rounded-2xl border-2 overflow-hidden ${u.status==='critico'?'border-red-300':u.status==='atencao'?'border-yellow-300':'border-green-200'}`}>
-                <div className={`px-4 py-2 flex items-center justify-between ${u.status==='critico'?'bg-red-50':u.status==='atencao'?'bg-yellow-50':'bg-green-50'}`}>
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-gray-600"/>
-                    <span className="font-bold text-sm">{u.nome}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full border font-medium ${cfg.cor}`}>{cfg.label}</span>
-                </div>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-xl">
-                      <p className="text-2xl font-bold text-gray-800">{u.totalAlunos}</p>
-                      <p className="text-xs text-gray-500">Criancas</p>
-                    </div>
-                    <div className="text-center p-3 bg-gray-50 rounded-xl">
-                      <p className="text-2xl font-bold text-gray-800">{u.totalTurmas}</p>
-                      <p className="text-xs text-gray-500">Turmas</p>
-                    </div>
-                    <div className={`text-center p-3 rounded-xl ${u.taxaPresenca>=85?'bg-green-50':u.taxaPresenca>=70?'bg-yellow-50':'bg-red-50'}`}>
-                      <p className={`text-2xl font-bold ${u.taxaPresenca>=85?'text-green-700':u.taxaPresenca>=70?'text-yellow-700':'text-red-700'}`}>{u.taxaPresenca}%</p>
-                      <p className="text-xs text-gray-500">Presenca</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border ${u.planejamentosOk?'bg-green-50 text-green-700 border-green-200':'bg-red-50 text-red-700 border-red-200'}`}>
-                      {u.planejamentosOk?<CheckCircle className="h-3 w-3"/>:<AlertCircle className="h-3 w-3"/>}
-                      Planejamentos {u.planejamentosOk?'ok':'pendentes'}
-                    </span>
-                    <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200">
-                      <ClipboardList className="h-3 w-3"/>{u.diariosEstaSemana} diarios esta semana
-                    </span>
-                    {u.requisicoesAbertas>0 && (
-                      <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border bg-orange-50 text-orange-700 border-orange-200">
-                        <ShoppingCart className="h-3 w-3"/>{u.requisicoesAbertas} pedido(s) aberto(s)
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
 
-      {abaAtiva === 'relatorio' && (
-        <div className="space-y-4">
-          <Card className="rounded-2xl border-2">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart2 className="h-5 w-5 text-blue-500"/>Ranking de Presenca por Unidade
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[...(dashboard?.unidades ?? [])].sort((a,b)=>b.taxaPresenca-a.taxaPresenca).map((u,idx)=>{
-                const cfg=STATUS_CONFIG[u.status];
+          {loading ? (
+            <div className="space-y-3">{[0,1,2,3].map(i => <div key={i} className="h-28 animate-pulse bg-gray-100 rounded-2xl" />)}</div>
+          ) : unidadesFiltradas.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-2xl">
+              <Building2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Nenhuma unidade encontrada</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {[...unidadesFiltradas].sort((a, b) => {
+                const order = { critico: 0, atencao: 1, otimo: 2 };
+                return order[a._status] - order[b._status];
+              }).map(u => {
+                const cfg = STATUS_CFG[u._status];
                 return (
-                  <div key={u.id}>
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={u.id} className={`border rounded-2xl p-4 ${cfg.bg} ${cfg.border}`}>
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${idx===0?'bg-yellow-400 text-white':idx===1?'bg-gray-300 text-white':idx===2?'bg-orange-400 text-white':'bg-gray-100 text-gray-600'}`}>{idx+1}</span>
-                        <span className="text-sm font-semibold">{u.nome}</span>
+                        <div className={`w-2.5 h-2.5 rounded-full ${cfg.dot} flex-shrink-0 mt-0.5`} />
+                        <div>
+                          <p className={`text-sm font-semibold ${cfg.text}`}>{u.nome}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>{cfg.label}</span>
+                        </div>
                       </div>
-                      <span className="text-sm font-bold text-gray-700">{u.taxaPresenca}%</span>
+                      <div className="text-right">
+                        <p className={`text-xl font-bold ${cfg.text}`}>{Math.round(u._presenca)}%</p>
+                        <p className="text-xs text-gray-500">presença</p>
+                      </div>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-3">
-                      <div className={`h-3 rounded-full ${cfg.barCor}`} style={{width:`${u.taxaPresenca}%`}}/>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+                      <div className={`h-1.5 rounded-full ${cfg.bar}`} style={{ width: `${Math.min(u._presenca, 100)}%` }} />
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+                      {[
+                        { label: 'Alunos',         val: u.totalAlunos,           alert: false },
+                        { label: 'Professores',    val: u.totalProfessores,      alert: false },
+                        { label: 'Turmas',         val: u.totalTurmas,           alert: false },
+                        { label: 'Diários hoje',   val: u.diariosHoje,           alert: u.diariosHoje === 0 },
+                        { label: 'Req. abertas',   val: u.requisicoesPendentes,  alert: u.requisicoesPendentes > 0 },
+                        { label: 'Plan. rascunho', val: u.planejamentosRascunho, alert: u.planejamentosRascunho > 3 },
+                      ].map((m, i) => (
+                        <div key={i} className={`bg-white bg-opacity-60 rounded-lg p-2 ${m.alert ? 'ring-1 ring-orange-300' : ''}`}>
+                          <p className={`text-base font-bold ${m.alert ? 'text-orange-600' : 'text-gray-700'}`}>{m.val}</p>
+                          <p className="text-xs text-gray-500 leading-tight">{m.label}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-2">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-purple-500"/>Diarios registrados esta semana
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {(dashboard?.unidades ?? []).map(u=>(
-                <div key={u.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                  <span className="text-sm font-medium">{u.nome}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      {Array.from({length:Math.min(u.diariosEstaSemana,10)}).map((_,i)=>(
-                        <span key={i} className="w-3 h-3 bg-blue-400 rounded-sm"/>
-                      ))}
-                      {u.diariosEstaSemana>10 && <span className="text-xs text-gray-500">+{u.diariosEstaSemana-10}</span>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: PEDAGÓGICO
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'pedagogico' && (
+        <div className="space-y-5">
+          <SectionCard title="Funil de Planejamentos (últimos 30 dias)" icon={<TrendingUp className="h-4 w-4 text-purple-500" />}>
+            {loading ? (
+              <div className="h-40 animate-pulse bg-gray-100 rounded-xl" />
+            ) : funilDados.length > 0 ? (
+              <div className="space-y-3">
+                {funilDados.map((f, i) => {
+                  const max = funilDados[0]?.valor || 1;
+                  const pctVal = Math.round((f.valor / max) * 100);
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-20 text-right">{f.etapa}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-7 relative overflow-hidden">
+                        <div className="h-7 rounded-full flex items-center justify-end pr-3 transition-all"
+                          style={{ width: `${Math.max(pctVal, 8)}%`, background: f.cor }}>
+                          <span className="text-xs font-bold text-white">{f.valor}</span>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400 w-10">{pctVal}%</span>
                     </div>
-                    <span className="text-sm font-bold text-blue-600">{u.diariosEstaSemana}</span>
+                  );
+                })}
+                {funil && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Taxa de aprovação: {funil.funnel.created
+                      ? Math.round((funil.funnel.approved / funil.funnel.created) * 100)
+                      : 0}% dos planejamentos criados foram aprovados
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 text-center py-8">Sem dados de planejamentos no período</p>
+            )}
+          </SectionCard>
+
+          {radarDados.length > 0 && (
+            <SectionCard title="Cobertura BNCC — Campos de Experiência" icon={<Star className="h-4 w-4 text-yellow-500" />}>
+              <ResponsiveContainer width="100%" height={250}>
+                <RadarChart data={radarDados}>
+                  <PolarGrid stroke="#e5e7eb" />
+                  <PolarAngleAxis dataKey="campo" tick={{ fontSize: 10 }} />
+                  <Radar name="Cobertura" dataKey="cobertura" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.25} />
+                  <Tooltip formatter={(v: number) => [`${v}%`, 'Cobertura']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </SectionCard>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: 'Planejamentos', icon: <FileText className="h-5 w-5" />,  path: '/app/coordenacao' },
+              { label: 'Diários',       icon: <BookOpen className="h-5 w-5" />,   path: '/app/coordenacao' },
+              { label: 'Matriz 2026',   icon: <Brain className="h-5 w-5" />,      path: '/app/matriz-pedagogica' },
+              { label: 'Análises',      icon: <BarChart2 className="h-5 w-5" />,  path: '/app/central' },
+              { label: 'RDICs',         icon: <Eye className="h-5 w-5" />,        path: '/app/rdic-geral' },
+              { label: 'Relatórios',    icon: <TrendingUp className="h-5 w-5" />, path: '/app/reports' },
+            ].map((item, i) => (
+              <button key={i} onClick={() => navigate(item.path)}
+                className="flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-2xl hover:border-blue-300 hover:shadow-sm transition-all text-gray-600 hover:text-blue-700">
+                {item.icon}
+                <span className="text-xs font-medium">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: REQUISIÇÕES
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'requisicoes' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {reqPendentes > 0 ? `${reqPendentes} requisição(ões) aguardando aprovação` : 'Nenhuma requisição pendente'}
+            </p>
+            <button onClick={() => navigate('/app/material-requests')}
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+              Gerenciar <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">{[0,1,2].map(i => <div key={i} className="h-16 animate-pulse bg-gray-100 rounded-xl" />)}</div>
+          ) : requisicoes.length === 0 ? (
+            <div className="text-center py-12 bg-green-50 border border-green-200 rounded-2xl">
+              <CheckCircle className="h-10 w-10 text-green-400 mx-auto mb-2" />
+              <p className="text-sm text-green-700 font-medium">Tudo em dia!</p>
+              <p className="text-xs text-green-500">Nenhuma requisição pendente</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {requisicoes.slice(0, 20).map(r => (
+                <div key={r.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-200 transition-all">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">
+                      {r.createdByUser ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}` : 'Professor'}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {r.classroom?.name ?? '—'}{r.classroom?.unit?.name ? ` · ${r.classroom.unit.name}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3">
+                    {r.category && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{r.category}</span>}
+                    <span className="text-xs text-gray-400">{relDate(r.createdAt)}</span>
+                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Pendente</span>
                   </div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ─── ABA MATRIZ 2026 ─── */}
-      {abaAtiva === 'matriz' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">Matriz Pedagógica 2026 — Dados Reais</h2>
-              <p className="text-sm text-gray-500">Objetivos do banco de dados, com Exemplo de Atividade visível para coordenação</p>
             </div>
-            <button onClick={() => navigate('/app/planejamento-diario')}
-              className="flex items-center gap-1 text-indigo-600 text-sm font-medium hover:text-indigo-800">
-              Calendário completo <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Filtros */}
-          <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Data inicial</label>
-              <input
-                type="date"
-                value={matrizDataFiltro}
-                onChange={e => {
-                  setMatrizDataFiltro(e.target.value);
-                  carregarMatriz(e.target.value);
-                }}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Segmento</label>
-              <select
-                value={matrizSegFiltro}
-                onChange={e => setMatrizSegFiltro(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              >
-                <option value="todos">Todos</option>
-                <option value="EI01">EI01 (0–18m)</option>
-                <option value="EI02">EI02 (19–47m)</option>
-                <option value="EI03">EI03 (48–71m)</option>
-              </select>
-            </div>
-            <button
-              onClick={() => carregarMatriz(matrizDataFiltro)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-all"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Atualizar
-            </button>
-          </div>
-
-          {loadingMatriz ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando dados da Matriz...</div>
-          ) : matrizEntries.length === 0 ? (
-            <div className="text-center py-10 bg-gray-50 rounded-xl">
-              <Layers className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Nenhum objetivo encontrado para o período selecionado</p>
-              <p className="text-xs text-gray-300 mt-1">Verifique se há entradas cadastradas na Matriz 2026</p>
-            </div>
-          ) : (
-            <>
-              {/* Resumo por segmento */}
-              {(() => {
-                const SEG_CORES: Record<string, string> = { EI01: 'bg-rose-50 border-rose-200', EI02: 'bg-amber-50 border-amber-200', EI03: 'bg-emerald-50 border-emerald-200' };
-                const SEG_TEXT: Record<string, string> = { EI01: 'text-rose-700', EI02: 'text-amber-700', EI03: 'text-emerald-700' };
-                const SEG_LABEL: Record<string, string> = { EI01: 'Bebês (0–18m)', EI02: 'Crianças Pequenas (19–47m)', EI03: 'Crianças Maiores (48–71m)' };
-                const segs = ['EI01', 'EI02', 'EI03'];
-                const filtradas = matrizEntries.filter(e => matrizSegFiltro === 'todos' || e.matrix.segment === matrizSegFiltro);
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {segs.filter(s => matrizSegFiltro === 'todos' || s === matrizSegFiltro).map(seg => {
-                      const total = filtradas.filter(e => e.matrix.segment === seg).length;
-                      return (
-                        <Card key={seg} className={`border-2 ${SEG_CORES[seg] ?? 'bg-gray-50 border-gray-200'}`}>
-                          <CardContent className="pt-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`font-bold text-sm ${SEG_TEXT[seg] ?? 'text-gray-700'}`}>{seg}</span>
-                              <span className="text-xs text-gray-500">{SEG_LABEL[seg]}</span>
-                            </div>
-                            <div className="flex items-end gap-2">
-                              <span className={`text-3xl font-bold ${SEG_TEXT[seg] ?? 'text-gray-700'}`}>{total}</span>
-                              <span className="text-sm text-gray-400 mb-1">objetivos no período</span>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-
-              {/* Tabela de objetivos com exemploAtividade */}
-              <Card className="border-2 border-indigo-100">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Calendar className="h-5 w-5 text-indigo-500" />
-                    Objetivos do período — {matrizEntries.filter(e => matrizSegFiltro === 'todos' || e.matrix.segment === matrizSegFiltro).length} registros
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-gray-50">
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Data</th>
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Segmento</th>
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Campo</th>
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Código BNCC</th>
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Objetivo BNCC</th>
-                          <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 bg-amber-50">Exemplo de Atividade ✦</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {matrizEntries
-                          .filter(e => matrizSegFiltro === 'todos' || e.matrix.segment === matrizSegFiltro)
-                          .map(entry => {
-                            const dateStr = entry.date ? new Date(entry.date).toLocaleDateString('pt-BR') : '—';
-                            const SEG_BADGE: Record<string, string> = {
-                              EI01: 'bg-rose-100 text-rose-700',
-                              EI02: 'bg-amber-100 text-amber-700',
-                              EI03: 'bg-emerald-100 text-emerald-700',
-                            };
-                            return (
-                              <tr key={entry.id} className="border-b hover:bg-gray-50">
-                                <td className="py-2 px-3 font-medium whitespace-nowrap">{dateStr}</td>
-                                <td className="py-2 px-3">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${SEG_BADGE[entry.matrix.segment] ?? 'bg-gray-100 text-gray-600'}`}>
-                                    {entry.matrix.segment}
-                                  </span>
-                                </td>
-                                <td className="py-2 px-3 text-xs text-gray-600 max-w-[120px] truncate">
-                                  {entry.campoDeExperiencia.replace(/_/g, ' ')}
-                                </td>
-                                <td className="py-2 px-3">
-                                  {entry.objetivoBNCCCode && (
-                                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{entry.objetivoBNCCCode}</span>
-                                  )}
-                                </td>
-                                <td className="py-2 px-3 text-xs text-gray-700 max-w-[200px]">
-                                  <p className="line-clamp-2">{entry.objetivoBNCC}</p>
-                                </td>
-                                <td className="py-2 px-3 text-xs max-w-[200px] bg-amber-50/30">
-                                  {entry.exemploAtividade ? (
-                                    <p className="text-amber-800 line-clamp-2">{entry.exemploAtividade}</p>
-                                  ) : (
-                                    <span className="text-gray-300 italic">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="mt-3 pt-3 border-t flex justify-end">
-                    <button onClick={() => navigate('/app/planejamento-diario')}
-                      className="flex items-center gap-1 text-indigo-600 text-sm font-medium hover:text-indigo-800">
-                      Ver calendário pedagógico completo <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
           )}
         </div>
       )}
-      {/* ABA: ALUNOS POR UNIDADE */}
-      {abaAtiva === 'alunos' && (
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-            <p className="text-sm text-blue-700">
-              Selecione uma unidade para visualizar todas as turmas, alunos, chamadas, diários de bordo e RDIC.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(dashboard?.unidades ?? []).map(unidade => (
-              <button key={unidade.id}
-                onClick={() => navigate(`/app/coordenacao?unitId=${unidade.id}`)}
-                className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800">{unidade.nome}</p>
-                    <p className="text-xs text-gray-400">{unidade.totalTurmas} turmas · {unidade.totalAlunos} alunos · {unidade.totalProfessores} professores</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                        <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${unidade.taxaPresenca}%` }} />
-                      </div>
-                      <span className="text-xs text-gray-500">{unidade.taxaPresenca}% presença</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-gray-300" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
-      {abaAtiva === 'observacoes' && (
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: REUNIÕES
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'reunioes' && (
         <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-            <p className="text-sm text-teal-700">
-              Visualize as observações individuais de desenvolvimento, comportamento e evolução de todos os alunos de todas as unidades.
-              Selecione uma unidade para começar.
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {dashboard?.proximasReunioes?.length ?? 0} próxima(s) reunião(ões) agendada(s)
             </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(dashboard?.unidades ?? []).map(unidade => (
-              <button key={unidade.id}
-                onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
-                className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <ClipboardList className="h-6 w-6 text-teal-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800">{unidade.nome}</p>
-                    <p className="text-xs text-gray-400">{unidade.totalAlunos} alunos · {unidade.totalTurmas} turmas</p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-gray-300" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ABA: DESENVOLVIMENTO PSICOLÓGICO */}
-      {abaAtiva === 'psicologia' && (
-        <div className="space-y-4">
-          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-purple-800 mb-1">Relatórios de Desenvolvimento Psicológico e Mental</p>
-            <p className="text-sm text-purple-700">
-              Acesse os alertas de desenvolvimento, observações psicológicas e relatórios individuais de evolução de todas as crianças.
-              Disponível para coordenadora geral e psicóloga.
-            </p>
+            <button onClick={() => navigate('/app/coordenacao')}
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+              Gerenciar <ArrowRight className="h-3 w-3" />
+            </button>
           </div>
 
-          {/* Alertas por unidade */}
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-700">Selecione uma unidade para ver os alertas:</p>
-            {(dashboard?.unidades ?? []).map(unidade => (
-              <div key={unidade.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-purple-200 transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                      <Building2 className="h-5 w-5 text-purple-600" />
-                    </div>
+          {(dashboard?.proximasReunioes?.length ?? 0) > 0 && (
+            <SectionCard title="Próximas" icon={<Clock className="h-4 w-4 text-blue-500" />}>
+              <div className="space-y-3">
+                {dashboard!.proximasReunioes.map(r => (
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <div>
-                      <p className="font-semibold text-gray-800">{unidade.nome}</p>
-                      <p className="text-xs text-gray-400">{unidade.totalAlunos} alunos · {unidade.totalTurmas} turmas</p>
+                      <p className="text-sm font-medium text-gray-800">{r.titulo}</p>
+                      {r.localOuLink && <p className="text-xs text-gray-400">{r.localOuLink}</p>}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
+                      <p className="text-xs text-gray-400 mt-0.5">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium border ${STATUS_CONFIG[unidade.status].cor}`}>
-                    {STATUS_CONFIG[unidade.status].label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
-                    <Network className="h-5 w-5 text-purple-600" />
-                    <span className="text-xs font-medium text-purple-700">Obs. Psicol.</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/rdic-geral?unitId=${unidade.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
-                    <ClipboardList className="h-5 w-5 text-indigo-600" />
-                    <span className="text-xs font-medium text-indigo-700">RDICs</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/reports?unitId=${unidade.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
-                    <TrendingUp className="h-5 w-5 text-teal-600" />
-                    <span className="text-xs font-medium text-teal-700">Evolução</span>
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          {/* Indicadores consolidados */}
-          <div className="bg-white border-2 border-purple-100 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-gray-700 mb-3">Indicadores Consolidados — Todas as Unidades</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-purple-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-purple-600">{dashboard?.totalAlunos ?? 0}</p>
-                <p className="text-xs text-gray-500">Total de crianças</p>
-              </div>
-              <div className="bg-orange-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-orange-600">
-                  {(dashboard?.unidades ?? []).filter(u => u.status === 'critico').length}
-                </p>
-                <p className="text-xs text-gray-500">Unidades em alerta crítico</p>
-              </div>
-              <div className="bg-yellow-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-yellow-600">
-                  {(dashboard?.unidades ?? []).filter(u => u.status === 'atencao').length}
-                </p>
-                <p className="text-xs text-gray-500">Unidades em atenção</p>
-              </div>
-              <div className="bg-green-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-green-600">
-                  {(dashboard?.unidades ?? []).filter(u => u.status === 'otimo').length}
-                </p>
-                <p className="text-xs text-gray-500">Unidades ótimas</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ABA: COBERTURA MULTIUNIDADE */}
-      {abaAtiva === 'cobertura' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-gray-700">Cobertura de Registros — Rede</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Crianças com pelo menos 1 DiaryEvent hoje, por unidade</p>
-            </div>
-            <button
-              onClick={() => { setCoberturaGeral(null); carregarCoberturaGeral(); }}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Atualizar">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
-
-          {loadingCoberturaGeral ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura da rede...</div>
-          ) : coberturaGeral ? (
-            <>
-              {/* Indicadores da Rede */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-700">{coberturaGeral.totalComRegistro}</p>
-                  <p className="text-xs text-blue-500 mt-1">Com registro hoje</p>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                  <p className="text-2xl font-bold text-gray-700">{coberturaGeral.totalCriancas}</p>
-                  <p className="text-xs text-gray-500 mt-1">Total na rede</p>
-                </div>
-                <div className={`border rounded-xl p-4 text-center ${
-                  coberturaGeral.percentualGeral >= 80 ? 'bg-green-50 border-green-200' :
-                  coberturaGeral.percentualGeral >= 50 ? 'bg-yellow-50 border-yellow-200' :
-                  'bg-red-50 border-red-200'
-                }`}>
-                  <p className={`text-2xl font-bold ${
-                    coberturaGeral.percentualGeral >= 80 ? 'text-green-700' :
-                    coberturaGeral.percentualGeral >= 50 ? 'text-yellow-700' : 'text-red-700'
-                  }`}>{coberturaGeral.percentualGeral}%</p>
-                  <p className="text-xs text-gray-500 mt-1">Cobertura geral</p>
-                </div>
-              </div>
-
-              {/* Barra global */}
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Cobertura da rede hoje</span>
-                  <span className="text-sm font-bold text-gray-600">{coberturaGeral.percentualGeral}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div
-                    className={`h-3 rounded-full transition-all duration-700 ${
-                      coberturaGeral.percentualGeral >= 80 ? 'bg-green-500' :
-                      coberturaGeral.percentualGeral >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}
-                    style={{ width: `${coberturaGeral.percentualGeral}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Comparativo por unidade — ranking */}
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Comparativo por unidade</p>
-                {[...coberturaGeral.unidades]
-                  .sort((a, b) => b.percentual - a.percentual)
-                  .map((u, idx) => (
-                    <div key={u.unitId} className="bg-white border border-gray-200 rounded-xl p-3">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                          idx === 0 ? 'bg-yellow-400 text-white' :
-                          idx === 1 ? 'bg-gray-300 text-white' :
-                          idx === 2 ? 'bg-orange-400 text-white' : 'bg-gray-100 text-gray-600'
-                        }`}>{idx + 1}</span>
-                        <span className="flex-1 font-medium text-sm text-gray-800">{u.unitName}</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          u.percentual >= 80 ? 'bg-green-100 text-green-700' :
-                          u.percentual >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>{u.totalComRegistro}/{u.totalCriancas} · {u.percentual}%</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2.5">
-                        <div
-                          className={`h-2.5 rounded-full ${
-                            u.percentual >= 80 ? 'bg-green-500' :
-                            u.percentual >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${u.percentual}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-
-              {/* Alerta unidades críticas */}
-              {coberturaGeral.unidades.filter(u => u.percentual < 50).length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    <p className="text-sm font-semibold text-red-700">Unidades com cobertura crítica (&lt;50%)</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    {coberturaGeral.unidades
-                      .filter(u => u.percentual < 50)
-                      .map(u => (
-                        <div key={u.unitId} className="flex items-center justify-between bg-white border border-red-100 rounded-lg px-3 py-2">
-                          <span className="text-sm font-medium text-gray-800">{u.unitName}</span>
-                          <span className="text-xs font-bold text-red-600">{u.percentual}%</span>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-10 bg-gray-50 rounded-xl">
-              <BarChart2 className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Nenhum dado de cobertura disponível</p>
-              <p className="text-xs text-gray-300 mt-1">Verifique se há crianças e turmas cadastradas</p>
-            </div>
+            </SectionCard>
           )}
-        </div>
-      )}
 
+          {(dashboard?.ultimasReunioes?.length ?? 0) > 0 && (
+            <SectionCard title="Últimas realizadas" icon={<CheckCircle className="h-4 w-4 text-green-500" />}>
+              <div className="space-y-3">
+                {dashboard!.ultimasReunioes.map(r => (
+                  <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <p className="text-sm text-gray-700">{r.titulo}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        r.status === 'REALIZADA' ? 'bg-green-100 text-green-700' :
+                        r.status === 'CANCELADA' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                      }`}>{r.status}</span>
+                      <span className="text-xs text-gray-400">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
 
-      {/* ABA: FUNIL PEDAGÓGICO */}
-      {abaAtiva === 'funil' && (
-        <div className="space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-indigo-800 mb-1">Funil de Planejamentos Pedagógicos</p>
-              <p className="text-xs text-indigo-600">Acompanhe quantos planejamentos avançaram por cada etapa do fluxo de revisão.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select value={funilUnitId} onChange={e => setFunilUnitId(e.target.value)}
-                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white">
-                <option value="">Toda a rede</option>
-                {unidadesDisponiveis.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <input type="date" value={funilStartDate} onChange={e => setFunilStartDate(e.target.value)}
-                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white" />
-              <input type="date" value={funilEndDate} onChange={e => setFunilEndDate(e.target.value)}
-                className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white" />
-              <button onClick={() => { setFunil(null); carregarFunil(funilUnitId, funilStartDate, funilEndDate); }}
-                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors">
-                Aplicar
+          {!loading && !dashboard?.proximasReunioes?.length && !dashboard?.ultimasReunioes?.length && (
+            <div className="text-center py-12 bg-gray-50 rounded-2xl">
+              <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Nenhuma reunião registrada</p>
+              <button onClick={() => navigate('/app/coordenacao')} className="mt-3 text-xs text-blue-600 underline">
+                Agendar reunião
               </button>
             </div>
-          </div>
-
-          {loadingFunil ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando funil pedagógico...</div>
-          ) : funil ? (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Criados', val: funil.funnel.created, cor: 'bg-blue-50 border-blue-200 text-blue-700', pct: 100 },
-                  { label: 'Submetidos', val: funil.funnel.submitted, cor: 'bg-indigo-50 border-indigo-200 text-indigo-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.submitted / funil.funnel.created * 100) : 0 },
-                  { label: 'Aprovados', val: funil.funnel.approved, cor: 'bg-green-50 border-green-200 text-green-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.approved / funil.funnel.created * 100) : 0 },
-                  { label: 'Executados', val: funil.funnel.executed, cor: 'bg-emerald-50 border-emerald-200 text-emerald-700', pct: funil.funnel.created > 0 ? Math.round(funil.funnel.executed / funil.funnel.created * 100) : 0 },
-                ].map((item, idx) => (
-                  <div key={idx} className={`border rounded-2xl p-4 text-center ${item.cor}`}>
-                    <p className="text-3xl font-bold">{item.val}</p>
-                    <p className="text-xs font-medium mt-1">{item.label}</p>
-                    <p className="text-xs mt-1 opacity-70">{item.pct}% do total</p>
-                  </div>
-                ))}
-              </div>
-              {/* Barra de funil visual */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-                <p className="text-sm font-semibold text-gray-700">Conversão por etapa</p>
-                {[
-                  { label: 'Criados → Submetidos', val: funil.funnel.created > 0 ? Math.round(funil.funnel.submitted / funil.funnel.created * 100) : 0, cor: 'bg-indigo-500' },
-                  { label: 'Submetidos → Aprovados', val: funil.funnel.submitted > 0 ? Math.round(funil.funnel.approved / funil.funnel.submitted * 100) : 0, cor: 'bg-green-500' },
-                  { label: 'Aprovados → Executados', val: funil.funnel.approved > 0 ? Math.round(funil.funnel.executed / funil.funnel.approved * 100) : 0, cor: 'bg-emerald-500' },
-                ].map((bar, idx) => (
-                  <div key={idx}>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>{bar.label}</span>
-                      <span className="font-bold">{bar.val}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2.5">
-                      <div className={`h-2.5 rounded-full ${bar.cor}`} style={{ width: `${bar.val}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 text-center">
-                Escopo: {funil.scope} · Período: {funil.periodo.inicio ?? '—'} a {funil.periodo.fim ?? '—'}
-              </p>
-            </>
-          ) : (
-            <div className="text-center py-10 bg-gray-50 rounded-xl">
-              <TrendingUp className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Nenhum dado de funil disponível</p>
-              <p className="text-xs text-gray-300 mt-1">Verifique se há planejamentos cadastrados no período</p>
-            </div>
           )}
         </div>
       )}
-
-      {/* ABA: CONSUMO REDE */}
-      {abaAtiva === 'consumo' && (
-        <div className="space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3 bg-orange-50 border border-orange-200 rounded-2xl p-4">
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-orange-800 mb-1">Consumo de Materiais — Rede</p>
-              <p className="text-xs text-orange-600">Requisições de materiais consolidadas por unidade e categoria.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select value={consumoUnitId} onChange={e => setConsumoUnitId(e.target.value)}
-                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white">
-                <option value="">Toda a rede</option>
-                {unidadesDisponiveis.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <input type="date" value={consumoDataInicio} onChange={e => setConsumoDataInicio(e.target.value)}
-                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white" />
-              <input type="date" value={consumoDataFim} onChange={e => setConsumoDataFim(e.target.value)}
-                className="text-xs border border-orange-200 rounded-lg px-2 py-1.5 bg-white" />
-              <button onClick={() => { setConsumoRede(null); carregarConsumoRede(consumoUnitId, consumoDataInicio, consumoDataFim); }}
-                className="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors">
-                Aplicar
-              </button>
-            </div>
-          </div>
-
-          {loadingConsumoRede ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando consumo da rede...</div>
-          ) : consumoRede ? (
-            <>
-              {/* Cards de totais */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Total', val: consumoRede.totais.requisicoes, cor: 'bg-gray-50 border-gray-200 text-gray-700' },
-                  { label: 'Aprovadas', val: consumoRede.totais.aprovadas, cor: 'bg-green-50 border-green-200 text-green-700' },
-                  { label: 'Pendentes', val: consumoRede.totais.pendentes, cor: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-                  { label: 'Rejeitadas', val: consumoRede.totais.rejeitadas, cor: 'bg-red-50 border-red-200 text-red-700' },
-                ].map((c, i) => (
-                  <div key={i} className={`border rounded-2xl p-4 text-center ${c.cor}`}>
-                    <p className="text-3xl font-bold">{c.val}</p>
-                    <p className="text-xs font-medium mt-1">{c.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Por unidade */}
-              {consumoRede.porUnidade.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Por Unidade</p>
-                  <div className="space-y-2">
-                    {[...consumoRede.porUnidade]
-                      .sort((a, b) => b.total - a.total)
-                      .map((u, idx) => (
-                        <div key={idx} className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500 w-4">{idx + 1}</span>
-                          <span className="flex-1 text-sm font-medium text-gray-800">{u.nome}</span>
-                          <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{u.total} req.</span>
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{u.aprovados} apr.</span>
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{u.pendentes} pend.</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Por categoria */}
-              {Object.keys(consumoRede.porCategoria).length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3">Por Categoria</p>
-                  <div className="space-y-2">
-                    {Object.entries(consumoRede.porCategoria)
-                      .sort(([,a],[,b]) => b.total - a.total)
-                      .map(([cat, data]) => (
-                        <div key={cat} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-700 capitalize">{cat.replace(/_/g, ' ').toLowerCase()}</span>
-                          <div className="flex gap-2">
-                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{data.total}</span>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{data.aprovados} apr.</span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-10 bg-gray-50 rounded-xl">
-              <ShoppingCart className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Nenhum dado de consumo disponível</p>
-              <p className="text-xs text-gray-300 mt-1">Verifique se há requisições de materiais no período</p>
-            </div>
-          )}
-        </div>
-      )}
-
     </PageShell>
   );
 }

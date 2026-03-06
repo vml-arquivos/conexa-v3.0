@@ -38,6 +38,7 @@ import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
+import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
 // ─── Módulo de Planejamento — Oficina e Torre de Controle ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
@@ -345,6 +346,16 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <DashboardCoordenacaoGeralPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Dashboard da Psicóloga Central ──────────────────────────────────
+      {
+        path: 'psicologo',
+        element: (
+          <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardPsicologoPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

@@ -100,8 +100,14 @@ const UNIDADE_PEDAGOGICO: MenuItem[] = [
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports',           label: 'Relatórios',                 icon: <BarChart2 className="h-4 w-4" /> },
 ];
-
-// STAFF_CENTRAL ────────────────────────────────────────────────────────────────
+// STAFF_CENTRAL_PSICOLOGIA ──────────────────────────────────────────────────────────────────────────────────
+const PSICOLOGA_ITEMS: MenuItem[] = [
+  { path: '/app/psicologo',    label: 'Psicologia Central',  icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/rdic-geral',   label: 'RDICs Publicados',    icon: <FileText className="h-4 w-4" /> },
+  { path: '/app/central',      label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
+  { path: '/app/reports',      label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
+];
+// STAFF_CENTRAL ──────────────────────────────────────────────────────────────────────────────────
 const CENTRAL_ITEMS: MenuItem[] = [
   { path: '/app/central',           label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
   { path: '/app/coordenacao-geral', label: 'Coordenação Geral',   icon: <Network className="h-4 w-4" /> },
@@ -196,6 +202,8 @@ export function Sidebar() {
   const isNutricionista   = userTypes.includes('UNIDADE_NUTRICIONISTA');
   const isCoordPedagogico = userTypes.includes('UNIDADE_COORDENADOR_PEDAGOGICO');
   const isAdministrativo  = userTypes.includes('UNIDADE_ADMINISTRATIVO');
+  // Flag de tipo para Psicóloga Central
+  const isPsicologa = userTypes.includes('STAFF_CENTRAL_PSICOLOGIA');
   // Se UNIDADE mas sem tipo específico, tratar como coordenadora genérica
   const isUnidadeGenerica = isUnidade && !isDiretor && !isNutricionista && !isCoordPedagogico && !isAdministrativo;
 
@@ -205,6 +213,7 @@ export function Sidebar() {
   // Label de perfil para exibição
   const perfilLabel = isDeveloper        ? 'Desenvolvedor'
     : isMantenedora                      ? 'Mantenedora'
+    : isPsicologa                        ? 'Psicóloga Central'
     : isCentral                          ? 'Equipe Central'
     : isDiretor                          ? 'Diretor(a)'
     : isNutricionista                    ? 'Nutricionista'
@@ -272,8 +281,12 @@ export function Sidebar() {
           <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} />
         )}
 
-        {/* STAFF_CENTRAL */}
-        {!isDeveloper && isCentral && (
+        {/* STAFF_CENTRAL — Psicóloga Central (menu dedicado) */}
+        {!isDeveloper && isCentral && isPsicologa && (
+          <NavSection titulo="Psicologia" items={PSICOLOGA_ITEMS} isActive={isActive} />
+        )}
+        {/* STAFF_CENTRAL — Coordenação Geral e demais */}
+        {!isDeveloper && isCentral && !isPsicologa && (
           <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} />
         )}
 
