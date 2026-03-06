@@ -38,6 +38,7 @@ import { DevelopmentObservationsModule } from './development-observations/develo
 import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { InsightsModule } from './insights/insights.module';
 import { UnitsModule } from './units/units.module';
+import { CatalogModule } from './catalog/catalog.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { UnitsModule } from './units/units.module';
     FeatureFlagsModule,
     InsightsModule,
     UnitsModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [

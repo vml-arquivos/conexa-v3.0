@@ -374,12 +374,12 @@ export function MaterialRequestApprovalTable() {
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Rejeitar Requisição</h2>
             <p className="text-sm text-gray-500 mb-4 line-clamp-2">{modalRejeitar.titulo}</p>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Motivo da rejeição <span className="text-gray-400 font-normal">(opcional)</span>
+              Motivo da rejeição <span className="text-red-500">*</span>
             </label>
             <textarea
               value={motivoRejeicao}
               onChange={e => setMotivoRejeicao(e.target.value)}
-              placeholder="Descreva o motivo para o professor..."
+              placeholder="Obrigatório: descreva o motivo para o professor..."
               rows={3}
               className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
             />
@@ -392,7 +392,7 @@ export function MaterialRequestApprovalTable() {
               </button>
               <button
                 onClick={handleConfirmarRejeicao}
-                disabled={!!processando}
+                disabled={!!processando || !motivoRejeicao.trim()}
                 className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {processando ? 'Rejeitando...' : 'Confirmar Rejeição'}

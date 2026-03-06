@@ -8,6 +8,7 @@ import { ReportsPage } from '../pages/ReportsPage';
 import TeacherDashboardPage from '../pages/TeacherDashboardPage';
 import { MaterialRequestPage } from '../pages/MaterialRequestPage';
 import { PedidosCompraPage } from '../pages/PedidosCompraPage';
+import { CatalogImportPage } from '../pages/CatalogImportPage';
 import { DashboardCentralPage } from '../pages/DashboardCentralPage';
 import { DashboardUnidadePage } from '../pages/DashboardUnidadePage';
 import { AtendimentoPaisPage } from '../pages/AtendimentoPaisPage';
@@ -244,6 +245,16 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PedidosCompraPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Catálogo de Produtos (importação CSV/XLSX) ─────────────────────
+      {
+        path: 'catalog-import',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+            <CatalogImportPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

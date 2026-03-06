@@ -31,7 +31,7 @@ import {
   type ItemPedidoDto,
   type StatusPedidoCompra,
 } from '../api/pedido-compra';
-import { getMaterialsCatalog, type MaterialCatalogItem } from '../api/materials-catalog';
+import { getCatalogItems, type CatalogItem } from '../api/catalog';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { useUnitScope } from '../contexts/UnitScopeContext';
@@ -47,23 +47,21 @@ const ICONES_STATUS: Record<string, React.ReactNode> = {
   CANCELADO: <XCircle className="h-4 w-4" />,
 };
 
-// Categorias do escopo da coordenadora (conforme especificação)
+// Categorias do escopo da coordenadora
 const CATEGORIAS_COORD = [
   { value: 'PEDAGOGICO', label: 'Pedagógico' },
   { value: 'HIGIENE', label: 'Higiene Pessoal' },
 ];
 
-// Todas as categorias disponíveis (para edição geral)
-const TODAS_CATEGORIAS = [
-  'PEDAGOGICO', 'HIGIENE', 'LIMPEZA', 'ALIMENTACAO', 'OUTRO',
-];
+const TODAS_CATEGORIAS = ['PEDAGOGICO', 'HIGIENE', 'LIMPEZA', 'ALIMENTACAO', 'OUTRO'];
 
 interface LinhaEdicao extends ItemPedidoDto {
   _key: string;
   _id?: string;
-  // Campos locais de UI (não enviados ao backend diretamente)
   _precoUnitario?: number;
   _fornecedor?: string;
+  _catalogId?: string;
+  _semPreco?: boolean; // flag: produto sem preço no catálogo
 }
 
 function gerarKey() { return Math.random().toString(36).slice(2, 10); }
@@ -71,10 +69,12 @@ function mesAtual() {
   const hoje = new Date();
   return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
 }
-
 function calcTotal(linha: LinhaEdicao): number {
   const preco = linha._precoUnitario ?? linha.custoEstimado ?? 0;
   return preco * (linha.quantidade ?? 0);
+}
+function fmtBRL(v: number) {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export function PedidosCompraPage() {
@@ -84,7 +84,7 @@ export function PedidosCompraPage() {
   const isUnidade = roles.includes('UNIDADE');
   const isMantenedora = roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
   const isCentral = roles.includes('STAFF_CENTRAL');
-  const isDiretor = types.includes('UNIDADE_DIRETOR');
+  const _isDiretor = types.includes('UNIDADE_DIRETOR');
   const { selectedUnitId: ctxUnitId } = useUnitScope();
 
   const [filtroMes, setFiltroMes] = useState(mesAtual());
@@ -110,8 +110,8 @@ export function PedidosCompraPage() {
   const [criando, setCriando] = useState(false);
   const [atualizandoStatus, setAtualizandoStatus] = useState<string | null>(null);
 
-  // Catálogo de materiais
-  const [catalogo, setCatalogo] = useState<MaterialCatalogItem[]>([]);
+  // Catálogo (novo endpoint /catalog/items)
+  const [catalogo, setCatalogo] = useState<CatalogItem[]>([]);
   const [carregandoCatalogo, setCarregandoCatalogo] = useState(false);
 
   const mostrarMensagem = (msg: string) => {
@@ -135,11 +135,11 @@ export function PedidosCompraPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Carrega catálogo quando muda a categoria do novo pedido
+  // Carrega catálogo quando abre novo pedido ou muda categoria
   useEffect(() => {
     if (!criandoNovo) return;
     setCarregandoCatalogo(true);
-    getMaterialsCatalog(novaCategoria)
+    getCatalogItems({ category: novaCategoria })
       .then(items => setCatalogo(items))
       .catch(() => setCatalogo([]))
       .finally(() => setCarregandoCatalogo(false));
@@ -151,23 +151,26 @@ export function PedidosCompraPage() {
     setNovasLinhas([{ _key: gerarKey(), categoria: cat, descricao: '', quantidade: 1 }]);
   };
 
-  // Preenche linha com dados do catálogo
-  const preencherDoCatalogo = (
+  // Seleciona produto do catálogo e preenche linha automaticamente
+  const selecionarDoCatalogo = (
     linhasState: LinhaEdicao[],
     setLinhasState: React.Dispatch<React.SetStateAction<LinhaEdicao[]>>,
     key: string,
-    materialId: string,
+    catalogId: string,
   ) => {
-    const mat = catalogo.find(m => m.id === materialId);
-    if (!mat) return;
+    const item = catalogo.find(c => c.id === catalogId);
+    if (!item) return;
     setLinhasState(linhasState.map(l =>
       l._key === key
         ? {
             ...l,
-            descricao: mat.name,
-            unidadeMedida: mat.unit,
-            _precoUnitario: mat.referencePrice ?? 0,
-            custoEstimado: mat.referencePrice ?? 0,
+            _catalogId: item.id,
+            descricao: item.name,
+            unidadeMedida: item.unit,
+            _precoUnitario: item.price ?? undefined,
+            custoEstimado: item.price ?? undefined,
+            _fornecedor: item.supplier ?? undefined,
+            _semPreco: item.price === null,
           }
         : l,
     ));
@@ -192,8 +195,8 @@ export function PedidosCompraPage() {
           }))
         : [{ _key: gerarKey(), categoria: 'PEDAGOGICO', descricao: '', quantidade: 1 }],
     );
-    // Carrega catálogo para edição
-    getMaterialsCatalog().then(items => setCatalogo(items)).catch(() => {});
+    // Carrega catálogo para edição (sem filtro de categoria)
+    getCatalogItems().then(items => setCatalogo(items)).catch(() => {});
   };
 
   const salvarEdicao = async (pedidoId: string) => {
@@ -207,7 +210,6 @@ export function PedidosCompraPage() {
           descricao,
           quantidade,
           unidadeMedida,
-          // Usa precoUnitario se preenchido, senão custoEstimado
           custoEstimado: _precoUnitario ?? custoEstimado,
         })),
       });
@@ -221,7 +223,7 @@ export function PedidosCompraPage() {
 
   const handleCriarPedido = async () => {
     const itensValidos = novasLinhas.filter(l => l.descricao.trim() !== '');
-    if (itensValidos.length === 0) { setErro('Adicione pelo menos um item com descrição.'); return; }
+    if (itensValidos.length === 0) { setErro('Adicione pelo menos um item.'); return; }
     setCriando(true); setErro(null);
     try {
       const novo = await criarPedido({
@@ -273,16 +275,21 @@ export function PedidosCompraPage() {
   const removerLinha = (setLinhasState: React.Dispatch<React.SetStateAction<LinhaEdicao[]>>, key: string) =>
     setLinhasState(prev => prev.filter(l => l._key !== key));
 
-  // ── Renderização da planilha (tabela) ─────────────────────────────────────
+  // ── Renderização da planilha ──────────────────────────────────────────────
   const renderTabela = (
     itens: LinhaEdicao[],
     setItens: React.Dispatch<React.SetStateAction<LinhaEdicao[]>>,
     editavel: boolean,
-    pedido?: PedidoCompra,
+    _pedido?: PedidoCompra,
     categoriaFixa?: string,
   ) => {
     const totalGeral = itens.reduce((s, l) => s + calcTotal(l), 0);
-    const colCount = editavel ? 9 : 8; // +1 para coluna de ações
+    const colCount = editavel ? 9 : 8;
+
+    // Filtra catálogo pela categoria fixada (se houver)
+    const catalogoFiltrado = categoriaFixa
+      ? catalogo.filter(c => c.category.toUpperCase() === categoriaFixa.toUpperCase())
+      : catalogo;
 
     return (
       <div className="overflow-x-auto">
@@ -330,49 +337,53 @@ export function PedidosCompraPage() {
                     </td>
                   )}
 
-                  {/* Produto */}
+                  {/* Produto — 100% SELECT do catálogo */}
                   <td className="px-3 py-1.5">
                     {editavel ? (
-                      catalogo.length > 0 ? (
-                        <div className="flex gap-1">
+                      catalogoFiltrado.length > 0 ? (
+                        <div>
+                          <select
+                            value={l._catalogId ?? ''}
+                            onChange={e => {
+                              if (e.target.value) {
+                                selecionarDoCatalogo(itens, setItens, l._key, e.target.value);
+                              } else {
+                                // Limpa seleção
+                                setItens(itens.map(x => x._key === l._key
+                                  ? { ...x, _catalogId: undefined, descricao: '', unidadeMedida: undefined, _precoUnitario: undefined, custoEstimado: undefined, _fornecedor: undefined, _semPreco: false }
+                                  : x,
+                                ));
+                              }
+                            }}
+                            className="w-full border border-gray-200 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                          >
+                            <option value="">— Selecione o produto —</option>
+                            {catalogoFiltrado.map(c => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}{c.price !== null ? ` (${fmtBRL(c.price)})` : ' (sem preço)'}
+                              </option>
+                            ))}
+                          </select>
+                          {l._semPreco && (
+                            <p className="text-xs text-amber-600 mt-0.5">
+                              Preço não cadastrado no catálogo — informe manualmente.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        // Fallback: catálogo vazio → campo de texto com aviso
+                        <div>
                           <input
                             type="text"
                             value={l.descricao}
                             onChange={e => atualizarLinha(itens, setItens, l._key, 'descricao', e.target.value)}
-                            placeholder="Descrição do produto…"
-                            list={`catalog-${l._key}`}
-                            className="w-full border border-gray-200 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            placeholder="Catálogo vazio — digite o produto"
+                            className="w-full border border-amber-300 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-400"
                           />
-                          <datalist id={`catalog-${l._key}`}>
-                            {catalogo
-                              .filter(m => !categoriaFixa || m.category === categoriaFixa)
-                              .map(m => (
-                                <option key={m.id} value={m.name} />
-                              ))}
-                          </datalist>
-                          {/* Botão para preencher do catálogo */}
-                          {catalogo.find(m => m.name === l.descricao) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const mat = catalogo.find(m => m.name === l.descricao);
-                                if (mat) preencherDoCatalogo(itens, setItens, l._key, mat.id);
-                              }}
-                              title="Preencher preço do catálogo"
-                              className="text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap px-1"
-                            >
-                              ↓ preço
-                            </button>
-                          )}
+                          <p className="text-xs text-amber-600 mt-0.5">
+                            Catálogo não disponível. Importe produtos em Administração → Catálogo.
+                          </p>
                         </div>
-                      ) : (
-                        <input
-                          type="text"
-                          value={l.descricao}
-                          onChange={e => atualizarLinha(itens, setItens, l._key, 'descricao', e.target.value)}
-                          placeholder="Descrição"
-                          className="w-full border border-gray-200 rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-                        />
                       )
                     ) : l.descricao}
                   </td>
@@ -401,13 +412,13 @@ export function PedidosCompraPage() {
                           min={1}
                           value={l.quantidade}
                           onChange={e => atualizarLinha(itens, setItens, l._key, 'quantidade', Number(e.target.value))}
-                          className="w-16 border border-gray-200 rounded px-1 py-0.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          className="w-full border border-gray-200 rounded px-1 py-0.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
                       )
                       : l.quantidade}
                   </td>
 
-                  {/* Preço Unitário */}
+                  {/* Preço Unitário — editável se sem preço no catálogo */}
                   <td className="px-3 py-1.5 text-right">
                     {editavel
                       ? (
@@ -415,22 +426,24 @@ export function PedidosCompraPage() {
                           type="number"
                           min={0}
                           step={0.01}
-                          value={precoUnit || ''}
+                          value={l._precoUnitario ?? l.custoEstimado ?? ''}
                           onChange={e => {
-                            const v = e.target.value === '' ? 0 : Number(e.target.value);
-                            atualizarLinha(itens, setItens, l._key, '_precoUnitario', v);
-                            atualizarLinha(itens, setItens, l._key, 'custoEstimado', v);
+                            const v = parseFloat(e.target.value);
+                            setItens(itens.map(x => x._key === l._key
+                              ? { ...x, _precoUnitario: isNaN(v) ? undefined : v, custoEstimado: isNaN(v) ? undefined : v, _semPreco: false }
+                              : x,
+                            ));
                           }}
                           placeholder="0,00"
-                          className="w-24 border border-gray-200 rounded px-1 py-0.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
+                          className={`w-full border rounded px-1 py-0.5 text-sm text-right focus:outline-none focus:ring-1 ${l._semPreco ? 'border-amber-300 focus:ring-amber-400' : 'border-gray-200 focus:ring-blue-400'}`}
                         />
                       )
-                      : precoUnit > 0 ? `R$ ${precoUnit.toFixed(2)}` : '—'}
+                      : fmtBRL(precoUnit)}
                   </td>
 
                   {/* Total */}
                   <td className="px-3 py-1.5 text-right font-medium text-gray-700">
-                    {total > 0 ? `R$ ${total.toFixed(2)}` : '—'}
+                    {fmtBRL(total)}
                   </td>
 
                   {/* Fornecedor */}
@@ -445,27 +458,32 @@ export function PedidosCompraPage() {
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
                       )
-                      : (l._fornecedor || '—')}
+                      : (l._fornecedor ?? '—')}
                   </td>
 
-                  {/* Observação (unidadeMedida reutilizada como obs na view) */}
-                  <td className="px-3 py-1.5 text-xs text-gray-500">
+                  {/* Observação */}
+                  <td className="px-3 py-1.5">
                     {editavel
                       ? (
                         <input
                           type="text"
-                          value={(l as LinhaEdicao & { _obs?: string })._obs ?? ''}
-                          onChange={e => atualizarLinha(itens, setItens, l._key, '_obs', e.target.value)}
+                          value={l.observacoes ?? ''}
+                          onChange={e => atualizarLinha(itens, setItens, l._key, 'observacoes', e.target.value)}
                           placeholder="Obs…"
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
                       )
-                      : '—'}
+                      : (l.observacoes ?? '—')}
                   </td>
 
+                  {/* Remover */}
                   {editavel && (
                     <td className="px-3 py-1.5 text-center">
-                      <button onClick={() => removerLinha(setItens, l._key)} className="text-red-400 hover:text-red-600">
+                      <button
+                        onClick={() => removerLinha(setItens, l._key)}
+                        className="text-gray-300 hover:text-red-500 transition-colors"
+                        title="Remover linha"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -474,30 +492,26 @@ export function PedidosCompraPage() {
               );
             })}
           </tbody>
-
-          {/* Rodapé com Total Geral */}
-          {itens.length > 0 && (
-            <tfoot>
-              <tr className="bg-gray-50 font-semibold text-sm border-t border-gray-200">
-                <td colSpan={!categoriaFixa ? 3 : 2} className="px-3 py-2 text-right text-gray-500 text-xs">
-                  Total Geral:
-                </td>
-                <td className="px-3 py-2 text-right">
-                  {itens.reduce((s, l) => s + l.quantidade, 0)}
-                </td>
-                <td></td>
-                <td className="px-3 py-2 text-right text-blue-700">
-                  R$ {totalGeral.toFixed(2)}
-                </td>
-                <td colSpan={editavel ? 3 : 2}></td>
-              </tr>
-            </tfoot>
-          )}
+          {/* Total Geral */}
+          <tfoot>
+            <tr className="bg-gray-50 border-t-2 border-gray-200">
+              <td
+                colSpan={editavel ? (categoriaFixa ? 4 : 5) : (categoriaFixa ? 4 : 5)}
+                className="px-3 py-2 text-right text-xs font-semibold text-gray-500 uppercase"
+              >
+                Total Geral
+              </td>
+              <td className="px-3 py-2 text-right font-bold text-gray-800">
+                {fmtBRL(totalGeral)}
+              </td>
+              <td colSpan={editavel ? 3 : 2} />
+            </tr>
+          </tfoot>
         </table>
-
         {editavel && (
           <div className="px-3 py-2 border-t border-gray-100">
             <button
+              type="button"
               onClick={() => adicionarLinha(setItens, categoriaFixa ?? 'PEDAGOGICO')}
               className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
             >
@@ -589,21 +603,20 @@ export function PedidosCompraPage() {
               </div>
             </div>
 
-            {/* Indicador de catálogo */}
+            {/* Status do catálogo */}
             {carregandoCatalogo && (
               <p className="text-xs text-blue-500 flex items-center gap-1">
-                <RefreshCw className="h-3 w-3 animate-spin" /> Carregando catálogo de preços…
+                <RefreshCw className="h-3 w-3 animate-spin" /> Carregando catálogo de produtos…
               </p>
             )}
             {!carregandoCatalogo && catalogo.length > 0 && (
               <p className="text-xs text-green-600">
-                ✓ Catálogo carregado com {catalogo.length} produto{catalogo.length !== 1 ? 's' : ''}.
-                Digite o nome do produto e clique em "↓ preço" para preencher automaticamente.
+                ✓ {catalogo.length} produto{catalogo.length !== 1 ? 's' : ''} no catálogo para esta categoria.
               </p>
             )}
             {!carregandoCatalogo && catalogo.length === 0 && (
-              <p className="text-xs text-gray-400">
-                Catálogo de preços não disponível. Preencha os preços manualmente.
+              <p className="text-xs text-amber-600">
+                Catálogo vazio para esta categoria. Importe produtos em Administração → Catálogo de Produtos.
               </p>
             )}
 
@@ -627,10 +640,7 @@ export function PedidosCompraPage() {
                 {criando ? 'Criando…' : 'Salvar Rascunho'}
               </button>
               <button
-                onClick={async () => {
-                  await handleCriarPedido();
-                  // Após criar, o pedido aparece na lista — o usuário pode enviá-lo de lá
-                }}
+                onClick={async () => { await handleCriarPedido(); }}
                 disabled={criando}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-60"
               >
@@ -725,7 +735,7 @@ export function PedidosCompraPage() {
                     <span className="text-xs text-gray-400">{pedido.itens.length} {pedido.itens.length === 1 ? 'item' : 'itens'}</span>
                     {pedido.itens.length > 0 && (
                       <span className="text-xs font-medium text-blue-700">
-                        Total: R$ {pedido.itens.reduce((s, i) => s + (i.custoEstimado ?? 0) * i.quantidade, 0).toFixed(2)}
+                        Total: {fmtBRL(pedido.itens.reduce((s, i) => s + (i.custoEstimado ?? 0) * i.quantidade, 0))}
                       </span>
                     )}
                   </div>
@@ -741,7 +751,7 @@ export function PedidosCompraPage() {
                       <button
                         onClick={e => { e.stopPropagation(); iniciarEdicao(pedido); }}
                         className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded"
-                        title="Editar itens"
+                        title="Editar pedido"
                       >
                         <Edit3 className="h-4 w-4" />
                       </button>
