@@ -446,7 +446,7 @@ export function CoordApprovalGrid() {
 
                         {/* Prioridade */}
                         <td className="px-4 py-3">
-                          <PrioridadeBadge prioridade={req.urgencia ?? req.priority} />
+                          <PrioridadeBadge prioridade={req.urgencia} />
                         </td>
 
                         {/* Status */}
