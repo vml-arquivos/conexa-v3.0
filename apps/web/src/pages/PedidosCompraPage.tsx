@@ -62,6 +62,7 @@ interface LinhaEdicao extends ItemPedidoDto {
   _fornecedor?: string;
   _catalogId?: string;
   _semPreco?: boolean; // flag: produto sem preço no catálogo
+  observacoes?: string;
 }
 
 function gerarKey() { return Math.random().toString(36).slice(2, 10); }
