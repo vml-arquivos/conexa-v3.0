@@ -56,11 +56,19 @@ export async function loadMe(): Promise<MeResponse> {
 }
 
 /**
- * Verifica se o usuário tem um determinado role
+ * Verifica se o usuário tem um determinado role.
+ * Suporta roles como string[] (legado) ou objeto[] com .level (formato atual do /auth/me).
  */
 export function hasRole(user: User | null, role: string): boolean {
   if (!user?.roles) return false;
-  return user.roles.includes(role);
+  return (user.roles as unknown[]).some((r) => {
+    if (typeof r === 'string') return r === role;
+    if (typeof r === 'object' && r !== null) {
+      const obj = r as Record<string, unknown>;
+      return obj.level === role || obj.roleId === role;
+    }
+    return false;
+  });
 }
 
 /**
