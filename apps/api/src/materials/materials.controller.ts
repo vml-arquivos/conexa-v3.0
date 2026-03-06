@@ -33,4 +33,14 @@ export class MaterialsController {
   async findHigiene() {
     return this.service.findHigiene();
   }
+
+  /**
+   * GET /materials/catalog?category=PEDAGOGICO|HIGIENE
+   * Catálogo de preços de referência para pedidos de compra.
+   * Retorna materiais do modelo Material com preço de referência.
+   */
+  @Get('catalog')
+  async getCatalog(@Query('category') category?: string) {
+    return this.service.getCatalog(category);
+  }
 }

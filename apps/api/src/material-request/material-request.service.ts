@@ -163,10 +163,33 @@ export class MaterialRequestService {
       throw new ForbiddenException('Fora do escopo');
     }
 
-    const status = dto.decision === ReviewDecision.APPROVED ? RequestStatus.APROVADO : RequestStatus.REJEITADO;
+    let status: RequestStatus;
+    if (dto.decision === ReviewDecision.APPROVED || dto.decision === ReviewDecision.ADJUSTED) {
+      status = RequestStatus.APROVADO;
+    } else {
+      status = RequestStatus.REJEITADO;
+    }
+
+    // Persiste notas de revisão (notes + itemsApproved) sem alterar schema
+    // Armazena como JSON no campo description apenas se houver informação de revisão
+    const reviewMeta =
+      dto.notes || dto.itemsApproved?.length
+        ? JSON.stringify({
+            _review: true,
+            decision: dto.decision,
+            notes: dto.notes ?? null,
+            itemsApproved: dto.itemsApproved ?? null,
+          })
+        : undefined;
+
     return this.prisma.materialRequest.update({
       where: { id },
-      data: { status, approvedBy: user.sub, approvedDate: new Date() },
+      data: {
+        status,
+        approvedBy: user.sub,
+        approvedDate: new Date(),
+        ...(reviewMeta !== undefined ? { description: reviewMeta } : {}),
+      },
     });
   }
 

@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import { useAuth } from '../app/AuthProvider';
-import { isProfessor } from '../api/auth';
+import { isProfessor, isUnidade } from '../api/auth';
 import { MaterialRequestForm } from '../components/material-request/MaterialRequestForm';
 import { MaterialRequestList } from '../components/material-request/MaterialRequestList';
+import { CoordApprovalGrid } from '../components/material-request/CoordApprovalGrid';
 import { ShoppingCart, ClipboardList, Info } from 'lucide-react';
 
 export function MaterialRequestPage() {
   const { user } = useAuth();
   const ehProfessor = isProfessor(user);
+  const ehUnidade = isUnidade(user);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
 
+  // ── COORDENADORA (UNIDADE): tela de aprovação ─────────────────────────────
+  if (ehUnidade && !ehProfessor) {
+    return (
+      <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <CoordApprovalGrid />
+      </div>
+    );
+  }
+
+  // ── PROFESSOR: wizard + minhas requisições (comportamento original) ────────
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Cabeçalho */}

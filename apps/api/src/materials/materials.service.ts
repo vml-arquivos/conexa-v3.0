@@ -47,4 +47,33 @@ export class MaterialsService {
   async findHigiene() {
     return this.findByCategory('HIGIENE');
   }
+
+  /**
+   * Catálogo de preços de referência para pedidos de compra.
+   * Usa o modelo Material (com referencePrice, category, unit).
+   * Aceita category: PEDAGOGICO | HIGIENE | HIGIENE_PESSOAL_CRIANCAS
+   */
+  async getCatalog(category?: string) {
+    // Normaliza alias HIGIENE_PESSOAL_CRIANCAS → HIGIENE
+    const cat = category === 'HIGIENE_PESSOAL_CRIANCAS' ? 'HIGIENE' : category;
+    const where: Record<string, unknown> = { isActive: true };
+    if (cat) {
+      where.category = cat;
+    } else {
+      // Sem filtro: retorna apenas PEDAGOGICO e HIGIENE (escopo da coordenadora)
+      where.category = { in: ['PEDAGOGICO', 'HIGIENE'] };
+    }
+    return this.prisma.material.findMany({
+      where: where as any,
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        category: true,
+        unit: true,
+        referencePrice: true,
+      },
+      orderBy: [{ category: 'asc' }, { name: 'asc' }],
+    });
+  }
 }

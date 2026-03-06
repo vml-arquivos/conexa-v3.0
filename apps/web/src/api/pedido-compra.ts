@@ -16,6 +16,8 @@ export interface ItemPedidoCompra {
   quantidade: number;
   unidadeMedida?: string;
   custoEstimado?: number;
+  /** Fornecedor (armazenado localmente, não persiste no backend sem schema change) */
+  _fornecedor?: string;
 }
 
 export interface PedidoCompra {
@@ -37,7 +39,11 @@ export interface ItemPedidoDto {
   descricao: string;
   quantidade: number;
   unidadeMedida?: string;
+  /** Preço unitário (alias de custoEstimado — enviado como custoEstimado ao backend) */
+  precoUnitario?: number;
   custoEstimado?: number;
+  /** Fornecedor (campo local, não persiste no schema atual) */
+  _fornecedor?: string;
 }
 
 export interface CriarPedidoDto {
@@ -191,14 +197,20 @@ export function getProximosStatusMantenedora(
  */
 export function exportarPedidoCSV(pedido: PedidoCompra): void {
   const linhas = [
-    ['Categoria', 'Descrição', 'Quantidade', 'Unidade de Medida', 'Custo Estimado (R$)'],
-    ...pedido.itens.map(item => [
-      item.categoria,
-      item.descricao,
-      String(item.quantidade),
-      item.unidadeMedida ?? '',
-      item.custoEstimado != null ? item.custoEstimado.toFixed(2) : '',
-    ]),
+    ['Categoria', 'Descrição', 'Quantidade', 'Unidade de Medida', 'Preço Unitário (R$)', 'Total (R$)', 'Fornecedor'],
+    ...pedido.itens.map(item => {
+      const precoUnit = item.custoEstimado ?? 0;
+      const total = precoUnit * item.quantidade;
+      return [
+        item.categoria,
+        item.descricao,
+        String(item.quantidade),
+        item.unidadeMedida ?? '',
+        precoUnit > 0 ? precoUnit.toFixed(2) : '',
+        total > 0 ? total.toFixed(2) : '',
+        item._fornecedor ?? '',
+      ];
+    }),
   ];
   const csv = linhas.map(l => l.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
