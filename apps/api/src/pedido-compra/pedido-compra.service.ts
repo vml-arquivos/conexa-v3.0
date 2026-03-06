@@ -343,21 +343,32 @@ export class PedidoCompraService {
         r.level === RoleLevel.MANTENEDORA || r.level === RoleLevel.DEVELOPER,
     );
     const isUnidade = user.roles.some((r) => r.level === RoleLevel.UNIDADE);
+    // Diretor pode aprovar pedidos ENVIADOS da própria unidade (ENVIADO → APROVADO)
+    const isDiretor = user.roles.some(
+      (r) => r.level === RoleLevel.UNIDADE && (r as any).type === 'UNIDADE_DIRETOR',
+    );
 
     if (!isMantenedora && isUnidade) {
-      // Unidade só pode ENVIAR ou CANCELAR o próprio pedido
+      // Verificar escopo de unidade
       if (pedido.unitId !== user.unitId) {
         throw new ForbiddenException(
           'Acesso negado: você só pode alterar pedidos da sua unidade.',
         );
       }
-      const statusPermitidosUnidade: StatusPedidoCompra[] = [
-        StatusPedidoCompra.ENVIADO,
-        StatusPedidoCompra.CANCELADO,
-      ];
+      // Diretor: pode APROVAR (ENVIADO → APROVADO) além de ENVIAR e CANCELAR
+      const statusPermitidosUnidade: StatusPedidoCompra[] = isDiretor
+        ? [StatusPedidoCompra.ENVIADO, StatusPedidoCompra.APROVADO, StatusPedidoCompra.CANCELADO]
+        : [StatusPedidoCompra.ENVIADO, StatusPedidoCompra.CANCELADO];
       if (!statusPermitidosUnidade.includes(dto.status)) {
+        const papelMsg = isDiretor ? 'Diretor' : 'Coordenadora';
         throw new ForbiddenException(
-          `Unidade pode apenas enviar (ENVIADO) ou cancelar (CANCELADO) o pedido. Status solicitado: ${dto.status}`,
+          `${papelMsg} pode apenas enviar${isDiretor ? ', aprovar' : ''} ou cancelar o pedido. Status solicitado: ${dto.status}`,
+        );
+      }
+      // Validar transição de estado para Diretor
+      if (dto.status === StatusPedidoCompra.APROVADO && pedido.status !== StatusPedidoCompra.ENVIADO) {
+        throw new ForbiddenException(
+          `Apenas pedidos ENVIADOS podem ser aprovados pelo Diretor. Status atual: ${pedido.status}`,
         );
       }
     }

@@ -35,6 +35,8 @@ import RdicCriancaPage from '../pages/RdicCriancaPage';
 import SalaDeAulaVirtualPage from '../pages/SalaDeAulaVirtualPage';
 import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
+import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
+import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 // ─── Módulo de Planejamento — Oficina e Torre de Controle ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
@@ -252,6 +254,26 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <DashboardCentralPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Dashboard do Diretor ──────────────────────────────────────────────
+      {
+        path: 'diretor',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardDiretorPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Dashboard da Nutricionista ───────────────────────────────────────────
+      {
+        path: 'nutricionista',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+            <DashboardNutricionistaPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

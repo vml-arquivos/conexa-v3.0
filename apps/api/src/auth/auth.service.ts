@@ -74,6 +74,7 @@ export class AuthService {
       roles: user.roles.map((userRole) => ({
         roleId: userRole.roleId,
         level: userRole.role.level,  // FIX: usar role.level (RoleLevel) e não scopeLevel
+        type: userRole.role.type,    // Papel específico (UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
         unitScopes: userRole.unitScopes.map((scope) => scope.unitId),
       })),
     };
@@ -202,7 +203,7 @@ export class AuthService {
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId, isActive: true },
       include: {
-        role: { select: { level: true } },
+        role: { select: { level: true, type: true } },
         unitScopes: { select: { unitId: true } },
       },
     });
@@ -212,6 +213,7 @@ export class AuthService {
     const rolesRich = userRoles.map((r) => ({
       roleId: r.roleId,
       level: r.role.level,
+      type: r.role.type,   // Papel específico (UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
       unitScopes: r.unitScopes.map((s) => s.unitId),
     }));
 

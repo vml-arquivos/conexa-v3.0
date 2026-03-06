@@ -1,32 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  BookOpen,
-  ClipboardList,
-  BarChart2,
-  ShoppingCart,
-  GraduationCap,
-  ChevronRight,
-  TrendingUp,
-  Users,
-  LayoutDashboard,
-  ShoppingBag,
-  FileText,
-  Home,
-  MessageCircle,
-  Camera,
-  UserCheck,
-  Building2,
-  Network,
-  Brain,
-  Layers,
-  Settings,
-  Sparkles,
-  UserCircle,
-  Calendar,
-  Apple,
+  BookOpen, ClipboardList, BarChart2, ShoppingCart, GraduationCap,
+  ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
+  FileText, Home, MessageCircle, Camera, UserCheck, Building2,
+  Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
+  Apple, Utensils, Shield,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
-import { normalizeRoles } from '../../app/RoleProtectedRoute';
+import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
 
 interface MenuItem {
   path: string;
@@ -36,16 +17,12 @@ interface MenuItem {
 }
 
 // ─── Menus por perfil ─────────────────────────────────────────────────────────
-// Regra: cada array contém apenas itens cuja rota está autorizada para o role.
-// Páginas não listadas aqui continuam existindo e acessíveis por URL direta;
-// apenas são omitidas do menu para não gerar ruído visual.
 
 // PROFESSOR / PROFESSOR_AUXILIAR ──────────────────────────────────────────────
 const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/teacher-dashboard', label: 'Painel do Professor', icon: <GraduationCap className="h-4 w-4" /> },
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
-
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/planejamentos',       label: 'Meus Planejamentos',     icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/planejamento/novo',   label: 'Novo Planejamento',      icon: <Calendar className="h-4 w-4" /> },
@@ -57,7 +34,53 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/matriz-pedagogica',   label: 'Matriz 2026',            icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
 ];
 
-// UNIDADE — Gestão ─────────────────────────────────────────────────────────────
+// UNIDADE — Coordenadora Pedagógica ────────────────────────────────────────────
+const COORD_GESTAO: MenuItem[] = [
+  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica',        label: 'Coord. Pedagógica',      icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao',                   label: 'Turmas & Reuniões',      icon: <Users className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
+];
+const COORD_PEDAGOGICO: MenuItem[] = [
+  { path: '/app/rdic-coord',        label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/rdic-crianca',      label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
+  { path: '/app/chamada',           label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdx',               label: 'Fotos da Turma',             icon: <Camera className="h-4 w-4" /> },
+  { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/reports',           label: 'Relatórios',                 icon: <BarChart2 className="h-4 w-4" /> },
+];
+
+// UNIDADE — Diretor ────────────────────────────────────────────────────────────
+const DIRETOR_ITEMS: MenuItem[] = [
+  { path: '/app/diretor',           label: 'Painel do Diretor',      icon: <Shield className="h-4 w-4" /> },
+  { path: '/app/pedidos-compra',    label: 'Aprovar Pedidos',        icon: <ShoppingBag className="h-4 w-4" />, badge: 'Aprovação' },
+  { path: '/app/coordenacao',       label: 'Turmas & Equipe',        icon: <Users className="h-4 w-4" /> },
+  { path: '/app/reports',           label: 'Relatórios',             icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/planejamentos',     label: 'Planejamentos',          icon: <BookOpen className="h-4 w-4" /> },
+];
+
+// UNIDADE — Nutricionista ──────────────────────────────────────────────────────
+const NUTRI_ITEMS: MenuItem[] = [
+  { path: '/app/nutricionista',                 label: 'Painel da Nutricionista', icon: <Utensils className="h-4 w-4" /> },
+  { path: '/app/painel-alergias',               label: 'Alergias e Dietas',       icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/material-requests',             label: 'Requisições Alimentação', icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',       icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',    icon: <BarChart2 className="h-4 w-4" /> },
+];
+
+// UNIDADE — Administrativo ─────────────────────────────────────────────────────
+const ADMIN_UNIDADE_ITEMS: MenuItem[] = [
+  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
+  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/coordenacao',                   label: 'Turmas',                 icon: <Users className="h-4 w-4" /> },
+];
+
+// UNIDADE — Genérico (sem roleType específico) ─────────────────────────────────
 const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
   { path: '/app/coordenacao-pedagogica',        label: 'Coord. Pedagógica',      icon: <Building2 className="h-4 w-4" /> },
@@ -68,8 +91,6 @@ const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/painel-alergias',               label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
 ];
-
-// UNIDADE — Pedagógico (supervisão e aprovação, sem duplicar ferramentas do professor)
 const UNIDADE_PEDAGOGICO: MenuItem[] = [
   { path: '/app/rdic-coord',        label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
   { path: '/app/rdic-crianca',      label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
@@ -101,15 +122,17 @@ const MANTENEDORA_ITEMS: MenuItem[] = [
   { path: '/app/reports',           label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
 ];
 
-// DEVELOPER — acesso completo, sem duplicatas entre seções ─────────────────────
+// DEVELOPER — acesso completo ──────────────────────────────────────────────────
 const DEV_EXTRA: MenuItem[] = [
-  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',      icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/rdic-ria',             label: 'RDIC — Registros (RIA)',    icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/planejamentos',        label: 'Planejamentos',             icon: <FileText className="h-4 w-4" /> },
-  { path: '/app/configuracoes',        label: 'Configurações',             icon: <Settings className="h-4 w-4" /> },
+  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',   icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/rdic-ria',             label: 'RDIC — Registros (RIA)', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/planejamentos',        label: 'Planejamentos',          icon: <FileText className="h-4 w-4" /> },
+  { path: '/app/nutricionista',        label: 'Dashboard Nutricionista',icon: <Utensils className="h-4 w-4" /> },
+  { path: '/app/diretor',              label: 'Dashboard Diretor',      icon: <Shield className="h-4 w-4" /> },
+  { path: '/app/configuracoes',        label: 'Configurações',          icon: <Settings className="h-4 w-4" /> },
 ];
 
-// ─── Item de menu ─────────────────────────────────────────────────────────────
+// ─── Componentes de navegação ─────────────────────────────────────────────────
 function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
   return (
     <Link
@@ -136,14 +159,16 @@ function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
   );
 }
 
-function NavSection({ titulo, items, isActive }: { titulo: string; items: MenuItem[]; isActive: (path: string) => boolean }) {
+function NavSection({
+  titulo, items, isActive,
+}: { titulo: string; items: MenuItem[]; isActive: (path: string) => boolean }) {
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
         {titulo}
       </p>
       <div className="space-y-1">
-        {items.map(item => (
+        {items.map((item) => (
           <NavItem key={item.path} item={item} active={isActive(item.path)} />
         ))}
       </div>
@@ -155,29 +180,43 @@ function NavSection({ titulo, items, isActive }: { titulo: string; items: MenuIt
 export function Sidebar() {
   const location = useLocation();
   const { user } = useAuth();
-  const userRoles = normalizeRoles(user);
 
-  const isProfessor    = userRoles.some(r => r === 'PROFESSOR' || r === 'PROFESSOR_AUXILIAR');
-  const isUnidade      = userRoles.some(r => r === 'UNIDADE' || r.startsWith('UNIDADE_'));
-  const isCentral      = userRoles.some(r => r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_'));
-  const isMantenedora  = userRoles.some(r => r === 'MANTENEDORA' || r.startsWith('MANTENEDORA_'));
-  const isDeveloper    = userRoles.includes('DEVELOPER');
+  const userLevels = normalizeRoles(user);
+  const userTypes  = normalizeRoleTypes(user);
+
+  // Flags de nível
+  const isProfessor   = userLevels.some((r) => r === 'PROFESSOR' || r === 'PROFESSOR_AUXILIAR');
+  const isUnidade     = userLevels.some((r) => r === 'UNIDADE' || r.startsWith('UNIDADE_'));
+  const isCentral     = userLevels.some((r) => r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_'));
+  const isMantenedora = userLevels.some((r) => r === 'MANTENEDORA' || r.startsWith('MANTENEDORA_'));
+  const isDeveloper   = userLevels.includes('DEVELOPER');
+
+  // Flags de tipo (sub-papel dentro de UNIDADE)
+  const isDiretor         = userTypes.includes('UNIDADE_DIRETOR');
+  const isNutricionista   = userTypes.includes('UNIDADE_NUTRICIONISTA');
+  const isCoordPedagogico = userTypes.includes('UNIDADE_COORDENADOR_PEDAGOGICO');
+  const isAdministrativo  = userTypes.includes('UNIDADE_ADMINISTRATIVO');
+  // Se UNIDADE mas sem tipo específico, tratar como coordenadora genérica
+  const isUnidadeGenerica = isUnidade && !isDiretor && !isNutricionista && !isCoordPedagogico && !isAdministrativo;
 
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/');
 
-  const perfilLabel = isDeveloper   ? 'Desenvolvedor'
-    : isMantenedora ? 'Mantenedora'
-    : isCentral     ? 'Equipe Central'
-    : isUnidade     ? 'Unidade'
-    : isProfessor   ? 'Professor(a)'
+  // Label de perfil para exibição
+  const perfilLabel = isDeveloper        ? 'Desenvolvedor'
+    : isMantenedora                      ? 'Mantenedora'
+    : isCentral                          ? 'Equipe Central'
+    : isDiretor                          ? 'Diretor(a)'
+    : isNutricionista                    ? 'Nutricionista'
+    : isCoordPedagogico                  ? 'Coord. Pedagógica'
+    : isAdministrativo                   ? 'Administrativo'
+    : isUnidade                          ? 'Unidade'
+    : isProfessor                        ? 'Professor(a)'
     : 'Usuário';
 
-  // Itens de rodapé (todos os perfis)
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
   const perfilItem: MenuItem = { path: '/app/meu-perfil',    label: 'Meu Perfil',    icon: <UserCircle className="h-4 w-4" /> };
 
-  // Itens de administração (Unidade, Central, Mantenedora, Developer)
   const adminItems: MenuItem[] = [
     { path: '/app/admin/usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> },
     { path: '/app/admin/turmas',   label: 'Turmas',   icon: <GraduationCap className="h-4 w-4" /> },
@@ -215,14 +254,16 @@ export function Sidebar() {
       {/* Navegação */}
       <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
 
-        {/* DEVELOPER: vê todas as seções + extras de dev */}
+        {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
           <>
-            <NavSection titulo="Professor"   items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} />
-            <NavSection titulo="Unidade"     items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} />
-            <NavSection titulo="Central"     items={CENTRAL_ITEMS}                                      isActive={isActive} />
-            <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS}                                  isActive={isActive} />
-            <NavSection titulo="Dev — Extras" items={DEV_EXTRA}                                         isActive={isActive} />
+            <NavSection titulo="Professor"    items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} />
+            <NavSection titulo="Nutricionista" items={NUTRI_ITEMS}                                        isActive={isActive} />
+            <NavSection titulo="Diretor"       items={DIRETOR_ITEMS}                                      isActive={isActive} />
+            <NavSection titulo="Unidade"       items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} />
+            <NavSection titulo="Central"       items={CENTRAL_ITEMS}                                      isActive={isActive} />
+            <NavSection titulo="Mantenedora"   items={MANTENEDORA_ITEMS}                                  isActive={isActive} />
+            <NavSection titulo="Dev — Extras"  items={DEV_EXTRA}                                          isActive={isActive} />
           </>
         )}
 
@@ -236,15 +277,38 @@ export function Sidebar() {
           <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} />
         )}
 
-        {/* UNIDADE */}
-        {!isDeveloper && isUnidade && (
+        {/* UNIDADE — Diretor */}
+        {!isDeveloper && isDiretor && (
+          <NavSection titulo="Diretor" items={DIRETOR_ITEMS} isActive={isActive} />
+        )}
+
+        {/* UNIDADE — Nutricionista */}
+        {!isDeveloper && isNutricionista && (
+          <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} isActive={isActive} />
+        )}
+
+        {/* UNIDADE — Coordenadora Pedagógica */}
+        {!isDeveloper && isCoordPedagogico && (
+          <>
+            <NavSection titulo="Gestão"      items={COORD_GESTAO}      isActive={isActive} />
+            <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  isActive={isActive} />
+          </>
+        )}
+
+        {/* UNIDADE — Administrativo */}
+        {!isDeveloper && isAdministrativo && (
+          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} isActive={isActive} />
+        )}
+
+        {/* UNIDADE — Genérico (sem roleType específico) */}
+        {!isDeveloper && isUnidadeGenerica && (
           <>
             <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      isActive={isActive} />
             <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  isActive={isActive} />
           </>
         )}
 
-        {/* PROFESSOR / PROFESSOR_AUXILIAR (sem role de unidade) */}
+        {/* PROFESSOR / PROFESSOR_AUXILIAR */}
         {!isDeveloper && !isUnidade && isProfessor && (
           <>
             <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   isActive={isActive} />
@@ -252,7 +316,7 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Fallback: usuário sem role reconhecida */}
+        {/* Fallback */}
         {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} isActive={isActive} />
         )}

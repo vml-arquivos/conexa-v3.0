@@ -32,7 +32,9 @@ import {
   type StatusPedidoCompra,
 } from '../api/pedido-compra';
 import { useAuth } from '../app/AuthProvider';
-import { normalizeRoles } from '../app/RoleProtectedRoute';
+import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
+import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 
 const ICONES_STATUS: Record<string, React.ReactNode> = {
   RASCUNHO: <Clock className="h-4 w-4" />,
@@ -63,8 +65,12 @@ function mesAtual() {
 export function PedidosCompraPage() {
   const { user } = useAuth();
   const roles = normalizeRoles(user);
+  const types = normalizeRoleTypes(user);
   const isUnidade = roles.includes('UNIDADE');
   const isMantenedora = roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
+  const isCentral = roles.includes('STAFF_CENTRAL');
+  const isDiretor = types.includes('UNIDADE_DIRETOR');
+  const { selectedUnitId: ctxUnitId } = useUnitScope();
 
   const [filtroMes, setFiltroMes] = useState(mesAtual());
   const [filtroStatus, setFiltroStatus] = useState<StatusPedidoCompra | ''>('');
@@ -97,12 +103,13 @@ export function PedidosCompraPage() {
       const dados = await listarPedidosCompra({
         mesReferencia: filtroMes || undefined,
         status: filtroStatus || undefined,
+        unitId: (isMantenedora || isCentral) ? (ctxUnitId || undefined) : undefined,
       });
       setPedidos(dados);
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar pedidos.');
     } finally { setCarregando(false); }
-  }, [filtroMes, filtroStatus]);
+  }, [filtroMes, filtroStatus, ctxUnitId]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -320,6 +327,12 @@ export function PedidosCompraPage() {
 
       {/* Filtros */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 flex-wrap items-end">
+        {(isMantenedora || isCentral) && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
+            <UnitScopeSelector compact showNetworkOption />
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Mês</label>
           <input type="month" value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />

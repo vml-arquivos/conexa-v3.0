@@ -1,4 +1,4 @@
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, RoleType } from '@prisma/client';
 
 export interface JwtPayload {
   sub: string; // userId
@@ -8,6 +8,7 @@ export interface JwtPayload {
   roles: {
     roleId: string;
     level: RoleLevel;
+    type: RoleType;       // Papel específico (UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
     unitScopes: string[]; // Array de unitIds que o usuário tem acesso
   }[];
 }

@@ -1213,6 +1213,7 @@ enum StatusPedidoCompra {
   RASCUNHO
   ENVIADO
   EM_ANALISE
+  APROVADO        // Aprovado pelo Diretor — pronto para enviar à Mantenedora
   COMPRADO
   EM_ENTREGA
   ENTREGUE
