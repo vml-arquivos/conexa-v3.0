@@ -14,25 +14,41 @@ import { ReviewMaterialRequestDto } from './dto/review-material-request.dto';
 export class MaterialRequestController {
   constructor(private readonly svc: MaterialRequestService) {}
 
-  /** Professor ou Coordenadora cria requisição de material */
+  /**
+   * Apenas PROFESSOR (e DEVELOPER para testes) cria requisição.
+   * UNIDADE (coordenadora) NÃO cria — ela aprova.
+   */
   @Post()
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
   create(@Body() dto: CreateMaterialRequestDto, @CurrentUser() user: JwtPayload) {
     return this.svc.create(dto, user);
   }
 
-  /** Professor/Coordenadora lista suas próprias requisições */
+  /**
+   * Apenas PROFESSOR (e DEVELOPER) lista suas próprias requisições.
+   * UNIDADE NÃO tem "minhas" — usa GET / para ver todas da unidade.
+   */
   @Get('minhas')
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.DEVELOPER)
   listMine(@CurrentUser() user: JwtPayload) {
     return this.svc.listMine(user);
   }
 
-  /** Coordenador/Direção lista todas as requisições da unidade; STAFF_CENTRAL vê rede inteira */
+  /**
+   * Coordenadora/Direção lista todas as requisições da unidade.
+   * STAFF_CENTRAL/MANTENEDORA/DEVELOPER vê rede inteira.
+   * Filtros opcionais: status, classroomId, type/categoria.
+   */
   @Get()
   @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
-  list(@CurrentUser() user: JwtPayload) {
-    return this.svc.list(user);
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Query('status') status?: string,
+    @Query('classroomId') classroomId?: string,
+    @Query('type') type?: string,
+    @Query('categoria') categoria?: string,
+  ) {
+    return this.svc.list(user, { status, classroomId, type: type ?? categoria });
   }
 
   /** Coordenador aprova ou rejeita uma requisição */

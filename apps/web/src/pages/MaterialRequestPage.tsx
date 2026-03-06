@@ -3,7 +3,7 @@ import { useAuth } from '../app/AuthProvider';
 import { isProfessor, isUnidade } from '../api/auth';
 import { MaterialRequestForm } from '../components/material-request/MaterialRequestForm';
 import { MaterialRequestList } from '../components/material-request/MaterialRequestList';
-import { CoordApprovalGrid } from '../components/material-request/CoordApprovalGrid';
+import { MaterialRequestApprovalTable } from '../components/material-request/MaterialRequestApprovalTable';
 import { ShoppingCart, ClipboardList, Info } from 'lucide-react';
 
 export function MaterialRequestPage() {
@@ -17,7 +17,7 @@ export function MaterialRequestPage() {
   if (ehUnidade && !ehProfessor) {
     return (
       <div className="max-w-6xl mx-auto p-4 md:p-6">
-        <CoordApprovalGrid />
+        <MaterialRequestApprovalTable />
       </div>
     );
   }

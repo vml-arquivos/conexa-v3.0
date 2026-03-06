@@ -23,16 +23,13 @@ function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
   return 'OUTRO' as MaterialRequestType;
 }
 
-/** PROFESSOR, Coordenadora (UNIDADE), STAFF_CENTRAL, MANTENEDORA e DEVELOPER podem criar requisições */
+/** Apenas PROFESSOR (ou DEVELOPER para testes) pode criar requisições. UNIDADE não. */
 function isProfessorRole(user: JwtPayload): boolean {
   return (
     Array.isArray(user.roles) &&
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     user.roles.some((r: any) =>
       r?.level === RoleLevel.PROFESSOR ||
-      r?.level === RoleLevel.UNIDADE ||
-      r?.level === RoleLevel.STAFF_CENTRAL ||
-      r?.level === RoleLevel.MANTENEDORA ||
       r?.level === RoleLevel.DEVELOPER,
     )
   );
@@ -123,12 +120,20 @@ export class MaterialRequestService {
     });
   }
 
-  async list(user: JwtPayload) {
+  async list(
+    user: JwtPayload,
+    filters?: { status?: string; classroomId?: string; type?: string },
+  ) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    // Filtros condicionais
+    const extra: Record<string, unknown> = {};
+    if (filters?.status) extra.status = filters.status;
+    if (filters?.classroomId) extra.classroomId = filters.classroomId;
+    if (filters?.type) extra.type = filters.type;
     // STAFF_CENTRAL/MANTENEDORA/DEVELOPER: lista toda a rede
     if (isCentralRole(user)) {
       return this.prisma.materialRequest.findMany({
-        where: { mantenedoraId: user.mantenedoraId },
+        where: { mantenedoraId: user.mantenedoraId, ...extra } as any,
         include: {
           createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
           classroom: { select: { id: true, name: true } },
@@ -142,7 +147,7 @@ export class MaterialRequestService {
     if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
     return this.prisma.materialRequest.findMany({
-      where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId },
+      where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId, ...extra } as any,
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         classroom: { select: { id: true, name: true } },
