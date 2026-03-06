@@ -129,4 +129,59 @@ export class DevelopmentObservationsService {
 
     return { total, porCategoria, ultimas: obs };
   }
+
+  /**
+   * Resumo consolidado de uma turma: total de observações, por categoria,
+   * crianças com e sem observações, alertas e recomendações.
+   */
+  async resumoTurma(classroomId: string) {
+    const obs = await this.prisma.developmentObservation.findMany({
+      where: { classroomId },
+      orderBy: { date: 'desc' },
+      include: {
+        child: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const totalObs = obs.length;
+    const porCategoria = obs.reduce((acc: Record<string, number>, o) => {
+      acc[o.category] = (acc[o.category] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Agrupar por criança
+    const porCrianca: Record<string, {
+      id: string; nome: string; total: number;
+      alertas: number; recomendacoes: number;
+      categorias: Record<string, number>;
+    }> = {};
+
+    for (const o of obs) {
+      const cid = o.childId;
+      const nome = o.child
+        ? `${o.child.firstName} ${o.child.lastName}`.trim()
+        : cid;
+      if (!porCrianca[cid]) {
+        porCrianca[cid] = { id: cid, nome, total: 0, alertas: 0, recomendacoes: 0, categorias: {} };
+      }
+      porCrianca[cid].total++;
+      if ((o as any).alert) porCrianca[cid].alertas++;
+      if ((o as any).recommendation) porCrianca[cid].recomendacoes++;
+      porCrianca[cid].categorias[o.category] = (porCrianca[cid].categorias[o.category] || 0) + 1;
+    }
+
+    const criancas = Object.values(porCrianca).sort((a, b) => b.total - a.total);
+    const totalAlertas = obs.filter(o => (o as any).alert).length;
+    const totalRecomendacoes = obs.filter(o => (o as any).recommendation).length;
+
+    return {
+      classroomId,
+      totalObs,
+      totalAlertas,
+      totalRecomendacoes,
+      totalCriancas: criancas.length,
+      porCategoria,
+      criancas,
+    };
+  }
 }

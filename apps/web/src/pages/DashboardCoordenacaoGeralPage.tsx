@@ -510,6 +510,18 @@ export default function DashboardCoordenacaoGeralPage() {
                         </div>
                       ))}
                     </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => navigate(`/app/coordenacao-pedagogica?unitId=${u.id}`)}
+                        className="flex-1 text-xs py-2 px-3 bg-white border border-blue-200 text-blue-600 rounded-xl hover:bg-blue-50 transition-all font-medium">
+                        Coord. Pedagógica
+                      </button>
+                      <button
+                        onClick={() => navigate(`/app/desenvolvimento-infantil?unitId=${u.id}`)}
+                        className="flex-1 text-xs py-2 px-3 bg-white border border-purple-200 text-purple-600 rounded-xl hover:bg-purple-50 transition-all font-medium">
+                        Desenvolvimento
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -518,7 +530,7 @@ export default function DashboardCoordenacaoGeralPage() {
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
+      {/* ══════════════════════════════════════════════════════════════
           ABA: PEDAGÓGICO
       ══════════════════════════════════════════════════════════════════ */}
       {abaAtiva === 'pedagogico' && (

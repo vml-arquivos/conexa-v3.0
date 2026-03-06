@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getDiaryByClassroom, getDiaryByPeriod, getDiaryUnplanned } from '../api/reports';
 import { getAccessibleClassrooms } from '../api/lookup';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -52,6 +53,8 @@ export function ReportsPage() {
   const roles = normalizeRoles(user);
   const isCentral = roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
 
+  const [searchParams] = useSearchParams();
+  const unitIdFromQuery = searchParams.get('unitId') ?? '';
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +78,13 @@ export function ReportsPage() {
   const [endDate, setEndDate] = useState('');
   const [periodoInicio, setPeriodoInicio] = useState('');
   const [periodoFim, setPeriodoFim] = useState('');
+
+  // Inicializar unidade a partir do query param (quando navegado de outra tela)
+  useEffect(() => {
+    if (unitIdFromQuery && unitIdFromQuery !== selectedUnitId) {
+      setSelectedUnitId(unitIdFromQuery);
+    }
+  }, [unitIdFromQuery]); // eslint-disable-line
 
   // Carregar unidades para STAFF_CENTRAL (agora via contexto global)
   useEffect(() => {

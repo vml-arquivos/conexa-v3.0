@@ -36,7 +36,9 @@ export class FeatureFlagsService {
       planejamentoV2: true, // disponível para todos
       coordenacaoGeral: isCentralOrAbove,
       insights: isCoordOrAbove,
-      aprovacaoPlanejamento: isCoordOrAbove,
+      // REGRA DE NEGÓCIO: apenas UNIDADE (coordenação da unidade) pode aprovar planejamentos.
+      // STAFF_CENTRAL é somente leitura/análise — não aprova, não devolve.
+      aprovacaoPlanejamento: isUnidade || isDeveloper,
       exemploAtividade: isCoordOrAbove,
       superSaas: isCentralOrAbove,
     };

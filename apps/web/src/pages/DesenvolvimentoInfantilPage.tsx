@@ -10,7 +10,7 @@
  *  - Alertas de desenvolvimento e recomendações
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
@@ -301,18 +301,159 @@ function ModalResumoAluno({ childId, childName, onClose }: {
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
-export default function DesenvolvimentoInfantilPage() {
-  const { user } = useAuth();
+// ─── Painel de Visão Consolidada da Turma ──────────────────────────────────────────────────────────────────────────────────
+interface ResumoTurma {
+  classroomId: string;
+  totalObs: number;
+  totalAlertas: number;
+  totalRecomendacoes: number;
+  totalCriancas: number;
+  porCategoria: Record<string, number>;
+  criancas: Array<{
+    id: string;
+    nome: string;
+    total: number;
+    alertas: number;
+    recomendacoes: number;
+    categorias: Record<string, number>;
+  }>;
+}
+
+function VisaoTurmaPanel({ classroomId }: { classroomId: string }) {
+  const [resumo, setResumo] = useState<ResumoTurma | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!classroomId) { setResumo(null); return; }
+    setLoading(true);
+    setErro(null);
+    http.get(`/development-observations/resumo-turma/${classroomId}`)
+      .then(r => setResumo(r.data))
+      .catch(() => setErro('Erro ao carregar resumo da turma'))
+      .finally(() => setLoading(false));
+  }, [classroomId]);
+
+  if (!classroomId) {
+    return (
+      <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+        <Users className="h-14 w-14 mx-auto mb-3 text-gray-300" />
+        <p className="text-gray-500 font-medium">Selecione uma turma</p>
+        <p className="text-gray-400 text-sm mt-1">Escolha uma turma nos filtros acima para ver a visão consolidada</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1,2,3].map(i => <div key={i} className="h-20 animate-pulse bg-gray-100 rounded-2xl" />)}
+      </div>
+    );
+  }
+
+  if (erro || !resumo) {
+    return (
+      <div className="text-center py-10 text-red-500 text-sm bg-red-50 rounded-2xl border border-red-200">
+        {erro ?? 'Sem dados disponíveis para esta turma'}
+      </div>
+    );
+  }
+
+  const chartData = Object.entries(resumo.porCategoria)
+    .map(([cat, count]) => ({ name: CATEGORIAS[cat]?.label ?? cat, value: count }))
+    .sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="space-y-5">
+      {/* KPIs da turma */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard icon={<ClipboardList className="h-5 w-5" />} label="Total de Observações" value={resumo.totalObs} tone="purple" />
+        <KpiCard icon={<Users className="h-5 w-5" />} label="Crianças com Obs." value={resumo.totalCriancas} tone="blue" />
+        <KpiCard icon={<AlertTriangle className="h-5 w-5" />} label="Alertas" value={resumo.totalAlertas} tone={resumo.totalAlertas > 0 ? 'red' : 'default'} />
+        <KpiCard icon={<CheckCircle className="h-5 w-5" />} label="Recomendações" value={resumo.totalRecomendacoes} tone="green" />
+      </div>
+
+      {/* Gráfico por categoria */}
+      {chartData.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Distribuição por Categoria</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+              <Bar dataKey="value" radius={[4,4,0,0]}>
+                {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Lista de crianças */}
+      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100">
+          <p className="text-sm font-semibold text-gray-700">Crianças — Resumo Individual</p>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {resumo.criancas.map((c, i) => (
+            <div key={c.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-purple-700 font-bold text-sm">{c.nome[0]}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{c.nome}</p>
+                  <p className="text-xs text-gray-400">{c.total} observações</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {c.alertas > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                    {c.alertas} alerta{c.alertas > 1 ? 's' : ''}
+                  </span>
+                )}
+                {c.recomendacoes > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                    {c.recomendacoes} rec.
+                  </span>
+                )}
+                <div className="flex gap-1">
+                  {Object.entries(c.categorias).slice(0, 3).map(([cat], j) => (
+                    <span key={j} className={`text-xs px-1.5 py-0.5 rounded-full border ${COR_CATEGORIA[cat] ?? COR_CATEGORIA.GERAL}`}>
+                      {CATEGORIAS[cat]?.label?.slice(0, 3) ?? cat.slice(0, 3)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+          {resumo.criancas.length === 0 && (
+            <div className="text-center py-8 text-gray-400 text-sm">
+              Nenhuma observação registrada para esta turma
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Componente Principal ──────────────────────────────────────────────────────────────────────────────────
+export default function DesenvolvimentoInfantilPage()();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const unitIdParam = searchParams.get('unitId') ?? '';
   const roles = normalizeRoles(user);
   const isPsicologa = roles.some(r => r === 'STAFF_CENTRAL_PSICOLOGIA');
 
-  // ─── Estado de filtros ────────────────────────────────────────────────────
+  // ─── Estado de filtros ────────────────────────────────────────────────
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
-  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState(unitIdParam);
   const [selectedClassroomId, setSelectedClassroomId] = useState('');
   const [selectedChildId, setSelectedChildId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -326,7 +467,7 @@ export default function DesenvolvimentoInfantilPage() {
   const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [loadingCriancas, setLoadingCriancas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<'lista' | 'graficos'>('lista');
+  const [abaAtiva, setAbaAtiva] = useState<'lista' | 'graficos' | 'visao-turma'>('lista');
   const [resumoChildId, setResumoChildId] = useState<string | null>(null);
   const [resumoChildName, setResumoChildName] = useState('');
 
@@ -568,6 +709,7 @@ export default function DesenvolvimentoInfantilPage() {
         {[
           { id: 'lista', label: `Observações${observacoesFiltradas.length > 0 ? ` (${observacoesFiltradas.length})` : ''}`, icon: <ClipboardList className="h-3.5 w-3.5" /> },
           { id: 'graficos', label: 'Gráficos', icon: <TrendingUp className="h-3.5 w-3.5" /> },
+          { id: 'visao-turma', label: 'Visão da Turma', icon: <Users className="h-3.5 w-3.5" /> },
         ].map(tab => (
           <button key={tab.id} onClick={() => setAbaAtiva(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${abaAtiva === tab.id ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
@@ -727,10 +869,12 @@ export default function DesenvolvimentoInfantilPage() {
             </>
           )}
         </div>
+           {/* ─── Aba: Visão da Turma ────────────────────────────────────────────────────────────────── */}
+      {abaAtiva === 'visao-turma' && (
+        <VisaoTurmaPanel classroomId={selectedClassroomId} />
       )}
 
-      {/* ─── Atalhos ───────────────────────────────────────────────────────── */}
-      <div className="mt-6 border-t border-gray-100 pt-5">
+      {/* ─── Atalhos ────────────────────────────────────────────────────────────────── */}   <div className="mt-6 border-t border-gray-100 pt-5">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Acesso Rápido</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[

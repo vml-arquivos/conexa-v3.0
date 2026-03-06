@@ -56,6 +56,21 @@ export class DevelopmentObservationsController {
   }
 
   /**
+   * GET /development-observations/resumo-turma/:classroomId
+   * Resumo consolidado de desenvolvimento de toda a turma
+   */
+  @Get('resumo-turma/:classroomId')
+  @RequireRoles(
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  resumoTurma(@Param('classroomId') classroomId: string) {
+    return this.svc.resumoTurma(classroomId);
+  }
+
+  /**
    * GET /development-observations/:id
    * Detalhe de uma observação
    */

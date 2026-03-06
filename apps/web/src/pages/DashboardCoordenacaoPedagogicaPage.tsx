@@ -13,7 +13,9 @@ import {
   Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../app/AuthProvider';
+import { isCentral as checkIsCentral, isUnidade as checkIsUnidade } from '../api/auth';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -80,6 +82,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [loadingCobertura, setLoadingCobertura] = useState(false);
   const apiCache = useApiCache(60_000);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const unitIdParam = searchParams.get('unitId') ?? undefined;
+  const { user } = useAuth();
+  // Coordenação Geral (STAFF_CENTRAL) = somente leitura/análise. Apenas UNIDADE pode aprovar.
+  const isCentralUser = checkIsCentral(user);
+  const isUnidadeUser = checkIsUnidade(user);
+  const canApprove = isUnidadeUser && !isCentralUser;
   const [processando, setProcessando] = useState<string|null>(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
@@ -119,10 +128,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     try {
       setLoading(true);
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
-        http.get('/coordenacao/dashboard/unidade'),
-        http.get('/coordenacao/requisicoes'),
-        http.get('/coordenacao/planejamentos'),
-        http.get('/coordenacao/diarios'),
+        http.get('/coordenacao/dashboard/unidade', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/coordenacao/requisicoes', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/coordenacao/planejamentos', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/coordenacao/diarios', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
       ]);
       if (dashRes.status === 'fulfilled') {
         const raw = dashRes.value.data;
@@ -262,7 +271,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   return (
     <PageShell title="Coordenação Pedagógica" description="Acompanhe e apoie o trabalho dos professores">
       {/* Modal motivo rejeição */}
-      {itemParaRejeitar && (
+      {itemParaRejeitar && canApprove && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <h3 className="font-bold text-lg mb-2">Devolver com orientação</h3>
@@ -298,6 +307,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         </div>
       )}
 
+      {/* Banner modo leitura para Coordenação Geral */}
+      {isCentralUser && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center gap-3">
+          <Eye className="h-5 w-5 text-blue-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-blue-800">Modo Análise — Coordenação Geral</p>
+            <p className="text-xs text-blue-600">Você está visualizando dados desta unidade. Aprovações são responsabilidade da Coordenação da Unidade.</p>
+          </div>
+        </div>
+      )}
       {/* Abas */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
         {abas.map(aba => (
@@ -343,7 +362,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   <span className="bg-red-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.requisicoesParaAnalisar}</span>
                 </div>
                 <p className="font-bold text-red-800">Pedidos de material</p>
-                <p className="text-sm text-red-600 mt-1">aguardando sua análise</p>
+                <p className="text-sm text-red-600 mt-1">{canApprove ? "aguardando aprovação" : "para visualizar e analisar"}</p>
                 <div className="flex items-center gap-1 mt-3 text-red-500 text-sm font-medium">Analisar agora <ChevronRight className="h-4 w-4"/></div>
               </button>
             )}
@@ -424,6 +443,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     </div>
                   )}
                   <p className="text-xs text-gray-400">Pedido em {d.getDate()} de {MESES[d.getMonth()]}</p>
+                  {canApprove ? (
                   <div className="flex gap-3 pt-1">
                     <Button onClick={() => aprovarRequisicao(req.id)} disabled={processando === req.id}
                       className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 font-bold">
@@ -434,6 +454,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       <MessageSquare className="h-4 w-4 mr-2"/>Devolver
                     </Button>
                   </div>
+                  ) : (
+                  <div className="pt-1">
+                    <span className="text-xs text-gray-400 italic">Visualização — aprovação é responsabilidade da Coordenação da Unidade</span>
+                  </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -546,7 +571,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     )}
 
                     {/* Ações contextuais por status */}
-                    {plan.status === 'EM_REVISAO' && (
+                    {plan.status === 'EM_REVISAO' && canApprove && (
                       <div className="flex gap-3 pt-1">
                         <Button onClick={() => aprovarPlanejamento(plan.id)} disabled={processando === plan.id}
                           className="flex-1 h-10 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-sm">
@@ -556,6 +581,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           variant="outline" className="flex-1 h-10 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold text-sm">
                           <MessageSquare className="h-4 w-4 mr-1.5"/>Devolver
                         </Button>
+                      </div>
+                    )}
+                    {plan.status === 'EM_REVISAO' && !canApprove && (
+                      <div className="pt-1 p-2 bg-blue-50 rounded-xl">
+                        <p className="text-xs text-blue-600 text-center">Aguardando aprovação da Coordenação da Unidade</p>
                       </div>
                     )}
                     {plan.status === 'DEVOLVIDO' && (
@@ -727,18 +757,32 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           {/* Atalhos de relatórios gerais */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => navigate('/app/reports')}
+              onClick={() => navigate(unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports')}
               className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
               <TrendingUp className="h-6 w-6 text-blue-600 mb-2" />
               <p className="font-semibold text-sm text-gray-800">Relatório de Diários</p>
               <p className="text-xs text-gray-400">Por turma e período</p>
             </button>
             <button
-              onClick={() => navigate('/app/relatorio-consumo-materiais')}
+              onClick={() => navigate(unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais')}
               className="p-4 bg-white border-2 border-orange-100 rounded-2xl text-left hover:border-orange-300 hover:shadow-sm transition-all">
               <ShoppingCart className="h-6 w-6 text-orange-600 mb-2" />
               <p className="font-semibold text-sm text-gray-800">Consumo de Materiais</p>
               <p className="text-xs text-gray-400">Pedidos e gastos</p>
+            </button>
+            <button
+              onClick={() => navigate(unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil')}
+              className="p-4 bg-white border-2 border-purple-100 rounded-2xl text-left hover:border-purple-300 hover:shadow-sm transition-all">
+              <Brain className="h-6 w-6 text-purple-600 mb-2" />
+              <p className="font-semibold text-sm text-gray-800">Desenvolvimento Infantil</p>
+              <p className="text-xs text-gray-400">Observações individuais</p>
+            </button>
+            <button
+              onClick={() => navigate('/app/rdic-geral')}
+              className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
+              <ClipboardList className="h-6 w-6 text-teal-600 mb-2" />
+              <p className="font-semibold text-sm text-gray-800">RDICs Publicados</p>
+              <p className="text-xs text-gray-400">Relatórios individuais</p>
             </button>
           </div>
         </div>
