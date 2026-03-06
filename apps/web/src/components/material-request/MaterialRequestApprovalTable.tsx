@@ -9,10 +9,11 @@ import {
   type MaterialRequest,
   type MaterialCategory,
   type RequestStatus,
+  type ReviewItemDecision,
 } from '../../api/material-request';
 import { getAccessibleClassrooms } from '../../api/lookup';
 import type { AccessibleClassroom } from '../../types/lookup';
-import { X, CheckCircle2, XCircle, ChevronRight, Loader2 } from 'lucide-react';
+import { X, CheckCircle2, XCircle, ChevronRight, Loader2, CheckSquare, Square } from 'lucide-react';
 
 // ─── Badges ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ function UrgenciaBadge({ urgencia }: { urgencia?: string }) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 interface ParsedItem {
+  id?: string;
   item: string;
   quantidade: number;
   unidade?: string;
@@ -48,14 +50,25 @@ interface ParsedItem {
 }
 
 function parseItensDetalhado(req: MaterialRequest): ParsedItem[] {
+  // Prioridade 1: itens do banco (MaterialRequestItem)
   if (req.items && req.items.length > 0) {
     return req.items.map(i => ({
+      id: i.id,
       item: i.materialName ?? i.materialId,
       quantidade: i.quantity,
       unidade: i.unit,
       observacao: i.observations,
     }));
   }
+  // Prioridade 2: itens originais do campo description (retornados pelo getById)
+  if (req.originalItens && req.originalItens.length > 0) {
+    return req.originalItens.map(i => ({
+      item: i.item,
+      quantidade: i.quantidade,
+      unidade: i.unidade,
+    }));
+  }
+  // Prioridade 3: parsear description diretamente
   if (req.description) {
     try {
       const parsed = JSON.parse(req.description) as {
@@ -93,6 +106,16 @@ function parseUrgencia(req: MaterialRequest): string | undefined {
   return undefined;
 }
 
+// ─── Estado de revisão por item ───────────────────────────────────────────────
+
+interface ItemReviewState {
+  itemId: string;
+  approved: boolean;
+  qtyApproved: number;
+  reason: string;
+  qtyMax: number;
+}
+
 // ─── Tipos de aba ─────────────────────────────────────────────────────────────
 
 type Tab = 'pendentes' | 'aprovadas' | 'todas';
@@ -103,26 +126,55 @@ const TAB_STATUS: Record<Tab, RequestStatus | undefined> = {
   todas: undefined,
 };
 
-// ─── Drawer de Detalhe ────────────────────────────────────────────────────────
+// ─── Drawer de Detalhe com aprovação por item ─────────────────────────────────
 
 interface DetalheDrawerProps {
   reqId: string | null;
   onClose: () => void;
-  onAprovar: (id: string) => Promise<void>;
+  onRevisaoSalva: () => void;
   onRejeitar: (id: string, titulo: string) => void;
   processando: string | null;
+  setProcessando: (id: string | null) => void;
+  setToast: (t: { msg: string; tipo: 'ok' | 'erro' } | null) => void;
 }
 
-function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: DetalheDrawerProps) {
+function DetalheDrawer({
+  reqId,
+  onClose,
+  onRevisaoSalva,
+  onRejeitar,
+  processando,
+  setProcessando,
+  setToast,
+}: DetalheDrawerProps) {
   const [req, setReq] = useState<MaterialRequest | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Estado de revisão por item
+  const [itemStates, setItemStates] = useState<ItemReviewState[]>([]);
+  const [notaGeral, setNotaGeral] = useState('');
+  const [modoRevisao, setModoRevisao] = useState(false);
+
   useEffect(() => {
-    if (!reqId) { setReq(null); return; }
-    setLoading(true); setErro(null);
+    if (!reqId) { setReq(null); setItemStates([]); setModoRevisao(false); return; }
+    setLoading(true); setErro(null); setModoRevisao(false);
     getMaterialRequestById(reqId)
-      .then(setReq)
+      .then(data => {
+        setReq(data);
+        // Inicializa estados de revisão por item (apenas para itens do banco com ID)
+        const itens = parseItensDetalhado(data);
+        const states: ItemReviewState[] = itens
+          .filter(i => i.id)
+          .map(i => ({
+            itemId: i.id!,
+            approved: true,
+            qtyApproved: i.quantidade,
+            reason: '',
+            qtyMax: i.quantidade,
+          }));
+        setItemStates(states);
+      })
       .catch(() => setErro('Não foi possível carregar os detalhes.'))
       .finally(() => setLoading(false));
   }, [reqId]);
@@ -137,13 +189,106 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
     ? `${req.createdByUser.firstName} ${req.createdByUser.lastName}`
     : '—';
 
+  // Tem itens com ID (podem ser aprovados individualmente)
+  const temItensComId = itemStates.length > 0;
+
+  function toggleItemApproved(itemId: string) {
+    setItemStates(prev => prev.map(s =>
+      s.itemId === itemId
+        ? { ...s, approved: !s.approved, qtyApproved: !s.approved ? s.qtyMax : 0 }
+        : s
+    ));
+  }
+
+  function setQtyApproved(itemId: string, qty: number) {
+    setItemStates(prev => prev.map(s =>
+      s.itemId === itemId
+        ? { ...s, qtyApproved: Math.min(Math.max(0, qty), s.qtyMax), approved: qty > 0 }
+        : s
+    ));
+  }
+
+  function setItemReason(itemId: string, reason: string) {
+    setItemStates(prev => prev.map(s =>
+      s.itemId === itemId ? { ...s, reason } : s
+    ));
+  }
+
+  function aprovarTodos() {
+    setItemStates(prev => prev.map(s => ({ ...s, approved: true, qtyApproved: s.qtyMax })));
+  }
+
+  function rejeitarTodos() {
+    setItemStates(prev => prev.map(s => ({ ...s, approved: false, qtyApproved: 0 })));
+  }
+
+  async function handleSalvarRevisaoPorItem() {
+    if (!req) return;
+    try {
+      setProcessando(req.id);
+      const items: ReviewItemDecision[] = itemStates.map(s => ({
+        itemId: s.itemId,
+        approved: s.approved,
+        qtyApproved: s.qtyApproved,
+        reason: s.reason || undefined,
+      }));
+      await reviewMaterialRequest(req.id, {
+        decision: 'APPROVE_ITEMS',
+        notes: notaGeral || undefined,
+        items,
+      });
+      const allRejected = items.every(i => i.qtyApproved === 0);
+      const allApproved = items.every(i => i.approved && i.qtyApproved > 0);
+      const msg = allRejected
+        ? 'Requisição rejeitada.'
+        : allApproved
+        ? 'Requisição aprovada com sucesso.'
+        : 'Revisão salva: aprovação parcial.';
+      setToast({ msg, tipo: 'ok' });
+      onClose();
+      onRevisaoSalva();
+    } catch {
+      setToast({ msg: 'Erro ao salvar revisão. Tente novamente.', tipo: 'erro' });
+    } finally {
+      setProcessando(null);
+    }
+  }
+
+  async function handleAprovarTudo() {
+    if (!req) return;
+    try {
+      setProcessando(req.id);
+      await reviewMaterialRequest(req.id, { decision: 'APPROVED', notes: notaGeral || undefined });
+      setToast({ msg: 'Requisição aprovada com sucesso.', tipo: 'ok' });
+      onClose();
+      onRevisaoSalva();
+    } catch {
+      setToast({ msg: 'Erro ao aprovar. Tente novamente.', tipo: 'erro' });
+    } finally {
+      setProcessando(null);
+    }
+  }
+
+  // Calcula resumo da revisão atual
+  const aprovados = itemStates.filter(s => s.approved && s.qtyApproved > 0).length;
+  const rejeitados = itemStates.filter(s => !s.approved || s.qtyApproved === 0).length;
+  const isParcialPreview = aprovados > 0 && rejeitados > 0;
+
+  // Status virtual para exibir no detalhe
+  const statusExibido = req?.statusVirtual ?? req?.status ?? 'SOLICITADO';
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-white shadow-2xl flex flex-col">
+      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">Detalhe da Requisição</h2>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Detalhe da Requisição</h2>
+            {req && (
+              <p className="text-xs text-gray-400 mt-0.5">{req.code}</p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -153,7 +298,7 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {loading && (
             <div className="flex items-center justify-center py-12 text-gray-400 gap-2">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -165,6 +310,7 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
           )}
           {req && !loading && (
             <>
+              {/* Metadados */}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Professor</p>
@@ -189,7 +335,7 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Status</p>
-                  <StatusBadge status={req.status} />
+                  <StatusBadge status={statusExibido} />
                 </div>
                 {urgencia && (
                   <div>
@@ -199,18 +345,151 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
                 )}
               </div>
 
+              {/* Justificativa */}
               {req.justificativa && (
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Justificativa</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2">{req.justificativa}</p>
+                  <p className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2">
+                    {req.justificativa}
+                  </p>
                 </div>
               )}
 
+              {/* Revisão anterior (se já revisada) */}
+              {req.reviewData && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                  <p className="text-xs font-medium text-blue-700 uppercase tracking-wide mb-1">Revisão anterior</p>
+                  <p className="text-sm text-blue-800">
+                    {req.reviewData.isParcial ? 'Aprovação parcial' : req.reviewData.decision === 'REJECTED' ? 'Rejeitada' : 'Aprovada'}
+                    {req.reviewData.notes && ` — ${req.reviewData.notes}`}
+                  </p>
+                  {req.reviewData.reviewedAt && (
+                    <p className="text-xs text-blue-500 mt-0.5">
+                      {new Date(req.reviewData.reviewedAt).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Grade de itens */}
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Itens Solicitados</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">
+                    {isPending && modoRevisao ? 'Revisão por Item' : 'Itens Solicitados'}
+                  </p>
+                  {isPending && temItensComId && !modoRevisao && (
+                    <button
+                      onClick={() => setModoRevisao(true)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      Revisar por item
+                    </button>
+                  )}
+                  {isPending && modoRevisao && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={aprovarTodos}
+                        className="text-xs text-green-600 hover:text-green-800 font-medium"
+                      >
+                        Aprovar todos
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={rejeitarTodos}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium"
+                      >
+                        Rejeitar todos
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {itens.length === 0 ? (
                   <p className="text-sm text-gray-400 italic">Nenhum item detalhado.</p>
+                ) : modoRevisao && temItensComId ? (
+                  /* Modo revisão por item */
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                          <th className="px-3 py-2 text-left">Produto</th>
+                          <th className="px-3 py-2 text-center w-16">Solicit.</th>
+                          <th className="px-3 py-2 text-center w-20">Aprovar</th>
+                          <th className="px-3 py-2 text-center w-20">Qtd Aprov.</th>
+                          <th className="px-3 py-2 text-left">Motivo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {itens.map((item) => {
+                          const state = item.id ? itemStates.find(s => s.itemId === item.id) : null;
+                          return (
+                            <tr key={item.id ?? item.item} className={state && !state.approved ? 'bg-red-50' : state?.qtyApproved !== state?.qtyMax ? 'bg-orange-50' : ''}>
+                              <td className="px-3 py-2 font-medium text-gray-800">
+                                {item.item}
+                                {item.unidade && <span className="text-xs text-gray-400 ml-1">({item.unidade})</span>}
+                              </td>
+                              <td className="px-3 py-2 text-center text-gray-600">{item.quantidade}</td>
+                              <td className="px-3 py-2 text-center">
+                                {state ? (
+                                  <button
+                                    onClick={() => toggleItemApproved(state.itemId)}
+                                    className={`inline-flex items-center justify-center transition-colors ${state.approved ? 'text-green-600 hover:text-green-800' : 'text-gray-300 hover:text-gray-500'}`}
+                                  >
+                                    {state.approved
+                                      ? <CheckSquare className="h-5 w-5" />
+                                      : <Square className="h-5 w-5" />
+                                    }
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                {state ? (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={state.qtyMax}
+                                    value={state.qtyApproved}
+                                    onChange={e => setQtyApproved(state.itemId, parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center text-sm border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {state ? (
+                                  <input
+                                    type="text"
+                                    placeholder="Motivo (opcional)"
+                                    value={state.reason}
+                                    onChange={e => setItemReason(state.itemId, e.target.value)}
+                                    className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                  />
+                                ) : (
+                                  <span className="text-gray-300 text-xs">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {/* Resumo da revisão */}
+                    {itemStates.length > 0 && (
+                      <div className={`px-3 py-2 text-xs font-medium border-t ${isParcialPreview ? 'bg-orange-50 text-orange-700 border-orange-200' : aprovados === itemStates.length ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                        {isParcialPreview
+                          ? `Aprovação parcial: ${aprovados} aprovado(s), ${rejeitados} rejeitado(s)`
+                          : aprovados === itemStates.length
+                          ? 'Todos os itens serão aprovados'
+                          : 'Todos os itens serão rejeitados'
+                        }
+                      </div>
+                    )}
+                  </div>
                 ) : (
+                  /* Modo visualização */
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="min-w-full text-sm">
                       <thead>
@@ -218,46 +497,108 @@ function DetalheDrawer({ reqId, onClose, onAprovar, onRejeitar, processando }: D
                           <th className="px-3 py-2 text-left">Produto</th>
                           <th className="px-3 py-2 text-center">Qtd</th>
                           <th className="px-3 py-2 text-left">Unid.</th>
-                          <th className="px-3 py-2 text-left">Observação</th>
+                          {!isPending && <th className="px-3 py-2 text-center">Aprovado</th>}
+                          {!isPending && <th className="px-3 py-2 text-center">Qtd Aprov.</th>}
+                          <th className="px-3 py-2 text-left">Obs.</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {itens.map((i, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium text-gray-800">{i.item}</td>
-                            <td className="px-3 py-2 text-center text-gray-700">{i.quantidade}</td>
-                            <td className="px-3 py-2 text-gray-500">{i.unidade ?? '—'}</td>
-                            <td className="px-3 py-2 text-gray-500 text-xs">{i.observacao ?? '—'}</td>
-                          </tr>
-                        ))}
+                        {itens.map((i, idx) => {
+                          const dbItem = i.id ? req.items?.find(it => it.id === i.id) : null;
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-gray-800">{i.item}</td>
+                              <td className="px-3 py-2 text-center text-gray-700">{i.quantidade}</td>
+                              <td className="px-3 py-2 text-gray-500">{i.unidade ?? '—'}</td>
+                              {!isPending && (
+                                <td className="px-3 py-2 text-center">
+                                  {dbItem?.approved === true
+                                    ? <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
+                                    : dbItem?.approved === false
+                                    ? <XCircle className="h-4 w-4 text-red-400 mx-auto" />
+                                    : <span className="text-gray-300">—</span>
+                                  }
+                                </td>
+                              )}
+                              {!isPending && (
+                                <td className="px-3 py-2 text-center text-gray-700">
+                                  {dbItem?.qtyApproved != null ? dbItem.qtyApproved : '—'}
+                                </td>
+                              )}
+                              <td className="px-3 py-2 text-gray-500 text-xs">
+                                {dbItem?.approvalReason ?? i.observacao ?? '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 )}
               </div>
+
+              {/* Nota geral (modo revisão) */}
+              {isPending && modoRevisao && (
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase tracking-wide mb-1">
+                    Nota geral (opcional)
+                  </label>
+                  <textarea
+                    value={notaGeral}
+                    onChange={e => setNotaGeral(e.target.value)}
+                    placeholder="Observação geral para o professor..."
+                    rows={2}
+                    className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                  />
+                </div>
+              )}
             </>
           )}
         </div>
 
         {/* Footer com ações */}
         {req && isPending && (
-          <div className="border-t border-gray-200 px-5 py-4 flex gap-3 justify-end">
-            <button
-              onClick={() => onRejeitar(req.id, req.title)}
-              disabled={isProcessing}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
-            >
-              <XCircle className="h-4 w-4" />
-              Rejeitar
-            </button>
-            <button
-              onClick={() => onAprovar(req.id)}
-              disabled={isProcessing}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {isProcessing ? 'Aprovando...' : 'Aprovar'}
-            </button>
+          <div className="border-t border-gray-200 px-5 py-4 space-y-3">
+            {modoRevisao && temItensComId ? (
+              /* Ações do modo revisão por item */
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setModoRevisao(false)}
+                  disabled={isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSalvarRevisaoPorItem}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {isProcessing ? 'Salvando...' : 'Salvar Revisão'}
+                </button>
+              </div>
+            ) : (
+              /* Ações globais */
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => onRejeitar(req.id, req.title)}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Rejeitar
+                </button>
+                <button
+                  onClick={handleAprovarTudo}
+                  disabled={isProcessing}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  {isProcessing ? 'Aprovando...' : 'Aprovar Tudo'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -330,19 +671,8 @@ export function MaterialRequestApprovalTable() {
       })
     : requests;
 
-  async function handleAprovar(id: string) {
-    try {
-      setProcessando(id);
-      await reviewMaterialRequest(id, { decision: 'APPROVED' });
-      setToast({ msg: 'Requisição aprovada com sucesso.', tipo: 'ok' });
-      setDetalheId(null);
-      await carregar();
-    } catch {
-      setToast({ msg: 'Erro ao aprovar. Tente novamente.', tipo: 'erro' });
-    } finally {
-      setProcessando(null);
-    }
-  }
+  // Contadores por tab
+  const pendentes = requests.filter(r => r.status === 'SOLICITADO').length;
 
   function handleAbrirRejeicao(id: string, titulo: string) {
     setModalRejeitar({ id, titulo });
@@ -369,8 +699,8 @@ export function MaterialRequestApprovalTable() {
     }
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'pendentes', label: 'Pendentes' },
+  const tabs: { key: Tab; label: string; count?: number }[] = [
+    { key: 'pendentes', label: 'Pendentes', count: pendentes },
     { key: 'aprovadas', label: 'Aprovadas' },
     { key: 'todas', label: 'Todas' },
   ];
@@ -397,13 +727,20 @@ export function MaterialRequestApprovalTable() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
               tab === t.key
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
+            {t.count != null && t.count > 0 && (
+              <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                tab === t.key ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {t.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -427,6 +764,9 @@ export function MaterialRequestApprovalTable() {
           <option value="">Todas as categorias</option>
           <option value="PEDAGOGICO">Pedagógico</option>
           <option value="HIGIENE">Higiene Pessoal</option>
+          <option value="LIMPEZA">Limpeza</option>
+          <option value="ALIMENTACAO">Alimentação</option>
+          <option value="OUTRO">Outro</option>
         </select>
         <input
           type="text"
@@ -478,6 +818,8 @@ export function MaterialRequestApprovalTable() {
                     : '—';
                   const email = req.createdByUser?.email ?? '';
                   const data = new Date(req.requestedDate ?? req.createdAt).toLocaleDateString('pt-BR');
+                  // Usa statusVirtual se disponível (PARCIAL)
+                  const statusExibido = req.statusVirtual ?? req.status;
 
                   return (
                     <tr
@@ -503,7 +845,7 @@ export function MaterialRequestApprovalTable() {
                         <UrgenciaBadge urgencia={urgencia} />
                       </td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={req.status} />
+                        <StatusBadge status={statusExibido} />
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5 justify-center">
@@ -515,22 +857,13 @@ export function MaterialRequestApprovalTable() {
                             <ChevronRight className="h-3 w-3" />
                           </button>
                           {isPending && (
-                            <>
-                              <button
-                                onClick={() => handleAprovar(req.id)}
-                                disabled={isProcessing}
-                                className="px-2.5 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
-                              >
-                                {isProcessing ? '...' : 'Aprovar'}
-                              </button>
-                              <button
-                                onClick={() => handleAbrirRejeicao(req.id, req.title)}
-                                disabled={isProcessing}
-                                className="px-2.5 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 transition-colors"
-                              >
-                                Rejeitar
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleAbrirRejeicao(req.id, req.title)}
+                              disabled={isProcessing}
+                              className="px-2.5 py-1 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 transition-colors"
+                            >
+                              Rejeitar
+                            </button>
                           )}
                         </div>
                       </td>
@@ -546,9 +879,11 @@ export function MaterialRequestApprovalTable() {
       <DetalheDrawer
         reqId={detalheId}
         onClose={() => setDetalheId(null)}
-        onAprovar={handleAprovar}
+        onRevisaoSalva={carregar}
         onRejeitar={handleAbrirRejeicao}
         processando={processando}
+        setProcessando={setProcessando}
+        setToast={setToast}
       />
 
       {modalRejeitar && (

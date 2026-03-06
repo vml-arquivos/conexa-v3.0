@@ -160,6 +160,7 @@ export class MaterialRequestService {
 
   /**
    * Busca uma requisição pelo ID com todos os detalhes.
+   * Faz merge do reviewData (campo description) nos itens, retornando qtyApproved e approved por item.
    * UNIDADE: apenas requisições da própria unidade.
    */
   async getById(id: string, user: JwtPayload) {
@@ -177,37 +178,141 @@ export class MaterialRequestService {
     if (isCoordRole(user) && !isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
       throw new ForbiddenException('Requisição não pertence à sua unidade');
     }
-    return req;
+
+    // Tenta parsear reviewData do campo description
+    let reviewData: Record<string, unknown> | null = null;
+    let originalData: Record<string, unknown> | null = null;
+    if (req.description) {
+      try {
+        const parsed = JSON.parse(req.description) as Record<string, unknown>;
+        if (parsed._review) {
+          reviewData = parsed;
+          // Se havia dados originais preservados, recupera
+          if (parsed._originalData) originalData = parsed._originalData as Record<string, unknown>;
+        } else {
+          originalData = parsed;
+        }
+      } catch { /* ignora */ }
+    }
+
+    // Merge qtyApproved/approved nos itens do banco
+    type ItemDecision = { itemId: string; approved: boolean; qtyApproved: number; reason?: string | null };
+    const itemDecisions: ItemDecision[] = Array.isArray(reviewData?.items)
+      ? (reviewData.items as ItemDecision[])
+      : [];
+
+    const itemsWithApproval = req.items.map(item => {
+      const decision = itemDecisions.find(d => d.itemId === item.id);
+      return {
+        ...item,
+        qtyApproved: decision ? decision.qtyApproved : null,
+        approved: decision ? decision.approved : null,
+        approvalReason: decision?.reason ?? null,
+      };
+    });
+
+    // Status virtual: se _parcial=true, expor como PARCIAL no response
+    const statusVirtual = reviewData?._parcial ? 'PARCIAL' : req.status;
+
+    return {
+      ...req,
+      items: itemsWithApproval,
+      statusVirtual,
+      reviewData: reviewData
+        ? {
+            decision: reviewData.decision,
+            notes: reviewData.notes,
+            reviewedAt: reviewData.reviewedAt,
+            reviewedBy: reviewData.reviewedBy,
+            isParcial: reviewData._parcial ?? false,
+          }
+        : null,
+      // Expor dados originais (itens do description) se existirem
+      originalItens: originalData?.itens ?? null,
+      justificativa: originalData?.justificativa ?? null,
+      urgencia: originalData?.urgencia ?? null,
+    };
   }
 
   async review(id: string, dto: ReviewMaterialRequestDto, user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode aprovar/rejeitar');
 
-    const req = await this.prisma.materialRequest.findUnique({ where: { id } });
+    const req = await this.prisma.materialRequest.findUnique({
+      where: { id },
+      include: { items: true },
+    });
     if (!req) throw new NotFoundException('Solicitação não encontrada');
     if (req.mantenedoraId !== user.mantenedoraId || req.unitId !== user.unitId) {
       throw new ForbiddenException('Fora do escopo');
     }
 
-    let status: RequestStatus;
-    if (dto.decision === ReviewDecision.APPROVED || dto.decision === ReviewDecision.ADJUSTED) {
-      status = RequestStatus.APROVADO;
-    } else {
-      status = RequestStatus.REJEITADO;
+    // Recupera dados originais (itens do description) para preservar
+    let originalData: Record<string, unknown> | null = null;
+    if (req.description) {
+      try {
+        const parsed = JSON.parse(req.description) as Record<string, unknown>;
+        if (!parsed._review) originalData = parsed;
+      } catch { /* ignora */ }
     }
 
-    // Persiste notas de revisão (notes + itemsApproved) sem alterar schema
-    // Armazena como JSON no campo description apenas se houver informação de revisão
-    const reviewMeta =
-      dto.notes || dto.itemsApproved?.length
-        ? JSON.stringify({
-            _review: true,
-            decision: dto.decision,
-            notes: dto.notes ?? null,
-            itemsApproved: dto.itemsApproved ?? null,
-          })
-        : undefined;
+    let status: RequestStatus;
+    let reviewData: Record<string, unknown>;
+
+    if (dto.decision === ReviewDecision.APPROVE_ITEMS && dto.items && dto.items.length > 0) {
+      // ── Aprovação item-a-item ────────────────────────────────────────────
+      const itemDecisions = dto.items.map(i => ({
+        itemId: i.itemId,
+        approved: i.approved,
+        qtyApproved: i.approved ? Math.max(0, i.qtyApproved) : 0,
+        reason: i.reason ?? null,
+      }));
+
+      // Valida qty contra qty solicitada
+      for (const d of itemDecisions) {
+        const dbItem = req.items.find(it => it.id === d.itemId);
+        if (dbItem && d.qtyApproved > dbItem.quantity) {
+          throw new ForbiddenException(
+            `Item ${d.itemId}: qtyApproved (${d.qtyApproved}) não pode exceder qty solicitada (${dbItem.quantity})`,
+          );
+        }
+      }
+
+      const allRejected = itemDecisions.every(d => d.qtyApproved === 0);
+      const allApproved = itemDecisions.every(d => d.approved && d.qtyApproved > 0);
+      const isParcial = !allRejected && !allApproved;
+
+      status = allRejected ? RequestStatus.REJEITADO : RequestStatus.APROVADO;
+
+      reviewData = {
+        _review: true,
+        _parcial: isParcial,
+        decision: dto.decision,
+        notes: dto.notes ?? dto.comment ?? null,
+        items: itemDecisions,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: user.sub,
+      };
+    } else {
+      // ── Decisão global (legado) ────────────────────────────────────────────
+      status =
+        dto.decision === ReviewDecision.APPROVED || dto.decision === ReviewDecision.ADJUSTED
+          ? RequestStatus.APROVADO
+          : RequestStatus.REJEITADO;
+
+      reviewData = {
+        _review: true,
+        _parcial: false,
+        decision: dto.decision,
+        notes: dto.notes ?? dto.comment ?? null,
+        itemsApproved: dto.itemsApproved ?? null,
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: user.sub,
+      };
+    }
+
+    // Preserva dados originais no reviewData
+    if (originalData) reviewData._originalData = originalData;
 
     return this.prisma.materialRequest.update({
       where: { id },
@@ -215,7 +320,12 @@ export class MaterialRequestService {
         status,
         approvedBy: user.sub,
         approvedDate: new Date(),
-        ...(reviewMeta !== undefined ? { description: reviewMeta } : {}),
+        description: JSON.stringify(reviewData),
+      },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
     });
   }
