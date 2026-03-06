@@ -65,10 +65,8 @@ ENV VITE_DEFAULT_THEME=${VITE_DEFAULT_THEME}
 ENV VITE_DEFAULT_LANGUAGE=${VITE_DEFAULT_LANGUAGE}
 ENV VITE_STORAGE_PREFIX=${VITE_STORAGE_PREFIX}
 ENV VITE_API_TIMEOUT=${VITE_API_TIMEOUT}
-
-# Build apenas o app web usando pnpm filter
-RUN pnpm --filter @conexa/web build
-
+# Build apenas o app web usando vite diretamente (evita timeout SSH do tsc -b)
+RUN cd /app/apps/web && npx vite build
 # ---------- Runtime stage ----------
 FROM nginx:alpine
 
