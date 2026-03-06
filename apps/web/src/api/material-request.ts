@@ -51,9 +51,18 @@ export interface MaterialRequest {
   updatedAt: string;
 }
 
+export interface ItemApprovedDto {
+  id: string;
+  quantidadeAprovada: number;
+}
+
 export interface ReviewMaterialRequestDto {
-  decision: 'APPROVED' | 'REJECTED';
+  decision: 'APPROVED' | 'REJECTED' | 'ADJUSTED';
   observacao?: string;
+  /** Alias para notes (compatibilidade com backend) */
+  notes?: string;
+  /** Itens com quantidades ajustadas (ADJUSTED) */
+  itemsApproved?: ItemApprovedDto[];
 }
 
 /**
@@ -85,10 +94,16 @@ export async function listUnitMaterialRequests(filters?: {
 }
 
 /**
- * Unidade aprova ou rejeita uma requisição
+ * Unidade aprova, rejeita ou ajusta uma requisição
  */
 export async function reviewMaterialRequest(id: string, dto: ReviewMaterialRequestDto): Promise<MaterialRequest> {
-  const response = await http.patch(`/material-requests/${id}/review`, dto);
+  // Mapeia observacao -> notes para compatibilidade com o backend
+  const payload = {
+    decision: dto.decision,
+    notes: dto.notes ?? dto.observacao,
+    ...(dto.itemsApproved ? { itemsApproved: dto.itemsApproved } : {}),
+  };
+  const response = await http.patch(`/material-requests/${id}/review`, payload);
   return response.data;
 }
 
