@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../app/AuthProvider';
-import { isProfessor, isUnidade } from '../api/auth';
+import { isProfessor, isUnidade, isCentral } from '../api/auth';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { useUnitScope } from '../contexts/UnitScopeContext';
 import { submitPlanningForReview, approvePlanning, returnPlanning } from '../api/plannings';
 import { PageShell } from '../components/ui/PageShell';
@@ -108,6 +109,7 @@ export default function PlanejamentosPage() {
   const { user } = useAuth();
   const ehProfessor = isProfessor(user);
   const ehCoordenador = isUnidade(user);
+  const ehCentral = isCentral(user);
   // Contexto global de escopo de unidade (para STAFF_CENTRAL)
   const { selectedUnitId: ctxUnitId } = useUnitScope();
   const [aba, setAba] = useState<'meus' | 'novo' | 'matriz' | 'templates'>('meus');
@@ -278,6 +280,12 @@ export default function PlanejamentosPage() {
 
   return (
     <PageShell title="Planejamentos Pedagógicos" subtitle="Organize seus planejamentos com base na Matriz Curricular COCRIS 2026">
+      {/* Seletor de unidade — apenas para STAFF_CENTRAL/MANTENEDORA */}
+      {ehCentral && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
+          <UnitScopeSelector showNetworkOption placeholder="Toda a rede" />
+        </div>
+      )}
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[

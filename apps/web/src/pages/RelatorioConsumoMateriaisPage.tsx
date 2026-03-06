@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,9 +8,13 @@ import { Label } from '../components/ui/label';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
+import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import {
   BarChart2, ShoppingCart, CheckCircle, XCircle,
-  Clock, Package, RefreshCw, Filter, Download,
+  Clock, Package, RefreshCw, Filter,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -75,27 +80,41 @@ const STATUS_LABEL: Record<string, { label: string; cor: string }> = {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function RelatorioConsumoMateriaisPage() {
+  const { user } = useAuth();
+  const roles = normalizeRoles(user);
+  const isCentral = roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
+
+  // Suporte a ?unitId= via query param
+  const [searchParams] = useSearchParams();
+  const unitIdFromQuery = searchParams.get('unitId') ?? '';
+
+  // Contexto global de unidade (compartilhado entre telas)
+  const { selectedUnitId: ctxUnitId, setUnit: ctxSetUnit, accessibleUnits } = useUnitScope();
+
+  // Inicializar unidade a partir do query param se fornecido
+  useEffect(() => {
+    if (unitIdFromQuery && unitIdFromQuery !== ctxUnitId) {
+      ctxSetUnit(unitIdFromQuery);
+    }
+  }, [unitIdFromQuery]); // eslint-disable-line
+
+  const selectedUnitId = ctxUnitId ?? '';
+
   const [loading, setLoading] = useState(false);
   const [relatorio, setRelatorio] = useState<RelatorioData | null>(null);
   const [filtros, setFiltros] = useState({
-    classroomId: '',
     dataInicio: '',
     dataFim: '',
   });
 
-  useEffect(() => {
-    carregarRelatorio();
-  }, []);
-
-  async function carregarRelatorio() {
+  const carregarRelatorio = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filtros.classroomId) params.set('classroomId', filtros.classroomId);
       if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio);
       if (filtros.dataFim) params.set('dataFim', filtros.dataFim);
+      if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
       const res = await http.get(`/material-requests/relatorio-consumo?${params.toString()}`);
-      // Guards contra campos null/undefined que causam crash no .map/.entries
       const raw = res.data ?? {};
       setRelatorio({
         periodo: raw.periodo ?? { inicio: null, fim: null },
@@ -110,7 +129,12 @@ export default function RelatorioConsumoMateriaisPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [filtros.dataInicio, filtros.dataFim, selectedUnitId, isCentral]);
+
+  // Carregar automaticamente ao montar e quando unidade muda
+  useEffect(() => {
+    carregarRelatorio();
+  }, [carregarRelatorio]);
 
   function handleFiltrar(e: React.FormEvent) {
     e.preventDefault();
@@ -122,16 +146,45 @@ export default function RelatorioConsumoMateriaisPage() {
     return new Date(iso).toLocaleDateString('pt-BR');
   }
 
+  const unidadeNome = accessibleUnits.find(u => u.id === selectedUnitId)?.name;
+
   return (
     <PageShell
       title="Relatório de Consumo de Materiais"
-      subtitle="Análise de requisições por categoria, turma e período — exclusivo para coordenação"
+      subtitle={
+        isCentral
+          ? selectedUnitId
+            ? `Unidade: ${unidadeNome ?? selectedUnitId}`
+            : 'Toda a rede — selecione uma unidade para filtrar'
+          : 'Análise de requisições por categoria, turma e período'
+      }
     >
-      {/* Filtros */}
-      <Card className="border border-gray-200">
+      {/* Seletor de Unidade — apenas para STAFF_CENTRAL/MANTENEDORA/DEVELOPER */}
+      {isCentral && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex flex-wrap items-center gap-4">
+          <UnitScopeSelector
+            showNetworkOption
+            placeholder="Toda a rede (sem filtro)"
+            className="flex-1 min-w-[200px]"
+          />
+          {selectedUnitId && (
+            <span className="text-xs text-blue-600 bg-blue-100 px-3 py-1 rounded-full font-medium">
+              Filtrando por: <strong>{unidadeNome}</strong>
+            </span>
+          )}
+          {!selectedUnitId && (
+            <span className="text-xs text-gray-500">
+              Sem filtro de unidade — exibindo dados de toda a rede
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Filtros de período */}
+      <Card className="border border-gray-200 mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-700 text-base">
-            <Filter className="h-4 w-4" /> Filtros
+            <Filter className="h-4 w-4" /> Filtros de Período
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -163,7 +216,6 @@ export default function RelatorioConsumoMateriaisPage() {
       </Card>
 
       {loading && <LoadingState message="Gerando relatório..." />}
-
       {!loading && relatorio && (
         <>
           {/* Cards de totais */}
@@ -207,47 +259,20 @@ export default function RelatorioConsumoMateriaisPage() {
 
           {/* Por Categoria */}
           {Object.keys(relatorio.porCategoria).length > 0 && (
-            <Card>
+            <Card className="border border-gray-200">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart2 className="h-4 w-4 text-blue-600" /> Por Categoria
-                </CardTitle>
+                <CardTitle className="text-base text-gray-700">Por Categoria</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {Object.entries(relatorio.porCategoria).map(([tipo, dados]) => (
-                    <div key={tipo}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-700">{TIPO_LABEL[tipo] || tipo}</span>
-                        <span className="text-xs text-gray-500">{dados.total} requisições</span>
-                      </div>
-                      <div className="flex h-3 rounded-full overflow-hidden bg-gray-100">
-                        {dados.aprovados > 0 && (
-                          <div
-                            className="bg-green-500 h-full"
-                            style={{ width: `${(dados.aprovados / dados.total) * 100}%` }}
-                            title={`Aprovados: ${dados.aprovados}`}
-                          />
-                        )}
-                        {dados.pendentes > 0 && (
-                          <div
-                            className="bg-yellow-400 h-full"
-                            style={{ width: `${(dados.pendentes / dados.total) * 100}%` }}
-                            title={`Pendentes: ${dados.pendentes}`}
-                          />
-                        )}
-                        {dados.rejeitados > 0 && (
-                          <div
-                            className="bg-red-400 h-full"
-                            style={{ width: `${(dados.rejeitados / dados.total) * 100}%` }}
-                            title={`Rejeitados: ${dados.rejeitados}`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex gap-4 mt-1 text-xs text-gray-500">
-                        <span className="text-green-600">✓ {dados.aprovados} aprovados</span>
-                        <span className="text-yellow-600">⏳ {dados.pendentes} pendentes</span>
-                        <span className="text-red-600">✗ {dados.rejeitados} rejeitados</span>
+                    <div key={tipo} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <span className="text-sm font-medium text-gray-700">{TIPO_LABEL[tipo] ?? tipo}</span>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-gray-500">Total: <strong>{dados.total}</strong></span>
+                        <span className="text-green-600">Aprovados: <strong>{dados.aprovados}</strong></span>
+                        <span className="text-yellow-600">Pendentes: <strong>{dados.pendentes}</strong></span>
+                        <span className="text-red-600">Rejeitados: <strong>{dados.rejeitados}</strong></span>
                       </div>
                     </div>
                   ))}
@@ -258,42 +283,21 @@ export default function RelatorioConsumoMateriaisPage() {
 
           {/* Por Turma */}
           {relatorio.porTurma.length > 0 && (
-            <Card>
+            <Card className="border border-gray-200">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4 text-purple-600" /> Por Turma
-                </CardTitle>
+                <CardTitle className="text-base text-gray-700">Por Turma</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-gray-500 text-xs">
-                        <th className="text-left py-2 pr-4">Turma</th>
-                        <th className="text-center py-2 px-2">Total</th>
-                        <th className="text-center py-2 px-2">Aprovadas</th>
-                        <th className="text-center py-2 px-2">Taxa</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {relatorio.porTurma.sort((a, b) => b.total - a.total).map((t, i) => (
-                        <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
-                          <td className="py-2 pr-4 font-medium text-gray-800">{t.nome}</td>
-                          <td className="py-2 px-2 text-center text-gray-600">{t.total}</td>
-                          <td className="py-2 px-2 text-center text-green-600">{t.aprovados}</td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              t.total > 0 && (t.aprovados / t.total) >= 0.7
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                            }`}>
-                              {t.total > 0 ? Math.round((t.aprovados / t.total) * 100) : 0}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="space-y-2">
+                  {relatorio.porTurma.map((t, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                      <span className="text-sm text-gray-700">{t.nome}</span>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-gray-500">Total: <strong>{t.total}</strong></span>
+                        <span className="text-green-600">Aprovados: <strong>{t.aprovados}</strong></span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -301,43 +305,41 @@ export default function RelatorioConsumoMateriaisPage() {
 
           {/* Detalhes */}
           {relatorio.detalhes.length > 0 && (
-            <Card>
+            <Card className="border border-gray-200">
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4 text-gray-600" /> Detalhamento Completo
-                  <span className="ml-auto text-xs text-gray-400 font-normal">{relatorio.detalhes.length} registros</span>
+                <CardTitle className="text-base text-gray-700 flex items-center justify-between">
+                  <span>Detalhes das Requisições</span>
+                  <span className="text-xs font-normal text-gray-400">{relatorio.detalhes.length} itens</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-gray-500 text-xs">
-                        <th className="text-left py-2 pr-3">Código</th>
-                        <th className="text-left py-2 pr-3">Título</th>
-                        <th className="text-left py-2 pr-3">Tipo</th>
-                        <th className="text-left py-2 pr-3">Turma</th>
-                        <th className="text-left py-2 pr-3">Professor</th>
-                        <th className="text-center py-2 px-2">Qtd</th>
-                        <th className="text-center py-2 px-2">Status</th>
-                        <th className="text-left py-2 px-2">Data</th>
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Código</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Título</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Tipo</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Turma</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Status</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Qtd</th>
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500">Solicitado</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-50">
                       {relatorio.detalhes.map(d => (
-                        <tr key={d.id} className="border-b last:border-0 hover:bg-gray-50">
-                          <td className="py-2 pr-3 font-mono text-xs text-gray-500">{d.code}</td>
-                          <td className="py-2 pr-3 text-gray-800 max-w-[180px] truncate">{d.titulo}</td>
-                          <td className="py-2 pr-3 text-gray-600">{TIPO_LABEL[d.tipo] || d.tipo}</td>
-                          <td className="py-2 pr-3 text-gray-600">{d.turma || '—'}</td>
-                          <td className="py-2 pr-3 text-gray-600">{d.professor || '—'}</td>
-                          <td className="py-2 px-2 text-center text-gray-600">{d.quantidade}</td>
-                          <td className="py-2 px-2 text-center">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_LABEL[d.status]?.cor || 'bg-gray-100 text-gray-600'}`}>
-                              {STATUS_LABEL[d.status]?.label || d.status}
+                        <tr key={d.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-2 px-3 text-gray-400 font-mono text-xs">{d.code}</td>
+                          <td className="py-2 px-3 text-gray-700 font-medium">{d.titulo}</td>
+                          <td className="py-2 px-3 text-gray-500">{TIPO_LABEL[d.tipo] ?? d.tipo}</td>
+                          <td className="py-2 px-3 text-gray-600">{d.turma || '—'}</td>
+                          <td className="py-2 px-3">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_LABEL[d.status]?.cor ?? 'bg-gray-100 text-gray-600'}`}>
+                              {STATUS_LABEL[d.status]?.label ?? d.status}
                             </span>
                           </td>
-                          <td className="py-2 px-2 text-xs text-gray-500">{formatarData(d.dataSolicitacao)}</td>
+                          <td className="py-2 px-3 text-gray-700">{d.quantidade}</td>
+                          <td className="py-2 px-3 text-gray-400 text-xs">{formatarData(d.dataSolicitacao)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -348,10 +350,10 @@ export default function RelatorioConsumoMateriaisPage() {
           )}
 
           {relatorio.detalhes.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">Nenhuma requisição encontrada</p>
-              <p className="text-sm mt-1">Ajuste os filtros para ampliar o período de busca</p>
+            <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+              <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="text-gray-500 font-medium">Nenhuma requisição encontrada</p>
+              <p className="text-gray-400 text-sm mt-1">Tente ajustar os filtros de período{isCentral ? ' ou selecione uma unidade' : ''}</p>
             </div>
           )}
         </>

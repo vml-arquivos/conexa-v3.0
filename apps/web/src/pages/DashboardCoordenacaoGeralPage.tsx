@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { useApiCache } from '../hooks/useApiCache';
 import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { toast } from 'sonner';
 import http from '../api/http';
 import {
@@ -302,6 +303,10 @@ export default function DashboardCoordenacaoGeralPage() {
         </div>
       )}
 
+      {/* ── Seletor de Unidade ── */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4">
+        <UnitScopeSelector showNetworkOption placeholder="Toda a rede" compact />
+      </div>
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 overflow-x-auto">
         {ABAS.map(a => (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -216,6 +217,10 @@ export default function AdminTurmasPage() {
 
   return (
     <PageShell title="Gestão de Turmas" subtitle="Crie e gerencie as turmas de todas as unidades">
+      {/* Seletor de unidade */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4">
+        <UnitScopeSelector showNetworkOption placeholder="Todas as unidades" />
+      </div>
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[

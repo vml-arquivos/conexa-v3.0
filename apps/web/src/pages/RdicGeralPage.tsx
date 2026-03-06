@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useUnitScope } from '../contexts/UnitScopeContext';
+import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -199,6 +200,11 @@ export default function RdicGeralPage() {
       subtitle="Coordenação Geral — Visualização somente leitura"
     >
       <div className="space-y-6">
+        {/* Seletor de Unidade — filtra os RDICs por unidade */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+          <UnitScopeSelector showNetworkOption placeholder="Toda a rede" />
+        </div>
+
         {/* Aviso de somente leitura */}
         <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
           <Eye className="h-4 w-4 text-blue-500 flex-shrink-0" />
