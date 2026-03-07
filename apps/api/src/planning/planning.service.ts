@@ -376,13 +376,22 @@ export class PlanningService {
     }
 
     // Filtro por período
+    // BUG C FIX: Usar interseção de períodos (overlap) em vez de contenção estrita.
+    // A lógica anterior (startDate >= query.startDate AND endDate <= query.endDate)
+    // só retornava planejamentos cujo período estava DENTRO do intervalo consultado,
+    // ignorando planejamentos semanais que CONTÊM a data consultada.
+    // Lógica correta: planejamento intersecta o período consultado se:
+    //   planning.startDate <= query.endDate AND planning.endDate >= query.startDate
     if (query.startDate || query.endDate) {
-      where.AND = [];
-      if (query.startDate) {
-        where.AND.push({ startDate: { gte: new Date(query.startDate) } });
-      }
-      if (query.endDate) {
-        where.AND.push({ endDate: { lte: new Date(query.endDate) } });
+      where.AND = where.AND ?? [];
+      if (query.startDate && query.endDate) {
+        // Busca de interseção: retorna planejamentos que cobrem qualquer parte do período
+        where.AND.push({ startDate: { lte: new Date(query.endDate) } });
+        where.AND.push({ endDate: { gte: new Date(query.startDate) } });
+      } else if (query.startDate) {
+        where.AND.push({ endDate: { gte: new Date(query.startDate) } });
+      } else if (query.endDate) {
+        where.AND.push({ startDate: { lte: new Date(query.endDate) } });
       }
     }
 
@@ -489,9 +498,25 @@ export class PlanningService {
       );
     }
 
-    // REGRAS DE EDIÇÃO POR STATUS E ROLE
+    // BUG E FIX: Bloquear edição de planejamentos cujo período já passou.
+    // Professores não podem editar planejamentos com endDate anterior a hoje,
+    // independentemente do status. Apenas DEV e MANTENEDORA podem corrigir dados históricos.
     const isProfessor = user.roles.some((role) => role.level === RoleLevel.PROFESSOR);
     const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (isProfessor || isCoordinator) {
+      const hoje = new Date();
+      hoje.setUTCHours(0, 0, 0, 0);
+      const endDate = new Date(planning.endDate);
+      endDate.setUTCHours(0, 0, 0, 0);
+      if (endDate < hoje) {
+        throw new ForbiddenException(
+          'Planejamentos de períodos já encerrados não podem ser editados. O período deste planejamento já passou.',
+        );
+      }
+    }
+
+    // REGRAS DE EDIÇÃO POR STATUS E ROLE
+    // (isProfessor e isCoordinator já declarados acima)
 
     if (isProfessor) {
         // Professor só pode editar RASCUNHO ou DEVOLVIDO
@@ -905,6 +930,17 @@ export class PlanningService {
     // 2. Validar status: só pode enviar se estiver em RASCUNHO ou DEVOLVIDO
     if (planning.status !== PlanningStatus.RASCUNHO && planning.status !== PlanningStatus.DEVOLVIDO) {
         throw new BadRequestException(`Planejamentos com status ${planning.status} não podem ser enviados para revisão.`);
+    }
+
+    // BUG E FIX: Não permitir envio para revisão de planejamentos com período já encerrado.
+    const hoje = new Date();
+    hoje.setUTCHours(0, 0, 0, 0);
+    const endDate = new Date(planning.endDate);
+    endDate.setUTCHours(0, 0, 0, 0);
+    if (endDate < hoje) {
+        throw new ForbiddenException(
+          'Não é possível enviar para revisão um planejamento cujo período já encerrou.',
+        );
     }
 
     // 3. Atualizar status e registrar data de submissão

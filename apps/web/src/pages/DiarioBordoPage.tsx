@@ -13,7 +13,7 @@ import { createMicrogestureEvent, type MicrogestureKind } from '../services/micr
 import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
-  CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star,
+  CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 
@@ -204,6 +204,11 @@ export default function DiarioBordoPage() {
     rotina: ROTINA_PADRAO.map(r => ({ ...r })),
     microgestos: [] as Microgesto[],
     criancasPresentes: [] as string[],
+    // BUG C FIX: Campos de execução do planejamento integrados ao diário
+    execucaoPlanejamento: '',
+    reacaoCriancas: '',
+    adaptacoesRealizadas: '',
+    ocorrencias: '',
   });
 
   // Formulário de microgesto
@@ -250,12 +255,32 @@ export default function DiarioBordoPage() {
     loadTurmaECriancas();
   }, []);
 
-  async function loadObservacoes(cid?: string) {
+  // BUG D FIX: Carregar observações quando o usuário navega para a aba de observações.
+  // O problema anterior: loadObservacoes era chamado apenas no click de uma criança,
+  // mas criancas[] pode estar vazio se classroomId ainda não foi resolvido.
+  // Agora: quando a aba muda para 'observacoes' e classroomId já está disponível,
+  // carregamos todas as observações da turma para exibir o histórico.
+  useEffect(() => {
+    if (aba === 'observacoes' && classroomId) {
+      loadObservacoes();
+    }
+  }, [aba, classroomId]);
+
+  async function loadObservacoes(childIdParam?: string) {
     setLoadingObs(true);
     try {
+      // BUG D FIX: Sempre incluir classroomId para garantir escopo correto.
+      // childIdParam filtra por criança específica; sem ele, retorna todas da turma.
       const params: Record<string, string> = {};
-      if (cid) params.childId = cid;
-      if (classroomId) params.classroomId = classroomId;
+      if (childIdParam) params.childId = childIdParam;
+      // Usar classroomId do estado (já resolvido assincronamente por loadTurmaECriancas)
+      const cid = classroomId;
+      if (cid) params.classroomId = cid;
+      if (!childIdParam && !cid) {
+        // Sem contexto de turma ainda — aguardar
+        setObservacoes([]);
+        return;
+      }
       const res = await http.get('/development-observations', { params });
       setObservacoes(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
     } catch {
@@ -323,20 +348,21 @@ export default function DiarioBordoPage() {
         })();
         const chamadaRes = await http.get('/attendance/today', { params: { classroomId: cid, date: hoje } });
         const chamadaData = chamadaRes.data;
-        if (chamadaData?.alunos && chamadaData.alunos.length > 0) {
-          // Pré-marcar crianças com status PRESENTE na chamada
+        // BUG B FIX: Usar os totais exatos retornados pelo backend (presentes, ausentes, justificados).
+        // Não recalcular localmente — evita divergência entre chamada e diário.
+        // Preencher mesmo quando não há presentes (ex: todos ausentes), desde que haja registros.
+        if (chamadaData?.alunos && chamadaData.alunos.length > 0 && chamadaData.registrados > 0) {
           const presentesIds: string[] = chamadaData.alunos
             .filter((a: any) => a.status === 'PRESENTE')
             .map((a: any) => a.id);
-          if (presentesIds.length > 0) {
-            setForm(f => ({ ...f, criancasPresentes: presentesIds }));
-            setChamadaCarregada(true);
-            setChamadaInfo({
-              presentes: chamadaData.presentes ?? presentesIds.length,
-              ausentes: chamadaData.ausentes ?? (chamadaData.totalAlunos - presentesIds.length),
-              total: chamadaData.totalAlunos ?? lista.length,
-            });
-          }
+          setForm(f => ({ ...f, criancasPresentes: presentesIds }));
+          setChamadaCarregada(true);
+          // Usar exatamente os valores do backend — fonte única de verdade
+          setChamadaInfo({
+            presentes: chamadaData.presentes,
+            ausentes: chamadaData.ausentes,
+            total: chamadaData.totalAlunos,
+          });
         }
       } catch {
         // Chamada ainda não feita — não é erro, apenas não pré-preenche
@@ -390,7 +416,24 @@ export default function DiarioBordoPage() {
     try {
       const res = await http.get('/diary-events?limit=50&type=ATIVIDADE_PEDAGOGICA');
       const d = res.data;
-      setDiarios(Array.isArray(d) ? d : d?.data ?? []);
+      const raw: any[] = Array.isArray(d) ? d : d?.data ?? [];
+      // BUG B FIX: O modelo DiaryEvent não possui campos raiz presencas/ausencias.
+      // Esses valores são persistidos dentro do campo JSONB aiContext.
+      // Mapear aiContext para campos raiz para exibição consistente na lista.
+      const mapped = raw.map((item: any) => {
+        const ctx = item.aiContext && typeof item.aiContext === 'object' ? item.aiContext : {};
+        return {
+          ...item,
+          presencas: item.presencas ?? ctx.presencas ?? ctx.presentes ?? 0,
+          ausencias: item.ausencias ?? ctx.ausencias ?? ctx.ausentes ?? 0,
+          climaEmocional: item.climaEmocional ?? ctx.climaEmocional ?? '',
+          momentoDestaque: item.momentoDestaque ?? ctx.momentoDestaque ?? item.description ?? '',
+          reflexaoPedagogica: item.reflexaoPedagogica ?? ctx.reflexaoPedagogica ?? item.developmentNotes ?? '',
+          rotina: item.rotina ?? ctx.rotina ?? [],
+          microgestos: item.microgestos ?? ctx.microgestos ?? [],
+        };
+      });
+      setDiarios(mapped);
     } catch {
       // Tenta carregar do localStorage como fallback
       try {
@@ -508,10 +551,24 @@ export default function DiarioBordoPage() {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Reflexão Pedagógica');
       return;
     }
+    // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)
+    const dataDiario = new Date(form.date + 'T12:00:00');
+    const diaSemana = dataDiario.getDay(); // 0=Dom, 6=Sáb
+    if (diaSemana === 0 || diaSemana === 6) {
+      toast.error('Não é possível registrar o diário em fins de semana (dia não letivo).');
+      return;
+    }
     setSaving(true);
     try {
-      const presencasReais = form.criancasPresentes.length > 0 ? form.criancasPresentes.length : form.presencas;
-      const ausenciasReais = criancas.length > 0 ? criancas.length - presencasReais : form.ausencias;
+      // BUG B FIX: Usar totais exatos da chamada consolidada (fonte única de verdade).
+      // Se a chamada foi carregada do backend, usar chamadaInfo (valores exatos do servidor).
+      // Só recalcular localmente se a chamada não foi feita ainda.
+      const presencasReais = chamadaCarregada && chamadaInfo
+        ? chamadaInfo.presentes
+        : (form.criancasPresentes.length > 0 ? form.criancasPresentes.length : form.presencas);
+      const ausenciasReais = chamadaCarregada && chamadaInfo
+        ? chamadaInfo.ausentes
+        : (criancas.length > 0 ? criancas.length - presencasReais : form.ausencias);
 
       if (!classroomId || !childId) {
         // Modo offline/demo: salva localmente
@@ -540,17 +597,28 @@ export default function DiarioBordoPage() {
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
+          // BUG C FIX: Vincular planejamento aprovado ao diário quando existir
+          planningId: planejamentoHoje?.id ?? null,
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
-          presencas: presencasReais,
-          ausencias: ausenciasReais,
           microgestos: form.microgestos,
           tags: [form.climaEmocional],
           aiContext: {
+            // BUG B FIX: Persistir totais exatos da chamada no aiContext (campo JSONB)
+            presencas: presencasReais,
+            ausencias: ausenciasReais,
             climaEmocional: form.climaEmocional,
             momentoDestaque: form.momentoDestaque,
+            reflexaoPedagogica: form.reflexaoPedagogica,
             rotina: form.rotina,
             criancasPresentes: form.criancasPresentes,
+            // BUG C FIX: Registrar execução do planejamento no diário
+            planejamentoId: planejamentoHoje?.id ?? null,
+            planejamentoTitulo: planejamentoHoje?.title ?? null,
+            execucaoPlanejamento: form.execucaoPlanejamento,
+            reacaoCriancas: form.reacaoCriancas,
+            adaptacoesRealizadas: form.adaptacoesRealizadas,
+            ocorrencias: form.ocorrencias,
           },
         });
       }
@@ -568,6 +636,10 @@ export default function DiarioBordoPage() {
         rotina: ROTINA_PADRAO.map(r => ({ ...r })),
         microgestos: [],
         criancasPresentes: [],
+        execucaoPlanejamento: '',
+        reacaoCriancas: '',
+        adaptacoesRealizadas: '',
+        ocorrencias: '',
       });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao salvar diário');
@@ -730,30 +802,81 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-6 max-w-3xl">
-          {/* Card de Planejamento do Dia */}
+          {/* BUG C FIX: Card de Planejamento do Dia com campos de execução integrados */}
           {planejamentoHoje ? (
-            <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <Target className="h-4 w-4 text-indigo-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-semibold text-indigo-800">Planejamento do Dia</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-200 text-indigo-800">
-                      {planejamentoHoje.status === 'EM_EXECUCAO' ? 'Em Execução' : 'Aprovado'}
-                    </span>
+            <Card className="border-2 border-indigo-200 bg-indigo-50">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <Target className="h-4 w-4 text-indigo-600" />
                   </div>
-                  <p className="text-sm font-medium text-indigo-900 mb-1">{planejamentoHoje.title}</p>
-                  {planejamentoHoje.objectives && (
-                    <p className="text-xs text-indigo-700 mb-1"><strong>Objetivos:</strong> {planejamentoHoje.objectives}</p>
-                  )}
-                  {planejamentoHoje.activities && (
-                    <p className="text-xs text-indigo-700"><strong>Atividades:</strong> {planejamentoHoje.activities}</p>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-semibold text-indigo-800">Planejamento do Dia</p>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-200 text-indigo-800">
+                        {planejamentoHoje.status === 'EM_EXECUCAO' ? 'Em Execução' : 'Aprovado'}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-indigo-900 mb-1">{planejamentoHoje.title}</p>
+                    {planejamentoHoje.objectives && (
+                      <p className="text-xs text-indigo-700 mb-1"><strong>Objetivos:</strong> {planejamentoHoje.objectives}</p>
+                    )}
+                    {planejamentoHoje.activities && (
+                      <p className="text-xs text-indigo-700"><strong>Atividades:</strong> {planejamentoHoje.activities}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>
+              </CardHeader>
+              <CardContent className="space-y-3 pt-0">
+                <div className="border-t border-indigo-200 pt-3">
+                  <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-3">Registro de Execução do Planejamento</p>
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-indigo-800">O que foi executado?</Label>
+                      <Textarea
+                        placeholder="Descreva como o planejamento foi executado: quais atividades foram realizadas, como foram conduzidas, o que foi adaptado..."
+                        rows={2}
+                        value={form.execucaoPlanejamento}
+                        onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
+                        className="bg-white border-indigo-200"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-indigo-800">Reação das crianças</Label>
+                      <Textarea
+                        placeholder="Como as crianças responderam? Houve engajamento, resistência, surpresa, descobertas?"
+                        rows={2}
+                        value={form.reacaoCriancas}
+                        onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
+                        className="bg-white border-indigo-200"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-indigo-800">Adaptações realizadas</Label>
+                        <Textarea
+                          placeholder="Quais ajustes foram necessários em relação ao planejado?"
+                          rows={2}
+                          value={form.adaptacoesRealizadas}
+                          onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                          className="bg-white border-indigo-200"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-indigo-800">Ocorrências relevantes</Label>
+                        <Textarea
+                          placeholder="Alguma ocorrência importante durante a execução?"
+                          rows={2}
+                          value={form.ocorrencias}
+                          onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                          className="bg-white border-indigo-200"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -768,6 +891,15 @@ export default function DiarioBordoPage() {
                 <div>
                   <Label>Data</Label>
                   <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
+                  {/* BUG F FIX: Aviso visual de fim de semana */}
+                  {(() => {
+                    const d = new Date(form.date + 'T12:00:00').getDay();
+                    return (d === 0 || d === 6) ? (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> Fim de semana — dia não letivo. Altere a data.
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 {criancas.length === 0 && (
                   <div className="grid grid-cols-2 gap-4">
@@ -1024,7 +1156,12 @@ export default function DiarioBordoPage() {
           <Card className="border-2 border-teal-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-teal-700"><UserCircle className="h-5 w-5" /> Selecionar Criança</CardTitle></CardHeader>
             <CardContent>
-              {criancas.length === 0 ? (
+              {/* BUG D FIX: Exibir loading enquanto turma/crianças ainda estão sendo carregadas */}
+              {!classroomId ? (
+                <p className="text-sm text-gray-400 italic flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin" /> Carregando turma...
+                </p>
+              ) : criancas.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
               ) : (
                 <div className="flex flex-wrap gap-2">

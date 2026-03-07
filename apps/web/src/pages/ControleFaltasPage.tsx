@@ -35,6 +35,8 @@ interface ChamadaData {
   totalAlunos: number;
   presentes: number;
   ausentes: number;
+  registrados: number;
+  chamadaCompleta: boolean;
   alunos: Aluno[];
 }
 
@@ -82,7 +84,6 @@ export default function ControleFaltasPage() {
   const loadChamada = useCallback(async (date: string) => {
     try {
       setLoading(true);
-      setEtapa('chamada');
       // Passa a data local para o backend para evitar divergência de timezone
       const res = await http.get('/attendance/today', { params: { date } });
       const data: ChamadaData = res.data;
@@ -94,9 +95,20 @@ export default function ControleFaltasPage() {
         if (a.status) init[a.id] = { status: a.status, motivo: a.justification ?? undefined };
       });
       setRegistros(init);
+
+      // BUG A FIX: Se a chamada já foi completamente registrada, restaurar etapa de resumo.
+      // Não forçar 'chamada' quando chamadaCompleta === true — evita reabrir em branco.
+      // Critério: chamadaCompleta=true OU todos os alunos já têm status registrado.
+      const todosRegistrados = data.alunos.length > 0 && data.alunos.every(a => a.status !== null);
+      if (data.chamadaCompleta === true || todosRegistrados) {
+        setEtapa('resumo');
+      } else {
+        setEtapa('chamada');
+      }
     } catch {
       toast.error('Não foi possível carregar a lista de alunos');
       setChamada(null);
+      setEtapa('chamada');
     } finally {
       setLoading(false);
     }
@@ -116,6 +128,9 @@ export default function ControleFaltasPage() {
     minDate.setDate(hojeDate.getDate() - MAX_RETROATIVO);
     const novaDate = new Date(nova + 'T12:00:00');
     if (novaDate > hojeDate || novaDate < minDate) return;
+    // BUG F FIX: Não permite navegar para fins de semana (dia letivo obrigatório)
+    const diaSemana = novaDate.getDay(); // 0=Dom, 6=Sáb
+    if (diaSemana === 0 || diaSemana === 6) return;
     setSelectedDate(nova);
   }
 
@@ -124,6 +139,11 @@ export default function ControleFaltasPage() {
     const minDate = new Date(hoje + 'T12:00:00');
     minDate.setDate(minDate.getDate() - MAX_RETROATIVO);
     return new Date(selectedDate + 'T12:00:00') <= minDate;
+  })();
+  // BUG F FIX: Detectar se a data selecionada é fim de semana (não letivo)
+  const isFimDeSemana = (() => {
+    const d = new Date(selectedDate + 'T12:00:00').getDay();
+    return d === 0 || d === 6;
   })();
 
   function marcar(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
@@ -315,8 +335,19 @@ export default function ControleFaltasPage() {
         </button>
       </div>
 
+      {/* BUG F FIX: Aviso e bloqueio de fim de semana */}
+      {isFimDeSemana && (
+        <div className="mb-4 p-4 bg-gray-50 border-2 border-gray-300 rounded-xl text-sm text-gray-600 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 text-gray-400" />
+          <div>
+            <p className="font-semibold text-gray-700">Dia não letivo</p>
+            <p>Fins de semana não permitem registro de chamada. Navegue para um dia útil.</p>
+          </div>
+        </div>
+      )}
+
       {/* Aviso de retroativo */}
-      {!isHoje && (
+      {!isHoje && !isFimDeSemana && (
         <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>Você está registrando a chamada de um dia anterior. Máximo de {MAX_RETROATIVO} dias retroativos permitido.</span>
@@ -496,7 +527,7 @@ export default function ControleFaltasPage() {
       <div className="sticky bottom-4 flex justify-center">
         <Button
           onClick={salvar}
-          disabled={saving || totalMarcados === 0}
+          disabled={saving || totalMarcados === 0 || isFimDeSemana}
           size="lg"
           className={`shadow-xl px-8 h-14 text-base font-bold rounded-2xl transition-all ${
             chamadaCompleta

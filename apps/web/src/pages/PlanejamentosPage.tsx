@@ -333,6 +333,12 @@ export default function PlanejamentosPage() {
             {planningsFiltrados.map(p => {
               const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.RASCUNHO;
               const isExpanded = expandedPlanning === p.id;
+              // BUG E FIX: Detectar se o período do planejamento já passou.
+              // Planejamentos passados não podem ser editados nem reenviados para revisão.
+              const endDateStr = p.endDate ?? p.weekEnd;
+              const isPeriodoPasado = endDateStr
+                ? new Date(endDateStr + 'T23:59:59') < new Date()
+                : false;
               return (
                 <Card key={p.id} className="border-2 hover:border-blue-200 transition-all">
                   <CardContent className="pt-4">
@@ -353,8 +359,14 @@ export default function PlanejamentosPage() {
                             <Clock className="h-3 w-3" /> Aguardando revisão
                           </span>
                         )}
-                        {/* Botão Enviar para Revisão — professor em RASCUNHO */}
-                        {ehProfessor && p.status === 'RASCUNHO' && (
+                        {/* BUG E FIX: Exibir badge de período encerrado para planejamentos passados */}
+                        {isPeriodoPasado && (p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO') && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-lg font-medium" title="Período já encerrado — não editável">
+                            <Calendar className="h-3 w-3" /> Período encerrado
+                          </span>
+                        )}
+                        {/* Botão Enviar para Revisão — professor em RASCUNHO (só se período não passou) */}
+                        {ehProfessor && p.status === 'RASCUNHO' && !isPeriodoPasado && (
                           <button
                             onClick={() => enviarParaRevisao(p.id)}
                             title="Enviar para revisão"
@@ -363,8 +375,8 @@ export default function PlanejamentosPage() {
                             <Send className="h-3 w-3" /> Enviar para Revisão
                           </button>
                         )}
-                        {/* Botão Corrigir e Reenviar — professor em DEVOLVIDO */}
-                        {ehProfessor && p.status === 'DEVOLVIDO' && (
+                        {/* Botão Corrigir e Reenviar — professor em DEVOLVIDO (só se período não passou) */}
+                        {ehProfessor && p.status === 'DEVOLVIDO' && !isPeriodoPasado && (
                           <button
                             onClick={() => enviarParaRevisao(p.id)}
                             title="Corrigir e reenviar para revisão"
