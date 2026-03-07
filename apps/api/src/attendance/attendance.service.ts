@@ -18,8 +18,11 @@ export class AttendanceService {
     if (!classroomId || !date || !Array.isArray(registros) || registros.length === 0) {
       throw new BadRequestException('classroomId, date e registros são obrigatórios');
     }
-    const dataRegistro = new Date(date);
-    dataRegistro.setHours(0, 0, 0, 0);
+    // Usar UTC midnight para consistência com getToday
+    const dataRegistro = /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Date(date + 'T00:00:00.000Z')
+      : new Date(date);
+    dataRegistro.setUTCHours(0, 0, 0, 0);
 
     const results = await Promise.all(
       registros.map(async (reg: any) => {
@@ -70,7 +73,7 @@ export class AttendanceService {
    * Busca chamada de hoje para uma turma
    * Crianças são obtidas via Enrollment -> Child (schema correto)
    */
-  async getToday(classroomId: string, user: JwtPayload) {
+  async getToday(classroomId: string, user: JwtPayload, dateParam?: string) {
     if (!classroomId) {
       // Buscar turma do professor automaticamente
       const classroomTeacher = await this.prisma.classroomTeacher.findFirst({
@@ -81,8 +84,16 @@ export class AttendanceService {
       classroomId = classroomTeacher.classroomId;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Suporte a date opcional para corrigir bug de timezone (servidor UTC vs cliente GMT-3)
+    // O frontend envia a data local no formato YYYY-MM-DD para evitar divergência
+    let today: Date;
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      // Interpretar como data local (meia-noite UTC) para consistência com o upsert do register
+      today = new Date(dateParam + 'T00:00:00.000Z');
+    } else {
+      today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+    }
 
     // Buscar turma com alunos via enrollments (relação correta no schema)
     const [classroom, attendances] = await Promise.all([

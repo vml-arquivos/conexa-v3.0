@@ -28,8 +28,12 @@ export class AttendanceController {
    */
   @Get('today')
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  getToday(@Query('classroomId') classroomId: string, @CurrentUser() user: JwtPayload) {
-    return this.svc.getToday(classroomId, user);
+  getToday(
+    @Query('classroomId') classroomId: string,
+    @Query('date') date: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.getToday(classroomId, user, date);
   }
 
   /**

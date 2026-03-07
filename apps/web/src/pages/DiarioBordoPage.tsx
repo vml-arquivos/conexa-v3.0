@@ -219,6 +219,11 @@ export default function DiarioBordoPage() {
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
   const [savingMicrogesto, setSavingMicrogesto] = useState(false);
+  // Chamada do dia pré-carregada para preencher presenças automaticamente
+  const [chamadaCarregada, setChamadaCarregada] = useState(false);
+  const [chamadaInfo, setChamadaInfo] = useState<{ presentes: number; ausentes: number; total: number } | null>(null);
+  // Planejamento aprovado do dia
+  const [planejamentoHoje, setPlanejamentoHoje] = useState<{ id: string; title: string; objectives?: string; activities?: string; status: string } | null>(null);
 
   // Observações individuais
   const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
@@ -294,14 +299,86 @@ export default function DiarioBordoPage() {
       if (turmas.length === 0) return;
       const cid = turmas[0].id;
       setClassroomId(cid);
+
       // Buscar crianças matriculadas na turma
+      let lista: Crianca[] = [];
       try {
         const criancasRes = await http.get('/lookup/children/accessible', { params: { classroomId: cid } });
-        const lista: Crianca[] = Array.isArray(criancasRes.data) ? criancasRes.data : [];
+        lista = Array.isArray(criancasRes.data) ? criancasRes.data : [];
         setCriancas(lista);
         if (lista.length > 0) setChildId(lista[0].id);
       } catch {
         setCriancas([]);
+      }
+
+      // Pré-carregar chamada do dia para preencher presenças automaticamente
+      // Usa data local para evitar bug de timezone servidor UTC vs cliente GMT-3
+      try {
+        const hoje = (() => {
+          const d = new Date();
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${dd}`;
+        })();
+        const chamadaRes = await http.get('/attendance/today', { params: { classroomId: cid, date: hoje } });
+        const chamadaData = chamadaRes.data;
+        if (chamadaData?.alunos && chamadaData.alunos.length > 0) {
+          // Pré-marcar crianças com status PRESENTE na chamada
+          const presentesIds: string[] = chamadaData.alunos
+            .filter((a: any) => a.status === 'PRESENTE')
+            .map((a: any) => a.id);
+          if (presentesIds.length > 0) {
+            setForm(f => ({ ...f, criancasPresentes: presentesIds }));
+            setChamadaCarregada(true);
+            setChamadaInfo({
+              presentes: chamadaData.presentes ?? presentesIds.length,
+              ausentes: chamadaData.ausentes ?? (chamadaData.totalAlunos - presentesIds.length),
+              total: chamadaData.totalAlunos ?? lista.length,
+            });
+          }
+        }
+      } catch {
+        // Chamada ainda não feita — não é erro, apenas não pré-preenche
+      }
+
+      // Buscar planejamento aprovado/em execução do dia
+      try {
+        const hoje = (() => {
+          const d = new Date();
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${dd}`;
+        })();
+        const planRes = await http.get('/plannings', {
+          params: {
+            classroomId: cid,
+            startDate: hoje,
+            endDate: hoje,
+            limit: 1,
+          },
+        });
+        const planData = planRes.data;
+        const planList = Array.isArray(planData) ? planData : planData?.data ?? [];
+        // Aceitar planejamentos APROVADO ou EM_EXECUCAO
+        const planHoje = planList.find((p: any) =>
+          p.status === 'APROVADO' || p.status === 'EM_EXECUCAO' || p.status === 'ACTIVE'
+        );
+        if (planHoje) {
+          const pc = typeof planHoje.pedagogicalContent === 'string'
+            ? JSON.parse(planHoje.pedagogicalContent)
+            : planHoje.pedagogicalContent;
+          setPlanejamentoHoje({
+            id: planHoje.id,
+            title: planHoje.title || 'Planejamento do Dia',
+            objectives: pc?.objetivos || planHoje.objectives || '',
+            activities: pc?.atividades || planHoje.activities || '',
+            status: planHoje.status,
+          });
+        }
+      } catch {
+        // Sem planejamento para hoje — não é erro
       }
     } catch {
       // sem turma vinculada
@@ -653,6 +730,36 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-6 max-w-3xl">
+          {/* Card de Planejamento do Dia */}
+          {planejamentoHoje ? (
+            <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Target className="h-4 w-4 text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-semibold text-indigo-800">Planejamento do Dia</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-200 text-indigo-800">
+                      {planejamentoHoje.status === 'EM_EXECUCAO' ? 'Em Execução' : 'Aprovado'}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-indigo-900 mb-1">{planejamentoHoje.title}</p>
+                  {planejamentoHoje.objectives && (
+                    <p className="text-xs text-indigo-700 mb-1"><strong>Objetivos:</strong> {planejamentoHoje.objectives}</p>
+                  )}
+                  {planejamentoHoje.activities && (
+                    <p className="text-xs text-indigo-700"><strong>Atividades:</strong> {planejamentoHoje.activities}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <p className="text-xs text-gray-500">Nenhum planejamento aprovado para hoje. Registre o diário livremente.</p>
+            </div>
+          )}
           {/* Cabeçalho */}
           <Card className="border-2 border-blue-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-blue-700"><Calendar className="h-5 w-5" /> Informações do Dia</CardTitle></CardHeader>
@@ -679,8 +786,20 @@ export default function DiarioBordoPage() {
               {/* Chamada visual por fotos */}
               {criancas.length > 0 && (
                 <div>
-                  <Label className="mb-2 block">Chamada — Crianças Presentes ({form.criancasPresentes.length}/{criancas.length})</Label>
-                  <p className="text-xs text-gray-400 mb-2">Toque na foto para marcar presença</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Chamada — Crianças Presentes ({form.criancasPresentes.length}/{criancas.length})</Label>
+                    {chamadaCarregada && chamadaInfo && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                        <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
+                      </span>
+                    )}
+                  </div>
+                  {!chamadaCarregada && (
+                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                      ⚠️ Chamada do dia ainda não realizada. Marque as presenças manualmente ou acesse <strong>Chamada Diária</strong> primeiro.
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 mb-2">Toque na foto para ajustar a presença</p>
                   <div className="flex flex-wrap gap-2">
                     {criancas.map(c => {
                       const presente = form.criancasPresentes.includes(c.id);

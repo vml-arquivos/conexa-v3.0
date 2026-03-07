@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sun,
+  CalendarDays,
 } from 'lucide-react';
 
 interface Aluno {
@@ -55,6 +56,17 @@ function formatarData(dateStr: string) {
   return `${DIAS_SEMANA[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]}`;
 }
 
+/** Retorna a data local no formato YYYY-MM-DD sem conversão de timezone */
+function getLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Máximo de dias retroativos permitidos */
+const MAX_RETROATIVO = 4;
+
 export default function ControleFaltasPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,18 +75,16 @@ export default function ControleFaltasPage() {
   const [alunoSelecionado, setAlunoSelecionado] = useState<string | null>(null);
   const [etapa, setEtapa] = useState<'chamada' | 'resumo'>('chamada');
 
-  // Data de hoje
-  const hoje = new Date().toISOString().split('T')[0];
-  const [selectedDate] = useState(hoje);
+  // Data local do dispositivo — evita bug de timezone servidor UTC vs cliente GMT-3
+  const hoje = getLocalDateStr(new Date());
+  const [selectedDate, setSelectedDate] = useState(hoje);
 
-  useEffect(() => {
-    loadChamada();
-  }, []);
-
-  async function loadChamada() {
+  const loadChamada = useCallback(async (date: string) => {
     try {
       setLoading(true);
-      const res = await http.get('/attendance/today');
+      setEtapa('chamada');
+      // Passa a data local para o backend para evitar divergência de timezone
+      const res = await http.get('/attendance/today', { params: { date } });
       const data: ChamadaData = res.data;
       setChamada(data);
 
@@ -86,10 +96,35 @@ export default function ControleFaltasPage() {
       setRegistros(init);
     } catch {
       toast.error('Não foi possível carregar a lista de alunos');
+      setChamada(null);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadChamada(selectedDate);
+  }, [selectedDate, loadChamada]);
+
+  function navegarData(delta: number) {
+    const atual = new Date(selectedDate + 'T12:00:00');
+    atual.setDate(atual.getDate() + delta);
+    const nova = getLocalDateStr(atual);
+    // Não permite datas futuras nem mais de MAX_RETROATIVO dias atrás
+    const hojeDate = new Date(hoje + 'T12:00:00');
+    const minDate = new Date(hoje + 'T12:00:00');
+    minDate.setDate(hojeDate.getDate() - MAX_RETROATIVO);
+    const novaDate = new Date(nova + 'T12:00:00');
+    if (novaDate > hojeDate || novaDate < minDate) return;
+    setSelectedDate(nova);
   }
+
+  const isHoje = selectedDate === hoje;
+  const isMinDate = (() => {
+    const minDate = new Date(hoje + 'T12:00:00');
+    minDate.setDate(minDate.getDate() - MAX_RETROATIVO);
+    return new Date(selectedDate + 'T12:00:00') <= minDate;
+  })();
 
   function marcar(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
     setRegistros((prev) => ({
@@ -193,7 +228,7 @@ export default function ControleFaltasPage() {
 
           {/* Taxa de presença */}
           <div className="p-5 bg-blue-50 rounded-2xl text-center">
-            <p className="text-sm text-blue-600 font-medium mb-1">Taxa de presença hoje</p>
+            <p className="text-sm text-blue-600 font-medium mb-1">Taxa de presença</p>
             <p className="text-5xl font-bold text-blue-700">
               {chamada.totalAlunos > 0 ? Math.round((totalPresentes / chamada.totalAlunos) * 100) : 0}%
             </p>
@@ -250,6 +285,44 @@ export default function ControleFaltasPage() {
       title="Chamada do Dia"
       description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}
     >
+      {/* Navegação de data com retroativo controlado */}
+      <div className="flex items-center justify-between mb-4 bg-white rounded-2xl border shadow-sm p-3">
+        <button
+          onClick={() => navegarData(-1)}
+          disabled={isMinDate}
+          className="p-2 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Dia anterior"
+        >
+          <ChevronLeft className="h-5 w-5 text-gray-600" />
+        </button>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-blue-500" />
+          <span className="font-semibold text-gray-700 text-sm">{formatarData(selectedDate)}</span>
+          {isHoje && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Hoje</span>
+          )}
+          {!isHoje && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Retroativo</span>
+          )}
+        </div>
+        <button
+          onClick={() => navegarData(+1)}
+          disabled={isHoje}
+          className="p-2 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          title="Próximo dia"
+        >
+          <ChevronRight className="h-5 w-5 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Aviso de retroativo */}
+      {!isHoje && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm text-orange-700 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>Você está registrando a chamada de um dia anterior. Máximo de {MAX_RETROATIVO} dias retroativos permitido.</span>
+        </div>
+      )}
+
       {/* Barra de progresso */}
       <div className="mb-6 p-4 bg-white rounded-2xl border shadow-sm">
         <div className="flex items-center justify-between mb-3">
