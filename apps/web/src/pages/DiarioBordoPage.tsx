@@ -603,6 +603,10 @@ export default function DiarioBordoPage() {
           developmentNotes: form.reflexaoPedagogica,
           microgestos: form.microgestos,
           tags: [form.climaEmocional],
+          // BUG B FIX: Enviar presencas/ausencias como campos raiz do DTO
+          // O service usa createDto.presencas ?? 0 (campo raiz), não aiContext.presencas
+          presencas: presencasReais,
+          ausencias: ausenciasReais,
           aiContext: {
             // BUG B FIX: Persistir totais exatos da chamada no aiContext (campo JSONB)
             presencas: presencasReais,
