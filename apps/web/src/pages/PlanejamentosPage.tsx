@@ -407,51 +407,57 @@ export default function PlanejamentosPage() {
                         )}
                       </div>
                     )}
-                    {isExpanded && p.pedagogicalContent && (
+                    {isExpanded && p.pedagogicalContent && (() => {
+                      // Guard defensivo: pedagogicalContent pode chegar como string JSON (legado) ou objeto
+                      const pc: any = typeof p.pedagogicalContent === 'string'
+                        ? (() => { try { return JSON.parse(p.pedagogicalContent); } catch { return {}; } })()
+                        : p.pedagogicalContent;
+                      return (
                       <div className="mt-4 pt-4 border-t space-y-3">
-                        {p.pedagogicalContent.camposSelecionados?.length > 0 && (
+                        {pc.camposSelecionados?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Campos de Experiência</p>
                             <div className="flex flex-wrap gap-2">
-                              {p.pedagogicalContent.camposSelecionados.map((c: string) => {
+                              {pc.camposSelecionados.map((c: string) => {
                                 const campo = CAMPOS.find(x => x.id === c);
                                 return campo ? <span key={c} className={`text-xs px-2 py-1 rounded-full border ${campo.cor}`}>{campo.emoji} {campo.label.split(',')[0]}</span> : null;
                               })}
                             </div>
                           </div>
                         )}
-                        {p.pedagogicalContent.codigosBNCC?.length > 0 && (
+                        {pc.codigosBNCC?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Objetivos BNCC</p>
                             <div className="flex flex-wrap gap-2">
-                              {p.pedagogicalContent.codigosBNCC.map((c: string) => <span key={c} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-mono">{c}</span>)}
+                              {pc.codigosBNCC.map((c: string) => <span key={c} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-mono">{c}</span>)}
                             </div>
                           </div>
                         )}
-                        {p.pedagogicalContent.objetivos?.length > 0 && (
+                        {pc.objetivos?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Objetivos de Aprendizagem</p>
                             <ul className="space-y-1">
-                              {p.pedagogicalContent.objetivos.map((o: string, i: number) => (
+                              {pc.objetivos.map((o: string, i: number) => (
                                 <li key={i} className="text-sm text-gray-700 flex items-start gap-2"><Target className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />{o}</li>
                               ))}
                             </ul>
                           </div>
                         )}
-                        {p.pedagogicalContent.experiencias?.length > 0 && (
+                        {pc.experiencias?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Experiências Propostas</p>
                             <ul className="space-y-1">
-                              {p.pedagogicalContent.experiencias.map((e: string, i: number) => (
+                              {pc.experiencias.map((e: string, i: number) => (
                                 <li key={i} className="text-sm text-gray-700 flex items-start gap-2"><Lightbulb className="h-3.5 w-3.5 text-yellow-500 mt-0.5 flex-shrink-0" />{e}</li>
                               ))}
                             </ul>
                           </div>
                         )}
-                        {p.pedagogicalContent.materiais && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Materiais</p><p className="text-sm text-gray-700">{p.pedagogicalContent.materiais}</p></div>}
-                        {p.pedagogicalContent.observacoes && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Observações</p><p className="text-sm text-gray-700">{p.pedagogicalContent.observacoes}</p></div>}
+                        {pc.materiais && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Materiais</p><p className="text-sm text-gray-700">{pc.materiais}</p></div>}
+                        {pc.observacoes && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Observações</p><p className="text-sm text-gray-700">{pc.observacoes}</p></div>}
                       </div>
-                    )}
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );

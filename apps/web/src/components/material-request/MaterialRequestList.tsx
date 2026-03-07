@@ -164,9 +164,31 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
                   </div>
                 )}
 
-                {!req.items?.length && req.description && (
-                  <p className="text-xs text-gray-600 mb-2 line-clamp-2">{req.description}</p>
-                )}
+                {!req.items?.length && req.description && (() => {
+                  // Evita exibir JSON cru — tenta parsear itens do description
+                  try {
+                    const parsed = JSON.parse(req.description) as { itens?: { item: string; quantidade: number; unidade?: string }[]; _review?: boolean };
+                    if (parsed._review) return null;
+                    if (parsed.itens && parsed.itens.length > 0) {
+                      return (
+                        <div className="mb-2 space-y-0.5">
+                          {parsed.itens.slice(0, 3).map((it, i) => (
+                            <p key={i} className="text-xs text-gray-600">• {it.item} — {it.quantidade} {it.unidade ?? 'un.'}</p>
+                          ))}
+                          {parsed.itens.length > 3 && <p className="text-xs text-gray-400">+{parsed.itens.length - 3} item(ns)...</p>}
+                        </div>
+                      );
+                    }
+                    return null;
+                  } catch {
+                    // description não é JSON — exibe como texto simples apenas se não parecer JSON
+                    const d = req.description.trim();
+                    if (!d.startsWith('{') && !d.startsWith('[')) {
+                      return <p className="text-xs text-gray-600 mb-2 line-clamp-2">{d}</p>;
+                    }
+                    return null;
+                  }
+                })()}
 
                 {req.status === 'REJEITADO' && req.observacaoRevisao && (
                   <div className="mt-2 p-2 bg-red-50 rounded border border-red-100">

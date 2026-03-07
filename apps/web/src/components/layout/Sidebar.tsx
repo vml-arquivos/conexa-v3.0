@@ -44,9 +44,10 @@ const COORD_GESTAO: MenuItem[] = [
   { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/rdic-coord',        label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
-  { path: '/app/rdic-crianca',      label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
-  { path: '/app/chamada',           label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',           label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/rdic-crianca',         label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
+  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',       icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/chamada',              label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
   { path: '/app/rdx',               label: 'Fotos da Turma',             icon: <Camera className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },

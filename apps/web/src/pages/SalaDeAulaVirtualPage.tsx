@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../app/AuthProvider';
+import { isCentral, isMantenedora } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -100,6 +102,9 @@ const DESEMPENHOS = [
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function SalaDeAulaVirtualPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Coordenação Geral e Mantenedora acessam em modo leitura — sem criação/edição
+  const modoLeitura = isCentral(user) || isMantenedora(user);
   const [aba, setAba] = useState<'feed' | 'novo' | 'desempenho' | 'alunos'>('feed');
   const [posts, setPosts] = useState<ClassroomPost[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
@@ -490,7 +495,8 @@ export default function SalaDeAulaVirtualPage() {
         {[
           { id: 'feed', label: 'Feed da Turma', icon: <BookOpen className="h-4 w-4" /> },
           { id: 'alunos', label: 'Meus Alunos', icon: <Users className="h-4 w-4" /> },
-          { id: 'novo', label: 'Novo Post', icon: <Plus className="h-4 w-4" /> },
+          // Aba de criação de post oculta para perfis em modo leitura
+          ...(!modoLeitura ? [{ id: 'novo', label: 'Novo Post', icon: <Plus className="h-4 w-4" /> }] : []),
         ].map(tab => (
           <button
             key={tab.id}
@@ -532,8 +538,8 @@ export default function SalaDeAulaVirtualPage() {
           {!loading && posts.length === 0 && (
             <EmptyState
               title="Nenhum post ainda"
-              description="Crie o primeiro post da turma clicando em 'Novo Post'"
-              action={<Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" /> Criar Primeiro Post</Button>}
+              description={modoLeitura ? 'Nenhum post publicado nesta turma.' : "Crie o primeiro post da turma clicando em 'Novo Post'"}
+              action={!modoLeitura ? <Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" /> Criar Primeiro Post</Button> : undefined}
             />
           )}
 
@@ -645,7 +651,7 @@ export default function SalaDeAulaVirtualPage() {
       )}
 
       {/* ─── NOVO POST ─── */}
-      {aba === 'novo' && (
+      {aba === 'novo' && !modoLeitura && (
         <div className="space-y-6 max-w-2xl">
           <Card className="border-2 border-indigo-100">
             <CardHeader>

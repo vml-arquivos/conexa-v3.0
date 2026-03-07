@@ -125,23 +125,33 @@ export function AtendimentoPaisPage() {
   const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
   const [turmaSelecionada, setTurmaSelecionada] = useState('');
   const [alunos, setAlunos] = useState<{ id: string; name: string; allergies?: string | null; medicalConditions?: string | null }[]>([]);
+  // IDs das crianças da turma selecionada — usado para filtrar atendimentos no frontend
+  const [childIdsDaTurma, setChildIdsDaTurma] = useState<string[] | null>(null);
 
-  // Carregar turmas
+  // Carregar turmas e auto-selecionar a primeira (para PROFESSOR que tem apenas 1 turma)
   useEffect(() => {
     getAccessibleClassrooms()
-      .then(setTurmas)
+      .then(lista => {
+        setTurmas(lista);
+        if (lista.length === 1) setTurmaSelecionada(lista[0].id);
+      })
       .catch(() => setTurmas([]));
   }, []);
 
-  // Carregar alunos ao selecionar turma
+  // Carregar alunos ao selecionar turma e guardar IDs para filtrar atendimentos
   useEffect(() => {
     if (!turmaSelecionada) {
       setAlunos([]);
+      setChildIdsDaTurma(null);
       return;
     }
     http.get('/lookup/children/accessible', { params: { classroomId: turmaSelecionada } })
-      .then(r => setAlunos(r.data || []))
-      .catch(() => setAlunos([]));
+      .then(r => {
+        const lista = r.data || [];
+        setAlunos(lista);
+        setChildIdsDaTurma(lista.map((c: { id: string }) => c.id));
+      })
+      .catch(() => { setAlunos([]); setChildIdsDaTurma(null); });
   }, [turmaSelecionada]);
 
   const carregarAtendimentos = useCallback(async () => {
@@ -481,7 +491,10 @@ export function AtendimentoPaisPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {atendimentos.map(at => (
+          {/* Filtra por crianças da turma selecionada quando há turma ativa */}
+          {atendimentos
+            .filter(at => !childIdsDaTurma || childIdsDaTurma.includes(at.childId))
+            .map(at => (
             <div key={at.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               {/* Cabeçalho do card */}
               <div

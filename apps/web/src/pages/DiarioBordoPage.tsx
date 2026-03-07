@@ -288,22 +288,20 @@ export default function DiarioBordoPage() {
 
   async function loadTurmaECriancas() {
     try {
-      const meRes = await http.get('/auth/me');
-      const me = meRes.data;
-      if (me?.classrooms?.length > 0) setClassroomId(me.classrooms[0].id);
-      if (me?.children?.length > 0) setChildId(me.children[0].id);
-
-      // Buscar crianças da turma
-      const cid = me?.classrooms?.[0]?.id;
-      if (cid) {
-        try {
-          const res = await http.get(`/classrooms/${cid}/children`);
-          const lista = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-          setCriancas(lista);
-        } catch {
-          // Se não tiver endpoint, usa crianças do me
-          if (me?.children) setCriancas(me.children);
-        }
+      // Usa o endpoint de lookup que retorna turmas acessíveis ao professor
+      const turmasRes = await http.get('/lookup/classrooms/accessible');
+      const turmas: { id: string; name: string }[] = Array.isArray(turmasRes.data) ? turmasRes.data : [];
+      if (turmas.length === 0) return;
+      const cid = turmas[0].id;
+      setClassroomId(cid);
+      // Buscar crianças matriculadas na turma
+      try {
+        const criancasRes = await http.get('/lookup/children/accessible', { params: { classroomId: cid } });
+        const lista: Crianca[] = Array.isArray(criancasRes.data) ? criancasRes.data : [];
+        setCriancas(lista);
+        if (lista.length > 0) setChildId(lista[0].id);
+      } catch {
+        setCriancas([]);
       }
     } catch {
       // sem turma vinculada
