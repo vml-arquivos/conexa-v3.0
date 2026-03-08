@@ -1176,25 +1176,57 @@ export default function DiarioBordoPage() {
               ) : criancas.length === 0 ? (
                 <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {criancas.map(c => {
-                    const sel = criancaSelecionadaObs === c.id;
-                    return (
-                      <button key={c.id} type="button"
-                        onClick={() => { setCriancaSelecionadaObs(sel ? '' : c.id); loadObservacoes(sel ? undefined : c.id); }}
-                        className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-teal-500 bg-teal-50 shadow-sm' : 'border-gray-200 bg-white hover:border-teal-300'}`}>
-                        {c.photoUrl ? (
-                          <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center">
-                            <UserCircle className="w-6 h-6 text-teal-400" />
-                          </div>
-                        )}
-                        <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-teal-700' : 'text-gray-600'}`}>{c.firstName}</span>
-                        {sel && <span className="text-teal-500 text-xs">✓</span>}
-                      </button>
-                    );
-                  })}
+                <div className="space-y-3">
+                  {/* FIX P0.2: select pesquisável com nome completo — obrigatório para uso real */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    <select
+                      className="w-full border border-teal-200 rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-400"
+                      value={criancaSelecionadaObs}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setCriancaSelecionadaObs(val);
+                        if (val) loadObservacoes(val);
+                        else loadObservacoes(undefined);
+                      }}
+                    >
+                      <option value="">-- Selecione uma criança --</option>
+                      {criancas
+                        .slice()
+                        .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'pt-BR'))
+                        .map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.firstName} {c.lastName}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  {/* Cards de avatar mantidos para acesso rápido visual */}
+                  <div className="flex flex-wrap gap-2">
+                    {criancas.map(c => {
+                      const sel = criancaSelecionadaObs === c.id;
+                      return (
+                        <button key={c.id} type="button"
+                          title={`${c.firstName} ${c.lastName}`}
+                          onClick={() => {
+                            const next = sel ? '' : c.id;
+                            setCriancaSelecionadaObs(next);
+                            if (next) loadObservacoes(next); else loadObservacoes(undefined);
+                          }}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-teal-500 bg-teal-50 shadow-sm' : 'border-gray-200 bg-white hover:border-teal-300'}`}>
+                          {c.photoUrl ? (
+                            <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center">
+                              <UserCircle className="w-6 h-6 text-teal-400" />
+                            </div>
+                          )}
+                          <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-teal-700' : 'text-gray-600'}`}>{c.firstName}</span>
+                          {sel && <span className="text-teal-500 text-xs">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>

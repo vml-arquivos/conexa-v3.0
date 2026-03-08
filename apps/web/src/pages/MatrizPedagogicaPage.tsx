@@ -28,6 +28,9 @@ interface ObjetivoMatriz {
   codigo_bncc: string;
   objetivo_bncc: string;
   exemplo_atividade?: string;
+  // FIX P0.4: campos pedagógicos obrigatórios para o professor
+  objetivo_curriculo_movimento?: string;
+  intencionalidade_pedagogica?: string;
   data?: string;
 }
 
@@ -110,7 +113,25 @@ function ObjetivoCard({ obj, compact, mostrarExemplo }: {
 
       {expanded && !compact && (
         <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-0 space-y-2">
-          {/* Exemplo de Atividade — visível apenas para coordenação/mantenedora */}
+          {/* FIX P0.4: Objetivo do Currículo 2026 — visível para professor e coordenação */}
+          {obj.objetivo_curriculo_movimento && obj.objetivo_curriculo_movimento !== obj.objetivo_bncc && (
+            <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
+              <p className="text-xs font-semibold text-blue-600 uppercase mb-1 flex items-center gap-1">
+                <Target className="h-3 w-3" /> Objetivo do Currículo 2026
+              </p>
+              <p className="text-sm text-blue-800">{obj.objetivo_curriculo_movimento}</p>
+            </div>
+          )}
+          {/* FIX P0.4: Intencionalidade Pedagógica — visível para professor e coordenação */}
+          {obj.intencionalidade_pedagogica && (
+            <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
+              <p className="text-xs font-semibold text-purple-600 uppercase mb-1 flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> Intencionalidade Pedagógica
+              </p>
+              <p className="text-sm text-purple-800">{obj.intencionalidade_pedagogica}</p>
+            </div>
+          )}
+          {/* Exemplo de Atividade — visível apenas para coordenação/mantenedora (professor não vê) */}
           {mostrarExemplo && obj.exemplo_atividade && obj.exemplo_atividade !== obj.objetivo_bncc && (
             <div className="bg-green-50 rounded-lg p-2.5 border border-green-100">
               <p className="text-xs font-semibold text-green-600 uppercase mb-1 flex items-center gap-1">
@@ -168,6 +189,9 @@ export default function MatrizPedagogicaPage() {
         codigo_bncc: o.codigo_bncc,
         objetivo_bncc: o.objetivo_bncc,
         exemplo_atividade: o.exemplo_atividade,
+        // FIX P0.4: mapear campos pedagógicos do lookup local
+        objetivo_curriculo_movimento: o.objetivo_curriculo_movimento,
+        intencionalidade_pedagogica: o.intencionalidade_pedagogica,
         data: o.data,
       })));
     });
@@ -200,6 +224,9 @@ export default function MatrizPedagogicaPage() {
               codigo_bncc: obj.objetivoBNCCCodigo ?? '',
               objetivo_bncc: obj.objetivoBNCC ?? '',
               exemplo_atividade: obj.exemploAtividade ?? '',
+              // FIX P0.4: mapear campos pedagógicos da API
+              objetivo_curriculo_movimento: obj.objetivoCurriculoMovimento ?? obj.objetivo_curriculo_movimento ?? '',
+              intencionalidade_pedagogica: obj.intencionalidadePedagogica ?? obj.intencionalidade_pedagogica ?? '',
               data: dia.date,
             });
           }

@@ -103,13 +103,16 @@ export class MaterialRequestService {
   }
 
   async listMine(user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+    // FIX P0.1: unitId pode ser null para professores sem unidade explícita no JWT.
+    // Filtramos por mantenedoraId + createdBy; se unitId existir, adicionamos ao filtro.
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const where: Record<string, unknown> = {
+      mantenedoraId: user.mantenedoraId,
+      createdBy: user.sub,
+    };
+    if (user.unitId) where.unitId = user.unitId;
     const result = await this.prisma.materialRequest.findMany({
-      where: {
-        mantenedoraId: user.mantenedoraId,
-        unitId: user.unitId,
-        createdBy: user.sub,
-      },
+      where: where as any,
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         classroom: { select: { id: true, name: true } },

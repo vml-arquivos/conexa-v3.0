@@ -88,6 +88,21 @@ const STATUS_CONFIG: Record<string, {
     corPonto: 'bg-blue-500',
     icon: <CheckCircle className="h-3.5 w-3.5" />,
   },
+  // FIX P0.5: status do ciclo pedagógico completo
+  EM_EXECUCAO: {
+    label: 'Em Execução',
+    cor: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+    corBadge: 'bg-indigo-200 text-indigo-700',
+    corPonto: 'bg-indigo-500',
+    icon: <BookOpen className="h-3.5 w-3.5" />,
+  },
+  CONCLUIDO: {
+    label: 'Concluído',
+    cor: 'bg-teal-100 text-teal-700 border-teal-300',
+    corBadge: 'bg-teal-200 text-teal-700',
+    corPonto: 'bg-teal-500',
+    icon: <CheckCircle className="h-3.5 w-3.5" />,
+  },
 };
 
 function getStatusConfig(status: string) {
@@ -235,7 +250,8 @@ export default function PlanoDeAulaListaPage() {
 
             {/* Legenda de status */}
             <div className="flex flex-wrap gap-3 mb-4">
-              {Object.entries(STATUS_CONFIG).slice(0, 4).map(([key, cfg]) => (
+              {/* FIX P0.5: remover slice(0,4) para exibir todos os status na legenda */}
+              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
                 <div key={key} className="flex items-center gap-1.5 text-xs text-gray-600">
                   <div className={`w-2.5 h-2.5 rounded-full ${cfg.corPonto}`} />
                   {cfg.label}
