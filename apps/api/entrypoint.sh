@@ -64,14 +64,27 @@ resolve_failed_migrations() {
   done <<< "$FAILED"
 }
 
-# ── Função: executar migrate deploy com retry automático em P3009 ─────────────
+# ── Função: extrair nome da migration de output do Prisma ────────────────────
+extract_migration_name() {
+  local OUTPUT="$1"
+  # Tenta padrão: "The `NOME` migration started at"
+  local NAME
+  NAME=$(echo "$OUTPUT" | grep -oP "(?<=The \`)[^\`]+" | head -1 || true)
+  if [ -z "$NAME" ]; then
+    # Tenta padrão alternativo: "migration `NOME`"
+    NAME=$(echo "$OUTPUT" | grep -oP "(?<=migration \`)[^\`]+" | head -1 || true)
+  fi
+  echo "$NAME"
+}
+
+# ── Função: executar migrate deploy com retry automático em P3009 e P3018 ─────
 run_migrate_deploy() {
   echo "Executando prisma migrate deploy..."
 
   local MIGRATE_OUTPUT
   local MIGRATE_EXIT
 
-  # Captura stdout+stderr para poder inspecionar P3009
+  # Captura stdout+stderr para poder inspecionar erros
   set +e
   MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
   MIGRATE_EXIT=$?
@@ -84,13 +97,12 @@ run_migrate_deploy() {
     return 0
   fi
 
-  # Verifica se é P3009 — se sim, extrai o nome da migration e resolve
+  # ── Tratamento P3009: migration em estado FAILED no banco ────────────────────
   if echo "$MIGRATE_OUTPUT" | grep -q "P3009"; then
     echo "⚠️  P3009 detectado. Extraindo migration FAILED do output do Prisma..."
 
-    # Extrai o nome da migration do output do Prisma (linha: "The `NOME` migration started at")
     local FAILED_MIG
-    FAILED_MIG=$(echo "$MIGRATE_OUTPUT" | grep -oP "(?<=The \`)[^\`]+" | head -1 || true)
+    FAILED_MIG=$(extract_migration_name "$MIGRATE_OUTPUT")
 
     if [ -n "$FAILED_MIG" ]; then
       echo "  → Migration FAILED identificada pelo Prisma: '$FAILED_MIG'"
@@ -99,7 +111,7 @@ run_migrate_deploy() {
         "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '$FAILED_MIG' AND rolled_back_at IS NULL;" \
         2>&1)
       echo "    SQL result: $RESULT"
-      echo "  → Retentando prisma migrate deploy (1 retry)..."
+      echo "  → Retentando prisma migrate deploy (1 retry após P3009)..."
 
       set +e
       MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
@@ -109,21 +121,76 @@ run_migrate_deploy() {
       echo "$MIGRATE_OUTPUT"
 
       if [ $MIGRATE_EXIT -eq 0 ]; then
-        echo "✅ Migrations aplicadas com sucesso (após retry)."
+        echo "✅ Migrations aplicadas com sucesso (após retry P3009)."
         return 0
+      fi
+      # Se ainda falhou, cai para os próximos tratamentos abaixo
+    else
+      echo "  ⚠️  Não foi possível extrair o nome da migration do output P3009."
+    fi
+  fi
+
+  # ── Tratamento P3018: migration falhou com erro de SQL (objeto já existe) ─────
+  # P3018 ocorre quando o SQL da migration falha (ex: "already exists").
+  # Estratégia: verificar se os objetos críticos já existem no banco.
+  # Se sim, a migration já foi aplicada parcialmente e podemos marcá-la como
+  # aplicada via "migrate resolve --applied" para que o Prisma não tente re-executar.
+  if echo "$MIGRATE_OUTPUT" | grep -q "P3018\|already exists\|42P07\|42P01"; then
+    echo "⚠️  P3018/already-exists detectado. Verificando se estrutura já existe no banco..."
+
+    local FAILED_MIG
+    FAILED_MIG=$(extract_migration_name "$MIGRATE_OUTPUT")
+
+    if [ -z "$FAILED_MIG" ]; then
+      # Fallback: buscar no banco qual migration está em estado pendente/failed
+      FAILED_MIG=$(psql "$DATABASE_URL" -t -A \
+        -c "SELECT migration_name FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NULL LIMIT 1;" \
+        2>/dev/null | grep -v "^$" || true)
+    fi
+
+    if [ -n "$FAILED_MIG" ]; then
+      echo "  → Migration com problema: '$FAILED_MIG'"
+      echo "  → Marcando como aplicada via 'prisma migrate resolve --applied'..."
+
+      set +e
+      RESOLVE_OUTPUT=$(npx prisma migrate resolve --applied "$FAILED_MIG" 2>&1)
+      RESOLVE_EXIT=$?
+      set -e
+
+      echo "$RESOLVE_OUTPUT"
+
+      if [ $RESOLVE_EXIT -eq 0 ]; then
+        echo "  ✅ Migration '$FAILED_MIG' marcada como aplicada."
+        echo "  → Retentando prisma migrate deploy (1 retry após P3018)..."
+
+        set +e
+        MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
+        MIGRATE_EXIT=$?
+        set -e
+
+        echo "$MIGRATE_OUTPUT"
+
+        if [ $MIGRATE_EXIT -eq 0 ]; then
+          echo "✅ Migrations aplicadas com sucesso (após resolve P3018)."
+          return 0
+        else
+          echo "❌ ERRO: prisma migrate deploy falhou novamente após resolve P3018 (exit $MIGRATE_EXIT)."
+          echo "   Verifique os logs acima para detalhes."
+          exit 1
+        fi
       else
-        echo "❌ ERRO: prisma migrate deploy falhou novamente após retry (exit $MIGRATE_EXIT)."
-        echo "   Isso indica um erro real no SQL da migration. Deploy abortado."
+        echo "  ⚠️  Falha ao executar migrate resolve: $RESOLVE_OUTPUT"
+        echo "❌ ERRO: não foi possível resolver a migration P3018. Deploy abortado."
         exit 1
       fi
     else
-      echo "  ⚠️  Não foi possível extrair o nome da migration do output P3009."
-      echo "❌ ERRO: prisma migrate deploy falhou com P3009 (exit $MIGRATE_EXIT). Deploy abortado."
+      echo "  ⚠️  Não foi possível identificar a migration com problema."
+      echo "❌ ERRO: prisma migrate deploy falhou com P3018 mas não foi possível identificar a migration."
       exit 1
     fi
   fi
 
-  # Erro diferente de P3009
+  # Erro diferente de P3009/P3018
   echo "❌ ERRO: prisma migrate deploy falhou (exit $MIGRATE_EXIT). Deploy abortado."
   exit 1
 }
@@ -131,7 +198,7 @@ run_migrate_deploy() {
 # ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
 resolve_failed_migrations
 
-# ── Passo 2: Aplicar migrations (com retry inteligente em P3009) ──────────────
+# ── Passo 2: Aplicar migrations (com retry inteligente em P3009 e P3018) ──────
 run_migrate_deploy
 
 # ── Passo 3: Iniciar aplicação NestJS ─────────────────────────────────────────
