@@ -14,10 +14,77 @@ ALTER TABLE "Unit"
 ALTER TABLE "Child"
   ADD COLUMN IF NOT EXISTS "photoUrl" TEXT;
 
--- ─── 3. recado_turma: adicionar atualizado_em ─────────────────────────────────
--- Coluna de timestamp de atualização (mapeada como @updatedAt no Prisma)
+-- ─── 3. recado_turma: garantir que a tabela existe antes de alterar ───────────
+-- A tabela pode não existir se o banco foi provisionado sem a migration 20260223.
+-- Criamos com IF NOT EXISTS (idempotente) incluindo já a coluna atualizado_em.
+CREATE TABLE IF NOT EXISTS "recado_turma" (
+    "id"             TEXT NOT NULL,
+    "mantenedora_id" TEXT NOT NULL,
+    "unit_id"        TEXT NOT NULL,
+    "classroom_id"   TEXT,
+    "destinatario"   VARCHAR(50) NOT NULL DEFAULT 'TODAS_PROFESSORAS',
+    "professor_id"   TEXT,
+    "titulo"         VARCHAR(255) NOT NULL,
+    "mensagem"       TEXT NOT NULL,
+    "importante"     BOOLEAN NOT NULL DEFAULT false,
+    "criado_por_id"  TEXT NOT NULL,
+    "criado_em"      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizado_em"  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at"     TIMESTAMP(3),
+    CONSTRAINT "RecadoTurma_pkey" PRIMARY KEY ("id")
+);
+
+-- Índices da tabela recado_turma (idempotentes)
+CREATE INDEX IF NOT EXISTS "RecadoTurma_mantenedoraId_idx" ON "recado_turma"("mantenedora_id");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_unitId_idx"        ON "recado_turma"("unit_id");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_classroomId_idx"   ON "recado_turma"("classroom_id");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_criadoPorId_idx"   ON "recado_turma"("criado_por_id");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_destinatario_idx"  ON "recado_turma"("destinatario");
+CREATE INDEX IF NOT EXISTS "RecadoTurma_expiresAt_idx"     ON "recado_turma"("expires_at");
+
+-- Foreign key para Mantenedora (idempotente)
+DO $$ BEGIN
+  ALTER TABLE "recado_turma"
+    ADD CONSTRAINT "RecadoTurma_mantenedoraId_fkey"
+    FOREIGN KEY ("mantenedora_id") REFERENCES "Mantenedora"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Foreign key para Unit (idempotente)
+DO $$ BEGIN
+  ALTER TABLE "recado_turma"
+    ADD CONSTRAINT "RecadoTurma_unitId_fkey"
+    FOREIGN KEY ("unit_id") REFERENCES "Unit"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Agora adiciona a coluna atualizado_em com segurança (caso a tabela já existia sem ela)
 ALTER TABLE "recado_turma"
   ADD COLUMN IF NOT EXISTS "atualizado_em" TIMESTAMP(3) NOT NULL DEFAULT NOW();
+
+-- ─── 3b. recado_leitura: garantir que a tabela existe ─────────────────────────
+-- Pode não existir se o banco foi provisionado sem a migration 20260223.
+CREATE TABLE IF NOT EXISTS "recado_leitura" (
+    "id"        TEXT NOT NULL,
+    "recado_id" TEXT NOT NULL,
+    "user_id"   TEXT NOT NULL,
+    "lido_em"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RecadoLeitura_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "RecadoLeitura_recadoId_userId_key" UNIQUE ("recado_id", "user_id")
+);
+
+CREATE INDEX IF NOT EXISTS "RecadoLeitura_recadoId_idx" ON "recado_leitura"("recado_id");
+CREATE INDEX IF NOT EXISTS "RecadoLeitura_userId_idx"   ON "recado_leitura"("user_id");
+
+DO $$ BEGIN
+  ALTER TABLE "recado_leitura"
+    ADD CONSTRAINT "RecadoLeitura_recadoId_fkey"
+    FOREIGN KEY ("recado_id") REFERENCES "recado_turma"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ─── 4. Material: criar tabela do catálogo de materiais ───────────────────────
 CREATE TABLE IF NOT EXISTS "Material" (
