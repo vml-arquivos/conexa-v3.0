@@ -2,6 +2,7 @@ import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service';
 import { AttendanceStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { assertSchoolDay } from '../common/utils/date.utils';
 
 @Injectable()
 export class AttendanceService {
@@ -18,11 +19,21 @@ export class AttendanceService {
     if (!classroomId || !date || !Array.isArray(registros) || registros.length === 0) {
       throw new BadRequestException('classroomId, date e registros são obrigatórios');
     }
-    // Usar UTC midnight para consistência com getToday
+    // TIMEZONE FIX: Usar meio-dia UTC (T12:00:00Z) para garantir que a data seja
+    // o mesmo dia em qualquer timezone (UTC-12 a UTC+12).
+    // UTC midnight (T00:00:00Z) pode ser o dia anterior em fusos negativos (ex: GMT-3).
     const dataRegistro = /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? new Date(date + 'T00:00:00.000Z')
+      ? new Date(date + 'T12:00:00.000Z')
       : new Date(date);
-    dataRegistro.setUTCHours(0, 0, 0, 0);
+    // Normalizar para meio-dia UTC para consistência
+    dataRegistro.setUTCHours(12, 0, 0, 0);
+
+    // BLOQUEIO DE DIA NÃO LETIVO: Buscar datas não letivas da unidade e validar
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: user.unitId ?? '' },
+      select: { nonSchoolDays: true },
+    });
+    assertSchoolDay(dataRegistro, unit?.nonSchoolDays ?? [], BadRequestException);
 
     const results = await Promise.all(
       registros.map(async (reg: any) => {
@@ -84,15 +95,14 @@ export class AttendanceService {
       classroomId = classroomTeacher.classroomId;
     }
 
-    // Suporte a date opcional para corrigir bug de timezone (servidor UTC vs cliente GMT-3)
-    // O frontend envia a data local no formato YYYY-MM-DD para evitar divergência
+    // TIMEZONE FIX: Usar meio-dia UTC (T12:00:00Z) para consistência com o register.
+    // O register também usa T12:00:00Z para evitar que UTC midnight seja o dia anterior em GMT-3.
     let today: Date;
     if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-      // Interpretar como data local (meia-noite UTC) para consistência com o upsert do register
-      today = new Date(dateParam + 'T00:00:00.000Z');
+      today = new Date(dateParam + 'T12:00:00.000Z');
     } else {
       today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+      today.setUTCHours(12, 0, 0, 0);
     }
 
     // Buscar turma com alunos via enrollments (relação correta no schema)

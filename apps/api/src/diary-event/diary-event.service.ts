@@ -14,6 +14,7 @@ import { RoleLevel, PlanningStatus, AuditLogEntity } from '@prisma/client';
 import {
   getPedagogicalDay,
   formatPedagogicalDate,
+  assertSchoolDay,
 } from '../common/utils/date.utils';
 import { getScopedWhereForDiaryEvent } from './diary-event-scope.helper';
 
@@ -39,6 +40,16 @@ export class DiaryEventService {
       throw new BadRequestException(
         `Não é permitido registrar eventos em datas futuras (${formatPedagogicalDate(eventDate)}).`,
       );
+    }
+
+    // TRAVA: Bloquear dias não letivos (fins de semana e feriados configurados)
+    // Buscar datas não letivas da unidade para validar
+    if (user.unitId) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: user.unitId },
+        select: { nonSchoolDays: true },
+      });
+      assertSchoolDay(eventDate, unit?.nonSchoolDays ?? [], BadRequestException);
     }
 
     // Validar se a criança existe e pertence à turma
@@ -195,14 +206,16 @@ export class DiaryEventService {
   async findAll(query: QueryDiaryEventDto, user: JwtPayload) {
     const where: any = {};
 
+    // ESCOPO DE ACESSO: DiaryEvent não tem mantenedoraId/unitId como campos raiz.
+    // Filtrar via relação classroom conforme o role do usuário.
     if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
       if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
-        where.mantenedoraId = user.mantenedoraId;
+        where.classroom = { unit: { mantenedoraId: user.mantenedoraId } };
       } else if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
         const staffRole = user.roles.find((role) => role.level === RoleLevel.STAFF_CENTRAL);
-        where.unitId = { in: staffRole?.unitScopes || [] };
+        where.classroom = { unitId: { in: staffRole?.unitScopes || [] } };
       } else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
-        where.unitId = user.unitId;
+        where.classroom = { unitId: user.unitId };
       } else if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
         const classrooms = await this.prisma.classroomTeacher.findMany({
           where: { teacherId: user.sub, isActive: true },

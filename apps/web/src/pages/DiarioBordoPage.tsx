@@ -551,6 +551,14 @@ export default function DiarioBordoPage() {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Reflexão Pedagógica');
       return;
     }
+    // EXECUÇÃO DO PLANEJAMENTO OBRIGATÓRIA:
+    // Quando há planejamento aprovado/em execução vinculado ao dia,
+    // o campo "O que foi executado?" é obrigatório.
+    // Regra de negócio: o diário é o registro de execução do planejamento.
+    if (planejamentoHoje && !form.execucaoPlanejamento.trim()) {
+      toast.error('Existe um planejamento aprovado para hoje. Preencha o campo "O que foi executado?" antes de salvar o diário.');
+      return;
+    }
     // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)
     const dataDiario = new Date(form.date + 'T12:00:00');
     const diaSemana = dataDiario.getDay(); // 0=Dom, 6=Sáb

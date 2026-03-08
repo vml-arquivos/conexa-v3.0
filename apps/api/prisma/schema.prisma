@@ -115,7 +115,6 @@ enum DiaryEventStatus {
 /// Tipo de planejamento
 enum PlanningType {
   SEMANAL
-  QUINZENAL  // Adicionado para planos quinzenais
   MENSAL
   TRIMESTRAL
   SEMESTRAL
@@ -129,8 +128,6 @@ enum PlanningStatus {
   EM_EXECUCAO
   CONCLUIDO
   CANCELADO
-
-  // Fluxo de Revisão
   EM_REVISAO
   APROVADO
   DEVOLVIDO
@@ -187,11 +184,6 @@ enum AuditLogAction {
   LOGOUT
   PERMISSION_CHANGE
   ROLE_CHANGE
-
-  // Fluxo de Revisão de Planejamento
-  SUBMIT_REVIEW
-  APPROVE_PLANNING
-  RETURN_PLANNING
 }
 
 /// Entidade auditada
@@ -275,6 +267,7 @@ model Mantenedora {
   auditLogs            AuditLog[]
   pedidosCompra        PedidoCompra[]
   solicitacoesCorrecao SolicitacaoCorrecao[]
+  fornecedores         Fornecedor[]
   arquivos             Arquivo[]
   coordenacoesReuniao  CoordenacaoReuniao[]
   formacoes            Formacao[]
@@ -309,6 +302,10 @@ model Unit {
   // Configurações pedagógicas
   capacity        Int    @default(100)
   ageGroupsServed String @default("0-4") // Faixa etária atendida
+  /// Datas não letivas configuradas pela unidade (feriados, recessos, etc.)
+  /// Formato: array de strings "YYYY-MM-DD" no fuso America/Sao_Paulo
+  /// Exemplo: ["2026-04-21", "2026-06-19"] (Tiradentes, Corpus Christi)
+  nonSchoolDays   String[] @default([])
 
   // Status
   isActive Boolean @default(true)
@@ -337,7 +334,6 @@ model Unit {
   aiContexts           AIContext[]
 
   dailyMetrics DailyMetric[]
-  recados      RecadoTurma[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
@@ -528,9 +524,6 @@ model Child {
   emergencyContactName  String? @db.VarChar(255)
   emergencyContactPhone String? @db.VarChar(20)
 
-  // Foto
-  photoUrl String? @db.VarChar(500)
-  
   // Informações de saúde
   bloodType         String? @db.VarChar(5)
   allergies         String? @db.Text
@@ -555,11 +548,9 @@ model Child {
   dietaryRestrictions DietaryRestriction[]
   reportBases         ReportBase[]
   aiContexts          AIContext[]
-  atendimentosPais         AtendimentoPais[]
-  rdixInstancias           RDIXInstancia[]
-  developmentObservations  DevelopmentObservation[]
-  developmentReports       DevelopmentReport[]
-  postPerformances         StudentPostPerformance[]
+  atendimentosPais    AtendimentoPais[]
+  rdixInstancias      RDIXInstancia[]
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([isActive])
@@ -632,7 +623,6 @@ model Classroom {
   attendances      Attendance[]
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
-  classroomPosts   ClassroomPost[]
 
   @@unique([unitId, code])
   @@index([unitId])
@@ -796,23 +786,15 @@ model Planning {
   // Conteúdo Pedagógico de Autoria Docente (NOVO)
   pedagogicalContent Json? // Experiências, materiais e estratégias por dia
 
-  // Ano letivo e professor
-  anoLetivo   Int?      // Ano letivo do planejamento (ex: 2026)
-  professorId String?   // ID do professor autor (redundante com createdBy para queries)
   // Status
   status PlanningStatus @default(RASCUNHO)
+
   // Timestamps
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   createdBy   String?   @db.VarChar(255)
   updatedBy   String?   @db.VarChar(255)
   publishedAt DateTime?
-
-  // Fluxo de Revisão
-  submittedAt   DateTime? // Data de envio para revisão
-  reviewedAt    DateTime? // Data da revisão
-  reviewedBy    String?   // ID do usuário que revisou
-  reviewComment String?   @db.Text // Comentário da revisão (devolução)
 
   // Relações
   mantenedora      Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
@@ -843,7 +825,7 @@ model DiaryEvent {
   classroomId       String
   childId           String
   planningId        String?
-  curriculumEntryId String? // Opcional: vínculo com entrada da matriz curricular
+  curriculumEntryId String? // Relação opcional com a entrada da matriz curricular
 
   // Identificação
   type        DiaryEventType
@@ -1013,7 +995,6 @@ model MaterialRequest {
   unit          Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   classroom     Classroom?  @relation(fields: [classroomId], references: [id], onDelete: SetNull)
   createdByUser User?       @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-  items         MaterialRequestItem[]
 
   @@unique([unitId, code])
   @@index([mantenedoraId])
@@ -1213,7 +1194,6 @@ enum StatusPedidoCompra {
   RASCUNHO
   ENVIADO
   EM_ANALISE
-  APROVADO        // Aprovado pelo Diretor — pronto para enviar à Mantenedora
   COMPRADO
   EM_ENTREGA
   ENTREGUE
@@ -1225,6 +1205,7 @@ model PedidoCompra {
   id            String @id @default(cuid())
   mantenedoraId String
   unitId        String
+  fornecedorId  String?
 
   /// Mês/ano de referência (ex.: 2026-03)
   mesReferencia String @db.VarChar(7)
@@ -1247,6 +1228,7 @@ model PedidoCompra {
   /// Relações
   mantenedora Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  fornecedor  Fornecedor?        @relation(fields: [fornecedorId], references: [id])
   itens       ItemPedidoCompra[]
 
   @@index([mantenedoraId])
@@ -1540,8 +1522,6 @@ model RelatorioFoto {
 enum StatusRDIX {
   RASCUNHO
   EM_REVISAO
-  DEVOLVIDO
-  APROVADO   // Aprovado pela coordenação da unidade (status terminal de revisão)
   FINALIZADO
   PUBLICADO
 }
@@ -1576,11 +1556,8 @@ model RDIXInstancia {
   conteudoFinal  Json?
   criadoPorId    String     @db.VarChar(255)
   revisadoPorId  String?    @db.VarChar(255)
-  reviewComment  String?    @db.Text
-  submittedAt    DateTime?  // Data de envio para revisão
-  reviewedAt     DateTime?  // Data da revisão
-  finalizadoEm   DateTime?
-  publicadoEm    DateTime?
+  finalizadoEm  DateTime?
+  publicadoEm   DateTime?
   criadoEm      DateTime   @default(now())
   atualizadoEm  DateTime   @updatedAt
   mantenedora   Mantenedora  @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
@@ -1710,262 +1687,32 @@ model SyncMutation {
 }
 
 // ============================================================================
-// 24. CATÁLOGO DE MATERIAIS
+// FORNECEDORES
 // ============================================================================
 
-/// Catálogo de materiais disponíveis para requisição
-model Material {
-  id             String   @id @default(cuid())
-  code           String   @unique @db.VarChar(50)
-  name           String   @db.VarChar(255)
-  description    String?  @db.Text
-  category       String   @db.VarChar(50) // PEDAGOGICO, HIGIENE
-  unit           String   @db.VarChar(50) // UN, Caixa, Pacote, Rolo, etc
-  referencePrice Float?   @default(0.0)
-  isActive       Boolean  @default(true)
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
-  requestItems   MaterialRequestItem[]
-  
-  @@index([category])
-  @@index([isActive])
-}
+model Fornecedor {
+  id                String   @id @default(cuid())
+  razaoSocial       String
+  nomeFantasia      String?
+  cnpj              String
+  inscricaoEstadual String?
+  email             String?
+  telefone          String?
+  celular           String?
+  endereco          String?
+  cidade            String?
+  estado            String?
+  cep               String?
+  contato           String?
+  observacoes       String?
+  ativo             Boolean  @default(true)
+  mantenedoraId     String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-/// Itens de uma requisição de materiais
-model MaterialRequestItem {
-  id           String   @id @default(cuid())
-  requestId    String
-  request      MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  
-  materialId   String
-  material     Material @relation(fields: [materialId], references: [id])
-  
-  quantity     Int
-  unitPrice    Float?
-  totalPrice   Float?
-  observations String?  @db.Text
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  @@index([requestId])
-  @@index([materialId])
-}
+  mantenedora Mantenedora    @relation(fields: [mantenedoraId], references: [id])
+  pedidos     PedidoCompra[]
 
-// ============================================================================
-// 17. RELATÓRIOS INDIVIDUAIS DE DESENVOLVIMENTO (RDIC)
-// ============================================================================
-
-/// Observações de Desenvolvimento Individual da Criança (RDIC)
-model DevelopmentObservation {
-  id          String   @id @default(cuid())
-  childId     String
-  classroomId String?
-  date        DateTime @default(now())
-  // Categoria da observação
-  category ObservationCategory @default(GERAL)
-  // Comportamento
-  behaviorDescription String? @db.Text
-  socialInteraction   String? @db.Text
-  emotionalState      String? @db.Text
-  // Desenvolvimento físico/motor
-  motorSkills     String? @db.Text
-  cognitiveSkills String? @db.Text
-  languageSkills  String? @db.Text
-  // Saúde e Bem-estar
-  healthNotes  String? @db.Text
-  dietaryNotes String? @db.Text
-  sleepPattern String? @db.Text
-  // Pedagógico
-  learningProgress       String? @db.Text
-  planningParticipation  String? @db.Text
-  interests              String? @db.Text
-  challenges             String? @db.Text
-  // Psicológico / desenvolvimento integral
-  psychologicalNotes  String? @db.Text
-  developmentAlerts   String? @db.Text
-  // Recomendações
-  recommendations String? @db.Text
-  nextSteps       String? @db.Text
-  // Metadados
-  createdBy String
-  updatedAt DateTime @updatedAt
-  // Relações
-  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
-  @@index([childId])
-  @@index([classroomId])
-  @@index([date])
-  @@index([category])
-  @@index([createdBy])
-}
-
-enum ObservationCategory {
-  COMPORTAMENTO
-  DESENVOLVIMENTO
-  SAUDE
-  APRENDIZAGEM
-  GERAL
-}
-
-/// Relatório Individual de Desenvolvimento (RDI/RIA)
-model DevelopmentReport {
-  id      String @id @default(cuid())
-  childId String
-
-  // Período do relatório
-  startDate DateTime
-  endDate   DateTime
-
-  // Tipo de relatório
-  reportType ReportType
-
-  // Conteúdo gerado automaticamente
-  behaviorSummary    String @db.Text
-  developmentSummary String @db.Text
-  healthSummary      String @db.Text
-  learningSummary    String @db.Text
-  overallAssessment  String @db.Text
-  recommendations    String @db.Text
-
-  // Metadados
-  generatedBy String // userId
-  generatedAt DateTime @default(now())
-  approvedBy  String? // coordenador
-  approvedAt  DateTime?
-
-  // Relações
-  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  @@index([childId])
-  @@index([startDate, endDate])
-  @@index([reportType])
-}
-
-enum ReportType {
-  RDI // Relatório de Desenvolvimento Individual
-  RIA // Relatório Individual de Aprendizagem
-  RDIC // Relatório de Desenvolvimento Individual da Criança (completo)
-  BIMESTRAL
-  SEMESTRAL
-  ANUAL
-}
-
-// ============================================================================
-// 33. SALA DE AULA VIRTUAL
-// ============================================================================
-enum PostType {
-  TAREFA
-  AVISO
-  ATIVIDADE
-  MATERIAL
-  REGISTRO
-  PLANEJAMENTO
-}
-
-enum PostStatus {
-  RASCUNHO
-  PUBLICADO
-  ARQUIVADO
-}
-
-model ClassroomPost {
-  id            String     @id @default(cuid())
-  classroomId   String
-  mantenedoraId String
-  unitId        String
-  type          PostType   @default(TAREFA)
-  status        PostStatus @default(PUBLICADO)
-  title         String     @db.VarChar(255)
-  content       String     @db.Text
-  planningId    String?
-  dueDate       DateTime?
-  createdBy     String
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  classroom    Classroom               @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  files        ClassroomPostFile[]
-  performances StudentPostPerformance[]
-
-  @@index([classroomId])
   @@index([mantenedoraId])
-  @@index([createdAt])
-}
-
-model ClassroomPostFile {
-  id           String   @id @default(cuid())
-  postId       String
-  nomeOriginal String   @db.VarChar(255)
-  url          String   @db.VarChar(500)
-  mimeType     String   @db.VarChar(100) @default("application/octet-stream")
-  tamanhoBytes Int      @default(0)
-  createdAt    DateTime @default(now())
-
-  post ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-
-  @@index([postId])
-}
-
-model StudentPostPerformance {
-  id          String   @id @default(cuid())
-  postId      String
-  childId     String
-  performance String   @db.VarChar(50) @default("NAO_AVALIADO")
-  notes       String?  @db.Text
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  post  ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  child Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
-
-  @@unique([postId, childId])
-  @@index([postId])
-  @@index([childId])
-}
-
-// ============================================================================
-// 34. RECADOS DA COORDENADORA
-// ============================================================================
-enum RecadoDestinatario {
-  TODAS_PROFESSORAS
-  TURMA_ESPECIFICA
-  PROFESSOR_ESPECIFICO
-}
-
-model RecadoTurma {
-  id            String             @id @default(cuid())
-  mantenedoraId String
-  unitId        String
-  classroomId   String?
-  destinatario  RecadoDestinatario @default(TODAS_PROFESSORAS)
-  professorId   String?
-  titulo        String             @db.VarChar(255)
-  mensagem      String             @db.Text
-  importante    Boolean            @default(false)
-  criadoPorId   String
-  criadoEm      DateTime           @default(now())
-  expiresAt     DateTime?
-
-  unit     Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  leituras RecadoLeitura[]
-
-  @@index([unitId])
-  @@index([classroomId])
-  @@index([criadoEm])
-}
-
-model RecadoLeitura {
-  id       String   @id @default(cuid())
-  recadoId String
-  userId   String
-  lidoEm   DateTime @default(now())
-
-  recado RecadoTurma @relation(fields: [recadoId], references: [id], onDelete: Cascade)
-
-  @@unique([recadoId, userId])
-  @@index([recadoId])
-  @@index([userId])
+  @@index([cnpj])
 }

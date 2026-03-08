@@ -15,6 +15,7 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { getScopedWhereForPlanning } from './planning-scope.helper';
 import { maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
+import { assertSchoolDay } from '../common/utils/date.utils';
 
 @Injectable()
 export class PlanningService {
@@ -204,6 +205,16 @@ export class PlanningService {
       throw new BadRequestException(
         'A data de início deve ser anterior à data de término',
       );
+    }
+
+    // BLOQUEIO DE DIA NÃO LETIVO: startDate deve ser dia letivo
+    // Planejamentos não podem iniciar em fins de semana ou feriados configurados
+    if (user.unitId) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: user.unitId },
+        select: { nonSchoolDays: true },
+      });
+      assertSchoolDay(startDate, unit?.nonSchoolDays ?? [], BadRequestException);
     }
 
     // Verificar se já existe um planejamento ACTIVE para a turma no período

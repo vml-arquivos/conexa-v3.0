@@ -128,6 +128,9 @@ enum PlanningStatus {
   EM_EXECUCAO
   CONCLUIDO
   CANCELADO
+  EM_REVISAO
+  APROVADO
+  DEVOLVIDO
 }
 
 /// Status de frequência
@@ -299,6 +302,10 @@ model Unit {
   // Configurações pedagógicas
   capacity        Int    @default(100)
   ageGroupsServed String @default("0-4") // Faixa etária atendida
+  /// Datas não letivas configuradas pela unidade (feriados, recessos, etc.)
+  /// Formato: array de strings "YYYY-MM-DD" no fuso America/Sao_Paulo
+  /// Exemplo: ["2026-04-21", "2026-06-19"] (Tiradentes, Corpus Christi)
+  nonSchoolDays   String[] @default([])
 
   // Status
   isActive Boolean @default(true)

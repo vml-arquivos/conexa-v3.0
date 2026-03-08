@@ -2,8 +2,16 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel } from '@prisma/client';
 
 /**
- * Helper para criar where clause com escopo para DiaryEvent
- * DiaryEvent não tem mantenedoraId/unitId direto, precisa filtrar via classroom
+ * Helper para criar where clause com escopo para DiaryEvent.
+ *
+ * IMPORTANTE: O modelo Classroom NÃO tem campo mantenedoraId direto.
+ * O vínculo com mantenedora é feito via classroom.unit.mantenedoraId.
+ * Portanto, o filtro de escopo deve usar a relação aninhada:
+ *   classroom: { unit: { mantenedoraId: ... } }
+ *
+ * Para PROFESSOR: o escopo é validado via ClassroomTeacher após a query,
+ * pois não é possível filtrar por relação many-to-many no where do Prisma
+ * de forma direta sem subquery. Retornamos where vazio e validamos depois.
  */
 export function getScopedWhereForDiaryEvent(user: JwtPayload) {
   // DEVELOPER tem acesso total
@@ -11,24 +19,24 @@ export function getScopedWhereForDiaryEvent(user: JwtPayload) {
     return {};
   }
 
-  // MANTENEDORA: filtrar por mantenedoraId via classroom
+  // MANTENEDORA: filtrar por mantenedoraId via classroom.unit (Classroom não tem mantenedoraId direto)
   if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
     return {
       classroom: {
-        mantenedoraId: user.mantenedoraId,
+        unit: { mantenedoraId: user.mantenedoraId },
       },
     };
   }
 
-  // STAFF_CENTRAL: filtrar por unitScopes via classroom
+  // STAFF_CENTRAL: filtrar por unitScopes via classroom.unitId
   if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
     const staffRole = user.roles.find(
       (role) => role.level === RoleLevel.STAFF_CENTRAL,
     );
     return {
       classroom: {
-        mantenedoraId: user.mantenedoraId,
         unitId: { in: staffRole?.unitScopes || [] },
+        unit: { mantenedoraId: user.mantenedoraId },
       },
     };
   }
@@ -37,17 +45,13 @@ export function getScopedWhereForDiaryEvent(user: JwtPayload) {
   if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
     return {
       classroom: {
-        mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
       },
     };
   }
 
-  // PROFESSOR: filtrar por classroomTeacher
-  // Não podemos fazer isso no where direto, precisa validar depois
-  return {
-    classroom: {
-      mantenedoraId: user.mantenedoraId,
-    },
-  };
+  // PROFESSOR: retorna where vazio — a validação de acesso é feita
+  // via ClassroomTeacher no método findOne/findAll após a query.
+  // Isso evita o erro "Unknown argument mantenedoraId" no Prisma.
+  return {};
 }
