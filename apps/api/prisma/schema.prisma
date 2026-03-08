@@ -1770,28 +1770,25 @@ model Fornecedor {
 /// Recado enviado pela coordenação para professores/turmas
 model RecadoTurma {
   id            String    @id @default(cuid())
-  mantenedoraId String
-  unitId        String
-  classroomId   String?   // null = todas as turmas da unidade
-  criadoPorId   String    @db.VarChar(255)
-  professorId   String?   @db.VarChar(255) // destinatário específico (opcional)
+  mantenedoraId String    @map("mantenedora_id")
+  unitId        String    @map("unit_id")
+  classroomId   String?   @map("classroom_id")
+  criadoPorId   String    @map("criado_por_id") @db.VarChar(255)
+  professorId   String?   @map("professor_id") @db.VarChar(255)
 
-  // Conteúdo
   titulo        String    @db.VarChar(255)
   mensagem      String    @db.Text
   importante    Boolean   @default(false)
   destinatario  String    @default("TODAS_PROFESSORAS") @db.VarChar(50)
-  // Valores: TODAS_PROFESSORAS | TURMA_ESPECIFICA | PROFESSOR_ESPECIFICO
 
-  // Expiração
-  expiresAt     DateTime?
-
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  expiresAt     DateTime? @map("expires_at")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
 
   mantenedora Mantenedora    @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   leituras    RecadoLeitura[]
 
+  @@map("recado_turma")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([classroomId])
@@ -1803,12 +1800,13 @@ model RecadoTurma {
 /// Confirmação de leitura de recado por professor
 model RecadoLeitura {
   id       String   @id @default(cuid())
-  recadoId String
-  userId   String   @db.VarChar(255) // ID do professor que leu
-  lidoEm   DateTime @default(now())
+  recadoId String   @map("recado_id")
+  userId   String   @map("user_id") @db.VarChar(255)
+  lidoEm   DateTime @default(now()) @map("lido_em")
 
   recado RecadoTurma @relation(fields: [recadoId], references: [id], onDelete: Cascade)
 
+  @@map("recado_leitura")
   @@unique([recadoId, userId])
   @@index([recadoId])
   @@index([userId])
@@ -1821,27 +1819,27 @@ model RecadoLeitura {
 /// Postagem pedagógica de uma turma (tarefa, atividade, aviso, etc.)
 model ClassroomPost {
   id            String   @id @default(cuid())
-  mantenedoraId String
-  unitId        String
-  classroomId   String
-  createdBy     String   @db.VarChar(255) // ID do professor autor
-  planningId    String?  // Referência opcional ao planejamento
+  mantenedoraId String   @map("mantenedora_id")
+  unitId        String   @map("unit_id")
+  classroomId   String   @map("classroom_id")
+  createdBy     String   @map("created_by") @db.VarChar(255)
+  planningId    String?  @map("planning_id")
 
-  // Conteúdo
-  title   String  @db.VarChar(255)
-  content String? @db.Text
-  type    String  @default("TAREFA") @db.VarChar(50) // TAREFA | ATIVIDADE | AVISO | FOTO | VIDEO
-  status  String  @default("PUBLICADO") @db.VarChar(50) // RASCUNHO | PUBLICADO | ARQUIVADO
-  dueDate DateTime? // Data de entrega (para tarefas)
+  title   String    @db.VarChar(255)
+  content String?   @db.Text
+  type    String    @default("TAREFA") @map("type") @db.VarChar(50)
+  status  String    @default("PUBLICADO") @map("status") @db.VarChar(50)
+  dueDate DateTime? @map("due_date")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   mantenedora  Mantenedora              @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   classroom    Classroom                @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   files        ClassroomPostFile[]
   performances StudentPostPerformance[]
 
+  @@map("classroom_post")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([classroomId])
@@ -1854,34 +1852,36 @@ model ClassroomPost {
 /// Arquivo anexado a uma postagem pedagógica
 model ClassroomPostFile {
   id     String @id @default(cuid())
-  postId String
+  postId String @map("post_id")
   url    String @db.VarChar(1024)
-  name   String @db.VarChar(255)
-  type   String @db.VarChar(50) // image | video | document | audio
+  name   String @map("nome_original") @db.VarChar(255)
+  type   String @map("mime_type") @db.VarChar(100)
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   post ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
+  @@map("classroom_post_file")
   @@index([postId])
 }
 
 /// Desempenho individual de aluno em uma postagem pedagógica
 model StudentPostPerformance {
-  id      String @id @default(cuid())
-  postId  String
-  childId String
-  createdBy String @db.VarChar(255) // ID do professor que registrou
+  id        String @id @default(cuid())
+  postId    String @map("post_id")
+  childId   String @map("child_id")
+  createdBy String @map("created_by") @db.VarChar(255)
 
-  performance String? @db.VarChar(50) // OTIMO | BOM | REGULAR | INSATISFATORIO
+  performance String? @db.VarChar(50)
   notes       String? @db.Text
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   post  ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   child Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
 
+  @@map("student_post_performance")
   @@unique([postId, childId])
   @@index([postId])
   @@index([childId])
@@ -1894,38 +1894,39 @@ model StudentPostPerformance {
 /// Observação de desenvolvimento individual de uma criança
 model DevelopmentObservation {
   id          String  @id @default(cuid())
-  childId     String
-  classroomId String?
-  createdBy   String  @db.VarChar(255) // ID do professor autor
+  childId     String  @map("child_id")
+  classroomId String? @map("classroom_id")
+  createdBy   String  @map("created_by") @db.VarChar(255)
 
   // Classificação
   category String   @default("GERAL") @db.VarChar(100)
   date     DateTime @default(now())
 
   // Campos de observação (todos opcionais)
-  behaviorDescription    String? @db.Text
-  socialInteraction      String? @db.Text
-  emotionalState         String? @db.Text
-  motorSkills            String? @db.Text
-  cognitiveSkills        String? @db.Text
-  languageSkills         String? @db.Text
-  healthNotes            String? @db.Text
-  dietaryNotes           String? @db.Text
-  sleepPattern           String? @db.Text
-  learningProgress       String? @db.Text
-  planningParticipation  String? @db.Text
+  behaviorDescription    String? @map("behavior_description") @db.Text
+  socialInteraction      String? @map("social_interaction") @db.Text
+  emotionalState         String? @map("emotional_state") @db.Text
+  motorSkills            String? @map("motor_skills") @db.Text
+  cognitiveSkills        String? @map("cognitive_skills") @db.Text
+  languageSkills         String? @map("language_skills") @db.Text
+  healthNotes            String? @map("health_notes") @db.Text
+  dietaryNotes           String? @map("dietary_notes") @db.Text
+  sleepPattern           String? @map("sleep_pattern") @db.Text
+  learningProgress       String? @map("learning_progress") @db.Text
+  planningParticipation  String? @map("planning_participation") @db.Text
   interests              String? @db.Text
   challenges             String? @db.Text
-  psychologicalNotes     String? @db.Text
-  developmentAlerts      String? @db.Text
+  psychologicalNotes     String? @map("psychological_notes") @db.Text
+  developmentAlerts      String? @map("development_alerts") @db.Text
   recommendations        String? @db.Text
-  nextSteps              String? @db.Text
+  nextSteps              String? @map("next_steps") @db.Text
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
 
+  @@map("development_observation")
   @@index([childId])
   @@index([classroomId])
   @@index([createdBy])
