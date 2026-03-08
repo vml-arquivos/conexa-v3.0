@@ -201,7 +201,27 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Diário de Bordo com Microgestos ──────────────────────────────────
+      // ─── RDIC alias (/app/rdic → RdicCriancaPage) ─────────────────────────────────
+      {
+        path: 'rdic',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <RdicCriancaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Observações Individuais alias (/app/coordenacao/observacoes) ────────────
+      {
+        path: 'coordenacao/observacoes',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DesenvolvimentoInfantilPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Diário de Bordo com Microgestos ──────────────────────────────────────────────
       {
         path: 'diario-de-bordo',
         element: (

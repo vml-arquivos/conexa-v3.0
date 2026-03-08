@@ -159,8 +159,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             try { const desc = JSON.parse(r.description as string ?? '{}'); itens = desc.itens ?? []; } catch { itens = []; }
             return {
               id: r.id as string,
-              professorNome: (r.createdBy as string) ?? 'Professor',
-              turmaNome: (r.classroomId as string) ?? '—',
+              professorNome: (r.createdByUser as any)
+                ? `${(r.createdByUser as any).firstName} ${(r.createdByUser as any).lastName}`.trim()
+                : (r.createdBy as string) ?? 'Professor',
+              turmaNome: (r.classroom as any)?.name ?? (r.classroomId as string) ?? '—',
               itens: itens.length > 0 ? itens : [{ item: r.title as string ?? 'Material', quantidade: 1 }],
               urgencia: (r.priority as string)?.toUpperCase() === 'ALTA' ? 'ALTA' : (r.priority as string)?.toUpperCase() === 'BAIXA' ? 'BAIXA' : 'MEDIA',
               justificativa: '',
@@ -179,7 +181,19 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         }
       }
       if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value.data) && reqRes.value.data.length > 0) {
-        setRequisicoes(reqRes.value.data);
+        setRequisicoes(reqRes.value.data.map((r: any) => ({
+          ...r,
+          professorNome: r.createdByUser
+            ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
+            : r.createdBy ?? 'Professor',
+          turmaNome: r.classroom?.name ?? r.classroomId ?? '—',
+          itens: Array.isArray(r.items) && r.items.length > 0
+            ? r.items.map((i: any) => ({ item: i.name ?? i.description ?? 'Material', quantidade: i.quantity ?? 1 }))
+            : [{ item: r.title ?? 'Material', quantidade: 1 }],
+          urgencia: r.priority === 'ALTA' ? 'ALTA' : r.priority === 'BAIXA' ? 'BAIXA' : 'MEDIA',
+          justificativa: r.justification ?? r.notes ?? '',
+          criadoEm: r.requestedDate ?? r.createdAt ?? new Date().toISOString(),
+        })));
       }
       if (planRes.status === 'fulfilled') {
         const rawPlans: Record<string, unknown>[] = Array.isArray(planRes.value.data) ? planRes.value.data : [];
@@ -550,12 +564,43 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     {/* Detalhes expandidos */}
                     {expandido && (
                       <div className="space-y-2 border-t pt-3">
-                        {plan.objectives && (
-                          <div className="p-3 bg-gray-50 rounded-xl">
-                            <p className="text-xs text-gray-500 font-medium mb-1">Objetivos:</p>
-                            <p className="text-sm text-gray-700">{plan.objectives}</p>
-                          </div>
-                        )}
+                        {plan.objectives && (() => {
+                          let objetivos: any[] = [];
+                          try {
+                            const parsed = JSON.parse(plan.objectives as string);
+                            objetivos = Array.isArray(parsed) ? parsed : [];
+                          } catch {
+                            // não é JSON — exibir como texto simples
+                          }
+                          if (objetivos.length === 0) {
+                            return (
+                              <div className="p-3 bg-gray-50 rounded-xl">
+                                <p className="text-xs text-gray-500 font-medium mb-1">Objetivos:</p>
+                                <p className="text-sm text-gray-700">{plan.objectives}</p>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="space-y-2">
+                              <p className="text-xs text-gray-500 font-medium">Objetivos da Matriz:</p>
+                              {objetivos.map((obj: any, idx: number) => (
+                                <div key={idx} className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                  {obj.codigoBNCC && (
+                                    <span className="inline-block text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded mb-1">
+                                      {obj.codigoBNCC}
+                                    </span>
+                                  )}
+                                  {obj.objetivoBNCC && (
+                                    <p className="text-sm text-gray-700">{obj.objetivoBNCC}</p>
+                                  )}
+                                  {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
+                                    <p className="text-xs text-gray-500 mt-1">{obj.objetivoCurriculoDF}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                         {plan.reviewComment && (
                           <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
                             <p className="text-xs text-orange-600 font-medium mb-1">Observação de devolução:</p>

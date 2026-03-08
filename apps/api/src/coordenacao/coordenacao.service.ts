@@ -169,7 +169,15 @@ export class CoordenacaoService {
 
     const requisicoesDetalhes = await this.prisma.materialRequest.findMany({
       where: { unitId, status: RequestStatus.SOLICITADO },
-      select: { id: true, title: true, createdBy: true, requestedDate: true, classroomId: true, priority: true },
+      include: {
+        createdByUser: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        classroom: {
+          select: { id: true, name: true },
+        },
+        items: true,
+      },
       orderBy: { requestedDate: 'desc' },
       take: 20,
     });
@@ -551,6 +559,15 @@ export class CoordenacaoService {
     else where.status = RequestStatus.SOLICITADO;
     return this.prisma.materialRequest.findMany({
       where,
+      include: {
+        createdByUser: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        classroom: {
+          select: { id: true, name: true },
+        },
+        items: true,
+      },
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
