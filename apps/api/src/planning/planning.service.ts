@@ -243,7 +243,7 @@ export class PlanningService {
       data: {
         title: createDto.title,
         description: createDto.description,
-        type: createDto.type ?? 'SEMANAL',
+        type: (createDto.type ?? 'SEMANAL') as import('@prisma/client').PlanningType,
         templateId: createDto.templateId,
         curriculumMatrixId: createDto.curriculumMatrixId, // NOVO
         classroomId: createDto.classroomId,
@@ -571,7 +571,7 @@ export class PlanningService {
         // Campos de conteúdo docente
         ...(updateDto.title !== undefined && { title: updateDto.title }),
         ...(updateDto.description !== undefined && { description: updateDto.description }),
-        ...(updateDto.type !== undefined && { type: updateDto.type }),
+        ...(updateDto.type !== undefined && { type: updateDto.type as import('@prisma/client').PlanningType }),
         ...(updateDto.classroomId !== undefined && { classroomId: updateDto.classroomId }),
         ...(updateDto.pedagogicalContent !== undefined && { pedagogicalContent: updateDto.pedagogicalContent }),
         // Campos legados
@@ -585,7 +585,7 @@ export class PlanningService {
         ...(updateDto.activities && { activities: updateDto.activities }),
         ...(updateDto.resources && { resources: updateDto.resources }),
         ...(updateDto.bnccAreas && { bnccAreas: updateDto.bnccAreas }),
-      },
+      } as any,
       include: {
         template: true,
         classroom: true,
