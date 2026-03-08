@@ -85,7 +85,18 @@ export class MaterialRequestService {
     const priorityMap: Record<string, string> = { BAIXA: 'baixa', MEDIA: 'normal', ALTA: 'alta' };
     const priority = dto.urgencia ? (priorityMap[dto.urgencia] ?? 'normal') : 'normal';
 
-    return this.prisma.materialRequest.create({
+    // Prepara os items para criar na tabela MaterialRequestItem
+    const itemsData = (dto.itens && dto.itens.length > 0)
+      ? dto.itens.map((i) => ({
+          productName: i.item,
+          quantity: i.quantidade,
+          unit: i.unidade ?? 'unidade(s)',
+        }))
+      : dto.item
+        ? [{ productName: dto.item, quantity: dto.quantity ?? 1, unit: 'unidade(s)' }]
+        : [];
+
+    const created = await this.prisma.materialRequest.create({
       data: {
         mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
@@ -98,6 +109,28 @@ export class MaterialRequestService {
         priority,
         status: RequestStatus.SOLICITADO,
         createdBy: user.sub,
+      },
+    });
+
+    // Cria os items na tabela MaterialRequestItem (relação 1:N)
+    if (itemsData.length > 0) {
+      await this.prisma.materialRequestItem.createMany({
+        data: itemsData.map((i) => ({
+          materialRequestId: created.id,
+          productName: i.productName,
+          quantity: i.quantity,
+          unit: i.unit,
+        })),
+      });
+    }
+
+    // Retorna com items incluídos
+    return this.prisma.materialRequest.findUnique({
+      where: { id: created.id },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: true,
       },
     });
   }

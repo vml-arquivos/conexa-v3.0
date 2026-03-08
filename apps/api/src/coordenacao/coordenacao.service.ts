@@ -185,7 +185,11 @@ export class CoordenacaoService {
     // FIX Bug 4: inclui EM_REVISAO na lista de planejamentos para revisão
     const planejamentosRevisao = await this.prisma.planning.findMany({
       where: { unitId, status: { in: [PlanningStatus.RASCUNHO, PlanningStatus.EM_REVISAO] } },
-      select: { id: true, title: true, createdBy: true, startDate: true, endDate: true, classroomId: true, status: true },
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        template: { select: { id: true, name: true } },
+      },
       orderBy: { startDate: 'asc' },
       take: 20,
     });

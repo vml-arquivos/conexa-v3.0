@@ -173,8 +173,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         if (Array.isArray(raw?.planejamentosParaRevisao) && raw.planejamentosParaRevisao.length > 0) {
           setPlanejamentos(raw.planejamentosParaRevisao.map((p: Record<string, unknown>) => ({
             id: p.id as string,
-            professorNome: (p.createdBy as string) ?? 'Professor',
-            turmaNome: (p.classroomId as string) ?? '—',
+            professorNome: (p.createdByUser as any)
+              ? `${(p.createdByUser as any).firstName} ${(p.createdByUser as any).lastName}`.trim()
+              : (p.createdBy as string) ?? 'Professor',
+            turmaNome: (p.classroom as any)?.name ?? (p.classroomId as string) ?? '—',
             semana: p.startDate ? new Date(p.startDate as string).toLocaleDateString('pt-BR') : '—',
             objetivos: undefined,
           })));
@@ -188,7 +190,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             : r.createdBy ?? 'Professor',
           turmaNome: r.classroom?.name ?? r.classroomId ?? '—',
           itens: Array.isArray(r.items) && r.items.length > 0
-            ? r.items.map((i: any) => ({ item: i.name ?? i.description ?? 'Material', quantidade: i.quantity ?? 1 }))
+            ? r.items.map((i: any) => ({ item: i.productName ?? i.materialName ?? i.name ?? i.description ?? 'Material', quantidade: i.quantity ?? 1 }))
             : [{ item: r.title ?? 'Material', quantidade: 1 }],
           urgencia: r.priority === 'ALTA' ? 'ALTA' : r.priority === 'BAIXA' ? 'BAIXA' : 'MEDIA',
           justificativa: r.justification ?? r.notes ?? '',

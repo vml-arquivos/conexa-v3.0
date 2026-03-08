@@ -31,18 +31,30 @@ export function useRedirectByRole() {
  */
 export function getRedirectPathByRoles(levels: string[], types: string[] = []): string {
   // Professor
-  if (levels.includes('PROFESSOR') || levels.includes('PROFESSOR_AUXILIAR')) {
+  if (levels.includes('PROFESSOR') || types.includes('PROFESSOR_AUXILIAR')) {
     return '/app/teacher-dashboard';
   }
-  // Nutricionista
+  // Nutricionista da unidade
   if (types.includes('UNIDADE_NUTRICIONISTA')) {
     return '/app/nutricionista';
   }
-  // Diretor
+  // Diretor da unidade
   if (types.includes('UNIDADE_DIRETOR')) {
     return '/app/diretor';
   }
-  // Coordenação Central
+  // Coordenador Pedagógico da unidade → dashboard de coordenação pedagógica
+  if (types.includes('UNIDADE_COORDENADOR_PEDAGOGICO')) {
+    return '/app/coordenacao-pedagogica';
+  }
+  // Psicóloga da central → dashboard de psicologia
+  if (types.includes('STAFF_CENTRAL_PSICOLOGIA')) {
+    return '/app/psicologo';
+  }
+  // Pedagógico da central → dashboard central
+  if (types.includes('STAFF_CENTRAL_PEDAGOGICO')) {
+    return '/app/central';
+  }
+  // Coordenação Central (outros tipos)
   if (levels.includes('STAFF_CENTRAL')) {
     return '/app/central';
   }
@@ -50,6 +62,9 @@ export function getRedirectPathByRoles(levels: string[], types: string[] = []): 
   if (levels.includes('MANTENEDORA') || levels.includes('DEVELOPER')) {
     return '/app/dashboard';
   }
-  // Unidade (Coordenadora Pedagógica, Administrativo, etc.)
+  // Unidade (Coordenadora Pedagógica sem type específico, Administrativo, etc.)
+  if (levels.includes('UNIDADE')) {
+    return '/app/coordenacao-pedagogica';
+  }
   return '/app/dashboard';
 }

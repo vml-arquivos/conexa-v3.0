@@ -151,7 +151,7 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
                     {req.items.map((item: MaterialRequestItemRecord) => (
                       <div key={item.id} className="text-xs text-gray-600 flex items-baseline gap-1">
                         <span className="text-gray-400">&bull;</span>
-                        <span>{item.materialName || item.materialId}</span>
+                        <span>{item.materialName ?? 'Material'}</span>
                         <span className="text-gray-400">x{item.quantity}</span>
                         {item.observations && (
                           <span className="text-gray-400 italic">({item.observations})</span>
