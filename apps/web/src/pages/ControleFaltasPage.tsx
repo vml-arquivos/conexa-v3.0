@@ -66,8 +66,8 @@ function getLocalDateStr(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Máximo de dias retroativos permitidos */
-const MAX_RETROATIVO = 4;
+/** Máximo de dias retroativos permitidos (G4 FIX: 5 dias conforme regra de negócio) */
+const MAX_RETROATIVO = 5;
 
 export default function ControleFaltasPage() {
   const [loading, setLoading] = useState(true);

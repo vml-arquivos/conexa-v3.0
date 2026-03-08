@@ -115,6 +115,35 @@ function getStatusConfig(status: string) {
   };
 }
 
+/**
+ * G2 FIX: Calcula o status visual de um planejamento.
+ * Planejamentos APROVADO ou EM_EXECUCAO com endDate no passado são exibidos como CONCLUIDO.
+ * Planejamentos APROVADO com startDate <= hoje <= endDate são exibidos como EM_EXECUCAO.
+ */
+function getStatusVirtual(p: Planning, today: Date): string {
+  const status = p.status;
+  if (status === 'RASCUNHO' || status === 'EM_REVISAO' || status === 'DEVOLVIDO' || status === 'CANCELADO') {
+    return status;
+  }
+  const start = p.startDate ? new Date(p.startDate) : null;
+  const end = p.endDate ? new Date(p.endDate) : start;
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (end) {
+    const endMid = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    if (endMid < todayMid && (status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'PUBLICADO')) {
+      return 'CONCLUIDO';
+    }
+  }
+  if (start && (status === 'APROVADO' || status === 'PUBLICADO')) {
+    const startMid = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const endMid = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate()) : startMid;
+    if (startMid <= todayMid && todayMid <= endMid) {
+      return 'EM_EXECUCAO';
+    }
+  }
+  return status;
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function PlanoDeAulaListaPage() {
@@ -182,6 +211,11 @@ export default function PlanoDeAulaListaPage() {
       if (!d) return false;
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === day;
     });
+  }
+
+  // G2 FIX: Retorna status visual (com CONCLUIDO virtual para planejamentos passados)
+  function getStatusDisplay(p: Planning): string {
+    return getStatusVirtual(p, today);
   }
 
   // Verifica se é hoje
@@ -298,7 +332,7 @@ export default function PlanoDeAulaListaPage() {
                       </div>
                       <div className="space-y-0.5 overflow-hidden">
                         {dayPlannings.slice(0, 2).map(p => {
-                          const cfg = getStatusConfig(p.status);
+                          const cfg = getStatusConfig(getStatusDisplay(p));
                           return (
                             <button
                               key={p.id}
@@ -335,7 +369,8 @@ export default function PlanoDeAulaListaPage() {
               Planejamentos de {MESES[currentMonth]}
             </h3>
             {plannings.map(p => {
-              const cfg = getStatusConfig(p.status);
+              const statusVis = getStatusDisplay(p);
+              const cfg = getStatusConfig(statusVis);
               return (
                 <button
                   key={p.id}
@@ -383,13 +418,13 @@ export default function PlanoDeAulaListaPage() {
         >
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Header */}
-            <div className={`p-5 rounded-t-2xl border-b ${getStatusConfig(selectedPlanning.status).cor}`}>
+            <div className={`p-5 rounded-t-2xl border-b ${getStatusConfig(getStatusDisplay(selectedPlanning)).cor}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    {getStatusConfig(selectedPlanning.status).icon}
-                    <Badge className={`text-xs ${getStatusConfig(selectedPlanning.status).corBadge} border-0`}>
-                      {getStatusConfig(selectedPlanning.status).label}
+                    {getStatusConfig(getStatusDisplay(selectedPlanning)).icon}
+                    <Badge className={`text-xs ${getStatusConfig(getStatusDisplay(selectedPlanning)).corBadge} border-0`}>
+                      {getStatusConfig(getStatusDisplay(selectedPlanning)).label}
                     </Badge>
                   </div>
                   <h3 className="font-bold text-gray-800 text-base leading-tight">
@@ -611,6 +646,42 @@ export default function PlanoDeAulaListaPage() {
                     <p className="text-sm font-bold text-red-700">Motivo da Devolução</p>
                   </div>
                   <p className="text-sm text-red-800">{selectedPlanning.reviewComment}</p>
+                </div>
+              )}
+
+              {/* G2 FIX: CONCLUIDO — histórico de execução (link para diários do período) */}
+              {getStatusDisplay(selectedPlanning) === 'CONCLUIDO' && (
+                <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                    <p className="text-sm font-bold text-teal-700">Planejamento Concluído</p>
+                  </div>
+                  <p className="text-xs text-teal-700 mb-3">
+                    Este planejamento foi executado no período{selectedPlanning.startDate ? ` de ${formatPedagogicalDate(selectedPlanning.startDate)}` : ''}{selectedPlanning.endDate ? ` a ${formatPedagogicalDate(selectedPlanning.endDate)}` : ''}.
+                    Consulte o Diário de Bordo para ver os registros de execução diária.
+                  </p>
+                  <button
+                    onClick={() => { setSelectedPlanning(null); navigate('/app/diario-de-bordo'); }}
+                    className="text-xs text-teal-600 underline hover:text-teal-800 font-medium"
+                  >
+                    Ver Diários de Bordo →
+                  </button>
+                </div>
+              )}
+
+              {/* G2 FIX: EM_EXECUCAO — link para registrar execução hoje */}
+              {getStatusDisplay(selectedPlanning) === 'EM_EXECUCAO' && (
+                <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-3">
+                  <BookOpen className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-indigo-800">Planejamento em execução</p>
+                    <button
+                      onClick={() => { setSelectedPlanning(null); navigate('/app/diario-de-bordo'); }}
+                      className="text-xs text-indigo-600 underline hover:text-indigo-800 mt-0.5"
+                    >
+                      Registrar execução no Diário de Bordo →
+                    </button>
+                  </div>
                 </div>
               )}
 

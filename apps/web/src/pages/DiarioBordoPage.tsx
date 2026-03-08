@@ -228,7 +228,17 @@ export default function DiarioBordoPage() {
   const [chamadaCarregada, setChamadaCarregada] = useState(false);
   const [chamadaInfo, setChamadaInfo] = useState<{ presentes: number; ausentes: number; total: number } | null>(null);
   // Planejamento aprovado do dia
-  const [planejamentoHoje, setPlanejamentoHoje] = useState<{ id: string; title: string; objectives?: string; activities?: string; status: string } | null>(null);
+  const [planejamentoHoje, setPlanejamentoHoje] = useState<{
+    id: string;
+    title: string;
+    objectives?: string;
+    activities?: string;
+    status: string;
+    // G3 FIX: campos da matriz pedagógica 2026
+    camposExperiencia?: string[];
+    objetivosMatriz?: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }>;
+    recursos?: string;
+  } | null>(null);
 
   // Observações individuais
   const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
@@ -395,12 +405,23 @@ export default function DiarioBordoPage() {
           const pc = typeof planHoje.pedagogicalContent === 'string'
             ? JSON.parse(planHoje.pedagogicalContent)
             : planHoje.pedagogicalContent;
+          // G3 FIX: extrair campos da matriz pedagógica do planejamento
+          const desc = typeof planHoje.description === 'string' && planHoje.description.startsWith('{')
+            ? (() => { try { return JSON.parse(planHoje.description); } catch { return null; } })()
+            : null;
+          const objetivosMatriz: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }> =
+            desc?.objectives ?? pc?.objetivosMatriz ?? [];
+          const camposExperiencia: string[] =
+            desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
           setPlanejamentoHoje({
             id: planHoje.id,
             title: planHoje.title || 'Planejamento do Dia',
-            objectives: pc?.objetivos || planHoje.objectives || '',
-            activities: pc?.atividades || planHoje.activities || '',
+            objectives: pc?.objetivos || planHoje.objectives || desc?.objectives_text || '',
+            activities: pc?.atividades || planHoje.activities || desc?.activities || '',
             status: planHoje.status,
+            camposExperiencia,
+            objetivosMatriz,
+            recursos: desc?.resources || pc?.recursos || '',
           });
         }
       } catch {
@@ -830,6 +851,31 @@ export default function DiarioBordoPage() {
                       </span>
                     </div>
                     <p className="text-sm font-medium text-indigo-900 mb-1">{planejamentoHoje.title}</p>
+                    {/* G3 FIX: Campos de Experiência da Matriz Pedagógica 2026 */}
+                    {planejamentoHoje.camposExperiencia && planejamentoHoje.camposExperiencia.length > 0 && (
+                      <div className="mb-1">
+                        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">Campos de Experiência</p>
+                        <div className="flex flex-wrap gap-1">
+                          {planejamentoHoje.camposExperiencia.map((c, i) => (
+                            <span key={i} className="text-xs bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded-full">{c}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* G3 FIX: Objetivos da Matriz (BNCC + Intencionalidade) */}
+                    {planejamentoHoje.objetivosMatriz && planejamentoHoje.objetivosMatriz.length > 0 && (
+                      <div className="mb-1 space-y-1">
+                        {planejamentoHoje.objetivosMatriz.slice(0, 2).map((obj, i) => (
+                          <div key={i} className="text-xs text-indigo-700">
+                            {obj.objetivo_bncc && <p><strong>BNCC:</strong> {obj.objetivo_bncc}</p>}
+                            {obj.intencionalidade && <p className="text-indigo-600 italic">🎯 {obj.intencionalidade}</p>}
+                          </div>
+                        ))}
+                        {planejamentoHoje.objetivosMatriz.length > 2 && (
+                          <p className="text-xs text-indigo-400">+{planejamentoHoje.objetivosMatriz.length - 2} objetivo(s)...</p>
+                        )}
+                      </div>
+                    )}
                     {planejamentoHoje.objectives && (
                       <p className="text-xs text-indigo-700 mb-1"><strong>Objetivos:</strong> {planejamentoHoje.objectives}</p>
                     )}

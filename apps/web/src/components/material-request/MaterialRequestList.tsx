@@ -59,8 +59,11 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
       // UNIDADE usa MaterialRequestApprovalTable (não chega aqui).
       const res = await http.get('/material-requests/minhas');
       setRequests(res.data ?? []);
-    } catch {
-      setError('Não foi possível carregar as requisições. Verifique sua conexão.');
+    } catch (err: any) {
+      // Exibir mensagem real do servidor para facilitar diagnóstico
+      const serverMsg = err?.response?.data?.message || err?.response?.data?.error;
+      const httpMsg = err?.response?.status ? `Erro ${err.response.status}` : null;
+      setError(serverMsg || httpMsg || err?.message || 'Não foi possível carregar as requisições. Verifique sua conexão.');
     } finally {
       setLoading(false);
     }
