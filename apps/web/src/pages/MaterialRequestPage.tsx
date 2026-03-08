@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../app/AuthProvider';
-import { isProfessor, isUnidade } from '../api/auth';
+import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { MaterialRequestForm } from '../components/material-request/MaterialRequestForm';
 import { MaterialRequestList } from '../components/material-request/MaterialRequestList';
 import { MaterialRequestApprovalTable } from '../components/material-request/MaterialRequestApprovalTable';
@@ -8,12 +8,18 @@ import { ShoppingCart, ClipboardList, Info } from 'lucide-react';
 
 export function MaterialRequestPage() {
   const { user } = useAuth();
-  const ehProfessor = isProfessor(user);
-  const ehUnidade = isUnidade(user);
+  // FIX P0.2b: usar normalizeRoles + normalizeRoleTypes para suportar PROFESSOR_AUXILIAR
+  // (RoleType PROFESSOR_AUXILIAR tem RoleLevel PROFESSOR no banco, portanto levels
+  //  inclui 'PROFESSOR' e types inclui 'PROFESSOR_AUXILIAR')
+  const levels = normalizeRoles(user);
+  const types  = normalizeRoleTypes(user);
+  const ehProfessor = levels.includes('PROFESSOR') || types.includes('PROFESSOR_AUXILIAR');
+  const ehUnidade   = levels.includes('UNIDADE') || levels.includes('MANTENEDORA') || levels.includes('DEVELOPER');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
 
   // ── COORDENADORA (UNIDADE): tela de aprovação ─────────────────────────────
+  // Mostra aprovação apenas para UNIDADE puro (sem papel de PROFESSOR)
   if (ehUnidade && !ehProfessor) {
     return (
       <div className="max-w-6xl mx-auto p-4 md:p-6">

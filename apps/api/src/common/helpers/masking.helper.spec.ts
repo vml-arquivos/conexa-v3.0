@@ -1,4 +1,4 @@
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, RoleType } from '@prisma/client';
 import { maskMatrizEntriesForProfessor, maskMatrizEntryForProfessor } from './masking.helper';
 import type { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 
@@ -7,7 +7,7 @@ function makeProfessor(): JwtPayload {
     sub: 'professor-1',
     email: 'prof@test.com',
     mantenedoraId: 'mant-1',
-    roles: [{ roleId: 'r1', level: RoleLevel.PROFESSOR, unitScopes: [] }],
+    roles: [{ roleId: 'r1', level: RoleLevel.PROFESSOR, type: RoleType.PROFESSOR, unitScopes: [] }],
   };
 }
 
@@ -17,7 +17,7 @@ function makeCoordenador(): JwtPayload {
     email: 'coord@test.com',
     mantenedoraId: 'mant-1',
     unitId: 'unit-1',
-    roles: [{ roleId: 'r2', level: RoleLevel.UNIDADE, unitScopes: [] }],
+    roles: [{ roleId: 'r2', level: RoleLevel.UNIDADE, type: RoleType.UNIDADE_COORDENADOR_PEDAGOGICO, unitScopes: [] }],
   };
 }
 

@@ -202,9 +202,18 @@ export function PedidosCompraPage() {
   };
 
   const salvarEdicao = async (pedidoId: string) => {
+    // FIX P1.1: produto deve vir do catálogo, não de input livre
+    const itensValidos = linhas.filter(l => l.descricao.trim() !== '');
+    if (itensValidos.length === 0) { setErro('Adicione pelo menos um item.'); return; }
+    if (catalogo.length > 0) {
+      const semCatalogo = itensValidos.filter(l => !l._catalogId);
+      if (semCatalogo.length > 0) {
+        setErro('Selecione o produto do catálogo para todos os itens. Não é permitido digitar o nome manualmente.');
+        return;
+      }
+    }
     setSalvando(true);
     try {
-      const itensValidos = linhas.filter(l => l.descricao.trim() !== '');
       const atualizado = await atualizarItensPedido(pedidoId, {
         observacoes: observacoesEdicao || undefined,
         itens: itensValidos.map(({ categoria, descricao, quantidade, unidadeMedida, _precoUnitario, custoEstimado }) => ({
@@ -224,8 +233,17 @@ export function PedidosCompraPage() {
   };
 
   const handleCriarPedido = async () => {
+    // FIX P1.1: produto deve vir do catálogo, não de input livre
     const itensValidos = novasLinhas.filter(l => l.descricao.trim() !== '');
     if (itensValidos.length === 0) { setErro('Adicione pelo menos um item.'); return; }
+    // Quando o catálogo está disponível, exigir seleção via catálogo
+    if (catalogo.length > 0) {
+      const semCatalogo = itensValidos.filter(l => !l._catalogId);
+      if (semCatalogo.length > 0) {
+        setErro('Selecione o produto do catálogo para todos os itens. Não é permitido digitar o nome manualmente.');
+        return;
+      }
+    }
     setCriando(true); setErro(null);
     try {
       const novo = await criarPedido({

@@ -1,3 +1,4 @@
+import { RoleType } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Reflector } from '@nestjs/core';
@@ -57,6 +58,7 @@ describe('LookupController', () => {
           {
             roleId: 'role-1',
             level: 'UNIDADE',
+            type: 'UNIDADE_COORDENADOR_PEDAGOGICO',
             unitScopes: [],
           },
         ],
@@ -81,6 +83,7 @@ describe('LookupController', () => {
           {
             roleId: 'role-2',
             level: 'STAFF_CENTRAL',
+            type: 'STAFF_CENTRAL_PEDAGOGICO',
             unitScopes: ['unit-1', 'unit-2', 'unit-3'],
           },
         ],
@@ -110,6 +113,7 @@ describe('LookupController', () => {
           {
             roleId: 'role-1',
             level: 'PROFESSOR',
+            type: 'PROFESSOR',
             unitScopes: [],
           },
         ],
@@ -136,6 +140,7 @@ describe('LookupController', () => {
           {
             roleId: 'role-2',
             level: 'STAFF_CENTRAL',
+            type: 'STAFF_CENTRAL_PEDAGOGICO',
             unitScopes: ['unit-1', 'unit-2'],
           },
         ],

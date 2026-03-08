@@ -23,14 +23,14 @@ describe('DashboardCentralController', () => {
     sub: 'staff-001',
     email: 'bruna@central.com',
     mantenedoraId: 'mant-001',
-    roles: [{ roleId: 'r1', level: 'STAFF_CENTRAL', unitScopes: ['unit-001', 'unit-002'] }],
+    roles: [{ roleId: 'r1', level: 'STAFF_CENTRAL', type: 'STAFF_CENTRAL_PEDAGOGICO', unitScopes: ['unit-001', 'unit-002'] }],
   };
 
   const mockUserMantenedora: JwtPayload = {
     sub: 'mant-user-001',
     email: 'carla@mantenedora.com',
     mantenedoraId: 'mant-001',
-    roles: [{ roleId: 'r2', level: 'MANTENEDORA', unitScopes: [] }],
+    roles: [{ roleId: 'r2', level: 'MANTENEDORA', type: 'MANTENEDORA_ADMIN', unitScopes: [] }],
   };
 
   beforeEach(async () => {

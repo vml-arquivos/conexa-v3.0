@@ -3,7 +3,7 @@ import { PlanningService } from './planning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
-import { RoleLevel, PlanningStatus } from '@prisma/client';
+import { RoleLevel, RoleType, PlanningStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 // --- Helpers para criar payloads de usuário de teste ---
@@ -14,7 +14,7 @@ function makeProfessor(id = 'professor-1'): JwtPayload {
     email: `${id}@test.com`,
     mantenedoraId: 'mant-1',
     unitId: 'unit-1',
-    roles: [{ roleId: 'role-1', level: RoleLevel.PROFESSOR, unitScopes: [] }],
+    roles: [{ roleId: 'role-1', level: RoleLevel.PROFESSOR, type: RoleType.PROFESSOR, unitScopes: [] }],
   };
 }
 
@@ -24,7 +24,7 @@ function makeCoordenador(id = 'coord-1'): JwtPayload {
     email: `${id}@test.com`,
     mantenedoraId: 'mant-1',
     unitId: 'unit-1',
-    roles: [{ roleId: 'role-2', level: RoleLevel.UNIDADE, unitScopes: [] }],
+    roles: [{ roleId: 'role-2', level: RoleLevel.UNIDADE, type: RoleType.UNIDADE_COORDENADOR_PEDAGOGICO, unitScopes: [] }],
   };
 }
 

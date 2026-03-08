@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
-import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { getRedirectPathByRoles } from '../hooks/useRedirectByRole';
 import { getErrorMessage } from '../utils/errorMessage';
 import { Eye, EyeOff, BookOpen, Sparkles } from 'lucide-react';
@@ -20,9 +19,24 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const userData = await login(email, password);
-      const roles = normalizeRoles(userData);
-      const redirectPath = getRedirectPathByRoles(roles);
+      // FIX P0.1: login() retorna Promise<void> — após o await o token já está
+      // no localStorage. Decodificamos o JWT para obter roles sem depender do
+      // state do React (que só atualiza no próximo ciclo de render).
+      await login(email, password);
+      let redirectPath = '/app/dashboard';
+      try {
+        const token = localStorage.getItem('accessToken');
+        if (token) {
+          const parts = token.split('.');
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as {
+            roles?: Array<{ level?: string; type?: string }>;
+          };
+          const roles = payload?.roles ?? [];
+          const levels = roles.map((r) => r.level ?? '').filter(Boolean);
+          const types  = roles.map((r) => r.type  ?? '').filter(Boolean);
+          redirectPath = getRedirectPathByRoles(levels, types);
+        }
+      } catch { /* fallback para /app/dashboard */ }
       navigate(redirectPath);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'E-mail ou senha incorretos. Tente novamente.'));

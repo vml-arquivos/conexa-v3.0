@@ -102,9 +102,9 @@ export class MaterialRequestService {
     });
   }
 
-   async listMine(user: JwtPayload) {
+  async listMine(user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-    return this.prisma.materialRequest.findMany({
+    const result = await this.prisma.materialRequest.findMany({
       where: {
         mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
@@ -118,6 +118,11 @@ export class MaterialRequestService {
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
+    // FIX P0.2c: frontend espera materialName, schema usa productName
+    return result.map(r => ({
+      ...r,
+      items: r.items.map(i => ({ ...i, materialName: i.productName })),
+    }));
   }
 
   async list(
@@ -131,8 +136,13 @@ export class MaterialRequestService {
     if (filters?.classroomId) extra.classroomId = filters.classroomId;
     if (filters?.type) extra.type = filters.type;
     // STAFF_CENTRAL/MANTENEDORA/DEVELOPER: lista toda a rede
+    const addMaterialName = (items: Array<Record<string, unknown>>) =>
+      items.map(i => ({ ...i, materialName: i.productName }));
+    const mapItems = (rows: Array<{ items: Array<Record<string, unknown>> }>) =>
+      rows.map(r => ({ ...r, items: addMaterialName(r.items) }));
+
     if (isCentralRole(user)) {
-      return this.prisma.materialRequest.findMany({
+      const rows = await this.prisma.materialRequest.findMany({
         where: { mantenedoraId: user.mantenedoraId, ...extra } as any,
         include: {
           createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -142,11 +152,13 @@ export class MaterialRequestService {
         orderBy: { requestedDate: 'desc' },
         take: 500,
       });
+      // FIX P0.2c: alias materialName
+      return mapItems(rows as any);
     }
     // UNIDADE: apenas sua unidade
     if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
-    return this.prisma.materialRequest.findMany({
+    const rows = await this.prisma.materialRequest.findMany({
       where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId, ...extra } as any,
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -156,6 +168,8 @@ export class MaterialRequestService {
       orderBy: { requestedDate: 'desc' },
       take: 200,
     });
+    // FIX P0.2c: alias materialName
+    return mapItems(rows as any);
   }
 
   /**
@@ -205,6 +219,8 @@ export class MaterialRequestService {
       const decision = itemDecisions.find(d => d.itemId === item.id);
       return {
         ...item,
+        // FIX P0.2c: frontend espera materialName, schema Prisma usa productName
+        materialName: item.productName,
         qtyApproved: decision ? decision.qtyApproved : null,
         approved: decision ? decision.approved : null,
         approvalReason: decision?.reason ?? null,

@@ -35,6 +35,26 @@ export class MaterialRequestController {
   }
 
   /**
+   * Relatório de consumo de materiais por turma e período.
+   * FIX P0.2a: Rota estática DEVE vir ANTES de @Get(':id') para evitar que
+   * 'relatorio-consumo' seja interpretado como um parâmetro :id pelo NestJS.
+   *
+   * STAFF_CENTRAL/MANTENEDORA/DEVELOPER: pode passar unitId (ou omitir para rede inteira)
+   * UNIDADE: sempre usa token.unitId
+   */
+  @Get('relatorio-consumo')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  relatorioConsumo(
+    @CurrentUser() user: JwtPayload,
+    @Query('classroomId') classroomId?: string,
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+    @Query('unitId') unitId?: string,
+  ) {
+    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId });
+  }
+
+  /**
    * Coordenadora/Direção lista todas as requisições da unidade.
    * STAFF_CENTRAL/MANTENEDORA/DEVELOPER vê rede inteira.
    * Filtros opcionais: status, classroomId, type/categoria.
@@ -54,6 +74,7 @@ export class MaterialRequestController {
   /**
    * Busca uma requisição pelo ID com detalhes completos.
    * UNIDADE: apenas requisições da própria unidade.
+   * NOTA: Esta rota DEVE ficar após todas as rotas estáticas (minhas, relatorio-consumo).
    */
   @Get(':id')
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
@@ -70,21 +91,5 @@ export class MaterialRequestController {
     @CurrentUser() user: JwtPayload,
   ) {
     return this.svc.review(id, dto, user);
-  }
-
-  /** Relatório de consumo de materiais por turma e período
-   * STAFF_CENTRAL/MANTENEDORA/DEVELOPER: pode passar unitId (ou omitir para rede inteira)
-   * UNIDADE: sempre usa token.unitId
-   */
-  @Get('relatorio-consumo')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
-  relatorioConsumo(
-    @CurrentUser() user: JwtPayload,
-    @Query('classroomId') classroomId?: string,
-    @Query('dataInicio') dataInicio?: string,
-    @Query('dataFim') dataFim?: string,
-    @Query('unitId') unitId?: string,
-  ) {
-    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId });
   }
 }

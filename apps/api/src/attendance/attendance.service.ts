@@ -28,6 +28,13 @@ export class AttendanceService {
     // Normalizar para meio-dia UTC para consistência
     dataRegistro.setUTCHours(12, 0, 0, 0);
 
+    // VALIDAÇÃO DE DATA FUTURA: não permite registrar chamada para datas futuras
+    const hoje = new Date();
+    hoje.setUTCHours(12, 0, 0, 0);
+    if (dataRegistro > hoje) {
+      throw new BadRequestException('Não é possível registrar chamada para uma data futura.');
+    }
+
     // BLOQUEIO DE DIA NÃO LETIVO: Buscar datas não letivas da unidade e validar
     const unit = await this.prisma.unit.findUnique({
       where: { id: user.unitId ?? '' },
@@ -170,8 +177,13 @@ export class AttendanceService {
     if (!classroomId || !startDate || !endDate) {
       throw new BadRequestException('classroomId, startDate e endDate são obrigatórios');
     }
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // FIX P0.3: usar UTC noon para consistência com register()
+    const start = /^\d{4}-\d{2}-\d{2}$/.test(startDate)
+      ? new Date(startDate + 'T00:00:00.000Z')   // início do dia UTC
+      : new Date(startDate);
+    const end = /^\d{4}-\d{2}-\d{2}$/.test(endDate)
+      ? new Date(endDate + 'T23:59:59.999Z')      // fim do dia UTC
+      : new Date(endDate);
 
     const attendances = await this.prisma.attendance.findMany({
       where: {
@@ -225,8 +237,17 @@ export class AttendanceService {
     if (!user?.mantenedoraId || !user?.unitId) {
       throw new ForbiddenException('Escopo inválido');
     }
-    const targetDate = date ? new Date(date) : new Date();
-    targetDate.setHours(0, 0, 0, 0);
+    // FIX P0.3: usar UTC noon (T12:00:00Z) para consistência com register() e getToday().
+    // setHours(0,0,0,0) usava local time do servidor (UTC), resultando em
+    // 2026-03-08T00:00:00.000Z, enquanto os registros foram salvos com T12:00:00.000Z.
+    // A query WHERE date = targetDate não encontrava nenhum registro.
+    let targetDate: Date;
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      targetDate = new Date(date + 'T12:00:00.000Z');
+    } else {
+      targetDate = new Date();
+      targetDate.setUTCHours(12, 0, 0, 0);
+    }
 
     const classrooms = await this.prisma.classroom.findMany({
       where: { unitId: user.unitId },

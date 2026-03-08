@@ -19,7 +19,7 @@ describe('ClassroomsController', () => {
     email: 'professora@escola.com',
     mantenedoraId: 'mant-001',
     unitId: 'unit-001',
-    roles: [{ roleId: 'r1', level: 'PROFESSOR', unitScopes: [] }],
+    roles: [{ roleId: 'r1', level: 'PROFESSOR', type: 'PROFESSOR', unitScopes: [] }],
   };
 
   const mockUserUnidade: JwtPayload = {
@@ -27,7 +27,7 @@ describe('ClassroomsController', () => {
     email: 'coordenadora@escola.com',
     mantenedoraId: 'mant-001',
     unitId: 'unit-001',
-    roles: [{ roleId: 'r2', level: 'UNIDADE', unitScopes: [] }],
+    roles: [{ roleId: 'r2', level: 'UNIDADE', type: 'UNIDADE_COORDENADOR_PEDAGOGICO', unitScopes: [] }],
   };
 
   const mockChildren = [

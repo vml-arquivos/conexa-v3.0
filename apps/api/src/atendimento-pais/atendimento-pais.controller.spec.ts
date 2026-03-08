@@ -22,7 +22,7 @@ describe('AtendimentoPaisController', () => {
     email: 'professora@escola.com',
     mantenedoraId: 'mant-001',
     unitId: 'unit-001',
-    roles: [{ roleId: 'r1', level: 'PROFESSOR', unitScopes: [] }],
+    roles: [{ roleId: 'r1', level: 'PROFESSOR', type: 'PROFESSOR', unitScopes: [] }],
   };
 
   beforeEach(async () => {
