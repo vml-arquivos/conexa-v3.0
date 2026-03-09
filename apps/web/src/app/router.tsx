@@ -40,7 +40,7 @@ import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
 import DesenvolvimentoInfantilPage from '../pages/DesenvolvimentoInfantilPage';
-// ─── Módulo de Planejamento — Oficina e Torre de Controle ─────────────────────
+// ─── Módulo de Planejamento — Oficina e Painel de Planejamentos ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -130,7 +130,7 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Planejamentos — Torre de Controle (rota canônica do professor) ─────────
+      // ─── Planejamentos — Painel de Planejamentos (rota canônica do professor) ─────────
       {
         path: 'planejamentos',
         element: (
@@ -490,7 +490,7 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Módulo de Planejamento — Torre de Controle (lista/calendário) ────────
+      // ─── Módulo de Planejamento — Painel de Planejamentos (lista/calendário) ────────
       {
         path: 'planejamentos-calendario',
         element: (

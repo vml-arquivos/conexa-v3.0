@@ -111,7 +111,7 @@ export default function DashboardMantenedoraPremium() {
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">Dashboard Mantenedora</h1>
+        <h1 className="text-4xl font-bold text-white mb-2">Painel da Mantenedora</h1>
         <p className="text-gray-400">Visão geral de todas as unidades</p>
       </div>
 

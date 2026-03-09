@@ -235,7 +235,10 @@ export function DashboardNutricionistaPage() {
   const totalCriancasComRestricao = new Set(dietas.filter((d) => d.isActive).map((d) => d.child.id)).size;
 
   return (
-    <PageShell title="Painel da Nutricionista" subtitle="Dietas, restrições alimentares e pedidos de alimentação">
+    <PageShell
+      title="Painel da Nutricionista"
+      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Nutricionista'}! Dietas, restrições alimentares e pedidos de alimentação.`}
+    >
       {/* Cards de Resumo */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">

@@ -88,7 +88,7 @@ const UNIDADE_GESTAO: MenuItem[] = [
   { path: '/app/coordenacao',                   label: 'Turmas & Reuniões',      icon: <Users className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/dashboard-consumo-materiais',   label: 'Dashboard Consumo',      icon: <TrendingUp className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/dashboard-consumo-materiais',   label: 'Consumo — Gráficos',      icon: <TrendingUp className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/painel-alergias',               label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
 ];
@@ -121,7 +121,7 @@ const CENTRAL_ITEMS: MenuItem[] = [
 
 // MANTENEDORA ──────────────────────────────────────────────────────────────────
 const MANTENEDORA_ITEMS: MenuItem[] = [
-  { path: '/app/dashboard',         label: 'Dashboard Global',    icon: <LayoutDashboard className="h-4 w-4" /> },
+  { path: '/app/dashboard',         label: 'Painel Global',       icon: <LayoutDashboard className="h-4 w-4" /> },
   { path: '/app/coordenacao-geral', label: 'Coordenação Geral',   icon: <Network className="h-4 w-4" /> },
   { path: '/app/central',           label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
   { path: '/app/rdic-geral',        label: 'RDICs Publicados',    icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
@@ -135,8 +135,8 @@ const DEV_EXTRA: MenuItem[] = [
   { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',   icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/rdic-ria',             label: 'RDIC — Registros (RIA)', icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/planejamentos',        label: 'Planejamentos',          icon: <FileText className="h-4 w-4" /> },
-  { path: '/app/nutricionista',        label: 'Dashboard Nutricionista',icon: <Utensils className="h-4 w-4" /> },
-  { path: '/app/diretor',              label: 'Dashboard Diretor',      icon: <Shield className="h-4 w-4" /> },
+  { path: '/app/nutricionista',        label: 'Painel da Nutricionista',icon: <Utensils className="h-4 w-4" /> },
+  { path: '/app/diretor',              label: 'Painel do Diretor',      icon: <Shield className="h-4 w-4" /> },
   { path: '/app/configuracoes',        label: 'Configurações',          icon: <Settings className="h-4 w-4" /> },
 ];
 

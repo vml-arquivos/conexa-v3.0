@@ -250,7 +250,7 @@ export default function PlanoDeAulaListaPage() {
 
   return (
     <PageShell
-      title="Torre de Controle"
+      title="Painel de Planejamentos"
       subtitle="Visualize e gerencie seus planejamentos no calendário"
     >
       <div className="space-y-6">

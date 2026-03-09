@@ -4,6 +4,7 @@
  * CORRIGIDO: usa dados reais de /coordenacao/dashboard/unidade
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../app/AuthProvider';
 import { IndicatorsCards } from '../components/ui/IndicatorsCards';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -65,6 +66,7 @@ interface PlanejamentoParado {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function DashboardUnidadePage() {
+  const { user } = useAuth();
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<'pendencias' | 'alertas' | 'materiais' | 'planejamentos'>('pendencias');
@@ -193,10 +195,10 @@ export function DashboardUnidadePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Package className="h-6 w-6 text-emerald-600" />
-            Gestão da Unidade
+            Painel da Coordenação Geral
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Controle operacional — pendências, alertas, materiais e planejamentos
+            Bem-vindo, {((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Controle operacional — pendências, alertas, materiais e planejamentos.
           </p>
         </div>
         <button

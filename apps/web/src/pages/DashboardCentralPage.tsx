@@ -5,6 +5,7 @@
  * Somente leitura — sem edição de cadastros operacionais
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../app/AuthProvider';
 import { IndicatorsCards } from '../components/ui/IndicatorsCards';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -87,6 +88,7 @@ const CORES_GRAFICOS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function DashboardCentralPage() {
+  const { user } = useAuth();
   const [filtros, setFiltros] = useState<FiltrosCentral>({ unidadeId: '', periodo: '30d' });
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -247,10 +249,10 @@ export function DashboardCentralPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-blue-600" />
-            Análises Centrais
+            Painel da Coordenação Geral
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Visão global de todas as unidades — somente leitura
+            Bem-vindo, {((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Visão global de todas as unidades.
           </p>
         </div>
         <div className="flex gap-2">

@@ -184,6 +184,9 @@ enum AuditLogAction {
   LOGOUT
   PERMISSION_CHANGE
   ROLE_CHANGE
+  SUBMIT_REVIEW
+  APPROVE_PLANNING
+  RETURN_PLANNING
 }
 
 /// Entidade auditada
@@ -277,6 +280,9 @@ model Mantenedora {
   rdixInstancias       RDIXInstancia[]
   alertasOperacionais  AlertaOperacional[]
   templatesOffline     TemplateOffline[]
+  recadosTurma         RecadoTurma[]
+  classroomPosts       ClassroomPost[]
+  materiais            Material[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -530,6 +536,9 @@ model Child {
   medicalConditions String? @db.Text
   medicationNeeds   String? @db.Text
 
+  // Foto do aluno
+  photoUrl          String? @db.Text
+
   // Status
   isActive Boolean @default(true)
 
@@ -550,6 +559,8 @@ model Child {
   aiContexts          AIContext[]
   atendimentosPais    AtendimentoPais[]
   rdixInstancias      RDIXInstancia[]
+  studentPostPerfs    StudentPostPerformance[]
+  developmentObs      DevelopmentObservation[]
 
   @@index([mantenedoraId])
   @@index([unitId])
@@ -623,7 +634,7 @@ model Classroom {
   attendances      Attendance[]
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
-
+  classroomPosts   ClassroomPost[]
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -789,12 +800,20 @@ model Planning {
   // Status
   status PlanningStatus @default(RASCUNHO)
 
+  // Rastreabilidade
+  anoLetivo   Int?    // Ano letivo do planejamento (ex: 2026)
+  professorId String? @db.VarChar(255) // ID do professor responsável
+
   // Timestamps
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   createdBy   String?   @db.VarChar(255)
   updatedBy   String?   @db.VarChar(255)
   publishedAt DateTime?
+  submittedAt   DateTime? // Data de envio para revisão
+  reviewedAt    DateTime? // Data de aprovação ou devolução
+  reviewedBy    String?   @db.VarChar(255) // ID do revisor
+  reviewComment String?   @db.Text // Comentário da devolução
 
   // Relações
   mantenedora      Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
@@ -991,10 +1010,11 @@ model MaterialRequest {
   approvedBy String?  @db.VarChar(255)
 
   // Relações
-  mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit          Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  classroom     Classroom?  @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  createdByUser User?       @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  mantenedora   Mantenedora          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit          Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  classroom     Classroom?           @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  createdByUser User?                @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  items         MaterialRequestItem[]
 
   @@unique([unitId, code])
   @@index([mantenedoraId])
@@ -1002,6 +1022,26 @@ model MaterialRequest {
   @@index([classroomId])
   @@index([status])
   @@index([requestedDate])
+}
+
+/// Item individual de uma requisição de material
+model MaterialRequestItem {
+  id                String          @id @default(cuid())
+  materialRequestId String
+  materialRequest   MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
+  materialId        String?         // Referência opcional ao catálogo de materiais
+  material          Material?       @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  productName       String          @db.VarChar(255)
+  quantity          Int
+  unit              String?         @db.VarChar(50)
+  unitPrice         Decimal?        @db.Decimal(10, 2)
+  supplier          String?         @db.VarChar(255)
+  observations      String?         @db.Text
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([materialRequestId])
+  @@index([materialId])
 }
 
 /// Item de estoque
@@ -1194,6 +1234,7 @@ enum StatusPedidoCompra {
   RASCUNHO
   ENVIADO
   EM_ANALISE
+  APROVADO
   COMPRADO
   EM_ENTREGA
   ENTREGUE
@@ -1522,6 +1563,8 @@ model RelatorioFoto {
 enum StatusRDIX {
   RASCUNHO
   EM_REVISAO
+  APROVADO
+  DEVOLVIDO
   FINALIZADO
   PUBLICADO
 }
@@ -1556,6 +1599,9 @@ model RDIXInstancia {
   conteudoFinal  Json?
   criadoPorId    String     @db.VarChar(255)
   revisadoPorId  String?    @db.VarChar(255)
+  submittedAt   DateTime? // Data de envio para revisão
+  reviewedAt    DateTime? // Data de aprovação ou devolução
+  reviewComment String?   @db.Text // Comentário da devolução
   finalizadoEm  DateTime?
   publicadoEm   DateTime?
   criadoEm      DateTime   @default(now())
@@ -1715,4 +1761,206 @@ model Fornecedor {
 
   @@index([mantenedoraId])
   @@index([cnpj])
+}
+
+// ============================================================================
+// 22. RECADOS DE TURMA (Comunicação professor → responsáveis)
+// ============================================================================
+
+/// Recado enviado pela coordenação para professores/turmas
+model RecadoTurma {
+  id            String    @id @default(cuid())
+  mantenedoraId String    @map("mantenedora_id")
+  unitId        String    @map("unit_id")
+  classroomId   String?   @map("classroom_id")
+  criadoPorId   String    @map("criado_por_id") @db.VarChar(255)
+  professorId   String?   @map("professor_id") @db.VarChar(255)
+
+  titulo        String    @db.VarChar(255)
+  mensagem      String    @db.Text
+  importante    Boolean   @default(false)
+  destinatario  String    @default("TODAS_PROFESSORAS") @db.VarChar(50)
+
+  expiresAt     DateTime? @map("expires_at")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  mantenedora Mantenedora    @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  leituras    RecadoLeitura[]
+
+  @@map("recado_turma")
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([classroomId])
+  @@index([criadoPorId])
+  @@index([destinatario])
+  @@index([expiresAt])
+}
+
+/// Confirmação de leitura de recado por professor
+model RecadoLeitura {
+  id       String   @id @default(cuid())
+  recadoId String   @map("recado_id")
+  userId   String   @map("user_id") @db.VarChar(255)
+  lidoEm   DateTime @default(now()) @map("lido_em")
+
+  recado RecadoTurma @relation(fields: [recadoId], references: [id], onDelete: Cascade)
+
+  @@map("recado_leitura")
+  @@unique([recadoId, userId])
+  @@index([recadoId])
+  @@index([userId])
+}
+
+// ============================================================================
+// 23. POSTAGENS PEDAGÓGICAS (ClassroomPost)
+// ============================================================================
+
+/// Postagem pedagógica de uma turma (tarefa, atividade, aviso, etc.)
+model ClassroomPost {
+  id            String   @id @default(cuid())
+  mantenedoraId String   @map("mantenedora_id")
+  unitId        String   @map("unit_id")
+  classroomId   String   @map("classroom_id")
+  createdBy     String   @map("created_by") @db.VarChar(255)
+  planningId    String?  @map("planning_id")
+
+  title   String    @db.VarChar(255)
+  content String?   @db.Text
+  type    String    @default("TAREFA") @map("type") @db.VarChar(50)
+  status  String    @default("PUBLICADO") @map("status") @db.VarChar(50)
+  dueDate DateTime? @map("due_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  mantenedora  Mantenedora              @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  classroom    Classroom                @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  files        ClassroomPostFile[]
+  performances StudentPostPerformance[]
+
+  @@map("classroom_post")
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([classroomId])
+  @@index([createdBy])
+  @@index([type])
+  @@index([status])
+  @@index([dueDate])
+}
+
+/// Arquivo anexado a uma postagem pedagógica
+model ClassroomPostFile {
+  id     String @id @default(cuid())
+  postId String @map("post_id")
+  url    String @db.VarChar(1024)
+  name   String @map("nome_original") @db.VarChar(255)
+  type   String @map("mime_type") @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("classroom_post_file")
+  @@index([postId])
+}
+
+/// Desempenho individual de aluno em uma postagem pedagógica
+model StudentPostPerformance {
+  id        String @id @default(cuid())
+  postId    String @map("post_id")
+  childId   String @map("child_id")
+  createdBy String @map("created_by") @db.VarChar(255)
+
+  performance String? @db.VarChar(50)
+  notes       String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post  ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  child Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@map("student_post_performance")
+  @@unique([postId, childId])
+  @@index([postId])
+  @@index([childId])
+}
+
+// ============================================================================
+// 24. OBSERVAÇÕES DE DESENVOLVIMENTO INDIVIDUAL
+// ============================================================================
+
+/// Observação de desenvolvimento individual de uma criança
+model DevelopmentObservation {
+  id          String  @id @default(cuid())
+  childId     String  @map("child_id")
+  classroomId String? @map("classroom_id")
+  createdBy   String  @map("created_by") @db.VarChar(255)
+
+  // Classificação
+  category String   @default("GERAL") @db.VarChar(100)
+  date     DateTime @default(now())
+
+  // Campos de observação (todos opcionais)
+  behaviorDescription    String? @map("behavior_description") @db.Text
+  socialInteraction      String? @map("social_interaction") @db.Text
+  emotionalState         String? @map("emotional_state") @db.Text
+  motorSkills            String? @map("motor_skills") @db.Text
+  cognitiveSkills        String? @map("cognitive_skills") @db.Text
+  languageSkills         String? @map("language_skills") @db.Text
+  healthNotes            String? @map("health_notes") @db.Text
+  dietaryNotes           String? @map("dietary_notes") @db.Text
+  sleepPattern           String? @map("sleep_pattern") @db.Text
+  learningProgress       String? @map("learning_progress") @db.Text
+  planningParticipation  String? @map("planning_participation") @db.Text
+  interests              String? @db.Text
+  challenges             String? @db.Text
+  psychologicalNotes     String? @map("psychological_notes") @db.Text
+  developmentAlerts      String? @map("development_alerts") @db.Text
+  recommendations        String? @db.Text
+  nextSteps              String? @map("next_steps") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@map("development_observation")
+  @@index([childId])
+  @@index([classroomId])
+  @@index([createdBy])
+  @@index([date])
+  @@index([category])
+}
+
+// ============================================================================
+// 25. CATÁLOGO DE MATERIAIS
+// ============================================================================
+
+/// Material do catálogo da mantenedora (referência para requisições e pedidos de compra)
+model Material {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+
+  // Identificação (nomes em inglês para compatibilidade com o service)
+  code          String   @db.VarChar(50)
+  name          String   @db.VarChar(255)
+  description   String?  @db.Text
+  category      String   @db.VarChar(50) // Ex: PEDAGOGICO, HIGIENE, ADMINISTRATIVO
+  unit          String?  @db.VarChar(50) // unidade de medida: unidade, caixa, pacote
+  referencePrice Decimal? @db.Decimal(10, 2)
+  defaultSupplier String? @db.VarChar(255)
+
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mantenedora Mantenedora          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  requestItems MaterialRequestItem[]
+
+  @@unique([mantenedoraId, code])
+  @@index([mantenedoraId])
+  @@index([category])
+  @@index([isActive])
 }

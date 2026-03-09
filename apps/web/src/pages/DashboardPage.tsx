@@ -146,7 +146,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard - Hub de Gestão</h1>
+      <h1 className="text-3xl font-bold">Bem-vindo, {(user?.nome as string)?.split(' ')[0] || user?.email}!</h1>
 
       {/* Informações do Usuário */}
       <div className="bg-white p-4 rounded-lg shadow">
@@ -287,7 +287,7 @@ export function DashboardPage() {
       {canViewTeacherDashboard && (
         <div className="bg-white p-6 rounded-lg shadow">
           <h2 className="text-2xl font-semibold mb-4 text-green-700">
-            Dashboard do Professor (Indicadores do dia)
+            Indicadores do Professor (dia)
           </h2>
 
           {/* Formulário com Selects */}

@@ -128,7 +128,7 @@ export default function TeacherDashboardPremium() {
 
   useEffect(() => { loadDashboardData(); }, [loadDashboardData]);
 
-  const nomeProfessora = (user as { firstName?: string } | null)?.firstName ?? 'Professora';
+  const nomeProfessora = ((user?.nome as string) || (user as any)?.firstName || 'Professora').split(' ')[0];
 
   return (
     <div className="min-h-screen bg-[#0A0A0B] text-[#FAFAFA] p-6">

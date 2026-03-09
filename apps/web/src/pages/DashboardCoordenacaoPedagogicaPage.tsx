@@ -283,7 +283,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   ] as const;
 
   return (
-    <PageShell title="Coordenação Pedagógica" description="Acompanhe e apoie o trabalho dos professores">
+    <PageShell
+      title={`Painel da Coordenação Pedagógica`}
+      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Acompanhe e apoie o trabalho dos professores.`}
+    >
       {/* Modal motivo rejeição */}
       {itemParaRejeitar && canApprove && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">

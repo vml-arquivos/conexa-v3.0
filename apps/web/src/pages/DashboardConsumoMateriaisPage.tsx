@@ -142,7 +142,7 @@ export default function DashboardConsumoMateriaisPage() {
 
   return (
     <PageShell
-      title="Dashboard de Consumo de Materiais"
+      title="Consumo de Materiais — Gráficos"
       subtitle="Análise de requisições por categoria, turma e período"
     >
       {/* ─── Seletor de unidade (apenas para STAFF_CENTRAL) ─── */}

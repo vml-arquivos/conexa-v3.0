@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
+import { useAuth } from '../app/AuthProvider';
 import { useApiCache } from '../hooks/useApiCache';
 import { toast } from 'sonner';
 import http from '../api/http';
@@ -168,6 +169,7 @@ function SkeletonGrid({ n = 6 }: { n?: number }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DashboardPsicologoPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const apiCache = useApiCache(120_000);
 
   const [loading, setLoading] = useState(true);
@@ -269,8 +271,8 @@ export default function DashboardPsicologoPage() {
 
   return (
     <PageShell
-      title="Psicologia Central"
-      subtitle="Acompanhamento do desenvolvimento infantil na rede"
+      title="Painel da Gestão Pedagógica"
+      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Psicóloga'}! Acompanhamento do desenvolvimento infantil na rede.`}
     >
       {/* ── Faixa de alertas ──────────────────────────────────────────── */}
       {!loading && (rdicsRevisao.length > 0 || rdicsDevolvidos.length > 0) && (

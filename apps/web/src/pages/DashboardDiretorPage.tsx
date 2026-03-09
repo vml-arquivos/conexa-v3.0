@@ -192,7 +192,10 @@ export function DashboardDiretorPage() {
   const pedidosEnviados = pedidos.filter((p) => p.status === 'ENVIADO');
 
   return (
-    <PageShell title="Painel do Diretor" subtitle="Gestão e aprovações da unidade">
+    <PageShell
+      title="Painel do Diretor"
+      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Diretor(a)'}! Gestão e aprovações da unidade.`}
+    >
       {/* Alertas de topo */}
       {msgSucesso && (
         <div className="mb-4 flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm">

@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../app/AuthProvider';
 import { PageShell } from '../components/ui/PageShell';
 import { useApiCache } from '../hooks/useApiCache';
 import { useUnitScope } from '../contexts/UnitScopeContext';
@@ -172,6 +173,7 @@ function SkeletonGrid({ n = 8 }: { n?: number }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DashboardCoordenacaoGeralPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { accessibleUnits: unidadesCtx } = useUnitScope();
   const apiCache = useApiCache(120_000);
 
@@ -274,8 +276,8 @@ export default function DashboardCoordenacaoGeralPage() {
 
   return (
     <PageShell
-      title="Coordenação Geral"
-      subtitle="Centro de inteligência da rede — dados em tempo real"
+      title="Painel da Coordenação Geral"
+      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Centro de inteligência da rede — dados em tempo real.`}
     >
       {/* ── Faixa de alertas ──────────────────────────────────────────── */}
       {!loading && (alertasCriticos > 0 || alertasAtencao > 0 || reqPendentes > 0) && (
