@@ -386,16 +386,22 @@ export class PedidoCompraService {
       dadosAtualizacao['entregueEm'] = new Date();
     }
 
+    // FIX C2.4: retornar unit e itens para o frontend atualizar a lista sem crash
     const pedidoAtualizado = await this.prisma.pedidoCompra.update({
       where: { id },
       data: dadosAtualizacao,
-      select: {
-        id: true,
-        mesReferencia: true,
-        status: true,
-        unitId: true,
-        enviadoEm: true,
-        entregueEm: true,
+      include: {
+        unit: { select: { id: true, name: true } },
+        itens: {
+          select: {
+            id: true,
+            categoria: true,
+            descricao: true,
+            quantidade: true,
+            unidadeMedida: true,
+            custoEstimado: true,
+          },
+        },
       },
     });
 

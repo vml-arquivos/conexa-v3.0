@@ -36,12 +36,14 @@ import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { useUnitScope } from '../contexts/UnitScopeContext';
 import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const ICONES_STATUS: Record<string, React.ReactNode> = {
   RASCUNHO: <Clock className="h-4 w-4" />,
   ENVIADO: <Send className="h-4 w-4" />,
   EM_ANALISE: <RefreshCw className="h-4 w-4" />,
-  COMPRADO: <CheckCircle2 className="h-4 w-4" />,
+  APROVADO: <CheckCircle2 className="h-4 w-4" />,
+  COMPRADO: <PackageCheck className="h-4 w-4" />,
   EM_ENTREGA: <Truck className="h-4 w-4" />,
   ENTREGUE: <PackageCheck className="h-4 w-4" />,
   CANCELADO: <XCircle className="h-4 w-4" />,
@@ -131,7 +133,7 @@ export function PedidosCompraPage() {
       });
       setPedidos(dados);
     } catch (e: unknown) {
-      setErro(e instanceof Error ? e.message : 'Erro ao carregar pedidos.');
+      setErro(getErrorMessage(e, 'Erro ao carregar pedidos.'));
     } finally { setCarregando(false); }
   }, [filtroMes, filtroStatus, ctxUnitId]);
 
@@ -228,7 +230,7 @@ export function PedidosCompraPage() {
       setModoEdicao(null);
       mostrarMensagem('Pedido salvo com sucesso.');
     } catch (e: unknown) {
-      setErro(e instanceof Error ? e.message : 'Erro ao salvar pedido.');
+      setErro(getErrorMessage(e, 'Erro ao salvar pedido.'));
     } finally { setSalvando(false); }
   };
 
@@ -265,7 +267,7 @@ export function PedidosCompraPage() {
       setPedidoExpandido(novo.id);
       mostrarMensagem('Pedido criado com sucesso. Planilha visível abaixo.');
     } catch (e: unknown) {
-      setErro(e instanceof Error ? e.message : 'Erro ao criar pedido.');
+      setErro(getErrorMessage(e, 'Erro ao criar pedido.'));
     } finally { setCriando(false); }
   };
 
@@ -276,7 +278,7 @@ export function PedidosCompraPage() {
       setPedidos(prev => prev.map(p => p.id === pedidoId ? atualizado : p));
       mostrarMensagem(`Status: "${getStatusPedidoLabel(novoStatus)}".`);
     } catch (e: unknown) {
-      setErro(e instanceof Error ? e.message : 'Erro ao atualizar status.');
+      setErro(getErrorMessage(e, 'Erro ao atualizar status.'));
     } finally { setAtualizandoStatus(null); }
   };
 

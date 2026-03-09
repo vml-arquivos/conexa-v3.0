@@ -4,6 +4,7 @@ export type StatusPedidoCompra =
   | 'RASCUNHO'
   | 'ENVIADO'
   | 'EM_ANALISE'
+  | 'APROVADO'
   | 'COMPRADO'
   | 'EM_ENTREGA'
   | 'ENTREGUE'
@@ -143,6 +144,7 @@ export function getStatusPedidoLabel(status: StatusPedidoCompra | string): strin
     RASCUNHO: 'Rascunho',
     ENVIADO: 'Enviado',
     EM_ANALISE: 'Em Análise',
+    APROVADO: 'Aprovado',
     COMPRADO: 'Comprado',
     EM_ENTREGA: 'Em Entrega',
     ENTREGUE: 'Entregue',
@@ -159,9 +161,10 @@ export function getStatusPedidoCor(status: StatusPedidoCompra | string): string 
     RASCUNHO: 'bg-gray-100 text-gray-700',
     ENVIADO: 'bg-yellow-100 text-yellow-800',
     EM_ANALISE: 'bg-blue-100 text-blue-800',
+    APROVADO: 'bg-green-100 text-green-800',
     COMPRADO: 'bg-purple-100 text-purple-800',
     EM_ENTREGA: 'bg-orange-100 text-orange-800',
-    ENTREGUE: 'bg-green-100 text-green-800',
+    ENTREGUE: 'bg-teal-100 text-teal-800',
     CANCELADO: 'bg-red-100 text-red-700',
   };
   return cores[status] || 'bg-gray-100 text-gray-700';
@@ -184,8 +187,9 @@ export function getProximosStatusMantenedora(
   statusAtual: StatusPedidoCompra,
 ): StatusPedidoCompra[] {
   const fluxo: Record<string, StatusPedidoCompra[]> = {
-    ENVIADO: ['EM_ANALISE', 'CANCELADO'],
-    EM_ANALISE: ['COMPRADO', 'CANCELADO'],
+    ENVIADO: ['EM_ANALISE', 'APROVADO', 'CANCELADO'],
+    EM_ANALISE: ['APROVADO', 'COMPRADO', 'CANCELADO'],
+    APROVADO: ['COMPRADO', 'CANCELADO'],
     COMPRADO: ['EM_ENTREGA'],
     EM_ENTREGA: ['ENTREGUE'],
   };

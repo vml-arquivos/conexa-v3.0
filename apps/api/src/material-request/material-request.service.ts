@@ -121,11 +121,30 @@ export class MaterialRequestService {
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
-    // FIX P0.2c: frontend espera materialName, schema usa productName
-    return result.map(r => ({
-      ...r,
-      items: r.items.map(i => ({ ...i, materialName: i.productName })),
-    }));
+    // FIX C2.1: parsear description para expor urgencia, observacaoRevisao e approvedDate
+    return result.map(r => {
+      let urgencia: string | null = null;
+      let observacaoRevisao: string | null = null;
+      if (r.description) {
+        try {
+          const parsed = JSON.parse(r.description) as Record<string, unknown>;
+          if (parsed._review) {
+            // reviewData: notas da revisão
+            observacaoRevisao = typeof parsed.notes === 'string' ? parsed.notes : null;
+          } else {
+            // originalData: dados do pedido original
+            urgencia = typeof parsed.urgencia === 'string' ? parsed.urgencia : null;
+          }
+        } catch { /* ignora */ }
+      }
+      return {
+        ...r,
+        urgencia,
+        observacaoRevisao,
+        approvedDate: r.approvedDate?.toISOString() ?? null,
+        items: r.items.map(i => ({ ...i, materialName: i.productName })),
+      };
+    });
   }
 
   async list(
@@ -141,8 +160,27 @@ export class MaterialRequestService {
     // STAFF_CENTRAL/MANTENEDORA/DEVELOPER: lista toda a rede
     const addMaterialName = (items: Array<Record<string, unknown>>) =>
       items.map(i => ({ ...i, materialName: i.productName }));
-    const mapItems = (rows: Array<{ items: Array<Record<string, unknown>> }>) =>
-      rows.map(r => ({ ...r, items: addMaterialName(r.items) }));
+    // FIX C2.2: parsear description para expor urgencia, statusVirtual e observacaoRevisao na listagem
+    const parseDescription = (r: Record<string, unknown>) => {
+      let urgencia: string | null = null;
+      let observacaoRevisao: string | null = null;
+      let statusVirtual: string | null = null;
+      const desc = r.description as string | null;
+      if (desc) {
+        try {
+          const parsed = JSON.parse(desc) as Record<string, unknown>;
+          if (parsed._review) {
+            observacaoRevisao = typeof parsed.notes === 'string' ? parsed.notes : null;
+            statusVirtual = parsed._parcial ? 'PARCIAL' : null;
+          } else {
+            urgencia = typeof parsed.urgencia === 'string' ? parsed.urgencia : null;
+          }
+        } catch { /* ignora */ }
+      }
+      return { urgencia, observacaoRevisao, statusVirtual };
+    };
+    const mapItems = (rows: Array<{ items: Array<Record<string, unknown>> } & Record<string, unknown>>) =>
+      rows.map(r => ({ ...r, ...parseDescription(r), items: addMaterialName(r.items) }));
 
     if (isCentralRole(user)) {
       const rows = await this.prisma.materialRequest.findMany({
