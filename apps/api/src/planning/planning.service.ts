@@ -44,7 +44,10 @@ export class PlanningService {
     // 2. Validar classroom
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: dto.classroomId },
-      include: { unit: true },
+      include: {
+        unit: true,
+      },
+      // ageGroupMin/Max são campos diretos do Classroom, retornados automaticamente
     });
 
     if (!classroom) {
@@ -52,27 +55,39 @@ export class PlanningService {
     }
 
     // 3. Buscar matriz curricular ativa da mantenedora
+    // FIX C3.2: filtrar por segment derivado da turma para pegar a matriz correta
+    const ageGroupMin = classroom.ageGroupMin ?? 0;
+    let segment: string | null = null;
+    if (ageGroupMin <= 18) segment = 'EI01';
+    else if (ageGroupMin <= 47) segment = 'EI02';
+    else if (ageGroupMin <= 71) segment = 'EI03';
+    const matrizWhere: Record<string, unknown> = {
+      mantenedoraId: user.mantenedoraId,
+      isActive: true,
+    };
+    if (segment) matrizWhere['segment'] = segment;
     const matriz = await this.prisma.curriculumMatrix.findFirst({
-      where: {
-        mantenedoraId: user.mantenedoraId,
-        isActive: true,
-      },
+      where: matrizWhere as any,
       orderBy: { year: 'desc' },
     });
 
     if (!matriz) {
       throw new NotFoundException(
-        'Matriz curricular ativa não encontrada para sua mantenedora',
+        `Matriz curricular ativa não encontrada para sua mantenedora${segment ? ` (segmento ${segment})` : ''}`,
       );
     }
 
     // 4. Buscar entrada da matriz para a data
+    // FIX C3.1: usar intervalo UTC do dia para cobrir tanto T00:00Z (new Date('YYYY-MM-DD'))
+    // quanto T03:00Z (parser com offset -03:00). Date.UTC garante independência de timezone do servidor.
     const targetDate = new Date(dto.date);
-
+    const dateParts = dto.date.split('-').map(Number);
+    const dayStart = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
+    const dayEnd   = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 23, 59, 59, 999));
     const matrixEntry = await this.prisma.curriculumMatrixEntry.findFirst({
       where: {
         matrixId: matriz.id,
-        date: targetDate,
+        date: { gte: dayStart, lte: dayEnd },
       },
     });
 
@@ -118,7 +133,8 @@ export class PlanningService {
         unitId: classroom.unitId,
         classroomId: classroom.id,
         type: 'SEMANAL',
-        createdBy: user.email,
+        // FIX C3.3: createdBy deve ser user.sub (User.id), não email
+        createdBy: user.sub,
         templateId: template.id,
         curriculumMatrixId: matriz.id,
         title,

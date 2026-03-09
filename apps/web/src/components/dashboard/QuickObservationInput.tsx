@@ -8,8 +8,9 @@ import { createDiaryEvent } from '../../api/diary';
 import { getPedagogicalToday } from '../../utils/pedagogicalDate';
 
 interface QuickObservationInputProps {
-  planningId: string;
-  curriculumEntryId: string;
+  // FIX C3.5: opcionais conforme contrato do backend
+  planningId?: string;
+  curriculumEntryId?: string;
   classroomId: string;
   students: any[];
 }

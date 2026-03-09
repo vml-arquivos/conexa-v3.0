@@ -54,11 +54,19 @@ export class CurriculumMatrixEntryService {
       throw new ForbiddenException('Acesso negado a esta matriz');
     }
 
+    // FIX C3.4: padronizar data com offset -03:00 para alinhar com o parser PDF
+    // Evita drift: parser grava T03:00Z, create manual gravava T00:00Z
+    // Ambos representam meia-noite BRT, mas o unique constraint os trata como datas diferentes
+    const normalizedDate = new Date(createDto.date + 'T00:00:00-03:00');
     // Verificar se já existe uma entrada para a mesma data e campo de experiência
+    // Usar intervalo UTC do dia para busca robusta
+    const dateParts = createDto.date.split('-').map(Number);
+    const existingStart = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
+    const existingEnd   = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 23, 59, 59, 999));
     const existing = await this.prisma.curriculumMatrixEntry.findFirst({
       where: {
         matrixId: createDto.matrixId,
-        date: new Date(createDto.date),
+        date: { gte: existingStart, lte: existingEnd },
         campoDeExperiencia: createDto.campoDeExperiencia,
       },
     });
@@ -73,7 +81,7 @@ export class CurriculumMatrixEntryService {
     const entry = await this.prisma.curriculumMatrixEntry.create({
       data: {
         ...createDto,
-        date: new Date(createDto.date),
+        date: normalizedDate,
       },
       include: {
         matrix: true,
@@ -389,14 +397,14 @@ export class CurriculumMatrixEntryService {
       };
     }
 
-    // 3. Normalizar a data sem toISOString() para evitar drift UTC
-    // Parseia YYYY-MM-DD e cria intervalo do dia inteiro em horário local
+    // 3. Normalizar a data usando Date.UTC para cobrir tanto T00:00Z quanto T03:00Z
+    // (parser PDF grava com offset -03:00 = T03:00Z; frontend envia YYYY-MM-DD = T00:00Z)
     const parts = date.split('-').map(Number);
     const year = parts[0];
     const month = parts[1] - 1; // 0-indexed
     const day = parts[2];
-    const targetDateStart = new Date(year, month, day, 0, 0, 0, 0);
-    const targetDateEnd = new Date(year, month, day, 23, 59, 59, 999);
+    const targetDateStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const targetDateEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
 
     // 4. Buscar a matriz ativa do segmento no escopo da mantenedora
     const matrix = await this.prisma.curriculumMatrix.findFirst({

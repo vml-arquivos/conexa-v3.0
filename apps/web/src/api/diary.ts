@@ -8,8 +8,9 @@ export interface DiaryEvent {
   eventDate: string;
   childId: string;
   classroomId: string;
-  planningId: string;
-  curriculumEntryId: string;
+  // FIX C3.5: opcionais no backend
+  planningId?: string | null;
+  curriculumEntryId?: string | null;
   createdAt?: string;
   updatedAt?: string;
   [key: string]: unknown;
@@ -22,8 +23,9 @@ export interface CreateDiaryEventDto {
   eventDate: string;
   childId: string;
   classroomId: string;
-  planningId: string;
-  curriculumEntryId: string;
+  // FIX C3.5: opcionais — backend aceita eventos sem vínculo de planejamento
+  planningId?: string;
+  curriculumEntryId?: string;
 }
 
 export async function getDiaryEvents(): Promise<DiaryEvent[]> {
@@ -54,7 +56,7 @@ export async function createDiaryEvent(data: CreateDiaryEventDto): Promise<Diary
   // Limpar payload antes de enviar
   const cleanedData = cleanPayload(data as unknown as Record<string, unknown>);
   
-  // Validar campos obrigatórios
+  // Validar apenas campos obrigatórios do backend (planningId/curriculumEntryId são opcionais)
   const requiredFields: (keyof CreateDiaryEventDto)[] = [
     'type',
     'title',
@@ -62,8 +64,6 @@ export async function createDiaryEvent(data: CreateDiaryEventDto): Promise<Diary
     'eventDate',
     'childId',
     'classroomId',
-    'planningId',
-    'curriculumEntryId',
   ];
   
   for (const field of requiredFields) {
