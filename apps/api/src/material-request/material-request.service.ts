@@ -23,7 +23,6 @@ function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
   return 'OUTRO' as MaterialRequestType;
 }
 
-/** Apenas PROFESSOR (ou DEVELOPER para testes) pode criar requisições. UNIDADE não. */
 function isProfessorRole(user: JwtPayload): boolean {
   return (
     Array.isArray(user.roles) &&
@@ -43,7 +42,6 @@ function isCoordRole(user: JwtPayload): boolean {
   );
 }
 
-/** STAFF_CENTRAL, MANTENEDORA ou DEVELOPER — acesso à rede inteira */
 function isCentralRole(user: JwtPayload): boolean {
   return (
     Array.isArray(user.roles) &&
@@ -56,6 +54,109 @@ function isCentralRole(user: JwtPayload): boolean {
   );
 }
 
+/**
+ * Parseia o campo description para extrair dados legados (urgencia, justificativa, itens)
+ * e dados de revisão (reviewData). Nunca lança exceção.
+ */
+function parseDescription(description: string | null): {
+  urgencia: string | null;
+  justificativa: string | null;
+  observacaoRevisao: string | null;
+  statusVirtual: string | null;
+  originalItens: { item: string; quantidade: number; unidade?: string }[] | null;
+  reviewData: Record<string, unknown> | null;
+  originalData: Record<string, unknown> | null;
+} {
+  const result = {
+    urgencia: null as string | null,
+    justificativa: null as string | null,
+    observacaoRevisao: null as string | null,
+    statusVirtual: null as string | null,
+    originalItens: null as { item: string; quantidade: number; unidade?: string }[] | null,
+    reviewData: null as Record<string, unknown> | null,
+    originalData: null as Record<string, unknown> | null,
+  };
+  if (!description) return result;
+  try {
+    const parsed = JSON.parse(description) as Record<string, unknown>;
+    if (parsed._review) {
+      result.reviewData = parsed;
+      result.observacaoRevisao = typeof parsed.notes === 'string' ? parsed.notes : null;
+      result.statusVirtual = parsed._parcial ? 'PARCIAL' : null;
+      if (parsed._originalData) {
+        const orig = parsed._originalData as Record<string, unknown>;
+        result.originalData = orig;
+        result.urgencia = typeof orig.urgencia === 'string' ? orig.urgencia : null;
+        result.justificativa = typeof orig.justificativa === 'string' ? orig.justificativa : null;
+        if (Array.isArray(orig.itens)) {
+          result.originalItens = orig.itens as { item: string; quantidade: number; unidade?: string }[];
+        }
+      }
+    } else {
+      result.originalData = parsed;
+      result.urgencia = typeof parsed.urgencia === 'string' ? parsed.urgencia : null;
+      result.justificativa = typeof parsed.justificativa === 'string' ? parsed.justificativa : null;
+      if (Array.isArray(parsed.itens)) {
+        result.originalItens = parsed.itens as { item: string; quantidade: number; unidade?: string }[];
+      }
+    }
+  } catch { /* ignora description não-JSON */ }
+  return result;
+}
+
+/**
+ * Normaliza os itens de uma requisição para o formato unificado de resposta.
+ * Prioridade: itens relacionais (MaterialRequestItem) > itens legados (description.itens)
+ */
+function normalizeItems(
+  items: Array<{
+    id: string;
+    productName: string;
+    quantity: number;
+    unit?: string | null;
+    observations?: string | null;
+    materialId?: string | null;
+    unitPrice?: unknown;
+    supplier?: string | null;
+  }>,
+  reviewDecisions: Array<{ itemId: string; approved: boolean; qtyApproved: number; reason?: string | null }>,
+  legacyItens: { item: string; quantidade: number; unidade?: string }[] | null,
+) {
+  if (items.length > 0) {
+    return items.map(item => {
+      const decision = reviewDecisions.find(d => d.itemId === item.id);
+      return {
+        id: item.id,
+        materialId: item.materialId ?? null,
+        productName: item.productName,
+        materialName: item.productName, // alias para compatibilidade com frontend
+        quantity: item.quantity,
+        unit: item.unit ?? null,
+        observations: item.observations ?? null,
+        qtyApproved: decision ? decision.qtyApproved : null,
+        approved: decision ? decision.approved : null,
+        approvalReason: decision?.reason ?? null,
+      };
+    });
+  }
+  // Fallback: itens legados do description
+  if (legacyItens && legacyItens.length > 0) {
+    return legacyItens.map((it, idx) => ({
+      id: `legacy-${idx}`,
+      materialId: null,
+      productName: it.item,
+      materialName: it.item,
+      quantity: it.quantidade,
+      unit: it.unidade ?? null,
+      observations: null,
+      qtyApproved: null,
+      approved: null,
+      approvalReason: null,
+    }));
+  }
+  return [];
+}
+
 @Injectable()
 export class MaterialRequestService {
   constructor(private readonly prisma: PrismaService) {}
@@ -64,8 +165,7 @@ export class MaterialRequestService {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     if (!isProfessorRole(user)) throw new ForbiddenException('Apenas PROFESSOR pode solicitar');
 
-    // FIX 1: Resolver unitId quando não está no JWT do professor.
-    // Prioridade: (1) JWT, (2) turma enviada no DTO, (3) primeira turma ativa do professor.
+    // Resolver unitId: JWT > turma do DTO > primeira turma ativa do professor
     let resolvedUnitId = user.unitId;
     if (!resolvedUnitId) {
       if (dto.classroomId) {
@@ -82,31 +182,51 @@ export class MaterialRequestService {
         });
         resolvedUnitId = ct?.classroom?.unitId ?? undefined;
       }
-      if (!resolvedUnitId) throw new ForbiddenException('Professor sem unidade vinculada. Contate a coordenação.');
+      if (!resolvedUnitId) {
+        throw new ForbiddenException('Professor sem unidade vinculada. Contate a coordenação.');
+      }
     }
 
     const code = `MR-${Date.now()}`;
-    const isNewFormat = !!(dto.titulo || dto.itens || dto.categoria);
     const title = dto.titulo || dto.item || 'Requisição de Material';
     const type = mapType(dto.categoria || dto.type);
-    const quantity = dto.itens?.[0]?.quantidade ?? dto.quantity ?? 1;
-
-    let description: string | undefined;
-    if (isNewFormat && dto.itens && dto.itens.length > 0) {
-      description = JSON.stringify({
-        itens: dto.itens,
-        justificativa: dto.justificativa,
-        urgencia: dto.urgencia,
-        descricao: dto.descricao,
-      });
-    } else if (dto.childId) {
-      description = `childId=${dto.childId}`;
-    }
-
     const priorityMap: Record<string, string> = { BAIXA: 'baixa', MEDIA: 'normal', ALTA: 'alta' };
     const priority = dto.urgencia ? (priorityMap[dto.urgencia] ?? 'normal') : 'normal';
 
-    return this.prisma.materialRequest.create({
+    // Normalizar itens: suporta novo formato (dto.itens) e legado (dto.item + dto.quantity)
+    const itensParaPersistir: Array<{ productName: string; quantity: number; unit?: string }> = [];
+    if (dto.itens && dto.itens.length > 0) {
+      for (const it of dto.itens) {
+        if (it.item?.trim()) {
+          itensParaPersistir.push({
+            productName: it.item.trim(),
+            quantity: it.quantidade ?? 1,
+            unit: it.unidade,
+          });
+        }
+      }
+    } else if (dto.item) {
+      itensParaPersistir.push({
+        productName: dto.item.trim(),
+        quantity: dto.quantity ?? 1,
+      });
+    }
+
+    // quantity total = soma dos itens (ou 1 se não houver itens)
+    const totalQuantity = itensParaPersistir.reduce((acc, it) => acc + it.quantity, 0) || 1;
+
+    // description: armazena metadados (justificativa, urgencia) sem duplicar itens
+    // Itens agora vivem exclusivamente na tabela MaterialRequestItem
+    const descriptionData: Record<string, unknown> = {};
+    if (dto.justificativa) descriptionData.justificativa = dto.justificativa;
+    if (dto.urgencia) descriptionData.urgencia = dto.urgencia;
+    if (dto.descricao) descriptionData.descricao = dto.descricao;
+    const description = Object.keys(descriptionData).length > 0
+      ? JSON.stringify(descriptionData)
+      : undefined;
+
+    // Criar requisição + itens em uma única transação
+    const created = await this.prisma.materialRequest.create({
       data: {
         mantenedoraId: user.mantenedoraId,
         unitId: resolvedUnitId,
@@ -115,23 +235,43 @@ export class MaterialRequestService {
         title,
         description,
         type,
-        quantity,
+        quantity: totalQuantity,
         priority,
         status: RequestStatus.SOLICITADO,
         createdBy: user.sub,
+        items: itensParaPersistir.length > 0
+          ? {
+              create: itensParaPersistir.map(it => ({
+                productName: it.productName,
+                quantity: it.quantity,
+                unit: it.unit ?? null,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        items: true,
+        classroom: { select: { id: true, name: true } },
       },
     });
+
+    const desc = parseDescription(created.description ?? null);
+    return {
+      ...created,
+      urgencia: desc.urgencia,
+      justificativa: desc.justificativa,
+      items: normalizeItems(created.items, [], null),
+    };
   }
 
   async listMine(user: JwtPayload) {
-    // FIX P0.1: unitId pode ser null para professores sem unidade explícita no JWT.
-    // Filtramos por mantenedoraId + createdBy; se unitId existir, adicionamos ao filtro.
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const where: Record<string, unknown> = {
       mantenedoraId: user.mantenedoraId,
       createdBy: user.sub,
     };
     if (user.unitId) where.unitId = user.unitId;
+
     const result = await this.prisma.materialRequest.findMany({
       where: where as any,
       include: {
@@ -142,28 +282,18 @@ export class MaterialRequestService {
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
-    // FIX C2.1: parsear description para expor urgencia, observacaoRevisao e approvedDate
+
     return result.map(r => {
-      let urgencia: string | null = null;
-      let observacaoRevisao: string | null = null;
-      if (r.description) {
-        try {
-          const parsed = JSON.parse(r.description) as Record<string, unknown>;
-          if (parsed._review) {
-            // reviewData: notas da revisão
-            observacaoRevisao = typeof parsed.notes === 'string' ? parsed.notes : null;
-          } else {
-            // originalData: dados do pedido original
-            urgencia = typeof parsed.urgencia === 'string' ? parsed.urgencia : null;
-          }
-        } catch { /* ignora */ }
-      }
+      const desc = parseDescription(r.description ?? null);
       return {
         ...r,
-        urgencia,
-        observacaoRevisao,
+        urgencia: desc.urgencia,
+        justificativa: desc.justificativa,
+        observacaoRevisao: desc.observacaoRevisao,
+        statusVirtual: desc.statusVirtual,
         approvedDate: r.approvedDate?.toISOString() ?? null,
-        items: r.items.map(i => ({ ...i, materialName: i.productName })),
+        items: normalizeItems(r.items, [], desc.originalItens),
+        originalItens: desc.originalItens,
       };
     });
   }
@@ -173,72 +303,54 @@ export class MaterialRequestService {
     filters?: { status?: string; classroomId?: string; type?: string },
   ) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-    // Filtros condicionais
     const extra: Record<string, unknown> = {};
     if (filters?.status) extra.status = filters.status;
     if (filters?.classroomId) extra.classroomId = filters.classroomId;
     if (filters?.type) extra.type = filters.type;
-    // STAFF_CENTRAL/MANTENEDORA/DEVELOPER: lista toda a rede
-    const addMaterialName = (items: Array<Record<string, unknown>>) =>
-      items.map(i => ({ ...i, materialName: i.productName }));
-    // FIX C2.2: parsear description para expor urgencia, statusVirtual e observacaoRevisao na listagem
-    const parseDescription = (r: Record<string, unknown>) => {
-      let urgencia: string | null = null;
-      let observacaoRevisao: string | null = null;
-      let statusVirtual: string | null = null;
-      const desc = r.description as string | null;
-      if (desc) {
-        try {
-          const parsed = JSON.parse(desc) as Record<string, unknown>;
-          if (parsed._review) {
-            observacaoRevisao = typeof parsed.notes === 'string' ? parsed.notes : null;
-            statusVirtual = parsed._parcial ? 'PARCIAL' : null;
-          } else {
-            urgencia = typeof parsed.urgencia === 'string' ? parsed.urgencia : null;
-          }
-        } catch { /* ignora */ }
-      }
-      return { urgencia, observacaoRevisao, statusVirtual };
+
+    const includeClause = {
+      createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+      classroom: { select: { id: true, name: true } },
+      items: true,
     };
-    const mapItems = (rows: Array<{ items: Array<Record<string, unknown>> } & Record<string, unknown>>) =>
-      rows.map(r => ({ ...r, ...parseDescription(r), items: addMaterialName(r.items) }));
+
+    const mapRows = (rows: any[]) =>
+      rows.map(r => {
+        const desc = parseDescription(r.description ?? null);
+        return {
+          ...r,
+          urgencia: desc.urgencia,
+          justificativa: desc.justificativa,
+          observacaoRevisao: desc.observacaoRevisao,
+          statusVirtual: desc.statusVirtual,
+          approvedDate: r.approvedDate?.toISOString() ?? null,
+          items: normalizeItems(r.items ?? [], [], desc.originalItens),
+          originalItens: desc.originalItens,
+        };
+      });
 
     if (isCentralRole(user)) {
       const rows = await this.prisma.materialRequest.findMany({
         where: { mantenedoraId: user.mantenedoraId, ...extra } as any,
-        include: {
-          createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
-          classroom: { select: { id: true, name: true } },
-          items: true,
-        },
+        include: includeClause,
         orderBy: { requestedDate: 'desc' },
         take: 500,
       });
-      // FIX P0.2c: alias materialName
-      return mapItems(rows as any);
+      return mapRows(rows);
     }
-    // UNIDADE: apenas sua unidade
+
     if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
     if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
+
     const rows = await this.prisma.materialRequest.findMany({
       where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId, ...extra } as any,
-      include: {
-        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
-        classroom: { select: { id: true, name: true } },
-        items: true,
-      },
+      include: includeClause,
       orderBy: { requestedDate: 'desc' },
       take: 200,
     });
-    // FIX P0.2c: alias materialName
-    return mapItems(rows as any);
+    return mapRows(rows);
   }
 
-  /**
-   * Busca uma requisição pelo ID com todos os detalhes.
-   * Faz merge do reviewData (campo description) nos itens, retornando qtyApproved e approved por item.
-   * UNIDADE: apenas requisições da própria unidade.
-   */
   async getById(id: string, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     const req = await this.prisma.materialRequest.findUnique({
@@ -255,60 +367,34 @@ export class MaterialRequestService {
       throw new ForbiddenException('Requisição não pertence à sua unidade');
     }
 
-    // Tenta parsear reviewData do campo description
-    let reviewData: Record<string, unknown> | null = null;
-    let originalData: Record<string, unknown> | null = null;
-    if (req.description) {
-      try {
-        const parsed = JSON.parse(req.description) as Record<string, unknown>;
-        if (parsed._review) {
-          reviewData = parsed;
-          // Se havia dados originais preservados, recupera
-          if (parsed._originalData) originalData = parsed._originalData as Record<string, unknown>;
-        } else {
-          originalData = parsed;
-        }
-      } catch { /* ignora */ }
-    }
+    const desc = parseDescription(req.description ?? null);
 
-    // Merge qtyApproved/approved nos itens do banco
+    // Merge qtyApproved/approved nos itens do banco (vem do reviewData.items)
     type ItemDecision = { itemId: string; approved: boolean; qtyApproved: number; reason?: string | null };
-    const itemDecisions: ItemDecision[] = Array.isArray(reviewData?.items)
-      ? (reviewData.items as ItemDecision[])
+    const itemDecisions: ItemDecision[] = Array.isArray(desc.reviewData?.items)
+      ? (desc.reviewData!.items as ItemDecision[])
       : [];
 
-    const itemsWithApproval = req.items.map(item => {
-      const decision = itemDecisions.find(d => d.itemId === item.id);
-      return {
-        ...item,
-        // FIX P0.2c: frontend espera materialName, schema Prisma usa productName
-        materialName: item.productName,
-        qtyApproved: decision ? decision.qtyApproved : null,
-        approved: decision ? decision.approved : null,
-        approvalReason: decision?.reason ?? null,
-      };
-    });
-
-    // Status virtual: se _parcial=true, expor como PARCIAL no response
-    const statusVirtual = reviewData?._parcial ? 'PARCIAL' : req.status;
+    const statusVirtual = desc.reviewData?._parcial ? 'PARCIAL' : req.status;
 
     return {
       ...req,
-      items: itemsWithApproval,
+      urgencia: desc.urgencia,
+      justificativa: desc.justificativa,
+      observacaoRevisao: desc.observacaoRevisao,
       statusVirtual,
-      reviewData: reviewData
+      approvedDate: req.approvedDate?.toISOString() ?? null,
+      items: normalizeItems(req.items, itemDecisions, desc.originalItens),
+      originalItens: desc.originalItens,
+      reviewData: desc.reviewData
         ? {
-            decision: reviewData.decision,
-            notes: reviewData.notes,
-            reviewedAt: reviewData.reviewedAt,
-            reviewedBy: reviewData.reviewedBy,
-            isParcial: reviewData._parcial ?? false,
+            decision: desc.reviewData.decision,
+            notes: desc.reviewData.notes,
+            reviewedAt: desc.reviewData.reviewedAt,
+            reviewedBy: desc.reviewData.reviewedBy,
+            isParcial: desc.reviewData._parcial ?? false,
           }
         : null,
-      // Expor dados originais (itens do description) se existirem
-      originalItens: originalData?.itens ?? null,
-      justificativa: originalData?.justificativa ?? null,
-      urgencia: originalData?.urgencia ?? null,
     };
   }
 
@@ -325,20 +411,14 @@ export class MaterialRequestService {
       throw new ForbiddenException('Fora do escopo');
     }
 
-    // Recupera dados originais (itens do description) para preservar
-    let originalData: Record<string, unknown> | null = null;
-    if (req.description) {
-      try {
-        const parsed = JSON.parse(req.description) as Record<string, unknown>;
-        if (!parsed._review) originalData = parsed;
-      } catch { /* ignora */ }
-    }
+    // Preserva dados originais do description (metadados: urgencia, justificativa)
+    const desc = parseDescription(req.description ?? null);
+    const originalData = desc.originalData;
 
     let status: RequestStatus;
     let reviewData: Record<string, unknown>;
 
     if (dto.decision === ReviewDecision.APPROVE_ITEMS && dto.items && dto.items.length > 0) {
-      // ── Aprovação item-a-item ────────────────────────────────────────────
       const itemDecisions = dto.items.map(i => ({
         itemId: i.itemId,
         approved: i.approved,
@@ -346,7 +426,6 @@ export class MaterialRequestService {
         reason: i.reason ?? null,
       }));
 
-      // Valida qty contra qty solicitada
       for (const d of itemDecisions) {
         const dbItem = req.items.find(it => it.id === d.itemId);
         if (dbItem && d.qtyApproved > dbItem.quantity) {
@@ -361,7 +440,6 @@ export class MaterialRequestService {
       const isParcial = !allRejected && !allApproved;
 
       status = allRejected ? RequestStatus.REJEITADO : RequestStatus.APROVADO;
-
       reviewData = {
         _review: true,
         _parcial: isParcial,
@@ -372,7 +450,6 @@ export class MaterialRequestService {
         reviewedBy: user.sub,
       };
     } else {
-      // ── Decisão global (legado) ────────────────────────────────────────────
       status =
         dto.decision === ReviewDecision.APPROVED || dto.decision === ReviewDecision.ADJUSTED
           ? RequestStatus.APROVADO
@@ -389,10 +466,9 @@ export class MaterialRequestService {
       };
     }
 
-    // Preserva dados originais no reviewData
     if (originalData) reviewData._originalData = originalData;
 
-    return this.prisma.materialRequest.update({
+    const updated = await this.prisma.materialRequest.update({
       where: { id },
       data: {
         status,
@@ -406,31 +482,44 @@ export class MaterialRequestService {
         items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
     });
+
+    const updatedDesc = parseDescription(updated.description ?? null);
+    type ItemDecision = { itemId: string; approved: boolean; qtyApproved: number; reason?: string | null };
+    const decisions: ItemDecision[] = Array.isArray(updatedDesc.reviewData?.items)
+      ? (updatedDesc.reviewData!.items as ItemDecision[])
+      : [];
+
+    return {
+      ...updated,
+      urgencia: updatedDesc.urgencia,
+      justificativa: updatedDesc.justificativa,
+      observacaoRevisao: updatedDesc.observacaoRevisao,
+      statusVirtual: updatedDesc.reviewData?._parcial ? 'PARCIAL' : updated.status,
+      approvedDate: updated.approvedDate?.toISOString() ?? null,
+      items: normalizeItems(updated.items, decisions, updatedDesc.originalItens),
+      reviewData: updatedDesc.reviewData
+        ? {
+            decision: updatedDesc.reviewData.decision,
+            notes: updatedDesc.reviewData.notes,
+            reviewedAt: updatedDesc.reviewData.reviewedAt,
+            reviewedBy: updatedDesc.reviewData.reviewedBy,
+            isParcial: updatedDesc.reviewData._parcial ?? false,
+          }
+        : null,
+    };
   }
 
-  /**
-   * Relatório de consumo de materiais por turma e período
-   * Suporte multiunidade: STAFF_CENTRAL/MANTENEDORA/DEVELOPER podem passar unitId (ou null = rede inteira)
-   * UNIDADE: sempre usa token.unitId
-   */
   async relatorioConsumo(
     user: JwtPayload,
     params: { classroomId?: string; dataInicio?: string; dataFim?: string; unitId?: string },
   ) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
-    const where: Record<string, unknown> = {
-      mantenedoraId: user.mantenedoraId,
-    };
+    const where: Record<string, unknown> = { mantenedoraId: user.mantenedoraId };
 
-    // Escopo de unidade: CENTRAL pode filtrar por unitId ou ver rede inteira
     if (isCentralRole(user)) {
-      if (params.unitId) {
-        where.unitId = params.unitId;
-      }
-      // se unitId não enviado: sem filtro de unitId → rede inteira
+      if (params.unitId) where.unitId = params.unitId;
     } else {
-      // UNIDADE: força token.unitId, ignora unitId do client
       if (!user.unitId) throw new ForbiddenException('Escopo inválido');
       if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode acessar o relatório');
       where.unitId = user.unitId;
@@ -473,7 +562,6 @@ export class MaterialRequestService {
         if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porTurmaMap[r.classroomId].aprovados++;
       }
 
-      // Agrupamento por unidade (útil para modo rede)
       if (r.unitId && r.unit) {
         if (!porUnidadeMap[r.unitId]) porUnidadeMap[r.unitId] = { nome: r.unit.name, total: 0, aprovados: 0, pendentes: 0 };
         porUnidadeMap[r.unitId].total++;
