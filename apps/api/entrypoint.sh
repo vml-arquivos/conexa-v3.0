@@ -201,7 +201,15 @@ resolve_failed_migrations
 # ── Passo 2: Aplicar migrations (com retry inteligente em P3009 e P3018) ──────
 run_migrate_deploy
 
-# ── Passo 3: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 3: Regenerar Prisma client com o schema atual ──────────────────────
+# CRÍTICO: o Prisma client é gerado no build, mas novas migrations podem adicionar
+# modelos que o client buildado não conhece (ex: MaterialRequestItem, Material).
+# Sem este passo, qualquer 'include' em relações novas lança PrismaClientValidationError → 500.
+echo "Regenerando Prisma client com schema atual..."
+npx prisma generate --schema=./prisma/schema.prisma
+echo "✅ Prisma client regenerado."
+
+# ── Passo 4: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js
