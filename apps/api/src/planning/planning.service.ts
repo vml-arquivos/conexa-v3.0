@@ -403,17 +403,41 @@ export class PlanningService {
     }
 
     // Filtro por período: interseção de períodos
-    // Retorna planejamentos que cobrem qualquer parte do período consultado:
-    //   planning.startDate <= query.endDate AND planning.endDate >= query.startDate
+    // FIX 2: Rascunhos sem startDate são sempre incluídos quando o filtro de período é aplicado.
+    // Regra: (status=RASCUNHO) OR (startDate <= endDate AND endDate >= startDate)
     if (query.startDate || query.endDate) {
-      where.AND = where.AND ?? [];
+      let periodConditions: object[] = [];
       if (query.startDate && query.endDate) {
-        where.AND.push({ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } });
-        where.AND.push({ endDate: { gte: new Date(query.startDate) } });
+        periodConditions = [
+          { startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } },
+          { endDate: { gte: new Date(query.startDate) } },
+        ];
       } else if (query.startDate) {
-        where.AND.push({ endDate: { gte: new Date(query.startDate) } });
+        periodConditions = [{ endDate: { gte: new Date(query.startDate) } }];
       } else if (query.endDate) {
-        where.AND.push({ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } });
+        periodConditions = [{ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } }];
+      }
+      // Preservar o OR existente (professor: createdBy OR classroomId) e adicionar OR de período
+      if (periodConditions.length > 0) {
+        const existingOr = where.OR as object[] | undefined;
+        if (existingOr) {
+          // Já existe OR (professor): encapsular em AND com o filtro de período
+          where.AND = where.AND ?? [];
+          (where.AND as object[]).push({
+            OR: [
+              { status: PlanningStatus.RASCUNHO },
+              { AND: periodConditions },
+            ],
+          });
+        } else {
+          where.AND = where.AND ?? [];
+          (where.AND as object[]).push({
+            OR: [
+              { status: PlanningStatus.RASCUNHO },
+              { AND: periodConditions },
+            ],
+          });
+        }
       }
     }
 

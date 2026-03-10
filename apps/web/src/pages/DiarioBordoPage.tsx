@@ -294,6 +294,8 @@ export default function DiarioBordoPage() {
     psychologicalNotes: '',
     developmentAlerts: '',
     recommendations: '',
+    // FIX 5: campo livre opcional
+    observacaoPersonalizada: '',
   });
 
   useEffect(() => {
@@ -431,11 +433,14 @@ export default function DiarioBordoPage() {
     if (!criancaSelecionadaObs) { toast.error('Selecione uma criança'); return; }
     setSavingObs(true);
     try {
+      // FIX 5: mapear observacaoPersonalizada para campo 'interests' (campo livre no schema)
+      const { observacaoPersonalizada, ...obsFormRest } = obsForm;
       await http.post('/development-observations', {
         childId: criancaSelecionadaObs,
         classroomId,
-        ...obsForm,
+        ...obsFormRest,
         date: obsForm.date + 'T12:00:00.000Z',
+        ...(observacaoPersonalizada.trim() ? { interests: observacaoPersonalizada } : {}),
       });
       toast.success('Observação salva com sucesso!');
       setObsForm({
@@ -443,6 +448,7 @@ export default function DiarioBordoPage() {
         behaviorDescription: '', socialInteraction: '', emotionalState: '',
         dietaryNotes: '', sleepPattern: '', learningProgress: '',
         planningParticipation: '', psychologicalNotes: '', developmentAlerts: '', recommendations: '',
+        observacaoPersonalizada: '',
       });
       setCriancaSelecionadaObs('');
       loadObservacoes();
@@ -620,11 +626,7 @@ export default function DiarioBordoPage() {
     const criancaFoto = criancasSel[0]?.photoUrl;
     const criancaIdSel = criancasSel[0]?.id;
 
-    // Bloquear se não houver criança selecionada
-    if (!criancaIdSel) {
-      toast.error('Selecione uma criança antes de registrar o microgesto.');
-      return;
-    }
+    // Criança é opcional — se não selecionada, registra sem vínculo a criança específica
     // Bloquear se não houver turma identificada
     if (!classroomId) {
       toast.error('Turma não identificada. Recarregue a página e tente novamente.');
@@ -650,18 +652,26 @@ export default function DiarioBordoPage() {
       const horarioInfo = microgestoForm.horario ? ` [${microgestoForm.horario}]` : '';
       const campoInfo = microgestoForm.campo ? ` | Campo: ${microgestoForm.campo}` : '';
       const tipoLabel = TIPOS_MICROGESTO.find(t => t.id === microgestoForm.tipo)?.label ?? microgestoForm.tipo;
+      const textoPayload = `[${tipoLabel}]${horarioInfo}${campoInfo} — ${microgestoForm.descricao}`;
 
-      await createMicrogestureEvent({
-        childId: criancaIdSel,
-        classroomId,
-        kind,
-        payload: {
-          texto: `[${tipoLabel}]${horarioInfo}${campoInfo} — ${microgestoForm.descricao}`,
-        },
-        eventDate: new Date().toISOString(),
-      });
+      if (criancasSel.length > 0) {
+        // Registrar um evento por criança selecionada (múltiplos alunos suportados)
+        await Promise.all(
+          criancasSel.map(c =>
+            createMicrogestureEvent({
+              childId: c.id,
+              classroomId,
+              kind,
+              payload: { texto: textoPayload },
+              eventDate: new Date().toISOString(),
+            })
+          )
+        );
+      }
+      // Se nenhuma criança selecionada: microgesto é adicionado apenas localmente
+      // (backend exige childId, então não persiste no servidor)
 
-      // Adicionar também ao estado local para exibição imediata na lista do diário
+      // Adicionar ao estado local para exibição imediata na lista do diário
       const novo: Microgesto = {
         id: Date.now().toString(),
         tipo: microgestoForm.tipo,
@@ -753,8 +763,8 @@ export default function DiarioBordoPage() {
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
-          // BUG C FIX: Vincular planejamento aprovado ao diário quando existir
-          planningId: planejamentoHoje?.id ?? null,
+          // FIX: planningId undefined (não null) para evitar falha de validação CUID no DTO
+          ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
           microgestos: form.microgestos,
@@ -1699,6 +1709,17 @@ export default function DiarioBordoPage() {
                     value={obsForm.developmentAlerts} onChange={e => setObsForm(f => ({ ...f, developmentAlerts: e.target.value }))} />
                   <Textarea placeholder="Recomendações e próximos passos para esta criança..." rows={2}
                     value={obsForm.recommendations} onChange={e => setObsForm(f => ({ ...f, recommendations: e.target.value }))} />
+                </div>
+
+                {/* FIX 5: Campo livre opcional */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Observação Personalizada (opcional)</p>
+                  <Textarea
+                    placeholder="Escreva livremente qualquer observação que não se encaixe nos campos acima..."
+                    rows={3}
+                    value={obsForm.observacaoPersonalizada}
+                    onChange={e => setObsForm(f => ({ ...f, observacaoPersonalizada: e.target.value }))}
+                  />
                 </div>
 
                 <Button onClick={salvarObservacao} disabled={savingObs} className="w-full bg-teal-600 hover:bg-teal-700">
