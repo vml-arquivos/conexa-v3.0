@@ -28,11 +28,12 @@ export interface CreateMaterialRequestDto {
 
 export interface MaterialRequestItemRecord {
   id: string;
-  materialId: string;
-  materialName?: string;
+  materialId?: string | null; // opcional: itens criados sem catálogo não têm materialId
+  productName?: string;       // nome real do item (campo relacional)
+  materialName?: string;      // alias de productName para compatibilidade
   quantity: number;
-  unit?: string;
-  observations?: string;
+  unit?: string | null;
+  observations?: string | null;
   /** Campos de aprovação por item (retornados pelo GET /:id após review) */
   qtyApproved?: number | null;
   approved?: boolean | null;
