@@ -280,10 +280,15 @@ export default function PlanoDeAulaNovoPage() {
             setClassroomId(v2.classroomId ?? planning.classroomId ?? '');
             setStartDate(v2.range?.start ?? '');
             setNumDays(v2.range?.days ?? 1);
-            // Restaura dados do professor por dia (objetivos serão recarregados via API)
+            // Restaura dados do professor por dia.
+            // Preserva objectives salvos: o useEffect de matriz só recarrega
+            // via API quando objectives está vazio, portanto dados salvos
+            // não são sobrescritos.
             const restored: DayState[] = v2.days.map(day => ({
               date: day.date,
-              objectives: [],
+              objectives: Array.isArray(day.objectives) && day.objectives.length > 0
+                ? day.objectives
+                : [],
               matrizLoading: false,
               teacher: day.teacher ?? { ...TEACHER_EMPTY },
               expanded: true,
