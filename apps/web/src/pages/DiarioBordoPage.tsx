@@ -14,6 +14,7 @@ import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
+  Camera, UploadCloud, Trash2, TriangleAlert,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 
@@ -72,6 +73,28 @@ interface ObservacaoIndividual {
   recommendations?: string;
   child?: { id: string; firstName: string; lastName: string; photoUrl?: string };
 }
+
+// ─── Ocorrências ─────────────────────────────────────────────────────────────
+interface Ocorrencia {
+  id?: string;
+  childId: string;
+  classroomId: string;
+  categoria: string;
+  descricao: string;
+  mediaUrls?: string[];
+  eventDate: string;
+  createdAt?: string;
+  child?: { id: string; firstName: string; lastName: string; photoUrl?: string };
+}
+
+const CATEGORIAS_OCORRENCIA = [
+  { id: 'CHEGADA_SAIDA', label: 'Chegada / Saída', emoji: '🚪' },
+  { id: 'SAUDE_LESAO', label: 'Saúde / Lesão', emoji: '🩹' },
+  { id: 'MATERIAL_PERTENCES', label: 'Material / Pertences', emoji: '🎒' },
+  { id: 'COMPORTAMENTO', label: 'Comportamento', emoji: '💬' },
+  { id: 'COMUNICACAO_RESPONSAVEIS', label: 'Comunicação com responsáveis', emoji: '📞' },
+  { id: 'OUTRO', label: 'Outro', emoji: '📝' },
+];
 
 interface RotinaItem {
   momento: string;
@@ -184,7 +207,7 @@ function SeletorCrianca({
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
-  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes'>('lista');
+  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>('lista');
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
@@ -240,6 +263,19 @@ export default function DiarioBordoPage() {
     recursos?: string;
   } | null>(null);
 
+  // Ocorrências
+  const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
+  const [loadingOcorr, setLoadingOcorr] = useState(false);
+  const [savingOcorr, setSavingOcorr] = useState(false);
+  const [criancaSelecionadaOcorr, setCriancaSelecionadaOcorr] = useState<string>('');
+  const [ocorrForm, setOcorrForm] = useState({
+    categoria: 'COMPORTAMENTO',
+    descricao: '',
+    eventDate: new Date().toISOString().split('T')[0],
+    fotos: [] as string[], // base64 data URLs
+  });
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+
   // Observações individuais
   const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
   const [loadingObs, setLoadingObs] = useState(false);
@@ -275,6 +311,97 @@ export default function DiarioBordoPage() {
       loadObservacoes();
     }
   }, [aba, classroomId]);
+
+  useEffect(() => {
+    if (aba === 'ocorrencias' && classroomId) {
+      loadOcorrencias();
+    }
+  }, [aba, classroomId]);
+
+  async function loadOcorrencias(childIdParam?: string) {
+    setLoadingOcorr(true);
+    try {
+      const params: Record<string, string> = { limit: '50' };
+      if (childIdParam) params.childId = childIdParam;
+      if (classroomId) params.classroomId = classroomId;
+      // Ocorrências são DiaryEvents com tipos de ocorrência
+      params.type = 'COMPORTAMENTO,SAUDE,FAMILIA,OUTRO,OBSERVACAO';
+      const res = await http.get('/diary-events', { params });
+      const lista = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      // Filtrar apenas eventos que têm a tag 'ocorrencia'
+      const ocorr = lista.filter((e: any) => {
+        const tags = Array.isArray(e.tags) ? e.tags : [];
+        return tags.includes('ocorrencia');
+      });
+      setOcorrencias(ocorr.map((e: any) => ({
+        id: e.id,
+        childId: e.childId,
+        classroomId: e.classroomId,
+        categoria: e.aiContext?.categoria ?? e.type ?? 'OUTRO',
+        descricao: e.description ?? e.behaviorNotes ?? '',
+        mediaUrls: Array.isArray(e.mediaUrls) ? e.mediaUrls : [],
+        eventDate: e.eventDate ?? e.createdAt,
+        createdAt: e.createdAt,
+        child: e.child,
+      })));
+    } catch {
+      setOcorrencias([]);
+    } finally {
+      setLoadingOcorr(false);
+    }
+  }
+
+  async function handleFotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande (máx. 5 MB)'); return; }
+    setUploadingFoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setOcorrForm(f => ({ ...f, fotos: [...f.fotos, dataUrl] }));
+        setUploadingFoto(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      toast.error('Erro ao processar imagem');
+      setUploadingFoto(false);
+    }
+    // Reset input
+    e.target.value = '';
+  }
+
+  async function salvarOcorrencia() {
+    if (!criancaSelecionadaOcorr) { toast.error('Selecione uma criança'); return; }
+    if (!ocorrForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
+    if (!classroomId) { toast.error('Turma não identificada'); return; }
+    setSavingOcorr(true);
+    try {
+      const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorrForm.categoria)?.label ?? ocorrForm.categoria;
+      await http.post('/diary-events', {
+        type: 'COMPORTAMENTO',
+        title: `Ocorrência: ${catLabel}`,
+        description: ocorrForm.descricao,
+        eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
+        childId: criancaSelecionadaOcorr,
+        classroomId,
+        behaviorNotes: ocorrForm.descricao,
+        mediaUrls: ocorrForm.fotos,
+        tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
+        aiContext: { categoria: ocorrForm.categoria, categoriaLabel: catLabel },
+      });
+      toast.success('Ocorrência registrada!');
+      setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: new Date().toISOString().split('T')[0], fotos: [] });
+      setCriancaSelecionadaOcorr('');
+      loadOcorrencias();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Erro ao salvar ocorrência');
+    } finally {
+      setSavingOcorr(false);
+    }
+  }
 
   async function loadObservacoes(childIdParam?: string) {
     setLoadingObs(true);
@@ -693,6 +820,7 @@ export default function DiarioBordoPage() {
         {[
           { id: 'lista', label: 'Meus Diários', icon: <BookOpen className="h-4 w-4" /> },
           { id: 'novo', label: 'Novo Registro', icon: <Plus className="h-4 w-4" /> },
+          { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
         ].map(tab => (
@@ -1196,6 +1324,220 @@ export default function DiarioBordoPage() {
               Salvar Diário de Bordo
             </Button>
             <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── OCORRÊNCIAS ─── */}
+      {aba === 'ocorrencias' && (
+        <div className="space-y-6 max-w-3xl">
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4">
+            <p className="text-sm text-orange-700">
+              Registre ocorrências individuais por criança: chegada/saída, saúde, comportamento, material ou comunicação com responsáveis.
+              Cada ocorrência fica vinculada à criança e pode incluir foto.
+            </p>
+          </div>
+
+          {/* Formulário de nova ocorrência */}
+          <Card className="border-2 border-orange-100">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-orange-700"><TriangleAlert className="h-5 w-5" /> Registrar Ocorrência</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {/* Seleção de criança */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Criança *</Label>
+                {!classroomId ? (
+                  <p className="text-sm text-gray-400 italic flex items-center gap-2"><RefreshCw className="h-4 w-4 animate-spin" /> Carregando turma...</p>
+                ) : criancas.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+                ) : (
+                  <div className="space-y-2">
+                    <select
+                      className="w-full border border-orange-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      value={criancaSelecionadaOcorr}
+                      onChange={e => setCriancaSelecionadaOcorr(e.target.value)}
+                    >
+                      <option value="">-- Selecione uma criança --</option>
+                      {criancas
+                        .slice()
+                        .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'pt-BR'))
+                        .map(c => (
+                          <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                        ))}
+                    </select>
+                    {/* Avatares para seleção rápida */}
+                    <div className="flex flex-wrap gap-2">
+                      {criancas.map(c => {
+                        const sel = criancaSelecionadaOcorr === c.id;
+                        return (
+                          <button key={c.id} type="button"
+                            title={`${c.firstName} ${c.lastName}`}
+                            onClick={() => setCriancaSelecionadaOcorr(sel ? '' : c.id)}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-orange-500 bg-orange-50 shadow-sm' : 'border-gray-200 bg-white hover:border-orange-300'}`}>
+                            {c.photoUrl ? (
+                              <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center">
+                                <UserCircle className="w-6 h-6 text-orange-400" />
+                              </div>
+                            )}
+                            <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-orange-700' : 'text-gray-600'}`}>{c.firstName}</span>
+                            {sel && <span className="text-orange-500 text-xs">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Categoria */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Categoria *</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {CATEGORIAS_OCORRENCIA.map(cat => (
+                    <button key={cat.id} type="button"
+                      onClick={() => setOcorrForm(f => ({ ...f, categoria: cat.id }))}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                        ocorrForm.categoria === cat.id
+                          ? 'border-orange-500 bg-orange-50 text-orange-700 shadow-sm'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300'
+                      }`}>
+                      <span>{cat.emoji}</span> {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Data */}
+              <div>
+                <Label>Data da ocorrência</Label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={ocorrForm.eventDate}
+                  onChange={e => setOcorrForm(f => ({ ...f, eventDate: e.target.value }))}
+                />
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <Label>Descrição detalhada *</Label>
+                <Textarea
+                  placeholder="Descreva o que aconteceu com detalhes: hora, contexto, pessoas envolvidas, como foi resolvido..."
+                  rows={4}
+                  value={ocorrForm.descricao}
+                  onChange={e => setOcorrForm(f => ({ ...f, descricao: e.target.value }))}
+                />
+              </div>
+
+              {/* Upload de foto */}
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Foto (opcional)</Label>
+                <div className="space-y-2">
+                  {ocorrForm.fotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {ocorrForm.fotos.map((foto, idx) => (
+                        <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-orange-200">
+                          <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setOcorrForm(f => ({ ...f, fotos: f.fotos.filter((_, i) => i !== idx) }))}
+                            className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-orange-300 rounded-xl cursor-pointer hover:bg-orange-50 transition-colors">
+                    {uploadingFoto ? (
+                      <><RefreshCw className="h-4 w-4 animate-spin text-orange-500" /><span className="text-sm text-orange-600">Processando...</span></>
+                    ) : (
+                      <><UploadCloud className="h-4 w-4 text-orange-500" /><span className="text-sm text-orange-600">Adicionar foto (JPG, PNG — máx. 5 MB)</span></>
+                    )}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleFotoUpload} disabled={uploadingFoto} />
+                  </label>
+                </div>
+              </div>
+
+              <Button onClick={salvarOcorrencia} disabled={savingOcorr || !criancaSelecionadaOcorr || !ocorrForm.descricao.trim()} className="w-full bg-orange-600 hover:bg-orange-700">
+                {savingOcorr ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : <><Save className="h-4 w-4 mr-2" /> Registrar Ocorrência</>}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Histórico de ocorrências */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-800">Histórico de Ocorrências</h3>
+              <select
+                className="border border-gray-200 rounded-lg px-2 py-1 text-xs"
+                onChange={e => { const v = e.target.value; if (v) loadOcorrencias(v); else loadOcorrencias(); }}
+              >
+                <option value="">Todas as crianças</option>
+                {criancas.slice().sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'pt-BR')).map(c => (
+                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                ))}
+              </select>
+            </div>
+
+            {loadingOcorr && <LoadingState message="Carregando ocorrências..." />}
+
+            {!loadingOcorr && ocorrencias.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <Camera className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                <p className="text-sm">Nenhuma ocorrência registrada ainda</p>
+              </div>
+            )}
+
+            {ocorrencias.map(ocorr => {
+              const cat = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorr.categoria);
+              const crianca = criancas.find(c => c.id === ocorr.childId);
+              const dataFormatada = ocorr.eventDate
+                ? new Date(ocorr.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                : '—';
+              return (
+                <Card key={ocorr.id ?? ocorr.eventDate} className="border-2 border-orange-100 hover:border-orange-200 transition-all">
+                  <CardContent className="pt-4">
+                    <div className="flex items-start gap-3">
+                      {/* Avatar da criança */}
+                      <div className="flex-shrink-0">
+                        {crianca?.photoUrl ? (
+                          <img src={crianca.photoUrl} alt={crianca.firstName} className="w-10 h-10 rounded-full object-cover border-2 border-orange-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center border-2 border-orange-200">
+                            <UserCircle className="w-6 h-6 text-orange-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm text-gray-800">
+                            {crianca ? `${crianca.firstName} ${crianca.lastName}` : 'Criança'}
+                          </span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                            {cat?.emoji} {cat?.label ?? ocorr.categoria}
+                          </span>
+                          <span className="text-xs text-gray-400 ml-auto">{dataFormatada}</span>
+                        </div>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{ocorr.descricao}</p>
+                        {/* Fotos */}
+                        {ocorr.mediaUrls && ocorr.mediaUrls.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {ocorr.mediaUrls.map((url, idx) => (
+                              <img key={idx} src={url} alt={`Foto ${idx + 1}`}
+                                className="w-16 h-16 rounded-lg object-cover border border-orange-200 cursor-pointer"
+                                onClick={() => window.open(url, '_blank')}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

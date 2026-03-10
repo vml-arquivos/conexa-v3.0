@@ -23,6 +23,8 @@ import {
   X,
   Eye,
   Heart,
+  UploadCloud,
+  RefreshCw,
 } from 'lucide-react';
 
 // ─── Campos de Experiência com ícones e linguagem simples ─────────────────────
@@ -126,6 +128,7 @@ export default function RdxPage() {
   const [novaFotoUrl, setNovaFotoUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [publicando, setPublicando] = useState(false);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
 
   useEffect(() => {
     loadRelatorios();
@@ -175,6 +178,28 @@ export default function RdxPage() {
 
   function removerFoto(idx: number) {
     setForm((f) => ({ ...f, fotos: f.fotos.filter((_, i) => i !== idx) }));
+  }
+
+  function handleFotoFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande (máx. 5 MB)'); return; }
+    setUploadingFoto(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const campo = CAMPOS_EXPERIENCIA.find((c) => form.campos[0] === c.id);
+      setForm((f) => ({
+        ...f,
+        fotos: [...f.fotos, { url: dataUrl, campoExperiencia: campo?.bncc }],
+      }));
+      setUploadingFoto(false);
+      toast.success('Foto adicionada!');
+    };
+    reader.onerror = () => { toast.error('Erro ao processar imagem'); setUploadingFoto(false); };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   }
 
   async function publicar() {
@@ -454,23 +479,32 @@ export default function RdxPage() {
             <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-200 space-y-3">
               <div className="flex items-center gap-2">
                 <ImageIcon className="h-5 w-5 text-blue-500" />
-                <span className="text-sm font-semibold text-blue-700">Adicionar foto</span>
+                <span className="text-sm font-semibold text-blue-700">Adicionar foto do dispositivo</span>
               </div>
-              <input
-                className="w-full px-4 py-3 border-2 rounded-xl text-sm"
-                placeholder="Cole o link da foto aqui..."
-                value={novaFotoUrl}
-                onChange={(e) => setNovaFotoUrl(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && adicionarFoto()}
-              />
-              <Button
-                onClick={adicionarFoto}
-                disabled={!novaFotoUrl.trim()}
-                className="w-full rounded-xl"
-                variant="outline"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Adicionar foto
-              </Button>
+              <label className="flex items-center justify-center gap-2 w-full px-4 py-4 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-100 transition-colors">
+                {uploadingFoto ? (
+                  <><RefreshCw className="h-5 w-5 animate-spin text-blue-500" /><span className="text-sm text-blue-600">Processando imagem...</span></>
+                ) : (
+                  <><UploadCloud className="h-5 w-5 text-blue-500" /><span className="text-sm text-blue-600">Toque aqui para escolher uma foto (JPG, PNG — máx. 5 MB)</span></>
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={handleFotoFileUpload} disabled={uploadingFoto} />
+              </label>
+              {/* Alternativa: URL manual */}
+              <details className="text-xs">
+                <summary className="text-gray-400 cursor-pointer hover:text-gray-600">Ou cole um link de foto (URL)</summary>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    className="flex-1 px-3 py-2 border rounded-xl text-sm"
+                    placeholder="https://..."
+                    value={novaFotoUrl}
+                    onChange={(e) => setNovaFotoUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && adicionarFoto()}
+                  />
+                  <Button onClick={adicionarFoto} disabled={!novaFotoUrl.trim()} variant="outline" size="sm">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </details>
             </div>
 
             {form.fotos.length === 0 && (
