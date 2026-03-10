@@ -92,6 +92,9 @@ importers:
       pdf-parse:
         specifier: ^2.4.5
         version: 2.4.5
+      prisma:
+        specifier: ^5.22.0
+        version: 5.22.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -141,9 +144,6 @@ importers:
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
-      prisma:
-        specifier: ^5.22.0
-        version: 5.22.0
       ts-jest:
         specifier: ^29.4.6
         version: 29.4.6(@babel/core@7.29.0)(jest@30.2.0)(typescript@5.9.3)

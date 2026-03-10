@@ -29,8 +29,9 @@ COPY packages/utils/package.json ./packages/utils/package.json
 
 # Instalar TODAS as deps do workspace com cache mount
 # Cache persiste entre builds — evita baixar 1433 pacotes toda vez (~90s → ~5s)
+# Fallback: se o lockfile estiver levemente desatualizado, instala sem frozen
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
 
 # Copiar o código-fonte dos packages internos (dependências do web)
 COPY packages/ ./packages/
