@@ -559,9 +559,14 @@ export default function PlanoDeAulaNovoPage() {
     EM_REVISAO: { label: 'Em Revisão', icon: <Clock className="h-3 w-3" />, className: 'bg-amber-100 text-amber-700' },
     APROVADO: { label: 'Aprovado', icon: <CheckCircle className="h-3 w-3" />, className: 'bg-green-100 text-green-700' },
     DEVOLVIDO: { label: 'Devolvido', icon: <AlertCircle className="h-3 w-3" />, className: 'bg-red-100 text-red-700' },
+    PUBLICADO: { label: 'Publicado', icon: <CheckCircle className="h-3 w-3" />, className: 'bg-blue-100 text-blue-700' },
+    EM_EXECUCAO: { label: 'Em Execução', icon: <BookOpen className="h-3 w-3" />, className: 'bg-indigo-100 text-indigo-700' },
+    CONCLUIDO: { label: 'Concluído', icon: <CheckCircle className="h-3 w-3" />, className: 'bg-teal-100 text-teal-700' },
+    CANCELADO: { label: 'Cancelado', icon: <AlertCircle className="h-3 w-3" />, className: 'bg-gray-100 text-gray-500' },
   };
   const statusInfo = statusConfig[status] ?? statusConfig.RASCUNHO;
-  const bloqueado = status === 'EM_REVISAO' || status === 'APROVADO';
+  // Bloqueado: não pode editar quando em revisão, aprovado, em execução ou concluído
+  const bloqueado = ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
 
   if (loading) {
     return (
@@ -591,6 +596,21 @@ export default function PlanoDeAulaNovoPage() {
             {statusInfo.label}
           </span>
         </div>
+
+        {/* Aviso quando bloqueado */}
+        {bloqueado && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            <span>
+              {status === 'EM_REVISAO' && 'Este planejamento está aguardando aprovação da coordenação. Edição bloqueada.'}
+              {status === 'APROVADO' && 'Planejamento aprovado. Para editar, solicite devolução à coordenação.'}
+              {status === 'EM_EXECUCAO' && 'Planejamento em execução. Edição bloqueada.'}
+              {status === 'CONCLUIDO' && 'Planejamento concluído. Visualização somente leitura.'}
+              {status === 'PUBLICADO' && 'Planejamento publicado. Edição bloqueada.'}
+              {status === 'CANCELADO' && 'Planejamento cancelado.'}
+            </span>
+          </div>
+        )}
 
         {/* ─── Identificação ─── */}
         <Card>

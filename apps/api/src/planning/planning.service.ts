@@ -402,23 +402,18 @@ export class PlanningService {
       };
     }
 
-    // Filtro por período
-    // BUG C FIX: Usar interseção de períodos (overlap) em vez de contenção estrita.
-    // A lógica anterior (startDate >= query.startDate AND endDate <= query.endDate)
-    // só retornava planejamentos cujo período estava DENTRO do intervalo consultado,
-    // ignorando planejamentos semanais que CONTÊM a data consultada.
-    // Lógica correta: planejamento intersecta o período consultado se:
+    // Filtro por período: interseção de períodos
+    // Retorna planejamentos que cobrem qualquer parte do período consultado:
     //   planning.startDate <= query.endDate AND planning.endDate >= query.startDate
     if (query.startDate || query.endDate) {
       where.AND = where.AND ?? [];
       if (query.startDate && query.endDate) {
-        // Busca de interseção: retorna planejamentos que cobrem qualquer parte do período
-        where.AND.push({ startDate: { lte: new Date(query.endDate) } });
+        where.AND.push({ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } });
         where.AND.push({ endDate: { gte: new Date(query.startDate) } });
       } else if (query.startDate) {
         where.AND.push({ endDate: { gte: new Date(query.startDate) } });
       } else if (query.endDate) {
-        where.AND.push({ startDate: { lte: new Date(query.endDate) } });
+        where.AND.push({ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } });
       }
     }
 

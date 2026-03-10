@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import http from '../api/http';
-import { submitPlanningForReview } from '../api/plannings';
+// submitPlanningForReview: reenvio agora é feito pelo formulário de edição
 import type { Planning } from '../api/plannings';
 import { safeJsonParse } from '../lib/safeJson';
 import { startOfPedagogicalMonth, endOfPedagogicalMonth, formatPedagogicalDate } from '../lib/formatDate';
@@ -106,6 +106,13 @@ const STATUS_CONFIG: Record<string, {
     corPonto: 'bg-teal-500',
     icon: <CheckCircle className="h-3.5 w-3.5" />,
   },
+  CANCELADO: {
+    label: 'Cancelado',
+    cor: 'bg-gray-100 text-gray-500 border-gray-200',
+    corBadge: 'bg-gray-200 text-gray-500',
+    corPonto: 'bg-gray-300',
+    icon: <X className="h-3.5 w-3.5" />,
+  },
 };
 
 function getStatusConfig(status: string) {
@@ -159,7 +166,7 @@ export default function PlanoDeAulaListaPage() {
   const [plannings, setPlannings] = useState<Planning[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlanning, setSelectedPlanning] = useState<Planning | null>(null);
-  const [reenviando, setReenviando] = useState(false);
+  // reenviando: removido — reenvio agora navega para edição
 
   // Carrega planejamentos do mês atual
   const loadPlannings = useCallback(async () => {
@@ -228,17 +235,9 @@ export default function PlanoDeAulaListaPage() {
 
   // Reenviar para revisão
   async function reenviarParaRevisao(planning: Planning) {
-    setReenviando(true);
-    try {
-      await submitPlanningForReview(planning.id);
-      toast.success('Planejamento reenviado para revisão!');
-      setSelectedPlanning(null);
-      loadPlannings();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao reenviar');
-    } finally {
-      setReenviando(false);
-    }
+    // Navega para edição: o professor corrige e reenvia pelo formulário
+    setSelectedPlanning(null);
+    navigate(`/app/planejamento/${planning.id}/editar`);
   }
 
   // Gera as células do calendário
@@ -739,13 +738,9 @@ export default function PlanoDeAulaListaPage() {
               {selectedPlanning.status === 'DEVOLVIDO' && (
                 <Button
                   onClick={() => reenviarParaRevisao(selectedPlanning)}
-                  disabled={reenviando}
                   className="w-full bg-red-600 hover:bg-red-700 text-white"
                 >
-                  {reenviando
-                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Reenviando...</>
-                    : <><Send className="h-4 w-4 mr-2" /> Corrigir e Reenviar</>
-                  }
+                  <Send className="h-4 w-4 mr-2" /> Corrigir e Reenviar
                 </Button>
               )}
 
@@ -758,6 +753,28 @@ export default function PlanoDeAulaListaPage() {
                 >
                   Editar Planejamento
                 </Button>
+              )}
+              {/* EM_REVISAO: informação de que está aguardando aprovação */}
+              {selectedPlanning.status === 'EM_REVISAO' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm text-center">
+                  Aguardando aprovação da coordenação
+                </div>
+              )}
+              {/* EM_EXECUCAO: link para Diário de Bordo */}
+              {selectedPlanning.status === 'EM_EXECUCAO' && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/app/diario-de-bordo')}
+                  className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" /> Abrir Diário de Bordo
+                </Button>
+              )}
+              {/* CONCLUIDO: apenas informação */}
+              {selectedPlanning.status === 'CONCLUIDO' && (
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-teal-800 text-sm text-center">
+                  Planejamento concluído
+                </div>
               )}
 
               <Button
