@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { imprimirPlanejamento, gerarPDF } from '../components/PrintablePlan';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor } from '../api/auth';
@@ -19,6 +20,8 @@ import {
   RefreshCw,
   X,
   ThumbsDown,
+  Printer,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import http from '../api/http';
@@ -712,6 +715,26 @@ export default function PlanoDeAulaListaPage() {
 
             {/* Ações */}
             <div className="p-5 pt-0 flex flex-col gap-2">
+              {/* Botões PDF / Imprimir — sempre visíveis */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  onClick={() => gerarPDF(selectedPlanning)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Gerar PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  onClick={() => imprimirPlanejamento(selectedPlanning)}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir
+                </Button>
+              </div>
+
               {/* DEVOLVIDO: botão Corrigir e Reenviar */}
               {selectedPlanning.status === 'DEVOLVIDO' && (
                 <Button
