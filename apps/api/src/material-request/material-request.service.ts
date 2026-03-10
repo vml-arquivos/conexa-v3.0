@@ -61,8 +61,29 @@ export class MaterialRequestService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMaterialRequestDto, user: JwtPayload) {
-    if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
     if (!isProfessorRole(user)) throw new ForbiddenException('Apenas PROFESSOR pode solicitar');
+
+    // FIX 1: Resolver unitId quando não está no JWT do professor.
+    // Prioridade: (1) JWT, (2) turma enviada no DTO, (3) primeira turma ativa do professor.
+    let resolvedUnitId = user.unitId;
+    if (!resolvedUnitId) {
+      if (dto.classroomId) {
+        const classroom = await this.prisma.classroom.findUnique({
+          where: { id: dto.classroomId },
+          select: { unitId: true },
+        });
+        resolvedUnitId = classroom?.unitId ?? undefined;
+      }
+      if (!resolvedUnitId) {
+        const ct = await this.prisma.classroomTeacher.findFirst({
+          where: { teacherId: user.sub, isActive: true },
+          include: { classroom: { select: { unitId: true } } },
+        });
+        resolvedUnitId = ct?.classroom?.unitId ?? undefined;
+      }
+      if (!resolvedUnitId) throw new ForbiddenException('Professor sem unidade vinculada. Contate a coordenação.');
+    }
 
     const code = `MR-${Date.now()}`;
     const isNewFormat = !!(dto.titulo || dto.itens || dto.categoria);
@@ -88,7 +109,7 @@ export class MaterialRequestService {
     return this.prisma.materialRequest.create({
       data: {
         mantenedoraId: user.mantenedoraId,
-        unitId: user.unitId,
+        unitId: resolvedUnitId,
         classroomId: dto.classroomId ?? null,
         code,
         title,
