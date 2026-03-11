@@ -272,37 +272,17 @@ export class MaterialRequestService {
     };
     if (user.unitId) where.unitId = user.unitId;
 
-    // Tenta buscar com items relacionais; se o Prisma client não conhecer a relação
-    // (client não regenerado após migration), faz fallback sem include items.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let result: any[];
-    try {
-      result = await this.prisma.materialRequest.findMany({
-        where: where as any,
-        include: {
-          createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
-          classroom: { select: { id: true, name: true } },
-          items: true,
-        },
-        orderBy: { requestedDate: 'desc' },
-        take: 100,
-      });
-    } catch {
-      // Fallback: busca sem items (Prisma client desatualizado antes do prisma generate)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result = await (this.prisma.materialRequest as any).findMany({
-        where: where as any,
-        include: {
-          createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
-          classroom: { select: { id: true, name: true } },
-        },
-        orderBy: { requestedDate: 'desc' },
-        take: 100,
-      });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return result.map((r: any) => {
+    const result = await this.prisma.materialRequest.findMany({
+      where: where as any,
+      include: {
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        classroom: { select: { id: true, name: true } },
+        items: true,
+      },
+      orderBy: { requestedDate: 'desc' },
+      take: 100,
+    });
+    return result.map(r => {
       const desc = parseDescription(r.description ?? null);
       return {
         ...r,
@@ -311,7 +291,7 @@ export class MaterialRequestService {
         observacaoRevisao: desc.observacaoRevisao,
         statusVirtual: desc.statusVirtual,
         approvedDate: r.approvedDate?.toISOString() ?? null,
-        items: normalizeItems(r.items ?? [], [], desc.originalItens),
+        items: normalizeItems(r.items, [], desc.originalItens),
         originalItens: desc.originalItens,
       };
     });
