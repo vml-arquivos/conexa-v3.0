@@ -1031,17 +1031,35 @@ export default function CoordenacaoPedagogicaPage() {
                                         <div className="space-y-1">
                                           <p className="text-xs font-semibold text-gray-500 uppercase">Objetivos da Matriz</p>
                                           {(day.objectives ?? []).map((obj: any, oi: number) => (
-                                            <div key={oi} className="bg-blue-50 rounded-lg p-2 border border-blue-100">
-                                              {obj.codigoBNCC && <span className="text-xs font-mono text-blue-600 mr-2">{obj.codigoBNCC}</span>}
-                                              <span className="text-xs text-blue-800">{obj.objetivoBNCC}</span>
-                                              {obj.exemploAtividade && obj.exemploAtividade !== obj.objetivoBNCC && (
-                                                <div className="mt-1.5 bg-green-50 border border-green-100 rounded-md p-1.5">
-                                                  <p className="text-xs font-semibold text-green-600 flex items-center gap-1 mb-0.5">
-                                                    <Sparkles className="h-3 w-3" /> Exemplo de Experiência / Atividade
-                                                  </p>
-                                                  <p className="text-xs text-green-800">{obj.exemploAtividade}</p>
+                                            <div key={oi} className="text-xs text-gray-700 border border-indigo-200 rounded-lg overflow-hidden mb-2">
+                                              <div className="px-2 py-1 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-indigo-700 uppercase tracking-wide">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                                                {obj.codigoBNCC && <span className="ml-auto font-mono text-gray-500">{obj.codigoBNCC}</span>}
+                                              </div>
+                                              <div className="px-2 py-1.5 space-y-1.5 bg-white">
+                                                <div>
+                                                  <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo BNCC</p>
+                                                  <p className="leading-relaxed">{obj.objetivoBNCC}</p>
                                                 </div>
-                                              )}
+                                                {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
+                                                  <div>
+                                                    <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo do Currículo — DF</p>
+                                                    <p className="leading-relaxed">{obj.objetivoCurriculoDF}</p>
+                                                  </div>
+                                                )}
+                                                {obj.intencionalidadePedagogica && (
+                                                  <div className="bg-indigo-50 rounded px-2 py-1">
+                                                    <p className="font-semibold text-indigo-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>🎯 Intencionalidade Pedagógica</p>
+                                                    <p className="text-indigo-800 leading-relaxed">{obj.intencionalidadePedagogica}</p>
+                                                  </div>
+                                                )}
+                                                {obj.exemploAtividade && obj.exemploAtividade !== obj.objetivoBNCC && (
+                                                  <div className="bg-green-50 border border-green-100 rounded px-2 py-1">
+                                                    <p className="font-semibold text-green-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Exemplo de Experiência / Atividade</p>
+                                                    <p className="text-green-800 leading-relaxed">{obj.exemploAtividade}</p>
+                                                  </div>
+                                                )}
+                                              </div>
                                             </div>
                                           ))}
                                         </div>

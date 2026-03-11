@@ -257,6 +257,69 @@ export default function PlanoDeAulaListaPage() {
     >
       <div className="space-y-6">
 
+        {/* ─── Banner de rascunhos e devolvidos pendentes ─── */}
+        {(() => {
+          const rascunhos = plannings.filter(p => p.status === 'RASCUNHO');
+          const devolvidos = plannings.filter(p => p.status === 'DEVOLVIDO');
+          if (rascunhos.length === 0 && devolvidos.length === 0) return null;
+          return (
+            <div className="space-y-2">
+              {rascunhos.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-amber-800">
+                      {rascunhos.length === 1 ? 'Você tem 1 rascunho não enviado' : `Você tem ${rascunhos.length} rascunhos não enviados`}
+                    </p>
+                    <p className="text-xs text-amber-600 mt-0.5">Clique no planejamento no calendário para continuar a edição.</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {rascunhos.slice(0, 3).map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => navigate(`/app/planejamento/${r.id}/editar`)}
+                          className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 rounded-lg px-3 py-1.5 font-medium transition-colors flex items-center gap-1"
+                        >
+                          <FileText className="h-3 w-3" />
+                          {r.title?.substring(0, 40) || 'Rascunho sem título'}
+                        </button>
+                      ))}
+                      {rascunhos.length > 3 && (
+                        <span className="text-xs text-amber-600 self-center">+{rascunhos.length - 3} mais</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {devolvidos.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-red-800">
+                      {devolvidos.length === 1 ? '1 planejamento foi devolvido para correção' : `${devolvidos.length} planejamentos foram devolvidos para correção`}
+                    </p>
+                    <p className="text-xs text-red-600 mt-0.5">Clique no planejamento para ver a observação e reenviar.</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {devolvidos.slice(0, 3).map(r => (
+                        <button
+                          key={r.id}
+                          onClick={() => setSelectedPlanning(r)}
+                          className="text-xs bg-red-100 hover:bg-red-200 text-red-800 border border-red-300 rounded-lg px-3 py-1.5 font-medium transition-colors flex items-center gap-1"
+                        >
+                          <FileText className="h-3 w-3" />
+                          {r.title?.substring(0, 40) || 'Planejamento devolvido'}
+                        </button>
+                      ))}
+                      {devolvidos.length > 3 && (
+                        <span className="text-xs text-red-600 self-center">+{devolvidos.length - 3} mais</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ─── Cabeçalho do calendário ─── */}
         <Card>
           <CardContent className="pt-4">
@@ -485,10 +548,29 @@ export default function PlanoDeAulaListaPage() {
                               <div>
                                 <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Objetivos da Matriz 2026</p>
                                 {day.objectives.map((obj: any, i: number) => (
-                                  <div key={i} className="text-xs text-gray-700 border-l-2 border-indigo-300 pl-2 mb-1">
-                                    <span className="font-semibold">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
-                                    {obj.codigoBNCC && <span className="ml-1 text-gray-400 font-mono">[{obj.codigoBNCC}]</span>}
-                                    <p className="mt-0.5 leading-relaxed">{obj.objetivoBNCC}</p>
+                                  <div key={i} className="text-xs text-gray-700 border border-indigo-200 rounded-lg overflow-hidden mb-2">
+                                    <div className="px-2 py-1 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-bold text-indigo-700 uppercase tracking-wide">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                                      {obj.codigoBNCC && <span className="ml-auto font-mono text-gray-500">{obj.codigoBNCC}</span>}
+                                    </div>
+                                    <div className="px-2 py-1.5 space-y-1.5 bg-white">
+                                      <div>
+                                        <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo BNCC</p>
+                                        <p className="leading-relaxed">{obj.objetivoBNCC}</p>
+                                      </div>
+                                      {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
+                                        <div>
+                                          <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo do Currículo — DF</p>
+                                          <p className="leading-relaxed">{obj.objetivoCurriculoDF}</p>
+                                        </div>
+                                      )}
+                                      {obj.intencionalidadePedagogica && (
+                                        <div className="bg-indigo-50 rounded px-2 py-1">
+                                          <p className="font-semibold text-indigo-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>🎯 Intencionalidade Pedagógica</p>
+                                          <p className="text-indigo-800 leading-relaxed">{obj.intencionalidadePedagogica}</p>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>

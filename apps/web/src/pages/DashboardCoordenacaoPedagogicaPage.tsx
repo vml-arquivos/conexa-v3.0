@@ -597,7 +597,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                     <p className="text-sm text-gray-700">{obj.objetivoBNCC}</p>
                                   )}
                                   {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
-                                    <p className="text-xs text-gray-500 mt-1">{obj.objetivoCurriculoDF}</p>
+                                    <div className="mt-1">
+                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo do Currículo — DF</p>
+                                      <p className="text-xs text-gray-600">{obj.objetivoCurriculoDF}</p>
+                                    </div>
+                                  )}
+                                  {obj.intencionalidadePedagogica && (
+                                    <div className="mt-1.5 bg-indigo-50 border border-indigo-100 rounded p-1.5">
+                                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">🎯 Intencionalidade Pedagógica</p>
+                                      <p className="text-xs text-indigo-800">{obj.intencionalidadePedagogica}</p>
+                                    </div>
                                   )}
                                 </div>
                               ))}

@@ -15,7 +15,9 @@ interface DayV2 {
     codigoBNCC?: string;
     objetivoBNCC?: string;
     objetivoCurriculo?: string;
+    objetivoCurriculoDF?: string;
     intencionalidade?: string;
+    intencionalidadePedagogica?: string;
     exemploAtividade?: string;
   }>;
   teacher?: {
@@ -102,8 +104,8 @@ export function buildPrintableHTML(plan: Planning): string {
                     ${obj.campoExperiencia ? `<div class="obj-campo">${obj.campoExperiencia.replace(/_/g, ' ')}</div>` : ''}
                     ${obj.codigoBNCC ? `<div class="obj-codigo">Código BNCC: ${obj.codigoBNCC}</div>` : ''}
                     ${obj.objetivoBNCC ? `<div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivoBNCC}</div>` : ''}
-                    ${obj.objetivoCurriculo ? `<div class="obj-text"><strong>Currículo em Movimento:</strong> ${obj.objetivoCurriculo}</div>` : ''}
-                    ${obj.intencionalidade ? `<div class="obj-text"><strong>Intencionalidade:</strong> ${obj.intencionalidade}</div>` : ''}
+                    ${(obj.objetivoCurriculoDF || obj.objetivoCurriculo) ? `<div class="obj-text"><strong>Currículo em Movimento — DF:</strong> ${obj.objetivoCurriculoDF ?? obj.objetivoCurriculo}</div>` : ''}
+                    ${(obj.intencionalidadePedagogica || obj.intencionalidade) ? `<div class="obj-text"><strong>Intencionalidade Pedagógica:</strong> ${obj.intencionalidadePedagogica ?? obj.intencionalidade}</div>` : ''}
                   </div>`,
                   )
                   .join('')}

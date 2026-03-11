@@ -42,6 +42,7 @@ import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { toPedagogicalISODate } from '../lib/formatDate';
+import { extractErrorMessage } from '../lib/utils';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Turma {
@@ -395,7 +396,7 @@ export default function PlanoDeAulaNovoPage() {
         )
       );
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? 'Erro ao carregar Matriz Pedagógica.';
+      const msg = extractErrorMessage(err, 'Erro ao carregar Matriz Pedagógica.');
       setDays(prev =>
         prev.map(d =>
           d.date === date
@@ -518,7 +519,7 @@ export default function PlanoDeAulaNovoPage() {
         toast.success('Rascunho salvo');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Erro ao salvar');
+      toast.error(extractErrorMessage(err, 'Erro ao salvar'));
     } finally {
       setSaving(false);
     }
@@ -552,7 +553,7 @@ export default function PlanoDeAulaNovoPage() {
       toast.success('Planejamento enviado para revisão!');
       navigate('/app/planejamentos');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Erro ao enviar para revisão');
+      toast.error(extractErrorMessage(err, 'Erro ao enviar para revisão'));
     } finally {
       setSubmitting(false);
     }

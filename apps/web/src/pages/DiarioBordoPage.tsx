@@ -17,6 +17,7 @@ import {
   Camera, UploadCloud, Trash2, TriangleAlert,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
+import { extractErrorMessage } from '../lib/utils';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -236,7 +237,7 @@ export default function DiarioBordoPage() {
 
   // Formulário de microgesto
   const [microgestoForm, setMicrogestoForm] = useState({
-    tipo: 'ESCUTA',
+    tipos: ['ESCUTA'] as string[],
     descricao: '',
     campo: 'eu-outro-nos',
     horario: '',
@@ -399,7 +400,7 @@ export default function DiarioBordoPage() {
       setCriancaSelecionadaOcorr('');
       loadOcorrencias();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar ocorrência');
+      toast.error(extractErrorMessage(err, 'Erro ao salvar ocorrência'));
     } finally {
       setSavingOcorr(false);
     }
@@ -453,7 +454,7 @@ export default function DiarioBordoPage() {
       setCriancaSelecionadaObs('');
       loadObservacoes();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar observação');
+      toast.error(extractErrorMessage(err, 'Erro ao salvar observação'));
     } finally {
       setSavingObs(false);
     }
@@ -635,24 +636,15 @@ export default function DiarioBordoPage() {
 
     setSavingMicrogesto(true);
     try {
-      // Mapear tipo do microgesto pedagógico para MicrogestureKind
-      // Tipos pedagógicos (ESCUTA, MEDIACAO, etc.) são salvos como OBSERVACAO no backend
-      const kindMap: Record<string, MicrogestureKind> = {
-        ESCUTA: 'OBSERVACAO',
-        MEDIACAO: 'OBSERVACAO',
-        PROVOCACAO: 'OBSERVACAO',
-        ACOLHIMENTO: 'OBSERVACAO',
-        OBSERVACAO: 'OBSERVACAO',
-        ENCORAJAMENTO: 'OBSERVACAO',
-        DOCUMENTACAO: 'OBSERVACAO',
-        INTENCIONALIDADE: 'OBSERVACAO',
-      };
-      const kind: MicrogestureKind = kindMap[microgestoForm.tipo] ?? 'OBSERVACAO';
+      // Todos os tipos pedagógicos (ESCUTA, MEDIACAO, etc.) são salvos como OBSERVACAO no backend
+      const kind: MicrogestureKind = 'OBSERVACAO';
 
       const horarioInfo = microgestoForm.horario ? ` [${microgestoForm.horario}]` : '';
       const campoInfo = microgestoForm.campo ? ` | Campo: ${microgestoForm.campo}` : '';
-      const tipoLabel = TIPOS_MICROGESTO.find(t => t.id === microgestoForm.tipo)?.label ?? microgestoForm.tipo;
-      const textoPayload = `[${tipoLabel}]${horarioInfo}${campoInfo} — ${microgestoForm.descricao}`;
+      const tiposLabels = microgestoForm.tipos
+        .map(t => TIPOS_MICROGESTO.find(x => x.id === t)?.label ?? t)
+        .join(' + ');
+      const textoPayload = `[${tiposLabels}]${horarioInfo}${campoInfo} — ${microgestoForm.descricao}`;
 
       if (criancasSel.length > 0) {
         // Registrar um evento por criança selecionada (múltiplos alunos suportados)
@@ -672,9 +664,12 @@ export default function DiarioBordoPage() {
       // (backend exige childId, então não persiste no servidor)
 
       // Adicionar ao estado local para exibição imediata na lista do diário
+      const tiposLabels2 = microgestoForm.tipos
+        .map(t => TIPOS_MICROGESTO.find(x => x.id === t)?.label ?? t)
+        .join(' + ');
       const novo: Microgesto = {
         id: Date.now().toString(),
-        tipo: microgestoForm.tipo,
+        tipo: tiposLabels2,
         descricao: microgestoForm.descricao,
         campo: microgestoForm.campo,
         horario: microgestoForm.horario,
@@ -683,11 +678,11 @@ export default function DiarioBordoPage() {
         criancaFoto: criancaFoto,
       };
       setForm(f => ({ ...f, microgestos: [...f.microgestos, novo] }));
-      setMicrogestoForm({ tipo: 'ESCUTA', descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
+      setMicrogestoForm({ tipos: ['ESCUTA'], descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
       toast.success('Registrado com sucesso!');
     } catch (err: unknown) {
       const e = err as Error;
-      toast.error(e?.message || 'Erro ao salvar microgesto');
+      toast.error(extractErrorMessage(e, 'Erro ao salvar microgesto'));
     } finally {
       setSavingMicrogesto(false);
     }
@@ -812,7 +807,7 @@ export default function DiarioBordoPage() {
         ocorrencias: '',
       });
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar diário');
+      toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
       setSaving(false);
     }
@@ -1201,11 +1196,18 @@ export default function DiarioBordoPage() {
               <div className="bg-purple-50 rounded-xl p-4 space-y-3">
                 {/* Tipo */}
                 <div>
-                  <Label>Tipo de Microgesto</Label>
+                  <Label>Tipo de Microgesto <span className="text-xs font-normal text-gray-400">(pode selecionar mais de um)</span></Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                     {TIPOS_MICROGESTO.map(tipo => (
-                      <button key={tipo.id} onClick={() => setMicrogestoForm(f => ({ ...f, tipo: tipo.id }))}
-                        className={`p-2 rounded-lg border-2 text-center transition-all ${microgestoForm.tipo === tipo.id ? 'border-purple-400 bg-white shadow-sm' : 'border-transparent bg-white/50 hover:bg-white'}`}>
+                      <button key={tipo.id} onClick={() => setMicrogestoForm(f => ({
+                          ...f,
+                          tipos: f.tipos.includes(tipo.id)
+                            ? f.tipos.filter(t => t !== tipo.id).length > 0
+                              ? f.tipos.filter(t => t !== tipo.id)
+                              : [tipo.id]
+                            : [...f.tipos, tipo.id],
+                        }))}
+                        className={`p-2 rounded-lg border-2 text-center transition-all ${microgestoForm.tipos.includes(tipo.id) ? 'border-purple-400 bg-white shadow-sm' : 'border-transparent bg-white/50 hover:bg-white'}`}>
                         <span className="text-lg block">{tipo.emoji}</span>
                         <span className="text-xs font-medium text-gray-700">{tipo.label}</span>
                       </button>
