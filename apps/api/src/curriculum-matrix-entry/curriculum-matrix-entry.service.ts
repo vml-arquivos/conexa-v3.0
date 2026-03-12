@@ -359,7 +359,7 @@ export class CurriculumMatrixEntryService {
       select: {
         id: true,
         ageGroupMin: true,
-        ageGroupMax: true,
+        ageGroupMax: true, // necessário para calcular midpoint do segmento
         unit: {
           select: {
             id: true,
@@ -379,13 +379,17 @@ export class CurriculumMatrixEntryService {
       return { segment: null, date, classroomId, objectives: [], message: 'Acesso negado a esta turma' };
     }
 
-    // 2. Detectar segmento via ageGroupMin (meses) — sem fallback
-    // EI01: 0–18 meses | EI02: 19–47 meses | EI03: 48–71 meses
-    const min = classroom.ageGroupMin ?? 0;
+    // 2. Detectar segmento via midpoint(ageGroupMin, ageGroupMax) — consistente com diary-event.service.ts
+    // Usar midpoint evita erro de borda: turmas como MATERNAL I B (ageGroupMin=18, ageGroupMax=24)
+    // resultam em midpoint=21 → EI02 (correto), enquanto usar apenas ageGroupMin=18 → EI01 (errado)
+    // EI01: midpoint 0–18 meses | EI02: midpoint 19–47 meses | EI03: midpoint 48–71 meses
+    const ageMin = classroom.ageGroupMin ?? 0;
+    const ageMax = classroom.ageGroupMax ?? ageMin;
+    const midpoint = (ageMin + ageMax) / 2;
     let segment: string | null = null;
-    if (min <= 18) segment = 'EI01';
-    else if (min <= 47) segment = 'EI02';
-    else if (min <= 71) segment = 'EI03';
+    if (midpoint <= 18) segment = 'EI01';
+    else if (midpoint <= 47) segment = 'EI02';
+    else if (midpoint <= 71) segment = 'EI03';
 
     if (!segment) {
       return {
@@ -393,7 +397,7 @@ export class CurriculumMatrixEntryService {
         date,
         classroomId,
         objectives: [],
-        message: `Não foi possível detectar o segmento da turma (ageGroupMin=${min}). Verifique a configuração da turma.`,
+        message: `Não foi possível detectar o segmento da turma (ageGroupMin=${ageMin}, ageGroupMax=${ageMax}, midpoint=${midpoint}). Verifique a configuração da turma.`,
       };
     }
 
