@@ -5,6 +5,8 @@ import { Button } from '../components/ui/button';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
+import { useAuth } from '../app/AuthProvider';
+import { isUnidade, isCentral } from '../api/auth';
 import {
   CheckCircle,
   XCircle,
@@ -17,6 +19,8 @@ import {
   ChevronRight,
   Sun,
   CalendarDays,
+  BarChart2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface Aluno {
@@ -38,6 +42,30 @@ interface ChamadaData {
   registrados: number;
   chamadaCompleta: boolean;
   alunos: Aluno[];
+}
+
+// FIX P5: shape do retorno do endpoint /attendance/unit-summary
+interface TurmaResumo {
+  classroomId: string;
+  classroomName: string;
+  professor: string;
+  totalAlunos: number;
+  registrados: number;
+  presentes: number;
+  ausentes: number;
+  chamadaFeita: boolean;
+  taxaPresenca: number;
+}
+
+interface UnitSummaryData {
+  date: string;
+  unitId: string;
+  totalTurmas: number;
+  turmasComChamada: number;
+  totalAlunos: number;
+  totalPresentes: number;
+  taxaPresencaGeral: number;
+  turmas: TurmaResumo[];
 }
 
 // Motivos de falta pré-definidos (sem digitação)
@@ -69,7 +97,220 @@ function getLocalDateStr(date: Date): string {
 /** Máximo de dias retroativos permitidos (G4 FIX: 5 dias conforme regra de negócio) */
 const MAX_RETROATIVO = 5;
 
+// ─── Visão da Coordenação (UNIDADE / STAFF_CENTRAL) ──────────────────────────
+function ChamadaCoordenacaoView() {
+  const hoje = getLocalDateStr(new Date());
+  const [selectedDate, setSelectedDate] = useState(hoje);
+  const [summary, setSummary] = useState<UnitSummaryData | null>(null);
+  const [loading, setLoading] = useState(false);
+  // Turma selecionada para detalhe
+  const [turmaSelecionada, setTurmaSelecionada] = useState<TurmaResumo | null>(null);
+
+  const loadSummary = useCallback(async (date: string) => {
+    setLoading(true);
+    try {
+      const res = await http.get('/attendance/unit-summary', { params: { date } });
+      setSummary(res.data);
+    } catch {
+      toast.error('Não foi possível carregar o resumo de chamadas');
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSummary(selectedDate); }, [selectedDate, loadSummary]);
+
+  const isHoje = selectedDate === hoje;
+
+  function navegarData(delta: number) {
+    const atual = new Date(selectedDate + 'T12:00:00');
+    atual.setDate(atual.getDate() + delta);
+    const nova = getLocalDateStr(atual);
+    const hojeDate = new Date(hoje + 'T12:00:00');
+    const minDate = new Date(hoje + 'T12:00:00');
+    minDate.setDate(hojeDate.getDate() - MAX_RETROATIVO);
+    const novaDate = new Date(nova + 'T12:00:00');
+    if (novaDate > hojeDate || novaDate < minDate) return;
+    const diaSemana = novaDate.getDay();
+    if (diaSemana === 0 || diaSemana === 6) return;
+    setSelectedDate(nova);
+  }
+
+  return (
+    <PageShell
+      title="Chamada do Dia — Coordenação"
+      subtitle="Visão analítica de presença por turma"
+    >
+      {/* Navegação de data */}
+      <div className="flex items-center justify-between mb-4 bg-white rounded-2xl border shadow-sm p-3">
+        <button
+          onClick={() => navegarData(-1)}
+          className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+        >
+          <ChevronLeft className="h-5 w-5 text-gray-600" />
+        </button>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-blue-500" />
+          <span className="font-semibold text-gray-700 text-sm">{formatarData(selectedDate)}</span>
+          {isHoje && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Hoje</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navegarData(+1)}
+            disabled={isHoje}
+            className="p-2 rounded-xl hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="h-5 w-5 text-gray-600" />
+          </button>
+          <button
+            onClick={() => loadSummary(selectedDate)}
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            title="Atualizar"
+          >
+            <RefreshCw className={`h-4 w-4 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {loading && <LoadingState message="Carregando resumo de chamadas..." />}
+
+      {!loading && summary && (
+        <>
+          {/* Indicadores gerais */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center">
+              <p className="text-3xl font-bold text-blue-700">{summary.totalTurmas}</p>
+              <p className="text-xs text-blue-600 mt-1 font-medium">Turmas</p>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-center">
+              <p className="text-3xl font-bold text-green-700">{summary.turmasComChamada}</p>
+              <p className="text-xs text-green-600 mt-1 font-medium">Com chamada feita</p>
+            </div>
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-center">
+              <p className="text-3xl font-bold text-indigo-700">{summary.totalPresentes}</p>
+              <p className="text-xs text-indigo-600 mt-1 font-medium">Presentes hoje</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-center">
+              <p className="text-3xl font-bold text-purple-700">{summary.taxaPresencaGeral}%</p>
+              <p className="text-xs text-purple-600 mt-1 font-medium">Taxa de presença</p>
+            </div>
+          </div>
+
+          {/* Tabela de turmas */}
+          <Card>
+            <CardContent className="p-0">
+              <div className="flex items-center gap-2 px-4 py-3 border-b">
+                <BarChart2 className="h-4 w-4 text-indigo-600" />
+                <p className="font-semibold text-gray-700 text-sm">Chamada por Turma</p>
+              </div>
+              {summary.turmas.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm">Nenhuma turma encontrada para esta unidade.</div>
+              ) : (
+                <div className="divide-y">
+                  {summary.turmas.map((turma) => (
+                    <div
+                      key={turma.classroomId}
+                      className={`px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                        turmaSelecionada?.classroomId === turma.classroomId ? 'bg-indigo-50' : ''
+                      }`}
+                      onClick={() => setTurmaSelecionada(prev =>
+                        prev?.classroomId === turma.classroomId ? null : turma
+                      )}
+                    >
+                      {/* Status da chamada */}
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        turma.chamadaFeita ? 'bg-green-500' : 'bg-gray-300'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-800 truncate">{turma.classroomName}</p>
+                        <p className="text-xs text-gray-500 truncate">{turma.professor}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-600 flex-shrink-0">
+                        <span className="flex items-center gap-1 text-green-600 font-medium">
+                          <UserCheck className="h-3.5 w-3.5" />{turma.presentes}
+                        </span>
+                        <span className="flex items-center gap-1 text-red-500 font-medium">
+                          <UserX className="h-3.5 w-3.5" />{turma.ausentes}
+                        </span>
+                        <span className="text-gray-400">/ {turma.totalAlunos}</span>
+                        <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                          turma.chamadaFeita
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {turma.chamadaFeita ? `${turma.taxaPresenca}%` : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detalhe da turma selecionada */}
+          {turmaSelecionada && (
+            <Card className="mt-4 border-indigo-200">
+              <CardContent className="p-4">
+                <p className="font-bold text-gray-800 mb-1">{turmaSelecionada.classroomName}</p>
+                <p className="text-xs text-gray-500 mb-3">Professor: {turmaSelecionada.professor}</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-3 bg-green-50 rounded-xl border border-green-200">
+                    <p className="text-2xl font-bold text-green-700">{turmaSelecionada.presentes}</p>
+                    <p className="text-xs text-green-600 mt-0.5">Presentes</p>
+                  </div>
+                  <div className="text-center p-3 bg-red-50 rounded-xl border border-red-200">
+                    <p className="text-2xl font-bold text-red-700">{turmaSelecionada.ausentes}</p>
+                    <p className="text-xs text-red-600 mt-0.5">Ausentes</p>
+                  </div>
+                  <div className="text-center p-3 bg-blue-50 rounded-xl border border-blue-200">
+                    <p className="text-2xl font-bold text-blue-700">{turmaSelecionada.taxaPresenca}%</p>
+                    <p className="text-xs text-blue-600 mt-0.5">Presença</p>
+                  </div>
+                </div>
+                {!turmaSelecionada.chamadaFeita && (
+                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    Chamada ainda não realizada para esta turma nesta data.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {!loading && !summary && (
+        <div className="text-center py-16">
+          <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-lg text-gray-500">Nenhuma informação disponível</p>
+          <Button onClick={() => loadSummary(selectedDate)} variant="outline" className="mt-4">
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+    </PageShell>
+  );
+}
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
 export default function ControleFaltasPage() {
+  const { user } = useAuth();
+
+  // FIX P5: coordenação (UNIDADE/STAFF_CENTRAL) vê visão analítica por turma
+  if (isUnidade(user) || isCentral(user)) {
+    return <ChamadaCoordenacaoView />;
+  }
+
+  // ─── Visão do Professor ───────────────────────────────────────────────────
+  return <ControleFaltasProfessorView />;
+}
+
+// ─── Visão do Professor (extraída para componente separado) ───────────────────
+function ControleFaltasProfessorView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);

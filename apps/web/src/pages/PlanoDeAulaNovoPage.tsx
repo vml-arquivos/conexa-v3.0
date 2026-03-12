@@ -75,6 +75,8 @@ interface MatrizObjective {
   objetivoBNCC: string;
   objetivoCurriculoDF: string;
   intencionalidadePedagogica: string | null;
+  // FIX P3: retornado para UNIDADE/STAFF_CENTRAL/MANTENEDORA/DEVELOPER
+  exemploAtividade?: string | null;
 }
 
 interface MatrizByDayResponse {
@@ -178,6 +180,17 @@ function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: n
             </p>
             <p className="text-sm text-indigo-800 leading-relaxed">
               {objetivo.intencionalidadePedagogica}
+            </p>
+          </div>
+        )}
+        {/* FIX P3: exemploAtividade visível para coordenação/unidade */}
+        {objetivo.exemploAtividade && (
+          <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">
+              Exemplo de Atividade
+            </p>
+            <p className="text-sm text-emerald-800 leading-relaxed">
+              {objetivo.exemploAtividade}
             </p>
           </div>
         )}

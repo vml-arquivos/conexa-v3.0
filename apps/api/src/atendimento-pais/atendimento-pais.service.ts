@@ -91,7 +91,31 @@ export class AtendimentoPaisService {
       where,
       include: {
         child: {
-          select: { id: true, firstName: true, lastName: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            // FIX P6: incluir turma ativa e professor para enriquecer o card
+            enrollments: {
+              where: { status: 'ATIVA' },
+              select: {
+                classroom: {
+                  select: {
+                    id: true,
+                    name: true,
+                    teachers: {
+                      where: { isActive: true },
+                      take: 1,
+                      select: {
+                        teacher: { select: { firstName: true, lastName: true } },
+                      },
+                    },
+                  },
+                },
+              },
+              take: 1,
+            },
+          },
         },
       },
       orderBy: { dataAtendimento: 'desc' },
