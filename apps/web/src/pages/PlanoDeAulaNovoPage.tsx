@@ -165,7 +165,8 @@ function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: n
           </p>
           <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
         </div>
-        {objetivo.objetivoCurriculoDF && objetivo.objetivoCurriculoDF !== objetivo.objetivoBNCC && (
+        {/* FIX B: objetivoCurriculoDF sempre visível quando preenchido (campo obrigatório do banco) */}
+        {objetivo.objetivoCurriculoDF && (
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               Objetivo do Currículo em Movimento — DF (Transcrição Literal)
@@ -813,9 +814,18 @@ export default function PlanoDeAulaNovoPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
-                          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                          {day.matrizMessage ?? 'Sem objetivo cadastrado para este dia na Matriz 2026.'}
+                        <div className="flex flex-col gap-1 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                          <div className="flex items-center gap-2 text-amber-700 text-sm">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                            <span className="font-medium">
+                              {day.matrizMessage
+                                ? day.matrizMessage
+                                : 'Nenhum objetivo da Matriz 2026 cadastrado para esta data.'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-600 pl-6">
+                            Você pode continuar preenchendo o planejamento normalmente. Os campos de atividade, recursos e observações estão disponíveis abaixo.
+                          </p>
                         </div>
                       )}
                     </div>
