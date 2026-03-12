@@ -606,6 +606,13 @@ export default function PlanoDeAulaListaPage() {
                                           <p className="text-indigo-800 leading-relaxed">{obj.intencionalidadePedagogica}</p>
                                         </div>
                                       )}
+                                      {/* FIX P3: exemploAtividade visível para coordenação/unidade */}
+                                      {obj.exemploAtividade && (
+                                        <div className="bg-emerald-50 rounded px-2 py-1">
+                                          <p className="font-semibold text-emerald-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Exemplo de Atividade</p>
+                                          <p className="text-emerald-800 leading-relaxed">{obj.exemploAtividade}</p>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 ))}

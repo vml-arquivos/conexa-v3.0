@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -16,6 +16,7 @@ import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isCentral as checkIsCentral, isUnidade as checkIsUnidade } from '../api/auth';
+import { useUnitScope } from '../contexts/UnitScopeContext';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -83,7 +84,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const apiCache = useApiCache(60_000);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const unitIdParam = searchParams.get('unitId') ?? undefined;
+  // FIX P1: usar selectedUnitId do contexto global como fallback para unitIdParam
+  // Isso resolve o erro 403 quando STAFF_CENTRAL acessa sem unitId no token
+  const { selectedUnitId: ctxUnitId } = useUnitScope();
+  const unitIdParam = searchParams.get('unitId') ?? ctxUnitId ?? undefined;
   const { user } = useAuth();
   // Coordenação Geral (STAFF_CENTRAL) = somente leitura/análise. Apenas UNIDADE pode aprovar.
   const isCentralUser = checkIsCentral(user);
@@ -94,8 +98,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [itemParaRejeitar, setItemParaRejeitar] = useState<{id:string;tipo:'req'|'plan'}|null>(null);
   const [filtroPlanStatus, setFiltroPlanStatus] = useState<string>('TODOS');
   const [planExpandido, setPlanExpandido] = useState<string|null>(null);
+  const [erroPainel, setErroPainel] = useState<string | null>(null);
 
-  useEffect(() => { loadDashboard(); }, []);
+  // FIX P1: recarregar quando unitIdParam mudar (troca de unidade pelo seletor)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const loadDashboardCb = useCallback(loadDashboard, [unitIdParam]);
+  useEffect(() => { loadDashboardCb(); }, [loadDashboardCb]);
 
   useEffect(() => {
     if (abaAtiva === 'cobertura' && !cobertura) {
@@ -220,7 +228,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         }));
       }
       if (diarRes.status === 'fulfilled') setDiarios(diarRes.value.data ?? []);
-    } catch { toast.error('Erro ao carregar painel'); }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
+        ?? (e as { message?: string })?.message
+        ?? 'Erro desconhecido';
+      setErroPainel(msg);
+      toast.error('Erro ao carregar painel');
+    }
     finally { setLoading(false); }
   }
 
@@ -268,6 +282,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   }
 
   if (loading) return <LoadingState message="Carregando painel de coordenação..." />;
+  // FIX P1: mostrar mensagem de erro clara quando o painel não carregou
+  if (erroPainel && !dashboard) return (
+    <PageShell title="Painel da Coordenação Pedagógica" subtitle="">
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 max-w-md text-center">
+          <p className="font-bold text-red-800 mb-2">Não foi possível carregar o painel</p>
+          <p className="text-sm text-red-600 mb-4">{erroPainel}</p>
+          {erroPainel.includes('unidade') && (
+            <p className="text-xs text-gray-500 mb-4">Selecione uma unidade no seletor de escopo para visualizar o painel.</p>
+          )}
+          <Button onClick={() => { setErroPainel(null); loadDashboard(); }} className="rounded-xl">Tentar novamente</Button>
+        </div>
+      </div>
+    </PageShell>
+  );
 
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
 

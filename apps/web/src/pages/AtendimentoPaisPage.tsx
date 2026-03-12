@@ -32,7 +32,19 @@ type StatusAtendimento = 'AGENDADO' | 'REALIZADO' | 'CANCELADO' | 'PENDENTE_RETO
 interface Atendimento {
   id: string;
   childId: string;
-  child: { id: string; firstName: string; lastName: string };
+  child: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    // FIX P6: enriquecido pelo backend com turma e professor
+    enrollments?: Array<{
+      classroom: {
+        id: string;
+        name: string;
+        teachers: Array<{ teacher: { firstName: string; lastName: string } }>;
+      };
+    }>;
+  };
   responsavelNome: string;
   responsavelRelacao?: string;
   responsavelContato?: string;
@@ -502,18 +514,34 @@ export function AtendimentoPaisPage() {
                 onClick={() => setExpandido(expandido === at.id ? null : at.id)}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-gray-500">
+                  <div className="flex items-center gap-1.5 text-gray-500 flex-shrink-0">
                     {TIPO_ICONES[at.tipo]}
                     <span className="text-xs">{TIPO_LABELS[at.tipo]}</span>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">
+                  <div className="min-w-0">
+                    {/* FIX P6: linha 1 — nome do aluno + turma */}
+                    <p className="font-medium text-sm truncate">
                       {at.child.firstName} {at.child.lastName}
+                      {at.child.enrollments?.[0]?.classroom?.name && (
+                        <span className="ml-1.5 text-xs font-normal text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">
+                          {at.child.enrollments[0].classroom.name}
+                        </span>
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {at.responsavelNome}{at.responsavelRelacao ? ` (${at.responsavelRelacao})` : ''} •{' '}
+                    {/* FIX P6: linha 2 — professor + data + hora */}
+                    <p className="text-xs text-gray-500 truncate">
+                      {at.child.enrollments?.[0]?.classroom?.teachers?.[0]?.teacher && (
+                        <span className="font-medium text-gray-600">
+                          {at.child.enrollments[0].classroom.teachers[0].teacher.firstName}{' '}
+                          {at.child.enrollments[0].classroom.teachers[0].teacher.lastName}{' • '}
+                        </span>
+                      )}
+                      {at.responsavelNome}{at.responsavelRelacao ? ` (${at.responsavelRelacao})` : ''}{' • '}
                       {new Date(at.dataAtendimento).toLocaleDateString('pt-BR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                      })}{' '}
+                      {new Date(at.dataAtendimento).toLocaleTimeString('pt-BR', {
+                        hour: '2-digit', minute: '2-digit',
                       })}
                     </p>
                   </div>
