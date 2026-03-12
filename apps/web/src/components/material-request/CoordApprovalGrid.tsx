@@ -204,12 +204,23 @@ export function CoordApprovalGrid() {
   }
 
   function abrirModalAjuste(req: MaterialRequest) {
-    const itens = parseItens(req).map((i, idx) => ({
-      id: req.items?.[idx]?.id ?? `item-${idx}`,
-      nome: i.nome,
-      qtdSolicitada: i.qtd,
-      qtdAprovada: i.qtd,
-    }));
+    // Prioridade: itens do banco (com IDs reais) > itens parseados do description
+    let itens: ItemAjuste[];
+    if (req.items && req.items.length > 0) {
+      itens = req.items.map(i => ({
+        id: i.id,
+        nome: i.productName || i.materialName || i.materialId || '—',
+        qtdSolicitada: i.quantity,
+        qtdAprovada: i.quantity,
+      }));
+    } else {
+      itens = parseItens(req).map((i, idx) => ({
+        id: req.items?.[idx]?.id ?? `item-${idx}`,
+        nome: i.nome,
+        qtdSolicitada: i.qtd,
+        qtdAprovada: i.qtd,
+      }));
+    }
     setModalAjuste({ req, itens, observacao: '' });
   }
 
@@ -217,18 +228,36 @@ export function CoordApprovalGrid() {
     if (!modalAjuste) return;
     try {
       setProcessando(modalAjuste.req.id);
-      await reviewMaterialRequest(modalAjuste.req.id, {
-        decision: 'ADJUSTED',
-        observacao: modalAjuste.observacao || undefined,
-        ...(modalAjuste.itens.length > 0
-          ? {
-              itemsApproved: modalAjuste.itens.map(i => ({
-                id: i.id,
-                quantidadeAprovada: i.qtdAprovada,
-              })),
-            }
-          : {}),
-      });
+      // Verificar se os itens têm IDs reais do banco (não são IDs temporários "item-N")
+      const temIdsReais = modalAjuste.itens.length > 0 &&
+        modalAjuste.itens.every(i => i.id && !i.id.startsWith('item-'));
+
+      if (temIdsReais) {
+        // Usa APPROVE_ITEMS com decisão por item (backend salva qtyApproved por item)
+        await reviewMaterialRequest(modalAjuste.req.id, {
+          decision: 'APPROVE_ITEMS',
+          notes: modalAjuste.observacao || undefined,
+          items: modalAjuste.itens.map(i => ({
+            itemId: i.id,
+            approved: i.qtdAprovada > 0,
+            qtyApproved: i.qtdAprovada,
+          })),
+        });
+      } else {
+        // Fallback: usa ADJUSTED com itemsApproved (legado)
+        await reviewMaterialRequest(modalAjuste.req.id, {
+          decision: 'ADJUSTED',
+          observacao: modalAjuste.observacao || undefined,
+          ...(modalAjuste.itens.length > 0
+            ? {
+                itemsApproved: modalAjuste.itens.map(i => ({
+                  id: i.id,
+                  quantidadeAprovada: i.qtdAprovada,
+                })),
+              }
+            : {}),
+        });
+      }
       setModalAjuste(null);
       mostrarMensagem('Requisição ajustada e aprovada.');
       await carregar();

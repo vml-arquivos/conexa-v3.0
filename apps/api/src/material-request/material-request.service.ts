@@ -285,11 +285,20 @@ export class MaterialRequestService {
     // quantity total = soma dos itens (ou 1 se não houver itens)
     const totalQuantity = itensParaPersistir.reduce((acc, it) => acc + it.quantidade, 0) || 1;
 
-    // description: armazena metadados (justificativa, urgencia) sem duplicar itens
+    // description: armazena metadados (justificativa, urgencia) + itens como fallback
+    // Os itens são armazenados aqui para garantir exibição mesmo se o INSERT na tabela
+    // material_request_item falhar (banco com estrutura diferente do esperado).
     const descriptionData: Record<string, unknown> = {};
     if (dto.justificativa) descriptionData.justificativa = dto.justificativa;
     if (dto.urgencia) descriptionData.urgencia = dto.urgencia;
     if (dto.descricao) descriptionData.descricao = dto.descricao;
+    if (itensParaPersistir.length > 0) {
+      descriptionData.itens = itensParaPersistir.map(it => ({
+        item: it.item,
+        quantidade: it.quantidade,
+        unidade: it.unidade ?? null,
+      }));
+    }
     const description = Object.keys(descriptionData).length > 0
       ? JSON.stringify(descriptionData)
       : undefined;
@@ -317,14 +326,18 @@ export class MaterialRequestService {
     });
 
     // Inserir itens diretamente na tabela legada material_request_item
+    // NOTA: A tabela material_request_item tem colunas createdAt/updatedAt (camelCase),
+    // conforme confirmado no comentário da migration 20260223 (tabela pré-existente).
     if (itensParaPersistir.length > 0) {
       for (const it of itensParaPersistir) {
         const itemId = randomUUID();
+        let insertedLegacy = false;
+        // Tentativa 1: tabela legada com createdAt/updatedAt (camelCase)
         try {
           await this.prisma.$executeRaw(
             Prisma.sql`
               INSERT INTO material_request_item
-                (id, request_id, item, quantidade, unidade, quantity, created_at, updated_at)
+                (id, request_id, item, quantidade, unidade, quantity, "createdAt", "updatedAt")
               VALUES (
                 ${itemId},
                 ${created.id},
@@ -337,23 +350,51 @@ export class MaterialRequestService {
               )
             `,
           );
+          insertedLegacy = true;
         } catch {
-          // Fallback: tabela nova MaterialRequestItem (banco sem tabela legada)
-          await this.prisma.$executeRaw(
-            Prisma.sql`
-              INSERT INTO "MaterialRequestItem"
-                (id, "materialRequestId", "productName", quantity, unit, "createdAt", "updatedAt")
-              VALUES (
-                ${itemId},
-                ${created.id},
-                ${it.item},
-                ${it.quantidade},
-                ${it.unidade ?? null},
-                NOW(),
-                NOW()
-              )
-            `,
-          );
+          // Tentativa 2: tabela legada com created_at/updated_at (snake_case)
+          try {
+            await this.prisma.$executeRaw(
+              Prisma.sql`
+                INSERT INTO material_request_item
+                  (id, request_id, item, quantidade, unidade, quantity, created_at, updated_at)
+                VALUES (
+                  ${itemId},
+                  ${created.id},
+                  ${it.item},
+                  ${it.quantidade},
+                  ${it.unidade ?? null},
+                  ${it.quantidade},
+                  NOW(),
+                  NOW()
+                )
+              `,
+            );
+            insertedLegacy = true;
+          } catch { /* segue para fallback */ }
+        }
+        // Fallback: tabela nova MaterialRequestItem (banco sem tabela legada)
+        if (!insertedLegacy) {
+          try {
+            await this.prisma.$executeRaw(
+              Prisma.sql`
+                INSERT INTO "MaterialRequestItem"
+                  (id, "materialRequestId", "productName", quantity, unit, "createdAt", "updatedAt")
+                VALUES (
+                  ${itemId},
+                  ${created.id},
+                  ${it.item},
+                  ${it.quantidade},
+                  ${it.unidade ?? null},
+                  NOW(),
+                  NOW()
+                )
+              `,
+            );
+          } catch {
+            // Silencia: item não inserido, mas a requisição já foi criada com sucesso.
+            // Os itens ficam no campo description.itens como fallback de exibição.
+          }
         }
       }
     }
@@ -364,8 +405,10 @@ export class MaterialRequestService {
       ...created,
       urgencia: desc.urgencia,
       justificativa: desc.justificativa,
+      observacaoRevisao: null,
+      statusVirtual: created.status as string,
       approvedDate: created.approvedDate?.toISOString() ?? null,
-      items: normalizeRawItems(rawItems, [], null),
+      items: normalizeRawItems(rawItems, [], desc.originalItens),
       originalItens: desc.originalItens,
     };
   }
@@ -570,6 +613,25 @@ export class MaterialRequestService {
         reviewedBy: user.sub,
       };
     } else {
+      // Para ADJUSTED: calcular se é parcial baseado em itemsApproved vs itens totais
+      let isParcialAdjusted = false;
+      if (dto.decision === ReviewDecision.ADJUSTED && dto.itemsApproved && dto.itemsApproved.length > 0) {
+
+        const todosZero = dto.itemsApproved.every(i => i.quantidadeAprovada === 0);
+        const algumZero = dto.itemsApproved.some(i => i.quantidadeAprovada === 0);
+        const algumMenorQueOriginal = dto.itemsApproved.some(i => {
+          const dbItem = rawItems.find(it => it.id === i.id);
+          if (!dbItem) return false;
+          const dbQty = Number(dbItem.quantidade ?? dbItem.quantity ?? 0);
+          return i.quantidadeAprovada < dbQty;
+        });
+        if (todosZero) {
+          // Todos zerados = rejeição total
+        } else if (algumZero || algumMenorQueOriginal) {
+          isParcialAdjusted = true;
+        }
+      }
+
       status =
         dto.decision === ReviewDecision.APPROVED || dto.decision === ReviewDecision.ADJUSTED
           ? RequestStatus.APROVADO
@@ -577,7 +639,7 @@ export class MaterialRequestService {
 
       reviewData = {
         _review: true,
-        _parcial: false,
+        _parcial: isParcialAdjusted,
         decision: dto.decision,
         notes: dto.notes ?? dto.comment ?? null,
         itemsApproved: dto.itemsApproved ?? null,
