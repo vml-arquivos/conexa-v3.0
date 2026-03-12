@@ -55,7 +55,7 @@ function parseItensDetalhado(req: MaterialRequest): ParsedItem[] {
   if (req.items && req.items.length > 0) {
     return req.items.map(i => ({
       id: i.id,
-      item: i.materialName ?? i.productName ?? i.materialId ?? '—',
+      item: i.productName ?? i.materialName ?? i.materialId ?? '—',
       quantidade: i.quantity,
       unidade: i.unit,
       observacao: i.observations,

@@ -46,7 +46,11 @@ function parseItens(req: MaterialRequest): { nome: string; qtd: number }[] {
   }
   // Tenta ler do campo items (MaterialRequestItemRecord)
   if (req.items && req.items.length > 0) {
-    return req.items.map(i => ({ nome: i.materialName || i.materialId, qtd: i.quantity }));
+    return req.items.map(i => ({ nome: i.productName || i.materialName || i.materialId || '—', qtd: i.quantity }));
+  }
+  // Tenta ler do campo originalItens (itens armazenados no description)
+  if (req.originalItens && req.originalItens.length > 0) {
+    return req.originalItens.map(i => ({ nome: i.item ?? '—', qtd: i.quantidade ?? 1 }));
   }
   // Fallback: título como item único
   return [{ nome: req.title, qtd: req.quantity }];

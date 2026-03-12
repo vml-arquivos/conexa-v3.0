@@ -32,7 +32,7 @@ export enum UrgenciaLevel {
   ALTA = 'ALTA',
 }
 
-const CUID_REGEX = /^c[a-z0-9]{24,}$/i;
+const CUID_REGEX = /^c[a-z0-9]{24}$/i;
 
 export class MaterialRequestItemDto {
   @IsString()
@@ -81,9 +81,9 @@ export class CreateMaterialRequestDto {
   descricao?: string;
 
   /** Justificativa obrigatória */
-  @IsOptional()
   @IsString()
-  justificativa?: string;
+  @IsNotEmpty({ message: 'A justificativa é obrigatória' })
+  justificativa: string;
 
   /** Nível de urgência */
   @IsOptional()
@@ -100,12 +100,7 @@ export class CreateMaterialRequestDto {
   /** ID da turma (opcional) */
   @IsOptional()
   @IsString()
-  @Matches(CUID_REGEX, { message: 'classroomId deve ser CUID' })
-  classroomId?: string;
+  @Matches(CUID_REGEX, { message: 'classroomId deve ser um CUID válido' })
+  classroomId?: string | null;
 
-  /** ID da criança (opcional, legado) */
-  @IsOptional()
-  @IsString()
-  @Matches(CUID_REGEX, { message: 'childId deve ser CUID' })
-  childId?: string;
 }

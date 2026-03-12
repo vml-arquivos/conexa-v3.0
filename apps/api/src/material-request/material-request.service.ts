@@ -26,10 +26,10 @@ function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
 function isProfessorRole(user: JwtPayload): boolean {
   return (
     Array.isArray(user.roles) &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     user.roles.some((r: any) =>
       r?.level === RoleLevel.PROFESSOR ||
-      r?.level === RoleLevel.DEVELOPER,
+      r?.level === RoleLevel.DEVELOPER ||
+      r?.type === 'PROFESSOR_AUXILIAR'
     )
   );
 }
@@ -252,15 +252,18 @@ export class MaterialRequestService {
       include: {
         items: true,
         classroom: { select: { id: true, name: true } },
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        unit: { select: { id: true, name: true } },
       },
     });
-
     const desc = parseDescription(created.description ?? null);
     return {
       ...created,
       urgencia: desc.urgencia,
       justificativa: desc.justificativa,
+      approvedDate: created.approvedDate?.toISOString() ?? null,
       items: normalizeItems(created.items, [], null),
+      originalItens: desc.originalItens,
     };
   }
 
@@ -276,6 +279,7 @@ export class MaterialRequestService {
       where: where as any,
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
         items: true,
       },
@@ -309,6 +313,7 @@ export class MaterialRequestService {
 
     const includeClause = {
       createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+      unit: { select: { id: true, name: true } },
       classroom: { select: { id: true, name: true } },
       items: true,
     };
@@ -339,8 +344,6 @@ export class MaterialRequestService {
     }
 
     if (!user?.unitId) throw new ForbiddenException('Escopo inválido');
-    if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode listar todas as requisições');
-
     const rows = await this.prisma.materialRequest.findMany({
       where: { mantenedoraId: user.mantenedoraId, unitId: user.unitId, ...extra } as any,
       include: includeClause,
@@ -356,13 +359,14 @@ export class MaterialRequestService {
       where: { id },
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
         items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
     });
     if (!req) throw new NotFoundException('Requisição não encontrada');
     if (req.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
-    if (isCoordRole(user) && !isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
+    if (!isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
       throw new ForbiddenException('Requisição não pertence à sua unidade');
     }
 
@@ -399,15 +403,18 @@ export class MaterialRequestService {
 
   async review(id: string, dto: ReviewMaterialRequestDto, user: JwtPayload) {
     if (!user?.mantenedoraId || !user?.unitId) throw new ForbiddenException('Escopo inválido');
-    if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode aprovar/rejeitar');
+    if (!isCoordRole(user) && !isCentralRole(user)) throw new ForbiddenException('Apenas COORDENADOR/STAFF pode aprovar/rejeitar');
 
     const req = await this.prisma.materialRequest.findUnique({
       where: { id },
       include: { items: true },
     });
     if (!req) throw new NotFoundException('Solicitação não encontrada');
-    if (req.mantenedoraId !== user.mantenedoraId || req.unitId !== user.unitId) {
+    if (req.mantenedoraId !== user.mantenedoraId) {
       throw new ForbiddenException('Fora do escopo');
+    }
+    if (!isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
+      throw new ForbiddenException('Requisição não pertence à sua unidade');
     }
 
     // Preserva dados originais do description (metadados: urgencia, justificativa)
@@ -477,6 +484,7 @@ export class MaterialRequestService {
       },
       include: {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
         items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
@@ -520,7 +528,6 @@ export class MaterialRequestService {
       if (params.unitId) where.unitId = params.unitId;
     } else {
       if (!user.unitId) throw new ForbiddenException('Escopo inválido');
-      if (!isCoordRole(user)) throw new ForbiddenException('Apenas COORDENADOR pode acessar o relatório');
       where.unitId = user.unitId;
     }
 

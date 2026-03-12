@@ -84,7 +84,7 @@ export class MaterialRequestController {
 
   /** Coordenador aprova ou rejeita uma requisição */
   @Patch(':id/review')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   review(
     @Param('id') id: string,
     @Body() dto: ReviewMaterialRequestDto,

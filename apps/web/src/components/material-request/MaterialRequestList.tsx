@@ -151,7 +151,7 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
                     {req.items.map((item: MaterialRequestItemRecord) => (
                       <div key={item.id} className="text-xs text-gray-600 flex items-baseline gap-1">
                         <span className="text-gray-400">&bull;</span>
-                        <span>{item.materialName || item.productName || item.materialId || '—'}</span>
+                        <span>{item.productName || item.materialName || item.materialId || '—'}</span>
                         <span className="text-gray-400">x{item.quantity}</span>
                         {item.observations && (
                           <span className="text-gray-400 italic">({item.observations})</span>
@@ -167,7 +167,16 @@ export function MaterialRequestList({ refreshTrigger }: MaterialRequestListProps
                   </div>
                 )}
 
-                {!req.items?.length && req.description && (() => {
+                {/* Fallback: originalItens retornados pelo backend */}
+                {!req.items?.length && req.originalItens && req.originalItens.length > 0 && (
+                  <div className="mb-2 space-y-0.5">
+                    {req.originalItens.slice(0, 3).map((it, i) => (
+                      <p key={i} className="text-xs text-gray-600">• {it.item} — {it.quantidade} {it.unidade ?? 'un.'}</p>
+                    ))}
+                    {req.originalItens.length > 3 && <p className="text-xs text-gray-400">+{req.originalItens.length - 3} item(ns)...</p>}
+                  </div>
+                )}
+                {!req.items?.length && !req.originalItens?.length && req.description && (() => {
                   // Evita exibir JSON cru — tenta parsear itens do description
                   try {
                     const parsed = JSON.parse(req.description) as { itens?: { item: string; quantidade: number; unidade?: string }[]; _review?: boolean };

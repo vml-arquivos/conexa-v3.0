@@ -14,7 +14,7 @@ export function MaterialRequestPage() {
   const levels = normalizeRoles(user);
   const types  = normalizeRoleTypes(user);
   const ehProfessor = levels.includes('PROFESSOR') || types.includes('PROFESSOR_AUXILIAR');
-  const ehUnidade   = levels.includes('UNIDADE') || levels.includes('MANTENEDORA') || levels.includes('DEVELOPER');
+  const ehUnidade   = levels.includes('UNIDADE') || levels.includes('STAFF_CENTRAL') || levels.includes('MANTENEDORA') || levels.includes('DEVELOPER');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [activeView, setActiveView] = useState<'form' | 'list'>('form');
 

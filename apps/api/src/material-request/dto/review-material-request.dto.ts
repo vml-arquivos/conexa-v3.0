@@ -39,12 +39,10 @@ export class ReviewMaterialRequestDto {
   @IsEnum(ReviewDecision)
   decision: ReviewDecision;
 
-  /** Observação/motivo (obrigatório para REJECTED, opcional para outros) */
   @IsOptional()
   @IsString()
   notes?: string;
 
-  /** Alias legado */
   @IsOptional()
   @IsString()
   comment?: string;

@@ -255,7 +255,7 @@ export const router = createBrowserRouter([
       {
         path: 'material-requests',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <MaterialRequestPage />
           </RoleProtectedRoute>
         ),

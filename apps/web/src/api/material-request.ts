@@ -17,13 +17,14 @@ export interface MaterialRequestItem {
 }
 
 export interface CreateMaterialRequestDto {
-  classroomId?: string;
-  categoria: MaterialCategory;
-  titulo: string;
+  classroomId?: string | null;
+  categoria?: MaterialCategory;
+  type?: string;
+  titulo?: string;
   descricao?: string;
-  itens: MaterialRequestItem[];
+  itens?: MaterialRequestItem[];
   justificativa: string;
-  urgencia: 'BAIXA' | 'MEDIA' | 'ALTA';
+  urgencia?: 'BAIXA' | 'MEDIA' | 'ALTA';
 }
 
 export interface MaterialRequestItemRecord {
