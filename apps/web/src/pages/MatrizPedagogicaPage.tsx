@@ -35,13 +35,34 @@ interface ObjetivoMatriz {
 }
 
 // ─── Mapeamento de campos de experiência ─────────────────────────────────────
+// Suporta tanto o label legível quanto o valor do enum do banco (CampoDeExperiencia)
 const CAMPO_MAP: Record<string, string> = {
+  // Labels legíveis (fallback local e coordenacao/full)
   'O eu, o outro e o nós': 'eu-outro-nos',
   'Corpo, gestos e movimentos': 'corpo-gestos',
   'Traços, sons, cores e formas': 'tracos-sons',
   'Escuta, fala, pensamento e imaginação': 'escuta-fala',
   'Espaços, tempos, quantidades, relações e transformações': 'espacos-tempos',
+  // Valores do enum do banco (retornados pelo findAll para o professor)
+  'O_EU_O_OUTRO_E_O_NOS': 'eu-outro-nos',
+  'CORPO_GESTOS_E_MOVIMENTOS': 'corpo-gestos',
+  'TRACOS_SONS_CORES_E_FORMAS': 'tracos-sons',
+  'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO': 'escuta-fala',
+  'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES': 'espacos-tempos',
 };
+
+// Converte enum do banco para label legível
+const CAMPO_LABEL: Record<string, string> = {
+  'O_EU_O_OUTRO_E_O_NOS': 'O eu, o outro e o nós',
+  'CORPO_GESTOS_E_MOVIMENTOS': 'Corpo, gestos e movimentos',
+  'TRACOS_SONS_CORES_E_FORMAS': 'Traços, sons, cores e formas',
+  'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO': 'Escuta, fala, pensamento e imaginação',
+  'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES': 'Espaços, tempos, quantidades, relações e transformações',
+};
+
+function normalizeCampoLabel(campo: string): string {
+  return CAMPO_LABEL[campo] ?? campo;
+}
 
 const COR_CAMPO: Record<string, string> = {
   'eu-outro-nos': 'bg-pink-100 text-pink-700 border-pink-200',
@@ -113,8 +134,8 @@ function ObjetivoCard({ obj, compact, mostrarExemplo }: {
 
       {expanded && !compact && (
         <div className="px-3 pb-3 pt-0 border-t border-gray-100 mt-0 space-y-2">
-          {/* FIX P0.4: Objetivo do Currículo 2026 — visível para professor e coordenação */}
-          {obj.objetivo_curriculo_movimento && obj.objetivo_curriculo_movimento !== obj.objetivo_bncc && (
+          {/* FIX A2: Objetivo do Currículo em Movimento — sempre visível quando preenchido (professor e coordenação) */}
+          {obj.objetivo_curriculo_movimento && (
             <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100">
               <p className="text-xs font-semibold text-blue-600 uppercase mb-1 flex items-center gap-1">
                 <Target className="h-3 w-3" /> Objetivo do Currículo 2026
@@ -198,49 +219,95 @@ export default function MatrizPedagogicaPage() {
   }, []);
 
   // Carregar dados da API
+  // FIX A1: professor usa /curriculum-matrix-entries (findAll, acessível para todos os roles)
+  // coordenação usa /curriculum-matrix-entries/coordenacao/full (restrito a UNIDADE+)
+  // Os dois endpoints retornam campos com nomes diferentes — mapeamento específico por endpoint
   useEffect(() => {
     if (abaAtiva !== 'matriz') return;
     setCarregando(true);
     setErroApi(false);
     const startDate = '2026-02-01';
     const endDate = '2026-12-31';
-    const params: Record<string, string> = { startDate, endDate };
-    if (segmentoFiltro) params.segment = segmentoFiltro;
 
-    http.get('/curriculum-matrix-entries/coordenacao/full', { params })
-      .then(r => {
-        const diasLetivos: any[] = r.data?.diasLetivos ?? [];
-        const objetivos: ObjetivoMatriz[] = [];
-        for (const dia of diasLetivos) {
-          for (const obj of (dia.objectives ?? [])) {
-            objetivos.push({
-              id: obj.id ?? `${dia.date}-${obj.objetivoBNCCCodigo}`,
-              segmento: r.data?.segment ?? '',
-              bimestre: obj.bimestre ?? 1,
-              semana: obj.semana ?? 1,
-              semana_tema: obj.semana ?? '',
-              campo_experiencia: obj.campoExperiencia ?? '',
-              campo_id: getCampoId(obj.campoExperiencia ?? ''),
-              codigo_bncc: obj.objetivoBNCCCodigo ?? '',
-              objetivo_bncc: obj.objetivoBNCC ?? '',
-              exemplo_atividade: obj.exemploAtividade ?? '',
-              // FIX C3: getMatrizFullForCoord retorna 'objetivoCurriculo' e 'intencionalidade'
-              // (não 'objetivoCurriculoMovimento' nem 'intencionalidadePedagogica')
-              objetivo_curriculo_movimento: obj.objetivoCurriculo ?? obj.objetivoCurriculoMovimento ?? obj.objetivo_curriculo_movimento ?? '',
-              intencionalidade_pedagogica: obj.intencionalidade ?? obj.intencionalidadePedagogica ?? obj.intencionalidade_pedagogica ?? '',
-              data: dia.date,
-            });
+    if (ehProfessor) {
+      // Professor: usa findAll — retorna campos reais do banco
+      // campoDeExperiencia (enum), objetivoBNCC, objetivoBNCCCode, objetivoCurriculo,
+      // intencionalidade, bimester, weekOfYear, date, matrix.segment
+      const params: Record<string, string | number> = { startDate, endDate };
+      http.get('/curriculum-matrix-entries', { params })
+        .then(r => {
+          const raw: any[] = Array.isArray(r.data) ? r.data : r.data?.data ?? [];
+          const objetivos: ObjetivoMatriz[] = raw.map((e: any) => {
+            const campoRaw: string = e.campoDeExperiencia ?? '';
+            const campoLabel = normalizeCampoLabel(campoRaw);
+            return {
+              id: e.id ?? '',
+              // matrix.segment é o segmento real (EI01/EI02/EI03)
+              segmento: e.matrix?.segment ?? '',
+              bimestre: e.bimester ?? 1,
+              semana: e.weekOfYear ?? 1,
+              semana_tema: '',
+              // FIX A1: campo_experiencia usa o label legível para exibição
+              campo_experiencia: campoLabel,
+              campo_id: getCampoId(campoLabel),
+              codigo_bncc: e.objetivoBNCCCode ?? '',
+              // FIX A1: campos reais do banco mapeados corretamente
+              objetivo_bncc: e.objetivoBNCC ?? '',
+              objetivo_curriculo_movimento: e.objetivoCurriculo ?? '',
+              intencionalidade_pedagogica: e.intencionalidade ?? '',
+              // professor não recebe exemploAtividade (mascarado no backend)
+              exemplo_atividade: '',
+              data: e.date ? e.date.split('T')[0] : '',
+            };
+          });
+          if (objetivos.length > 0) {
+            setMatrizApi(objetivos);
+          } else {
+            setErroApi(true);
           }
-        }
-        if (objetivos.length > 0) {
-          setMatrizApi(objetivos);
-        } else {
-          setErroApi(true);
-        }
-      })
-      .catch(() => setErroApi(true))
-      .finally(() => setCarregando(false));
-  }, [abaAtiva, segmentoFiltro]);
+        })
+        .catch(() => setErroApi(true))
+        .finally(() => setCarregando(false));
+    } else {
+      // Coordenação/Mantenedora: usa coordenacao/full — retorna diasLetivos agrupados por data
+      const params: Record<string, string> = { startDate, endDate };
+      if (segmentoFiltro) params.segment = segmentoFiltro;
+      http.get('/curriculum-matrix-entries/coordenacao/full', { params })
+        .then(r => {
+          const diasLetivos: any[] = r.data?.diasLetivos ?? [];
+          const objetivos: ObjetivoMatriz[] = [];
+          for (const dia of diasLetivos) {
+            for (const obj of (dia.objectives ?? [])) {
+              const campoRaw: string = obj.campoExperiencia ?? '';
+              const campoLabel = normalizeCampoLabel(campoRaw);
+              objetivos.push({
+                id: obj.id ?? `${dia.date}-${obj.objetivoBNCCCodigo}`,
+                segmento: r.data?.segment ?? '',
+                bimestre: obj.bimestre ?? 1,
+                semana: obj.semana ?? 1,
+                semana_tema: obj.semana ?? '',
+                campo_experiencia: campoLabel,
+                campo_id: getCampoId(campoLabel),
+                codigo_bncc: obj.objetivoBNCCCodigo ?? '',
+                objetivo_bncc: obj.objetivoBNCC ?? '',
+                exemplo_atividade: obj.exemploAtividade ?? '',
+                // FIX A1: getMatrizFullForCoord retorna 'objetivoCurriculo' e 'intencionalidade'
+                objetivo_curriculo_movimento: obj.objetivoCurriculo ?? '',
+                intencionalidade_pedagogica: obj.intencionalidade ?? '',
+                data: dia.date,
+              });
+            }
+          }
+          if (objetivos.length > 0) {
+            setMatrizApi(objetivos);
+          } else {
+            setErroApi(true);
+          }
+        })
+        .catch(() => setErroApi(true))
+        .finally(() => setCarregando(false));
+    }
+  }, [abaAtiva, segmentoFiltro, ehProfessor]);
 
   // Usar API se disponível, senão fallback local
   const matrizBase = matrizApi.length > 0 ? matrizApi : matrizLocal;
