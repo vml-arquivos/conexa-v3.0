@@ -476,6 +476,18 @@ export class CurriculumMatrixEntryService {
       return obj;
     });
 
+    // FIX C2: quando não há entradas cadastradas para a data, retornar message explicativa
+    // para que o frontend distinga "data sem registro" de "erro de sistema"
+    if (objectives.length === 0) {
+      return {
+        segment,
+        date,
+        classroomId,
+        objectives,
+        message: `Nenhum objetivo cadastrado na Matriz 2026 para a data ${date}. Verifique se a entrada foi cadastrada para este segmento.`,
+      };
+    }
+
     return { segment, date, classroomId, objectives };
   }
 

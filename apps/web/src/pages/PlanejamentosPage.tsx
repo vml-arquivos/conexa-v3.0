@@ -123,6 +123,8 @@ export default function PlanejamentosPage() {
   const [saving, setSaving] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroSegmento, setFiltroSegmento] = useState('');
+  // FIX C4: filtro de turma para coordenação/unidade no painel de planejamentos
+  const [filtroClassroomId, setFiltroClassroomId] = useState('');
   const [busca, setBusca] = useState('');
   const [expandedPlanning, setExpandedPlanning] = useState<string | null>(null);
 
@@ -269,6 +271,8 @@ export default function PlanejamentosPage() {
   const planningsFiltrados = plannings.filter(p => {
     if (filtroStatus && p.status !== filtroStatus) return false;
     if (busca && !p.title.toLowerCase().includes(busca.toLowerCase())) return false;
+    // FIX C4: filtrar por turma quando coordenação/unidade selecionar
+    if (filtroClassroomId && p.classroomId !== filtroClassroomId) return false;
     return true;
   });
 
@@ -313,6 +317,17 @@ export default function PlanejamentosPage() {
               <option value="">Todos os status</option>
               {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
+            {/* FIX C4: filtro de turma visível apenas para coordenação/unidade */}
+            {!ehProfessor && turmas.length > 0 && (
+              <select
+                className="px-3 py-2 border rounded-lg text-sm text-gray-700"
+                value={filtroClassroomId}
+                onChange={e => setFiltroClassroomId(e.target.value)}
+              >
+                <option value="">Todas as turmas</option>
+                {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            )}
             <Button onClick={() => setAba('novo')} className="flex items-center gap-2">
               <Plus className="h-4 w-4" /> Novo
             </Button>

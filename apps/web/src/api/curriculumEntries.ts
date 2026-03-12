@@ -2,8 +2,10 @@ import http from './http';
 
 export interface CurriculumEntry {
   id: string;
-  curriculumMatrixId: string;
+  // FIX C1: campo real do banco é matrixId (não curriculumMatrixId)
+  matrixId: string;
   date: string;
+  campoDeExperiencia: string;
   objetivoBNCC: string;
   objetivoCurriculo: string;
   intencionalidade: string;
@@ -22,7 +24,8 @@ export interface GetCurriculumEntriesParams {
 export async function getCurriculumEntries(params: GetCurriculumEntriesParams): Promise<CurriculumEntry[]> {
   const response = await http.get('/curriculum-matrix-entries', {
     params: {
-      curriculumMatrixId: params.matrixId,
+      // FIX C1: parâmetro correto conforme QueryCurriculumMatrixEntryDto do backend
+      matrixId: params.matrixId,
       startDate: params.startDate,
       endDate: params.endDate,
     },

@@ -224,9 +224,10 @@ export default function MatrizPedagogicaPage() {
               codigo_bncc: obj.objetivoBNCCCodigo ?? '',
               objetivo_bncc: obj.objetivoBNCC ?? '',
               exemplo_atividade: obj.exemploAtividade ?? '',
-              // FIX P0.4: mapear campos pedagógicos da API
-              objetivo_curriculo_movimento: obj.objetivoCurriculoMovimento ?? obj.objetivo_curriculo_movimento ?? '',
-              intencionalidade_pedagogica: obj.intencionalidadePedagogica ?? obj.intencionalidade_pedagogica ?? '',
+              // FIX C3: getMatrizFullForCoord retorna 'objetivoCurriculo' e 'intencionalidade'
+              // (não 'objetivoCurriculoMovimento' nem 'intencionalidadePedagogica')
+              objetivo_curriculo_movimento: obj.objetivoCurriculo ?? obj.objetivoCurriculoMovimento ?? obj.objetivo_curriculo_movimento ?? '',
+              intencionalidade_pedagogica: obj.intencionalidade ?? obj.intencionalidadePedagogica ?? obj.intencionalidade_pedagogica ?? '',
               data: dia.date,
             });
           }
