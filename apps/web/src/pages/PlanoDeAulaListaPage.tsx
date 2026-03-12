@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { imprimirPlanejamento, gerarPDF } from '../components/PrintablePlan';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
@@ -166,7 +166,26 @@ export default function PlanoDeAulaListaPage() {
   const [plannings, setPlannings] = useState<Planning[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPlanning, setSelectedPlanning] = useState<Planning | null>(null);
+  // Filtro de turma (para coordenação/unidade)
+  const [turmas, setTurmas] = useState<{ id: string; name: string }[]>([]);
+  const [filtroClassroomId, setFiltroClassroomId] = useState('');
+  const turmasCarregadas = useRef(false);
   // reenviando: removido — reenvio agora navega para edição
+
+  // Carrega turmas acessíveis para coordenação/unidade (uma vez)
+  useEffect(() => {
+    if (isProfessor(user) || turmasCarregadas.current) return;
+    turmasCarregadas.current = true;
+    http.get('/lookup/classrooms/accessible')
+      .then(res => {
+        const d = res.data;
+        const list: { id: string; name: string }[] = Array.isArray(d) ? d
+          : Array.isArray(d?.classrooms) ? d.classrooms
+          : [];
+        setTurmas(list);
+      })
+      .catch(() => setTurmas([]));
+  }, [user]);
 
   // Carrega planejamentos do mês atual
   const loadPlannings = useCallback(async () => {
@@ -175,15 +194,16 @@ export default function PlanoDeAulaListaPage() {
       // Usa fuso pedagógico America/Sao_Paulo para evitar drift de data
       const startDate = startOfPedagogicalMonth(currentYear, currentMonth);
       const endDate = endOfPedagogicalMonth(currentYear, currentMonth);
-
       // Professor usa /plannings (filtra pelo seu próprio createdBy)
-      // Coordenação/Unidade usa /coordenacao/planejamentos (filtra por unitId)
+      // Coordenação/Unidade usa /coordenacao/planejamentos (filtra por unitId + turma opcional)
       if (isProfessor(user)) {
         const res = await http.get('/plannings', { params: { startDate, endDate } });
         const data = res.data;
         setPlannings(Array.isArray(data) ? data : data?.data ?? data?.plannings ?? []);
       } else {
-        const res = await http.get('/coordenacao/planejamentos', { params: { startDate, endDate } });
+        const params: Record<string, string> = { startDate, endDate };
+        if (filtroClassroomId) params.classroomId = filtroClassroomId;
+        const res = await http.get('/coordenacao/planejamentos', { params });
         const data = res.data;
         if (Array.isArray(data)) {
           setPlannings(data);
@@ -200,7 +220,7 @@ export default function PlanoDeAulaListaPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentYear, currentMonth, user]);
+  }, [currentYear, currentMonth, user, filtroClassroomId]);
 
   useEffect(() => { loadPlannings(); }, [loadPlannings]);
 
@@ -346,6 +366,22 @@ export default function PlanoDeAulaListaPage() {
                 <ChevronRight className="h-5 w-5 text-gray-600" />
               </button>
             </div>
+
+            {/* Filtro de turma — apenas para coordenação/unidade */}
+            {!isProfessor(user) && turmas.length > 0 && (
+              <div className="mb-4">
+                <select
+                  value={filtroClassroomId}
+                  onChange={e => setFiltroClassroomId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Todas as turmas</option>
+                  {turmas.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Legenda de status */}
             <div className="flex flex-wrap gap-3 mb-4">

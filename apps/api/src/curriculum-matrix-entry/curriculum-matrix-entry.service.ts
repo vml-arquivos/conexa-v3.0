@@ -448,8 +448,8 @@ export class CurriculumMatrixEntryService {
         objetivoBNCC: true,
         objetivoCurriculo: true,
         intencionalidade: true,
-        // exemploAtividade: retornado condicionalmente por role
-        exemploAtividade: !isProfessorOnly,
+        // exemploAtividade: retornado apenas para roles acima de PROFESSOR
+        ...(isProfessorOnly ? {} : { exemploAtividade: true }),
       },
       orderBy: { campoDeExperiencia: 'asc' },
     });
