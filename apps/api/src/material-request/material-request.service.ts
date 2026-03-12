@@ -4,6 +4,8 @@ import { CreateMaterialRequestDto, MaterialRequestTypeInput } from './dto/create
 import { ReviewDecision, ReviewMaterialRequestDto } from './dto/review-material-request.dto';
 import { MaterialRequestType, RequestStatus, RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
   if (!input) return 'OUTRO' as MaterialRequestType;
@@ -105,34 +107,102 @@ function parseDescription(description: string | null): {
 }
 
 /**
- * Normaliza os itens de uma requisição para o formato unificado de resposta.
- * Prioridade: itens relacionais (MaterialRequestItem) > itens legados (description.itens)
+ * Shape do item retornado pela query raw da tabela legada material_request_item.
+ * Campos confirmados no banco real de produção (migration 20260223 + 20260307).
  */
-function normalizeItems(
-  items: Array<{
-    id: string;
-    productName: string;
-    quantity: number;
-    unit?: string | null;
-    observations?: string | null;
-    materialId?: string | null;
-    unitPrice?: unknown;
-    supplier?: string | null;
-  }>,
+interface RawMaterialRequestItem {
+  id: string;
+  request_id: string | null;
+  material_id: string | null;
+  quantity: number | null;
+  unit_price: unknown;
+  total_price: unknown;
+  observations: string | null;
+  item: string | null;
+  quantidade: number | null;
+  unidade: string | null;
+}
+
+/**
+ * Busca os itens da tabela legada material_request_item pelo requestId.
+ * Usa $queryRaw para contornar incompatibilidade entre o Prisma Client
+ * (gerado com o schema novo que usa productName/materialRequestId)
+ * e o banco real de produção (que tem item/quantidade/unidade/request_id).
+ *
+ * Fallback: se a tabela legada não existir, tenta a tabela nova MaterialRequestItem.
+ */
+async function fetchItemsRaw(
+  prisma: PrismaService,
+  requestId: string,
+): Promise<RawMaterialRequestItem[]> {
+  try {
+    const rows = await prisma.$queryRaw<RawMaterialRequestItem[]>(
+      Prisma.sql`
+        SELECT id,
+               request_id,
+               material_id,
+               quantity,
+               unit_price,
+               total_price,
+               observations,
+               item,
+               quantidade,
+               unidade
+        FROM material_request_item
+        WHERE request_id = ${requestId}
+        ORDER BY id
+      `,
+    );
+    return rows;
+  } catch {
+    // Fallback: banco novo com tabela MaterialRequestItem (PascalCase, schema 20260307)
+    try {
+      const rows2 = await prisma.$queryRaw<RawMaterialRequestItem[]>(
+        Prisma.sql`
+          SELECT id,
+                 "materialRequestId" AS request_id,
+                 "materialId"        AS material_id,
+                 quantity,
+                 "unitPrice"         AS unit_price,
+                 NULL::numeric       AS total_price,
+                 observations,
+                 "productName"       AS item,
+                 quantity            AS quantidade,
+                 unit                AS unidade
+          FROM "MaterialRequestItem"
+          WHERE "materialRequestId" = ${requestId}
+          ORDER BY id
+        `,
+      );
+      return rows2;
+    } catch {
+      return [];
+    }
+  }
+}
+
+/**
+ * Normaliza os itens raw para o formato unificado de resposta.
+ * Prioridade: itens do banco > itens legados (description.itens)
+ */
+function normalizeRawItems(
+  rawItems: RawMaterialRequestItem[],
   reviewDecisions: Array<{ itemId: string; approved: boolean; qtyApproved: number; reason?: string | null }>,
   legacyItens: { item: string; quantidade: number; unidade?: string }[] | null,
 ) {
-  if (items.length > 0) {
-    return items.map(item => {
-      const decision = reviewDecisions.find(d => d.itemId === item.id);
+  if (rawItems.length > 0) {
+    return rawItems.map(it => {
+      const nome = it.item ?? '';
+      const qty = Number(it.quantidade ?? it.quantity ?? 1);
+      const decision = reviewDecisions.find(d => d.itemId === it.id);
       return {
-        id: item.id,
-        materialId: item.materialId ?? null,
-        productName: item.productName,
-        materialName: item.productName, // alias para compatibilidade com frontend
-        quantity: item.quantity,
-        unit: item.unit ?? null,
-        observations: item.observations ?? null,
+        id: it.id,
+        materialId: it.material_id ?? null,
+        productName: nome,
+        materialName: nome,
+        quantity: qty,
+        unit: it.unidade ?? null,
+        observations: it.observations ?? null,
         qtyApproved: decision ? decision.qtyApproved : null,
         approved: decision ? decision.approved : null,
         approvalReason: decision?.reason ?? null,
@@ -194,29 +264,28 @@ export class MaterialRequestService {
     const priority = dto.urgencia ? (priorityMap[dto.urgencia] ?? 'normal') : 'normal';
 
     // Normalizar itens: suporta novo formato (dto.itens) e legado (dto.item + dto.quantity)
-    const itensParaPersistir: Array<{ productName: string; quantity: number; unit?: string }> = [];
+    const itensParaPersistir: Array<{ item: string; quantidade: number; unidade?: string }> = [];
     if (dto.itens && dto.itens.length > 0) {
       for (const it of dto.itens) {
         if (it.item?.trim()) {
           itensParaPersistir.push({
-            productName: it.item.trim(),
-            quantity: it.quantidade ?? 1,
-            unit: it.unidade,
+            item: it.item.trim(),
+            quantidade: it.quantidade ?? 1,
+            unidade: it.unidade,
           });
         }
       }
     } else if (dto.item) {
       itensParaPersistir.push({
-        productName: dto.item.trim(),
-        quantity: dto.quantity ?? 1,
+        item: dto.item.trim(),
+        quantidade: dto.quantity ?? 1,
       });
     }
 
     // quantity total = soma dos itens (ou 1 se não houver itens)
-    const totalQuantity = itensParaPersistir.reduce((acc, it) => acc + it.quantity, 0) || 1;
+    const totalQuantity = itensParaPersistir.reduce((acc, it) => acc + it.quantidade, 0) || 1;
 
     // description: armazena metadados (justificativa, urgencia) sem duplicar itens
-    // Itens agora vivem exclusivamente na tabela MaterialRequestItem
     const descriptionData: Record<string, unknown> = {};
     if (dto.justificativa) descriptionData.justificativa = dto.justificativa;
     if (dto.urgencia) descriptionData.urgencia = dto.urgencia;
@@ -225,7 +294,7 @@ export class MaterialRequestService {
       ? JSON.stringify(descriptionData)
       : undefined;
 
-    // Criar requisição + itens em uma única transação
+    // Criar a requisição (sem items via Prisma para evitar P2022 com productName)
     const created = await this.prisma.materialRequest.create({
       data: {
         mantenedoraId: user.mantenedoraId,
@@ -239,30 +308,64 @@ export class MaterialRequestService {
         priority,
         status: RequestStatus.SOLICITADO,
         createdBy: user.sub,
-        items: itensParaPersistir.length > 0
-          ? {
-              create: itensParaPersistir.map(it => ({
-                productName: it.productName,
-                quantity: it.quantity,
-                unit: it.unit ?? null,
-              })),
-            }
-          : undefined,
       },
       include: {
-        items: true,
         classroom: { select: { id: true, name: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
       },
     });
+
+    // Inserir itens diretamente na tabela legada material_request_item
+    if (itensParaPersistir.length > 0) {
+      for (const it of itensParaPersistir) {
+        const itemId = randomUUID();
+        try {
+          await this.prisma.$executeRaw(
+            Prisma.sql`
+              INSERT INTO material_request_item
+                (id, request_id, item, quantidade, unidade, quantity, created_at, updated_at)
+              VALUES (
+                ${itemId},
+                ${created.id},
+                ${it.item},
+                ${it.quantidade},
+                ${it.unidade ?? null},
+                ${it.quantidade},
+                NOW(),
+                NOW()
+              )
+            `,
+          );
+        } catch {
+          // Fallback: tabela nova MaterialRequestItem (banco sem tabela legada)
+          await this.prisma.$executeRaw(
+            Prisma.sql`
+              INSERT INTO "MaterialRequestItem"
+                (id, "materialRequestId", "productName", quantity, unit, "createdAt", "updatedAt")
+              VALUES (
+                ${itemId},
+                ${created.id},
+                ${it.item},
+                ${it.quantidade},
+                ${it.unidade ?? null},
+                NOW(),
+                NOW()
+              )
+            `,
+          );
+        }
+      }
+    }
+
+    const rawItems = await fetchItemsRaw(this.prisma, created.id);
     const desc = parseDescription(created.description ?? null);
     return {
       ...created,
       urgencia: desc.urgencia,
       justificativa: desc.justificativa,
       approvedDate: created.approvedDate?.toISOString() ?? null,
-      items: normalizeItems(created.items, [], null),
+      items: normalizeRawItems(rawItems, [], null),
       originalItens: desc.originalItens,
     };
   }
@@ -281,24 +384,28 @@ export class MaterialRequestService {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
-        items: true,
       },
       orderBy: { requestedDate: 'desc' },
       take: 100,
     });
-    return result.map(r => {
-      const desc = parseDescription(r.description ?? null);
-      return {
-        ...r,
-        urgencia: desc.urgencia,
-        justificativa: desc.justificativa,
-        observacaoRevisao: desc.observacaoRevisao,
-        statusVirtual: desc.statusVirtual,
-        approvedDate: r.approvedDate?.toISOString() ?? null,
-        items: normalizeItems(r.items, [], desc.originalItens),
-        originalItens: desc.originalItens,
-      };
-    });
+    // Buscar itens de cada requisição via raw query (compatível com banco legado)
+    const rows = await Promise.all(
+      result.map(async r => {
+        const rawItems = await fetchItemsRaw(this.prisma, r.id);
+        const desc = parseDescription(r.description ?? null);
+        return {
+          ...r,
+          urgencia: desc.urgencia,
+          justificativa: desc.justificativa,
+          observacaoRevisao: desc.observacaoRevisao,
+          statusVirtual: desc.statusVirtual,
+          approvedDate: r.approvedDate?.toISOString() ?? null,
+          items: normalizeRawItems(rawItems, [], desc.originalItens),
+          originalItens: desc.originalItens,
+        };
+      }),
+    );
+    return rows;
   }
 
   async list(
@@ -315,23 +422,25 @@ export class MaterialRequestService {
       createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       unit: { select: { id: true, name: true } },
       classroom: { select: { id: true, name: true } },
-      items: true,
     };
 
-    const mapRows = (rows: any[]) =>
-      rows.map(r => {
-        const desc = parseDescription(r.description ?? null);
-        return {
-          ...r,
-          urgencia: desc.urgencia,
-          justificativa: desc.justificativa,
-          observacaoRevisao: desc.observacaoRevisao,
-          statusVirtual: desc.statusVirtual,
-          approvedDate: r.approvedDate?.toISOString() ?? null,
-          items: normalizeItems(r.items ?? [], [], desc.originalItens),
-          originalItens: desc.originalItens,
-        };
-      });
+    const mapRows = async (rows: any[]) =>
+      Promise.all(
+        rows.map(async r => {
+          const rawItems = await fetchItemsRaw(this.prisma, r.id);
+          const desc = parseDescription(r.description ?? null);
+          return {
+            ...r,
+            urgencia: desc.urgencia,
+            justificativa: desc.justificativa,
+            observacaoRevisao: desc.observacaoRevisao,
+            statusVirtual: desc.statusVirtual,
+            approvedDate: r.approvedDate?.toISOString() ?? null,
+            items: normalizeRawItems(rawItems, [], desc.originalItens),
+            originalItens: desc.originalItens,
+          };
+        }),
+      );
 
     if (isCentralRole(user)) {
       const rows = await this.prisma.materialRequest.findMany({
@@ -361,7 +470,6 @@ export class MaterialRequestService {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
-        items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
     });
     if (!req) throw new NotFoundException('Requisição não encontrada');
@@ -379,6 +487,7 @@ export class MaterialRequestService {
       : [];
 
     const statusVirtual = desc.reviewData?._parcial ? 'PARCIAL' : req.status;
+    const rawItems = await fetchItemsRaw(this.prisma, id);
 
     return {
       ...req,
@@ -387,7 +496,7 @@ export class MaterialRequestService {
       observacaoRevisao: desc.observacaoRevisao,
       statusVirtual,
       approvedDate: req.approvedDate?.toISOString() ?? null,
-      items: normalizeItems(req.items, itemDecisions, desc.originalItens),
+      items: normalizeRawItems(rawItems, itemDecisions, desc.originalItens),
       originalItens: desc.originalItens,
       reviewData: desc.reviewData
         ? {
@@ -407,7 +516,6 @@ export class MaterialRequestService {
 
     const req = await this.prisma.materialRequest.findUnique({
       where: { id },
-      include: { items: true },
     });
     if (!req) throw new NotFoundException('Solicitação não encontrada');
     if (req.mantenedoraId !== user.mantenedoraId) {
@@ -416,6 +524,9 @@ export class MaterialRequestService {
     if (!isCentralRole(user) && user.unitId && req.unitId !== user.unitId) {
       throw new ForbiddenException('Requisição não pertence à sua unidade');
     }
+
+    // Buscar itens via raw query para validação de qtyApproved
+    const rawItems = await fetchItemsRaw(this.prisma, id);
 
     // Preserva dados originais do description (metadados: urgencia, justificativa)
     const desc = parseDescription(req.description ?? null);
@@ -433,11 +544,14 @@ export class MaterialRequestService {
       }));
 
       for (const d of itemDecisions) {
-        const dbItem = req.items.find(it => it.id === d.itemId);
-        if (dbItem && d.qtyApproved > dbItem.quantity) {
-          throw new ForbiddenException(
-            `Item ${d.itemId}: qtyApproved (${d.qtyApproved}) não pode exceder qty solicitada (${dbItem.quantity})`,
-          );
+        const dbItem = rawItems.find(it => it.id === d.itemId);
+        if (dbItem) {
+          const dbQty = Number(dbItem.quantidade ?? dbItem.quantity ?? 0);
+          if (d.qtyApproved > dbQty) {
+            throw new ForbiddenException(
+              `Item ${d.itemId}: qtyApproved (${d.qtyApproved}) não pode exceder qty solicitada (${dbQty})`,
+            );
+          }
         }
       }
 
@@ -486,7 +600,6 @@ export class MaterialRequestService {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
         classroom: { select: { id: true, name: true } },
-        items: { include: { material: { select: { id: true, name: true, unit: true } } } },
       },
     });
 
@@ -496,6 +609,8 @@ export class MaterialRequestService {
       ? (updatedDesc.reviewData!.items as ItemDecision[])
       : [];
 
+    const updatedRawItems = await fetchItemsRaw(this.prisma, id);
+
     return {
       ...updated,
       urgencia: updatedDesc.urgencia,
@@ -503,7 +618,7 @@ export class MaterialRequestService {
       observacaoRevisao: updatedDesc.observacaoRevisao,
       statusVirtual: updatedDesc.reviewData?._parcial ? 'PARCIAL' : updated.status,
       approvedDate: updated.approvedDate?.toISOString() ?? null,
-      items: normalizeItems(updated.items, decisions, updatedDesc.originalItens),
+      items: normalizeRawItems(updatedRawItems, decisions, updatedDesc.originalItens),
       reviewData: updatedDesc.reviewData
         ? {
             decision: updatedDesc.reviewData.decision,

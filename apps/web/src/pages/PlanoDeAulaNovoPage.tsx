@@ -213,6 +213,8 @@ export default function PlanoDeAulaNovoPage() {
 
   // Cache de matriz: chave = "classroomId|YYYY-MM-DD"
   const matrizCache = useRef<Map<string, MatrizByDayResponse>>(new Map());
+  // Rastreia a turma anterior para detectar mudança e limpar objetivos
+  const prevClassroomIdRef = useRef<string>('');
 
   // ─── Turma selecionada ────────────────────────────────────────────────────
   const turmaSelecionada = useMemo(
@@ -430,16 +432,32 @@ export default function PlanoDeAulaNovoPage() {
     }
   }, []);
 
+  // Quando classroomId muda, limpa cache e objetivos para forçar recarga
+  useEffect(() => {
+    if (!classroomId) return;
+    if (prevClassroomIdRef.current && prevClassroomIdRef.current !== classroomId) {
+      matrizCache.current.clear();
+      setDays(prev =>
+        prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined }))
+      );
+    }
+    prevClassroomIdRef.current = classroomId;
+  }, [classroomId]);
+
   useEffect(() => {
     if (!classroomId || !startDate) return;
     if (numDays > 1) {
       fetchMatrizLote(classroomId, startDate, numDays);
     } else {
-      for (const day of days) {
-        if (day.objectives.length === 0 && !day.matrizLoading) {
-          fetchMatrizForDay(day.date, classroomId);
+      // Usa setDays com callback para acessar o estado mais recente (evita stale closure)
+      setDays(prev => {
+        for (const day of prev) {
+          if (day.objectives.length === 0 && !day.matrizLoading) {
+            fetchMatrizForDay(day.date, classroomId);
+          }
         }
-      }
+        return prev;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days.length, classroomId, startDate, numDays]);
