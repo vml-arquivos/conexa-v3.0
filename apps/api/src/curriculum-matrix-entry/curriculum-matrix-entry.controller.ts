@@ -32,17 +32,6 @@ export class CurriculumMatrixEntryController {
     private readonly curriculumMatrixEntryService: CurriculumMatrixEntryService,
   ) {}
 
-  /**
-   * POST /curriculum-matrix-entries/seed-w6w8
-   * Executa o seed das semanas 6–8 (16/03 a 03/04/2026) no banco de produção.
-   * Idempotente (upsert). Acesso restrito a DEVELOPER.
-   */
-  @Post('seed-w6w8')
-  @RequireRoles('DEVELOPER')
-  seedW6W8(@CurrentUser() user: JwtPayload) {
-    return this.curriculumMatrixEntryService.seedW6W8(user);
-  }
-
   @Post()
   @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
   create(
