@@ -125,6 +125,7 @@ export class AttendanceService {
                   id: true,
                   firstName: true,
                   lastName: true,
+                  photoUrl: true, // FIX C2: foto da criança para exibição na chamada
                 },
               },
             },
@@ -145,7 +146,7 @@ export class AttendanceService {
       return {
         id: child.id,
         nome: `${child.firstName} ${child.lastName}`,
-        photoUrl: null as string | null,
+        photoUrl: (child as any).photoUrl ?? null, // FIX C2: usar photoUrl real do banco
         status: att?.status ?? null,
         justification: att?.justification ?? null,
         registrado: !!att,

@@ -172,8 +172,52 @@ export default function PlanejamentosPage() {
       try {
         const mr = await http.get('/curriculum-matrix-entries?limit=300');
         const md = mr.data;
-        const entries = Array.isArray(md) ? md : md?.data ?? [];
-        if (entries.length > 0) setMatrizEntries(entries);
+        const rawEntries: any[] = Array.isArray(md) ? md : md?.data ?? [];
+        if (rawEntries.length > 0) {
+          // FIX A1: Normalizar campos da API (Prisma) para o formato MatrizEntry do frontend.
+          // A API retorna campoDeExperiencia (enum), objetivoBNCCCode, objetivoBNCC,
+          // objetivoCurriculo, intencionalidade, exemploAtividade, bimester, weekOfYear,
+          // date (ISO), matrix.segment — enquanto o frontend usa campo_id, codigo_bncc, etc.
+          const CAMPO_ID_MAP: Record<string, string> = {
+            O_EU_O_OUTRO_E_O_NOS: 'eu-outro-nos',
+            CORPO_GESTOS_E_MOVIMENTOS: 'corpo-gestos',
+            TRACOS_SONS_CORES_E_FORMAS: 'tracos-sons',
+            ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO: 'escuta-fala',
+            ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES: 'espacos-tempos',
+          };
+          const CAMPO_LABEL_MAP: Record<string, string> = {
+            O_EU_O_OUTRO_E_O_NOS: 'O eu, o outro e o nós',
+            CORPO_GESTOS_E_MOVIMENTOS: 'Corpo, gestos e movimentos',
+            TRACOS_SONS_CORES_E_FORMAS: 'Traços, sons, cores e formas',
+            ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO: 'Escuta, fala, pensamento e imaginação',
+            ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES: 'Espaços, tempos, quantidades, relações e transformações',
+          };
+          const mapped: MatrizEntry[] = rawEntries.map((e: any) => {
+            const campoEnum: string = e.campoDeExperiencia ?? '';
+            const campoId = CAMPO_ID_MAP[campoEnum] ?? campoEnum.toLowerCase().replace(/_/g, '-');
+            const campoLabel = CAMPO_LABEL_MAP[campoEnum] ?? campoEnum;
+            const dateStr = e.date
+              ? new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
+              : '';
+            const segmento: string = e.matrix?.segment ?? '';
+            return {
+              id: e.id,
+              data: dateStr,
+              segmento,
+              bimestre: e.bimester ?? 0,
+              semana: e.weekOfYear ?? 0,
+              semana_tema: e.weekTheme ?? '',
+              campo_experiencia: campoLabel,
+              campo_id: campoId,
+              codigo_bncc: e.objetivoBNCCCode ?? '',
+              objetivo_bncc: e.objetivoBNCC ?? '',
+              objetivo_curriculo_movimento: e.objetivoCurriculo ?? '',
+              intencionalidade_pedagogica: e.intencionalidade ?? '',
+              exemplo_atividade: e.exemploAtividade ?? '',
+            } as MatrizEntry;
+          });
+          setMatrizEntries(mapped);
+        }
       } catch { /* usa sample */ }
     } catch { /* silencioso */ }
     finally { setLoading(false); }

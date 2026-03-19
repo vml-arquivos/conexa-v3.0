@@ -53,9 +53,18 @@ export default function RequisicaoMateriaisPage() {
   async function loadMaterials() {
     try {
       setLoading(true);
-      // Endpoint correto via http client (com token automático)
-      const res = await http.get('/materials');
-      const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      // FIX B1: usar /materials/catalog que retorna o modelo Material (com category, unit, name)
+      // O endpoint /materials usa prisma.stockItem que é inventário físico da unidade e não tem 'category'.
+      const res = await http.get('/materials/catalog');
+      const rawData: any[] = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      // Normalizar para o formato Material esperado pelo frontend
+      const data: Material[] = rawData.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        category: (m.category === 'PEDAGOGICO' ? 'PEDAGOGICO' : 'HIGIENE') as 'PEDAGOGICO' | 'HIGIENE',
+        unit: m.unit ?? 'un',
+        description: m.description ?? undefined,
+      }));
       setMaterials(data);
     } catch (err) {
       console.error('Erro ao carregar materiais:', err);

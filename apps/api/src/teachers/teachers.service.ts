@@ -34,6 +34,7 @@ export class TeachersService {
                     isActive: true,
                     allergies: true,         // para AlergiaAlert
                     medicalConditions: true,  // para AlergiaAlert
+                    photoUrl: true,           // FIX C3: foto da criança para exibição no dashboard
                   },
                 },
               },
@@ -101,7 +102,7 @@ export class TeachersService {
         dateOfBirth: child.dateOfBirth,
         idade: this.calculateAge(child.dateOfBirth),
         gender: child.gender,
-        photoUrl: null as string | null, // campo não existe no schema atual
+        photoUrl: (child as any).photoUrl ?? null, // FIX C3: usar photoUrl real do banco
         allergies: child.allergies ?? null,         // para AlergiaAlert
         medicalConditions: child.medicalConditions ?? null, // para AlergiaAlert
       })),

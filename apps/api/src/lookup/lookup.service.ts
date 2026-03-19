@@ -33,6 +33,7 @@ export interface AccessibleChild {
   classroomId?: string;
   allergies?: string | null;
   medicalConditions?: string | null;
+  photoUrl?: string | null; // FIX C1: foto da criança para exibição no Diário e Chamada
 }
 
 @Injectable()
@@ -393,6 +394,7 @@ export class LookupService {
             lastName: true,
             allergies: true,         // para AlergiaAlert
             medicalConditions: true,  // para AlergiaAlert
+            photoUrl: true,           // FIX C1: foto da criança
           },
         },
       },
@@ -411,6 +413,7 @@ export class LookupService {
       classroomId,
       allergies: e.child.allergies ?? null,         // para AlergiaAlert
       medicalConditions: e.child.medicalConditions ?? null, // para AlergiaAlert
+      photoUrl: e.child.photoUrl ?? null,           // FIX C1: foto da criança
     }));
   }
 
