@@ -43,7 +43,54 @@ import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { toPedagogicalISODate } from '../lib/formatDate';
 import { extractErrorMessage } from '../lib/utils';
-// matrizHelpers e lookupDiario2026 não participam deste fluxo — dados vêm exclusivamente do backend
+// Fallback local: usado SOMENTE quando o backend retornar objectives vazio
+import { MATRIZ_2026, type EntradaMatriz, type SegmentoKey } from '../data/matrizCompleta2026';
+
+// ─── Fallback local ───────────────────────────────────────────────────────────
+const CAMPO_MAP: Record<string, string> = {
+  'eu-outro-nos':   'O_EU_O_OUTRO_E_O_NOS',
+  'corpo-gestos':   'CORPO_GESTOS_E_MOVIMENTOS',
+  'tracos-sons':    'TRACOS_SONS_CORES_E_FORMAS',
+  'escuta-fala':    'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+  'espacos-tempos': 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+};
+function inferirSegmento(turma: { name?: string; ageGroupMin?: number | null }): SegmentoKey | null {
+  const nome = (turma.name ?? '').toUpperCase();
+  if (/BERÇ|BERCARIO|BEBE|BEBÊ/.test(nome)) return 'EI01';
+  if (/MATERNAL/.test(nome)) return 'EI02';
+  if (/PRÉ|PRE|JARDIM/.test(nome)) return 'EI03';
+  const min = turma.ageGroupMin ?? null;
+  if (min !== null) {
+    if (min <= 6)  return 'EI01';
+    if (min <= 42) return 'EI02';
+    return 'EI03';
+  }
+  return null;
+}
+function entradaParaObjetivo(e: EntradaMatriz): MatrizObjective {
+  const campoRaw = e.campo_experiencia_id ?? e.campo_id;
+  const campoExperiencia = CAMPO_MAP[campoRaw] ?? campoRaw.toUpperCase().replace(/-/g, '_');
+  return {
+    campoExperiencia,
+    codigoBNCC: e.codigo_bncc ?? null,
+    objetivoBNCC: e.objetivo_bncc ?? '',
+    objetivoCurriculoDF: e.objetivo_curriculo_movimento ?? e.objetivo_curriculo ?? '',
+    intencionalidadePedagogica: e.intencionalidade_pedagogica ?? e.intencionalidade ?? null,
+    exemploAtividade: undefined,
+  };
+}
+function buildFallback(dateISO: string, turma: { name?: string; ageGroupMin?: number | null }): { objectives: MatrizObjective[]; message: string } | null {
+  const segmento = inferirSegmento(turma);
+  if (!segmento) return null;
+  const [, m, d] = dateISO.split('-');
+  const ddmm = `${d}/${m}`;
+  const entradas = (MATRIZ_2026[segmento] ?? []).filter((e: EntradaMatriz) => e.data === ddmm);
+  if (entradas.length === 0) return null;
+  return {
+    objectives: entradas.map(entradaParaObjetivo),
+    message: 'Objetivos carregados localmente (fallback) — verifique sincronização do banco.',
+  };
+}
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Turma {
@@ -413,8 +460,13 @@ export default function PlanoDeAulaNovoPage() {
         params: { classroomId: cid, date },
       });
       const data = res.data as MatrizByDayResponse;
-      const objectives = data.objectives ?? [];
-      const message = data.message;
+      let objectives = data.objectives ?? [];
+      let message = data.message;
+      // Fallback local: quando o banco não tem dados para a data
+      if (objectives.length === 0 && turmaSelecionada) {
+        const fb = buildFallback(date, turmaSelecionada);
+        if (fb) { objectives = fb.objectives; message = fb.message; }
+      }
       matrizCache.current.set(cacheKey, { ...data, objectives, message });
       setDays(prev =>
         prev.map(d =>
@@ -433,10 +485,9 @@ export default function PlanoDeAulaNovoPage() {
         )
       );
     }
-  }, []);
+  }, [turmaSelecionada]);
 
   /** Carrega todos os dias em lote usando by-classroom-date (mais eficiente para numDays > 1) */
-  // Dados vêm exclusivamente do backend — sem fallback local
   const fetchMatrizLote = useCallback(async (cid: string, start: string, n: number) => {
     if (!cid || !start || n < 1) return;
     setDays(prev => prev.map(d => ({ ...d, matrizLoading: true })));
@@ -449,9 +500,13 @@ export default function PlanoDeAulaNovoPage() {
       setDays(prev =>
         prev.map(d => {
           const found = byDate.get(d.date);
-          if (!found) return { ...d, matrizLoading: false };
-          const objectives = found.objectives ?? [];
-          const message = found.message;
+          let objectives = found?.objectives ?? [];
+          let message = found?.message;
+          // Fallback local: quando o banco não tem dados para a data
+          if (objectives.length === 0 && turmaSelecionada) {
+            const fb = buildFallback(d.date, turmaSelecionada);
+            if (fb) { objectives = fb.objectives; message = fb.message; }
+          }
           return { ...d, objectives, matrizLoading: false, matrizMessage: message };
         })
       );
@@ -459,7 +514,7 @@ export default function PlanoDeAulaNovoPage() {
       const msg = extractErrorMessage(err, 'Erro ao carregar Matriz.');
       setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: msg })));
     }
-  }, []);
+  }, [turmaSelecionada]);
 
   // Quando classroomId muda, limpa cache e objetivos para forçar recarga
   useEffect(() => {
