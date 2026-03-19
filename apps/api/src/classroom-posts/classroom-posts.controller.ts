@@ -19,7 +19,7 @@ export class ClassroomPostsController {
    * Professor cria um post/tarefa na sala virtual
    */
   @Post()
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.STAFF_CENTRAL, RoleLevel.DEVELOPER)
   criar(@Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.criar(dto, user);
   }

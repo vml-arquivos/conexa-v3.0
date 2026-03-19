@@ -148,9 +148,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         const professoresSet = new Set(turmasArr.map((t: TurmaResumo) => t.professor).filter((p: string | null) => p !== null && p !== 'Não atribuído'));
         setDashboard({
           turmas: ind.totalTurmas ?? turmasArr.length,
-          // ✅ CORRIGIDO: era `professoresSet.size || ind.totalProfessores ?? 0`
-          // TS5076: '||' e '??' não podem ser misturados sem parênteses
-          professores: (professoresSet.size || ind.totalProfessores) ?? 0,
+          // FIX D: usa totalProfessores do backend (professores únicos ativos na unidade)
+          professores: ind.totalProfessores ?? professoresSet.size ?? 0,
           alunosTotal: ind.totalAlunos ?? 0,
           requisicoesParaAnalisar: ind.requisicoesPendentes ?? 0,
           planejamentosParaRevisar: (ind.planejamentosEmRevisao ?? ind.planejamentosRascunho) ?? 0,

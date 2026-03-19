@@ -43,6 +43,8 @@ import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { toPedagogicalISODate } from '../lib/formatDate';
 import { extractErrorMessage } from '../lib/utils';
+import { LOOKUP_DIARIO_2026, type ObjetivoDia, type SegmentoKey } from '../data/lookupDiario2026';
+import { detectarSegmento } from '../lib/matrizHelpers';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Turma {
@@ -382,6 +384,25 @@ export default function PlanoDeAulaNovoPage() {
     });
   }, [startDate, numDays]);
 
+  // ─── Fallback local: usa LOOKUP_DIARIO_2026 quando banco não tem dados ────────
+  const lookupFallback = useCallback((date: string): MatrizObjective[] => {
+    if (!turmaSelecionada) return [];
+    const segmento = detectarSegmento(turmaSelecionada as Record<string, unknown>) as SegmentoKey | null;
+    if (!segmento) return [];
+    const [y, m, d] = date.split('-');
+    const ddmm = `${d}/${m}`;
+    const entrada = LOOKUP_DIARIO_2026[ddmm];
+    if (!entrada) return [];
+    const objs: ObjetivoDia[] = (entrada[segmento] ?? []) as ObjetivoDia[];
+    return objs.map(o => ({
+      campoExperiencia: o.campo_id,
+      codigoBNCC: o.codigo_bncc || null,
+      objetivoBNCC: o.objetivo_bncc,
+      objetivoCurriculoDF: o.objetivo_curriculo,
+      intencionalidadePedagogica: o.intencionalidade || null,
+    }));
+  }, [turmaSelecionada]);
+
   // ─── Busca matriz para cada dia (com cache) ───────────────────────────────
   const fetchMatrizForDay = useCallback(async (date: string, cid: string) => {
     if (!cid || !date) return;
@@ -403,25 +424,36 @@ export default function PlanoDeAulaNovoPage() {
         params: { classroomId: cid, date },
       });
       const data = res.data as MatrizByDayResponse;
-      matrizCache.current.set(cacheKey, data);
+      // Fallback: se banco não tem dados para a data, usa lookup local
+      const objectives = (data.objectives ?? []).length > 0
+        ? data.objectives
+        : lookupFallback(date);
+      const message = (data.objectives ?? []).length === 0 && objectives.length > 0
+        ? undefined // fallback silencioso — dados locais disponíveis
+        : data.message;
+      matrizCache.current.set(cacheKey, { ...data, objectives, message });
       setDays(prev =>
         prev.map(d =>
           d.date === date
-            ? { ...d, objectives: data.objectives ?? [], matrizLoading: false, matrizMessage: data.message }
+            ? { ...d, objectives, matrizLoading: false, matrizMessage: message }
             : d
         )
       );
     } catch (err: any) {
-      const msg = extractErrorMessage(err, 'Erro ao carregar Matriz Pedagógica.');
+      // Em caso de erro de rede, tenta fallback local
+      const fallbackObjs = lookupFallback(date);
+      const msg = fallbackObjs.length > 0
+        ? undefined
+        : extractErrorMessage(err, 'Erro ao carregar Matriz Pedagógica.');
       setDays(prev =>
         prev.map(d =>
           d.date === date
-            ? { ...d, objectives: [], matrizLoading: false, matrizMessage: msg }
+            ? { ...d, objectives: fallbackObjs, matrizLoading: false, matrizMessage: msg }
             : d
         )
       );
     }
-  }, []);
+  }, [lookupFallback]);
 
   /** Carrega todos os dias em lote usando by-classroom-date (mais eficiente para numDays > 1) */
   const fetchMatrizLote = useCallback(async (cid: string, start: string, n: number) => {
@@ -436,15 +468,25 @@ export default function PlanoDeAulaNovoPage() {
       setDays(prev =>
         prev.map(d => {
           const found = byDate.get(d.date);
-          return found
-            ? { ...d, objectives: found.objectives ?? [], matrizLoading: false, matrizMessage: found.message }
-            : { ...d, matrizLoading: false };
+          if (!found) return { ...d, matrizLoading: false };
+          // Fallback: se banco não tem dados para o dia, usa lookup local
+          const objectives = (found.objectives ?? []).length > 0
+            ? found.objectives
+            : lookupFallback(d.date);
+          const message = (found.objectives ?? []).length === 0 && objectives.length > 0
+            ? undefined
+            : found.message;
+          return { ...d, objectives, matrizLoading: false, matrizMessage: message };
         })
       );
     } catch {
-      setDays(prev => prev.map(d => ({ ...d, matrizLoading: false, matrizMessage: 'Erro ao carregar Matriz.' })));
+      // Em caso de erro de rede, tenta fallback local para cada dia
+      setDays(prev => prev.map(d => {
+        const fallbackObjs = lookupFallback(d.date);
+        return { ...d, objectives: fallbackObjs, matrizLoading: false, matrizMessage: fallbackObjs.length === 0 ? 'Erro ao carregar Matriz.' : undefined };
+      }));
     }
-  }, []);
+  }, [lookupFallback]);
 
   // Quando classroomId muda, limpa cache e objetivos para forçar recarga
   useEffect(() => {

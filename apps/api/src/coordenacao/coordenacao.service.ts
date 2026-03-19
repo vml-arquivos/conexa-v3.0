@@ -228,6 +228,10 @@ export class CoordenacaoService {
         diariosHoje,
         turmasComChamadaHoje: turmasComChamada.length,
         reunioesAgendadas,
+        // FIX D: totalProfessores — professores únicos ativos nas turmas da unidade
+        totalProfessores: new Set(
+          turmas.flatMap((t) => t.teachers.map((ct) => ct.teacher.id))
+        ).size,
       },
       turmas: turmas.map((t) => ({
         id: t.id,

@@ -176,11 +176,17 @@ export default function SalaDeAulaVirtualPage() {
   const [desempenhoMap, setDesempenhoMap] = useState<Record<string, { performance: string; notes: string }>>({});
 
   useEffect(() => {
-    loadDashboard();
+    if (modoLeitura) {
+      // Coordenação/Mantenedora: carrega posts de todas as turmas da unidade diretamente
+      loadPosts();
+    } else {
+      // Professor: carrega turma principal via dashboard
+      loadDashboard();
+    }
   }, []);
 
   useEffect(() => {
-    if (turmaId) {
+    if (!modoLeitura && turmaId) {
       loadPosts();
     }
   }, [turmaId, filterType]);
@@ -209,7 +215,9 @@ export default function SalaDeAulaVirtualPage() {
   async function loadPosts() {
     setLoading(true);
     try {
-      const params: Record<string, string> = { classroomId: turmaId };
+      const params: Record<string, string> = {};
+      // Para professor, filtrar pela turma; para coordenação, o backend filtra automaticamente pela unidade
+      if (turmaId) params.classroomId = turmaId;
       if (filterType) params.type = filterType;
       const res = await http.get('/classroom-posts', { params });
       setPosts(Array.isArray(res.data) ? res.data : res.data?.data ?? []);

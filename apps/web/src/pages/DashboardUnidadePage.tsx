@@ -103,7 +103,7 @@ export function DashboardUnidadePage() {
         totalAlunos: ind.totalAlunos ?? 0,
         totalTurmas: ind.totalTurmas ?? turmasArr.length,
         requisicoesAbertas: ind.requisicoesPendentes ?? reqArr.length,
-        alertasAtivos: (ind.planejamentosEmRevisao ?? 0) + (ind.planejamentosRascunho ?? 0) + (ind.totalTurmas - (ind.turmasComChamadaHoje ?? ind.totalTurmas)),
+        alertasAtivos: (ind.planejamentosEmRevisao ?? 0) + (ind.planejamentosRascunho ?? 0) + Math.max(0, (ind.totalTurmas ?? 0) - (ind.turmasComChamadaHoje ?? ind.totalTurmas ?? 0)),
       });
 
       setTurmas(turmasArr);

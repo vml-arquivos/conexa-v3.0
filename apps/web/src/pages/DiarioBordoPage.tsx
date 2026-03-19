@@ -754,7 +754,7 @@ export default function DiarioBordoPage() {
         await http.post('/diary-events', {
           type: 'ATIVIDADE_PEDAGOGICA',
           title: form.momentoDestaque.substring(0, 100) || 'Diário de Bordo',
-          description: form.reflexaoPedagogica || form.momentoDestaque,
+          description: form.reflexaoPedagogica || form.momentoDestaque || 'Diário de Bordo',
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
@@ -1147,7 +1147,9 @@ export default function DiarioBordoPage() {
                     })}
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    {form.criancasPresentes.length} presente(s) · {criancas.length - form.criancasPresentes.length} ausente(s)
+                    {chamadaCarregada
+                      ? `${form.criancasPresentes.length} presente(s) · ${criancas.length - form.criancasPresentes.length} ausente(s)`
+                      : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
                   </p>
                 </div>
               )}
