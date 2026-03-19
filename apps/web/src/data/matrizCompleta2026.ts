@@ -1,6 +1,6 @@
 // ============================================================
 // Matriz Pedagógica 2026 — Sequência Pedagógica Piloto
-// Total: 585 entradas | EI01: 200 | EI02: 199 | EI03: 186
+// Total: 588 entradas | EI01: 201 | EI02: 200 | EI03: 187
 // Cada entrada contém 4 exemplos de atividade distintos para escolha do professor
 //
 // Histórico de alterações:
@@ -1193,6 +1193,26 @@ export const MATRIZ_2026: Record<SegmentoKey, EntradaMatriz[]> = {
         {
           titulo: `Piquenique das Imagens na Natureza`,
           descricao: `Levar livros ilustrados para um ambiente externo, sentar com os bebês na grama e mostrar as imagens, nomeando objetos e personagens, aproveitando os sons e estímulos naturais para ampliar a atenção.`,
+        },
+      ],
+    },
+    {
+      data: `03/04`,
+      dia_semana: `Sexta-feira`,
+      campo_id: `espacos-tempos`,
+      campo_label: `Espaços, tempos, quantidades, relações e transformações`,
+      campo_emoji: `🔢`,
+      codigo_bncc: `EI01ET03`,
+      objetivo_bncc: `Manipular materiais diversos e variados para comparar as diferenças e semelhanças entre eles.`,
+      objetivo_curriculo: `Manipular materiais diversos para comparar diferenças e semelhanças.`,
+      intencionalidade: `Estimular o pensamento comparativo e a exploração sensorial com materiais variados.`,
+      exemplo_atividade: `Oferecer ao bebê dois ou três objetos com texturas, pesos e tamanhos diferentes para que ele explore com as mãos, incentivando a comparação sensorial e a descoberta das propriedades dos materiais.`,
+      semana_tema: `Semana 8 (30/03 a 03/04/2026)`,
+      bimestre: `1º Bimestre`,
+      exemplos_atividades: [
+        {
+          titulo: `Oferecer ao bebê dois ou três objetos co`,
+          descricao: `Oferecer ao bebê dois ou três objetos com texturas, pesos e tamanhos diferentes para que ele explore com as mãos, incentivando a comparação sensorial e a descoberta das propriedades dos materiais.`,
         },
       ],
     },
@@ -7599,6 +7619,26 @@ export const MATRIZ_2026: Record<SegmentoKey, EntradaMatriz[]> = {
       ],
     },
     {
+      data: `03/04`,
+      dia_semana: `Sexta-feira`,
+      campo_id: `espacos-tempos`,
+      campo_label: `Espaços, tempos, quantidades, relações e transformações`,
+      campo_emoji: `🔢`,
+      codigo_bncc: `EI02ET04`,
+      objetivo_bncc: `Identificar relações espaciais (dentro e fora, em cima, embaixo, acima, abaixo, entre e do lado) e temporais (antes, durante e depois).`,
+      objetivo_curriculo: `Identificar relações espaciais e temporais.`,
+      intencionalidade: `Desenvolver a orientação espacial e temporal por meio de atividades cotidianas.`,
+      exemplo_atividade: `Propor brincadeiras com caixas, túneis e almofadas onde as crianças entram, saem, sobem e descem, enquanto o professor nomeia as relações espaciais vivenciadas (dentro, fora, em cima, embaixo).`,
+      semana_tema: `Semana 8 (30/03 a 03/04/2026)`,
+      bimestre: `1º Bimestre`,
+      exemplos_atividades: [
+        {
+          titulo: `Propor brincadeiras com caixas, túneis e`,
+          descricao: `Propor brincadeiras com caixas, túneis e almofadas onde as crianças entram, saem, sobem e descem, enquanto o professor nomeia as relações espaciais vivenciadas (dentro, fora, em cima, embaixo).`,
+        },
+      ],
+    },
+    {
       data: `06/04`,
       dia_semana: `Segunda-feira`,
       campo_id: `eu-outro-nos`,
@@ -13581,6 +13621,26 @@ export const MATRIZ_2026: Record<SegmentoKey, EntradaMatriz[]> = {
         {
           titulo: `Jogo do Eco Rítmico`,
           descricao: `Sentados em roda, o professor fala uma palavra com ritmo marcado e as crianças repetem ecoando, depois criam palavras que rimem e batem palmas no mesmo ritmo, formando uma sequência musical coletiva que desenvolve consciência fonológica.`,
+        },
+      ],
+    },
+    {
+      data: `03/04`,
+      dia_semana: `Sexta-feira`,
+      campo_id: `espacos-tempos`,
+      campo_label: `Espaços, tempos, quantidades, relações e transformações`,
+      campo_emoji: `🔢`,
+      codigo_bncc: `EI03ET03`,
+      objetivo_bncc: `Identificar e selecionar fontes de informações para responder a questões sobre a natureza.`,
+      objetivo_curriculo: `Identificar fontes de informação sobre a natureza.`,
+      intencionalidade: `Desenvolver a pesquisa e o pensamento científico por meio da investigação orientada.`,
+      exemplo_atividade: `Propor uma pesquisa simples sobre um animal ou planta, orientando as crianças a observar, perguntar e registrar descobertas com desenhos, desenvolvendo o pensamento científico e a curiosidade investigativa.`,
+      semana_tema: `Semana 8 (30/03 a 03/04/2026)`,
+      bimestre: `1º Bimestre`,
+      exemplos_atividades: [
+        {
+          titulo: `Propor uma pesquisa simples sobre um ani`,
+          descricao: `Propor uma pesquisa simples sobre um animal ou planta, orientando as crianças a observar, perguntar e registrar descobertas com desenhos, desenvolvendo o pensamento científico e a curiosidade investigativa.`,
         },
       ],
     },
