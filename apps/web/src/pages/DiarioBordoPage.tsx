@@ -483,14 +483,16 @@ export default function DiarioBordoPage() {
       // Pré-carregar chamada do dia para preencher presenças automaticamente
       // Usa data local para evitar bug de timezone servidor UTC vs cliente GMT-3
       try {
-        const hoje = (() => {
-          const d = new Date();
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          return `${y}-${m}-${dd}`;
-        })();
-        const chamadaRes = await http.get('/attendance/today', { params: { classroomId: cid, date: hoje } });
+        const dateISO = /^\d{4}-\d{2}-\d{2}$/.test(form.date)
+          ? form.date
+          : (() => {
+              const d = new Date();
+              const y = d.getFullYear();
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              return `${y}-${m}-${dd}`;
+            })();
+        const chamadaRes = await http.get('/attendance/today', { params: { classroomId: cid, date: dateISO } });
         const chamadaData = chamadaRes.data;
         // BUG B FIX: Usar os totais exatos retornados pelo backend (presentes, ausentes, justificados).
         // Não recalcular localmente — evita divergência entre chamada e diário.
@@ -507,6 +509,27 @@ export default function DiarioBordoPage() {
             ausentes: chamadaData.ausentes,
             total: chamadaData.totalAlunos,
           });
+
+          // Sincronizar lista de crianças com a chamada importada (evita denominador incorreto na UI)
+          const criancasFromChamada: Crianca[] = chamadaData.alunos.map((a: any) => {
+            const nome = String(a.nome ?? '').trim();
+            const parts = nome.split(/\s+/).filter(Boolean);
+            const firstName = parts[0] ?? nome ?? 'Criança';
+            const lastName = parts.slice(1).join(' ');
+            return {
+              id: a.id,
+              firstName,
+              lastName,
+              photoUrl: a.photoUrl ?? a.fotoUrl ?? a.photo_url ?? undefined,
+              allergies: null,
+              medicalConditions: null,
+            };
+          });
+
+          if (criancasFromChamada.length > 0) {
+            setCriancas(criancasFromChamada);
+            setChildId(criancasFromChamada[0].id);
+          }
         }
       } catch {
         // Chamada ainda não feita — não é erro, apenas não pré-preenche
@@ -1107,10 +1130,15 @@ export default function DiarioBordoPage() {
               </div>
 
               {/* Chamada visual por fotos */}
-              {criancas.length > 0 && (
-                <div>
+              {criancas.length > 0 && (() => {
+                const totalChamadaUI = chamadaCarregada && chamadaInfo?.total ? chamadaInfo.total : criancas.length;
+                const presentesUI = form.criancasPresentes.length;
+                const ausentesUI = Math.max(0, totalChamadaUI - presentesUI);
+
+                return (
+                  <div>
                   <div className="flex items-center justify-between mb-2">
-                    <Label>Chamada — Crianças Presentes ({form.criancasPresentes.length}/{criancas.length})</Label>
+                    <Label>Chamada — Crianças Presentes ({presentesUI}/{totalChamadaUI})</Label>
                     {chamadaCarregada && chamadaInfo && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
                         <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
@@ -1148,11 +1176,12 @@ export default function DiarioBordoPage() {
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     {chamadaCarregada
-                      ? `${form.criancasPresentes.length} presente(s) · ${criancas.length - form.criancasPresentes.length} ausente(s)`
+                      ? `${presentesUI} presente(s) · ${ausentesUI} ausente(s)`
                       : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
                   </p>
                 </div>
-              )}
+                );
+              })()}
 
               <div>
                 <Label>Clima Emocional da Turma</Label>
