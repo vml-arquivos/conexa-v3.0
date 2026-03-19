@@ -178,19 +178,15 @@ export class PlanningService {
       }
     }
 
-    // Validar se a matriz curricular existe (opcional)
-    if (createDto.curriculumMatrixId) {
+    // Resolver matriz curricular pela regra fechada: mantenedora + segmento + ano + isActive
+    // Se o frontend já enviou curriculumMatrixId, validar; caso contrário, resolver automaticamente
+    let resolvedMatrixId: string | undefined = createDto.curriculumMatrixId;
+    if (resolvedMatrixId) {
       const matrix = await this.prisma.curriculumMatrix.findUnique({
-        where: { id: createDto.curriculumMatrixId },
+        where: { id: resolvedMatrixId },
       });
-
-      if (!matrix) {
-        throw new NotFoundException('Matriz curricular não encontrada');
-      }
-
-      if (!matrix.isActive) {
-        throw new BadRequestException('Matriz curricular não está ativa');
-      }
+      if (!matrix) throw new NotFoundException('Matriz curricular não encontrada');
+      if (!matrix.isActive) throw new BadRequestException('Matriz curricular não está ativa');
     }
 
     // Validar se a turma existe
@@ -212,6 +208,26 @@ export class PlanningService {
 
     // Validar permissão
     await this.validateCreatePermission(classroom, user);
+
+    // Resolver matriz automaticamente quando não fornecida pelo frontend
+    // Regra fechada: mantenedora + segmento (derivado de ageGroupMin) + isActive + ano desc
+    if (!resolvedMatrixId) {
+      const ageMin = classroom.ageGroupMin ?? 0;
+      let seg: string | null = null;
+      if (ageMin <= 18) seg = 'EI01';
+      else if (ageMin <= 47) seg = 'EI02';
+      else if (ageMin <= 71) seg = 'EI03';
+      const matrizAuto = await this.prisma.curriculumMatrix.findFirst({
+        where: {
+          mantenedoraId: classroom.unit.mantenedoraId,
+          isActive: true,
+          ...(seg ? { segment: seg } : {}),
+        },
+        orderBy: { year: 'desc' },
+        select: { id: true },
+      });
+      if (matrizAuto) resolvedMatrixId = matrizAuto.id;
+    }
 
     // Validar datas
     const startDate = new Date(createDto.startDate);
@@ -261,7 +277,7 @@ export class PlanningService {
         description: createDto.description,
         type: (createDto.type ?? 'SEMANAL') as import('@prisma/client').PlanningType,
         templateId: createDto.templateId,
-        curriculumMatrixId: createDto.curriculumMatrixId, // NOVO
+        curriculumMatrixId: resolvedMatrixId, // resolvido pela regra fechada: mantenedora + segmento + isActive
         classroomId: createDto.classroomId,
         startDate,
         endDate,

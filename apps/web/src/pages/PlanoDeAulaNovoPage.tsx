@@ -43,8 +43,7 @@ import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { toPedagogicalISODate } from '../lib/formatDate';
 import { extractErrorMessage } from '../lib/utils';
-import { LOOKUP_DIARIO_2026, type ObjetivoDia, type SegmentoKey } from '../data/lookupDiario2026';
-import { detectarSegmento } from '../lib/matrizHelpers';
+// matrizHelpers e lookupDiario2026 não participam deste fluxo — dados vêm exclusivamente do backend
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Turma {
@@ -161,40 +160,46 @@ function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: n
         )}
       </div>
       <div className="px-4 py-3 space-y-3 bg-white/80">
+        {/* Campo 1: Objetivo da BNCC — sempre exibido */}
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Objetivo da BNCC (Transcrição Literal)
+            Objetivo da BNCC
           </p>
-          <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
+          {objetivo.objetivoBNCC
+            ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
+            : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
+          }
         </div>
-        {/* FIX B: objetivoCurriculoDF sempre visível quando preenchido (campo obrigatório do banco) */}
-        {objetivo.objetivoCurriculoDF && (
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Objetivo do Currículo em Movimento — DF (Transcrição Literal)
-            </p>
-            <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
-          </div>
-        )}
-        {objetivo.intencionalidadePedagogica && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-            <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
-              Intencionalidade Pedagógica
-            </p>
-            <p className="text-sm text-indigo-800 leading-relaxed">
-              {objetivo.intencionalidadePedagogica}
-            </p>
-          </div>
-        )}
-        {/* FIX P3: exemploAtividade visível para coordenação/unidade */}
-        {objetivo.exemploAtividade && (
+        {/* Campo 2: Objetivo do Currículo em Movimento — sempre exibido */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            Objetivo do Currículo em Movimento — DF
+          </p>
+          {objetivo.objetivoCurriculoDF
+            ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
+            : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
+          }
+        </div>
+        {/* Campo 3: Intencionalidade Pedagógica — sempre exibida */}
+        <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
+            Intencionalidade Pedagógica
+          </p>
+          {objetivo.intencionalidadePedagogica
+            ? <p className="text-sm text-indigo-800 leading-relaxed">{objetivo.intencionalidadePedagogica}</p>
+            : <p className="text-xs text-indigo-300 italic">Não cadastrada</p>
+          }
+        </div>
+        {/* Campo 4: Exemplo de Atividade — visível apenas quando retornado pelo backend (roles acima de PROFESSOR) */}
+        {objetivo.exemploAtividade !== undefined && (
           <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
             <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">
               Exemplo de Atividade
             </p>
-            <p className="text-sm text-emerald-800 leading-relaxed">
-              {objetivo.exemploAtividade}
-            </p>
+            {objetivo.exemploAtividade
+              ? <p className="text-sm text-emerald-800 leading-relaxed">{objetivo.exemploAtividade}</p>
+              : <p className="text-xs text-emerald-300 italic">Não cadastrado</p>
+            }
           </div>
         )}
       </div>
@@ -384,26 +389,10 @@ export default function PlanoDeAulaNovoPage() {
     });
   }, [startDate, numDays]);
 
-  // ─── Fallback local: usa LOOKUP_DIARIO_2026 quando banco não tem dados ────────
-  const lookupFallback = useCallback((date: string): MatrizObjective[] => {
-    if (!turmaSelecionada) return [];
-    const segmento = detectarSegmento(turmaSelecionada as Record<string, unknown>) as SegmentoKey | null;
-    if (!segmento) return [];
-    const [y, m, d] = date.split('-');
-    const ddmm = `${d}/${m}`;
-    const entrada = LOOKUP_DIARIO_2026[ddmm];
-    if (!entrada) return [];
-    const objs: ObjetivoDia[] = (entrada[segmento] ?? []) as ObjetivoDia[];
-    return objs.map(o => ({
-      campoExperiencia: o.campo_id,
-      codigoBNCC: o.codigo_bncc || null,
-      objetivoBNCC: o.objetivo_bncc,
-      objetivoCurriculoDF: o.objetivo_curriculo,
-      intencionalidadePedagogica: o.intencionalidade || null,
-    }));
-  }, [turmaSelecionada]);
+  // Dados vêm exclusivamente do backend — sem fallback local
 
   // ─── Busca matriz para cada dia (com cache) ───────────────────────────────
+  // Dados vêm exclusivamente do backend — sem fallback local
   const fetchMatrizForDay = useCallback(async (date: string, cid: string) => {
     if (!cid || !date) return;
     const cacheKey = `${cid}|${date}`;
@@ -424,13 +413,8 @@ export default function PlanoDeAulaNovoPage() {
         params: { classroomId: cid, date },
       });
       const data = res.data as MatrizByDayResponse;
-      // Fallback: se banco não tem dados para a data, usa lookup local
-      const objectives = (data.objectives ?? []).length > 0
-        ? data.objectives
-        : lookupFallback(date);
-      const message = (data.objectives ?? []).length === 0 && objectives.length > 0
-        ? undefined // fallback silencioso — dados locais disponíveis
-        : data.message;
+      const objectives = data.objectives ?? [];
+      const message = data.message;
       matrizCache.current.set(cacheKey, { ...data, objectives, message });
       setDays(prev =>
         prev.map(d =>
@@ -440,22 +424,19 @@ export default function PlanoDeAulaNovoPage() {
         )
       );
     } catch (err: any) {
-      // Em caso de erro de rede, tenta fallback local
-      const fallbackObjs = lookupFallback(date);
-      const msg = fallbackObjs.length > 0
-        ? undefined
-        : extractErrorMessage(err, 'Erro ao carregar Matriz Pedagógica.');
+      const msg = extractErrorMessage(err, 'Erro ao carregar Matriz Pedagógica.');
       setDays(prev =>
         prev.map(d =>
           d.date === date
-            ? { ...d, objectives: fallbackObjs, matrizLoading: false, matrizMessage: msg }
+            ? { ...d, objectives: [], matrizLoading: false, matrizMessage: msg }
             : d
         )
       );
     }
-  }, [lookupFallback]);
+  }, []);
 
   /** Carrega todos os dias em lote usando by-classroom-date (mais eficiente para numDays > 1) */
+  // Dados vêm exclusivamente do backend — sem fallback local
   const fetchMatrizLote = useCallback(async (cid: string, start: string, n: number) => {
     if (!cid || !start || n < 1) return;
     setDays(prev => prev.map(d => ({ ...d, matrizLoading: true })));
@@ -469,24 +450,16 @@ export default function PlanoDeAulaNovoPage() {
         prev.map(d => {
           const found = byDate.get(d.date);
           if (!found) return { ...d, matrizLoading: false };
-          // Fallback: se banco não tem dados para o dia, usa lookup local
-          const objectives = (found.objectives ?? []).length > 0
-            ? found.objectives
-            : lookupFallback(d.date);
-          const message = (found.objectives ?? []).length === 0 && objectives.length > 0
-            ? undefined
-            : found.message;
+          const objectives = found.objectives ?? [];
+          const message = found.message;
           return { ...d, objectives, matrizLoading: false, matrizMessage: message };
         })
       );
-    } catch {
-      // Em caso de erro de rede, tenta fallback local para cada dia
-      setDays(prev => prev.map(d => {
-        const fallbackObjs = lookupFallback(d.date);
-        return { ...d, objectives: fallbackObjs, matrizLoading: false, matrizMessage: fallbackObjs.length === 0 ? 'Erro ao carregar Matriz.' : undefined };
-      }));
+    } catch (err: any) {
+      const msg = extractErrorMessage(err, 'Erro ao carregar Matriz.');
+      setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: msg })));
     }
-  }, [lookupFallback]);
+  }, []);
 
   // Quando classroomId muda, limpa cache e objetivos para forçar recarga
   useEffect(() => {
