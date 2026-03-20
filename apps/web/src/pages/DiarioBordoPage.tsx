@@ -381,6 +381,8 @@ export default function DiarioBordoPage() {
         eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
         childId: criancaSelecionadaOcorr,
         classroomId,
+        planningId: planejamentoHoje?.id,
+        curriculumEntryId: planejamentoHoje?.curriculumMatrix?.entries?.[0]?.id || planejamentoHoje?.curriculumMatrixId,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],

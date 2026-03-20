@@ -1,11 +1,13 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../common/services/audit.service';
 import { CreateMaterialRequestDto, MaterialRequestTypeInput } from './dto/create-material-request.dto';
 import { ReviewDecision, ReviewMaterialRequestDto } from './dto/review-material-request.dto';
-import { MaterialRequestType, RequestStatus, RoleLevel } from '@prisma/client';
+import { MaterialRequestType, RequestStatus, RoleLevel, AuditLogEntity } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { fromZonedTime } from 'date-fns-tz';
 
 function mapType(input?: MaterialRequestTypeInput): MaterialRequestType {
   if (!input) return 'OUTRO' as MaterialRequestType;
@@ -229,7 +231,10 @@ function normalizeRawItems(
 
 @Injectable()
 export class MaterialRequestService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService
+  ) {}
 
   async create(dto: CreateMaterialRequestDto, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
@@ -398,6 +403,15 @@ export class MaterialRequestService {
         }
       }
     }
+
+    await this.auditService.logCreate(
+      AuditLogEntity.MATERIAL_REQUEST,
+      created.id,
+      user.sub,
+      created.mantenedoraId,
+      created.unitId,
+      created,
+    );
 
     const rawItems = await fetchItemsRaw(this.prisma, created.id);
     const desc = parseDescription(created.description ?? null);
@@ -671,6 +685,16 @@ export class MaterialRequestService {
       ? (updatedDesc.reviewData!.items as ItemDecision[])
       : [];
 
+    await this.auditService.logUpdate(
+      AuditLogEntity.MATERIAL_REQUEST,
+      id,
+      user.sub,
+      updated.mantenedoraId,
+      updated.unitId,
+      req,
+      updated,
+    );
+
     const updatedRawItems = await fetchItemsRaw(this.prisma, id);
 
     return {
@@ -712,8 +736,9 @@ export class MaterialRequestService {
     if (params.teacherId) where.createdBy = params.teacherId;
     if (params.dataInicio || params.dataFim) {
       const dateFilter: Record<string, Date> = {};
-      if (params.dataInicio) dateFilter.gte = new Date(params.dataInicio);
-      if (params.dataFim) dateFilter.lte = new Date(params.dataFim);
+      const tz = 'America/Sao_Paulo';
+      if (params.dataInicio) dateFilter.gte = fromZonedTime(`${params.dataInicio} 00:00:00`, tz);
+      if (params.dataFim) dateFilter.lte = fromZonedTime(`${params.dataFim} 23:59:59`, tz);
       where.requestedDate = dateFilter;
     }
 
@@ -789,17 +814,15 @@ export class MaterialRequestService {
     const serieMensal = Object.values(serieMensalMap).sort((a, b) => a.mes.localeCompare(b.mes)).map(s => ({ ...s, custoEstimado: Math.round(s.custoEstimado * 100) / 100 }));
     const porProfessor = Object.values(porProfessorMap).sort((a, b) => b.requisicoes - a.requisicoes).slice(0, 10).map(p => ({ ...p, custoEstimado: Math.round(p.custoEstimado * 100) / 100 }));
 
-        return {
+    return {
       periodo: { inicio: params.dataInicio || null, fim: params.dataFim || null },
       escopo: params.unitId ? 'unidade' : (isCentralRole(user) ? 'rede' : 'unidade'),
-      totais: {
-        requisicoes: requisicoes.length,
-        aprovadas: porStatus['APROVADO'] || 0,
-        pendentes: (porStatus['SOLICITADO'] || 0) + (porStatus['EM_ANALISE'] || 0),
-        rejeitadas: porStatus['REJEITADO'] || 0,
-        entregues: porStatus['ENTREGUE'] || 0,
-        custoEstimadoTotal: Math.round(custoEstimadoTotal * 100) / 100,
-      },
+      total: requisicoes.length,
+      aprovados: (porStatus['APROVADO'] || 0) + (porStatus['ENTREGUE'] || 0),
+      pendentes: (porStatus['SOLICITADO'] || 0) + (porStatus['RASCUNHO'] || 0) + (porStatus['EM_ANALISE'] || 0),
+      rejeitados: porStatus['REJEITADO'] || 0,
+      entregues: porStatus['ENTREGUE'] || 0,
+      custoEstimadoTotal: Math.round(custoEstimadoTotal * 100) / 100,
       porCategoria,
       porTurma: Object.values(porTurmaMap),
       porUnidade: Object.values(porUnidadeMap),
