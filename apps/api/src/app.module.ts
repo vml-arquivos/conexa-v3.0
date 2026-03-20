@@ -40,6 +40,7 @@ import { FeatureFlagsModule } from './feature-flags/feature-flags.module';
 import { InsightsModule } from './insights/insights.module';
 import { UnitsModule } from './units/units.module';
 import { CatalogModule } from './catalog/catalog.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { CatalogModule } from './catalog/catalog.module';
     InsightsModule,
     UnitsModule,
     CatalogModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

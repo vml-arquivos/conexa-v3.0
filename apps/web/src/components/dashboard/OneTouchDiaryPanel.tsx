@@ -94,10 +94,10 @@ export function OneTouchDiaryPanel({ planningId, curriculumEntryId, classroomId,
         <Button 
           variant="outline" 
           className="h-24 flex flex-col gap-2 hover:bg-green-50 hover:border-green-200 hover:text-green-700 transition-all group"
-          onClick={() => handleQuickRegister('OCORRENCIA', 'Sem Ocorrências', 'Dia transcorreu sem intercorrências médicas ou disciplinares.')}
+          onClick={() => handleQuickRegister('OBSERVACAO', 'Sem Ocorrências', 'Dia transcorreu sem intercorrências médicas ou disciplinares.')}
           disabled={!!loading}
         >
-          {loading === 'OCORRENCIA' ? (
+          {loading === 'OBSERVACAO' ? (
             <Loader2 className="h-6 w-6 animate-spin" />
           ) : (
             <AlertCircle className="h-6 w-6 text-green-500 group-hover:scale-110 transition-transform" />

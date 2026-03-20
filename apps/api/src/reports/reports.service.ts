@@ -405,6 +405,24 @@ export class ReportsService {
       }
     }
 
+    // AUDITORIA MULTI-TENANT: MANTENEDORA/STAFF_CENTRAL não podem acessar unidades de outra mantenedora
+    if (
+      user.mantenedoraId &&
+      user.roles.some(
+        (r) =>
+          r.level === RoleLevel.MANTENEDORA ||
+          r.level === RoleLevel.STAFF_CENTRAL,
+      )
+    ) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: targetUnitId },
+        select: { mantenedoraId: true },
+      });
+      if (!unit || unit.mantenedoraId !== user.mantenedoraId) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
+    }
+
     // Período (padrão: hoje)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -502,6 +520,24 @@ export class ReportsService {
 
     if (user.roles.some((r) => r.level === RoleLevel.UNIDADE)) {
       if (user.unitId && user.unitId !== targetUnitId) {
+        throw new ForbiddenException('Sem acesso à unidade informada');
+      }
+    }
+
+    // AUDITORIA MULTI-TENANT: MANTENEDORA/STAFF_CENTRAL não podem acessar unidades de outra mantenedora
+    if (
+      user.mantenedoraId &&
+      user.roles.some(
+        (r) =>
+          r.level === RoleLevel.MANTENEDORA ||
+          r.level === RoleLevel.STAFF_CENTRAL,
+      )
+    ) {
+      const unit = await this.prisma.unit.findUnique({
+        where: { id: targetUnitId },
+        select: { mantenedoraId: true },
+      });
+      if (!unit || unit.mantenedoraId !== user.mantenedoraId) {
         throw new ForbiddenException('Sem acesso à unidade informada');
       }
     }

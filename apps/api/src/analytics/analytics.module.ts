@@ -3,6 +3,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuditDashboardAccessInterceptor } from '../common/interceptors/audit-dashboard-access.interceptor';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     }),
   ],
   controllers: [AnalyticsController],
-  providers: [AnalyticsService],
+  providers: [AnalyticsService, AuditDashboardAccessInterceptor],
   exports: [AnalyticsService],
 })
 export class AnalyticsModule {}

@@ -5,6 +5,7 @@ import { useUnitScope } from '../contexts/UnitScopeContext';
 import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
+import { getPedagogicalToday } from '../utils/pedagogicalDate';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, PieChart, Pie, Cell, RadialBarChart, RadialBar,
