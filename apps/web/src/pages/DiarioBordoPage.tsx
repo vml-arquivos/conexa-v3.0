@@ -373,9 +373,21 @@ export default function DiarioBordoPage() {
   async function salvarOcorrencia() {
     if (!criancaSelecionadaOcorr) { toast.error('Selecione uma criança'); return; }
     if (!ocorrForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
-    if (!classroomId) { toast.error('Turma não identificada'); return; }
     setSavingOcorr(true);
     try {
+      // Resolver classroomId: usar o do estado ou buscar a primeira turma acessível
+      let resolvedClassroomId = classroomId;
+      if (!resolvedClassroomId) {
+        try {
+          const turmasRes = await http.get('/lookup/classrooms/accessible');
+          const turmas: { id: string }[] = Array.isArray(turmasRes.data) ? turmasRes.data : [];
+          if (turmas.length > 0) {
+            resolvedClassroomId = turmas[0].id;
+            setClassroomId(resolvedClassroomId);
+          }
+        } catch { /* continua sem classroomId */ }
+      }
+
       const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorrForm.categoria)?.label ?? ocorrForm.categoria;
       // 1) Criar evento SEM base64 no JSON (resolve 413)
       // planningId e curriculumEntryId são opcionais — só incluir se existirem
@@ -385,16 +397,19 @@ export default function DiarioBordoPage() {
         description: ocorrForm.descricao,
         eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
         childId: criancaSelecionadaOcorr,
-        classroomId,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
         aiContext: { categoria: ocorrForm.categoria, categoriaLabel: catLabel },
       };
+      // classroomId é opcional no backend — incluir apenas se resolvido
+      if (resolvedClassroomId) payload.classroomId = resolvedClassroomId;
       if (planejamentoHoje?.id) payload.planningId = planejamentoHoje.id;
       if (planejamentoHoje?.curriculumEntryId) payload.curriculumEntryId = planejamentoHoje.curriculumEntryId;
+
       const res = await http.post('/diary-events', payload);
       const eventoId: string = res.data?.id;
+
       // 2) Upload das fotos via multipart (sem base64 no payload)
       if (eventoId && ocorrForm.fotosFiles.length > 0) {
         for (const file of ocorrForm.fotosFiles) {
@@ -405,7 +420,7 @@ export default function DiarioBordoPage() {
           });
         }
       }
-      toast.success('Ocorrência registrada!');
+      toast.success('Ocorrência registrada com sucesso!');
       ocorrForm.fotos.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
       setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: getPedagogicalToday(), fotos: [], fotosFiles: [] });
       setCriancaSelecionadaOcorr('');

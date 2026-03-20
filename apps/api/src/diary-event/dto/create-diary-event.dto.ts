@@ -37,9 +37,9 @@ export class CreateDiaryEventDto {
   childId: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @Matches(CUID_REGEX, { message: 'classroomId deve ser um CUID válido' })
-  classroomId: string;
+  classroomId?: string;
 
   // planningId e curriculumEntryId são opcionais para permitir registros
   // de diário e microgestos sem vínculo obrigatório a um planejamento

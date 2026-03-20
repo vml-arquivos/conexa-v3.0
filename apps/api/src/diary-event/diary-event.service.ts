@@ -52,13 +52,27 @@ export class DiaryEventService {
       assertSchoolDay(eventDate, unit?.nonSchoolDays ?? [], BadRequestException);
     }
 
+    // Resolver classroomId: usar o fornecido ou buscar via matrícula ativa da criança
+    let resolvedClassroomId = createDto.classroomId;
+    if (!resolvedClassroomId) {
+      const activeEnrollment = await this.prisma.enrollment.findFirst({
+        where: { childId: createDto.childId, status: 'ATIVA' },
+        select: { classroomId: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!activeEnrollment) {
+        throw new BadRequestException('Criança não possui matrícula ativa em nenhuma turma');
+      }
+      resolvedClassroomId = activeEnrollment.classroomId;
+    }
+
     // Validar se a criança existe e pertence à turma
     const child = await this.prisma.child.findUnique({
       where: { id: createDto.childId },
       include: {
         enrollments: {
           where: {
-            classroomId: createDto.classroomId,
+            classroomId: resolvedClassroomId,
             status: 'ATIVA',
           },
         },
@@ -75,7 +89,7 @@ export class DiaryEventService {
 
     // Validar se a turma existe
     const classroom = await this.prisma.classroom.findUnique({
-      where: { id: createDto.classroomId },
+      where: { id: resolvedClassroomId },
       include: {
         unit: {
           select: {
@@ -126,7 +140,7 @@ export class DiaryEventService {
         );
       }
 
-      if (planning.classroomId !== createDto.classroomId) {
+      if (planning.classroomId !== resolvedClassroomId) {
         throw new BadRequestException('O planejamento não pertence à turma informada');
       }
     }
@@ -157,7 +171,7 @@ export class DiaryEventService {
         description: createDto.description,
         eventDate,
         childId: createDto.childId,
-        classroomId: createDto.classroomId,
+        classroomId: resolvedClassroomId,
         ...(createDto.planningId ? { planningId: createDto.planningId } : {}),
         ...(createDto.curriculumEntryId ? { curriculumEntryId: createDto.curriculumEntryId } : {}),
 
