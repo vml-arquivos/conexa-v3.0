@@ -25,6 +25,7 @@ import http from '@/api/http';
 import { getAccessibleClassrooms } from '@/api/lookup';
 import { flushOfflineQueue } from '@/api/diary.api';
 import { useAuth } from '../app/AuthProvider';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 interface ClassroomChild {
   id: string;

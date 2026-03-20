@@ -17,6 +17,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isCentral as checkIsCentral, isUnidade as checkIsUnidade } from '../api/auth';
 import { useUnitScope } from '../contexts/UnitScopeContext';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },

@@ -1,33 +1,53 @@
 /**
  * Pedagogical Date Utilities
- * 
- * Provides a single source of truth for date calculations in the pedagogical context.
+ *
+ * Single source of truth for date calculations in the pedagogical context.
  * All dates are calculated in America/Sao_Paulo timezone to ensure consistency
  * with the school calendar and avoid timezone-related bugs.
+ *
+ * HOTFIX: implementação canônica via Intl.DateTimeFormat (zero libs, SSR-safe).
+ * Usar SEMPRE esta função — nunca new Date().toISOString() diretamente.
  */
 
+export const PEDAGOGICAL_TZ = 'America/Sao_Paulo';
+
 /**
- * Returns the current pedagogical date in YYYY-MM-DD format (America/Sao_Paulo timezone)
- * 
- * This is the ONLY function that should be used to determine "today" in pedagogical contexts.
- * 
- * @returns {string} Current date in YYYY-MM-DD format (e.g., "2026-02-06")
- * 
+ * Retorna a data pedagógica atual no formato YYYY-MM-DD (fuso America/Sao_Paulo).
+ *
+ * @param tz - Fuso horário (padrão: America/Sao_Paulo)
+ * @returns string YYYY-MM-DD
+ *
  * @example
- * const today = getPedagogicalToday();
- * // Returns: "2026-02-06" (in America/Sao_Paulo timezone)
+ * getPedagogicalToday(); // "2026-03-20"
  */
-export function getPedagogicalToday(): string {
-  // Create date in America/Sao_Paulo timezone
-  const now = new Date();
-  const saoPauloDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-  
-  // Extract year, month, day
-  const year = saoPauloDate.getFullYear();
-  const month = String(saoPauloDate.getMonth() + 1).padStart(2, '0');
-  const day = String(saoPauloDate.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
+export function getPedagogicalToday(tz: string = PEDAGOGICAL_TZ): string {
+  // en-CA produz YYYY-MM-DD nativamente via Intl — sem manipulação manual de string
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  return fmt.format(new Date());
+}
+
+/**
+ * Normaliza uma data pedagógica: se vier inválida ou ausente, retorna hoje.
+ * Evita que datas corrompidas causem drift para 2020/2021.
+ *
+ * @param input - String de data (YYYY-MM-DD) ou undefined
+ * @returns string YYYY-MM-DD válida
+ *
+ * @example
+ * normalizePedagogicalDate('2026-03-20');  // '2026-03-20'
+ * normalizePedagogicalDate('lixo');        // hoje
+ * normalizePedagogicalDate(undefined);     // hoje
+ */
+export function normalizePedagogicalDate(input?: string): string {
+  if (!input) return getPedagogicalToday();
+  // Aceita estritamente YYYY-MM-DD
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(input);
+  return ok ? input : getPedagogicalToday();
 }
 
 /**

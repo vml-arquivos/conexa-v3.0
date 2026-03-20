@@ -26,6 +26,7 @@ import {
   UploadCloud,
   RefreshCw,
 } from 'lucide-react';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Campos de Experiência com ícones e linguagem simples ─────────────────────
 const CAMPOS_EXPERIENCIA = [

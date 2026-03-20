@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { MATRIZ_2026 } from '../data/matrizCompleta2026';
 import type { SegmentoKey } from '../data/matrizCompleta2026';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface TurmaTeacher {
