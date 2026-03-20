@@ -695,7 +695,7 @@ export class MaterialRequestService {
 
   async relatorioConsumo(
     user: JwtPayload,
-    params: { classroomId?: string; dataInicio?: string; dataFim?: string; unitId?: string },
+    params: { classroomId?: string; dataInicio?: string; dataFim?: string; unitId?: string; teacherId?: string },
   ) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
@@ -709,6 +709,7 @@ export class MaterialRequestService {
     }
 
     if (params.classroomId) where.classroomId = params.classroomId;
+    if (params.teacherId) where.createdBy = params.teacherId;
     if (params.dataInicio || params.dataFim) {
       const dateFilter: Record<string, Date> = {};
       if (params.dataInicio) dateFilter.gte = new Date(params.dataInicio);
@@ -720,8 +721,9 @@ export class MaterialRequestService {
       where: where as any,
       include: {
         classroom: { select: { name: true } },
-        createdByUser: { select: { firstName: true, lastName: true, email: true } },
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
+        items: { select: { quantity: true, unitPrice: true } },
       },
       orderBy: { requestedDate: 'desc' },
     });
@@ -756,7 +758,38 @@ export class MaterialRequestService {
       if (r.estimatedCost) custoEstimadoTotal += r.estimatedCost;
     }
 
-    return {
+    // ─── Série mensal ────────────────────────────────────────────────────────────
+    const serieMensalMap: Record<string, { mes: string; requisicoes: number; aprovadas: number; pendentes: number; rejeitadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
+    const porProfessorMap: Record<string, { teacherId: string; nome: string; requisicoes: number; aprovadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
+    for (const r of requisicoes) {
+      const d = new Date(r.requestedDate);
+      const mes = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      if (!serieMensalMap[mes]) serieMensalMap[mes] = { mes, requisicoes: 0, aprovadas: 0, pendentes: 0, rejeitadas: 0, entregues: 0, custoEstimado: 0, itens: 0 };
+      serieMensalMap[mes].requisicoes++;
+      if (r.status === 'APROVADO') serieMensalMap[mes].aprovadas++;
+      else if (r.status === 'ENTREGUE') { serieMensalMap[mes].aprovadas++; serieMensalMap[mes].entregues++; }
+      else if (r.status === 'REJEITADO') serieMensalMap[mes].rejeitadas++;
+      else serieMensalMap[mes].pendentes++;
+      const itemsArr = (r as any).items ?? [];
+      const qtdItens = itemsArr.length > 0 ? itemsArr.reduce((s: number, i: any) => s + (i.quantity ?? 0), 0) : (r.quantity ?? 0);
+      const custoItens = itemsArr.length > 0 ? itemsArr.reduce((s: number, i: any) => s + ((i.unitPrice ?? 0) * (i.quantity ?? 0)), 0) : (r.estimatedCost ?? 0);
+      serieMensalMap[mes].itens += qtdItens;
+      serieMensalMap[mes].custoEstimado += custoItens;
+      // Por professor
+      if (r.createdBy && r.createdByUser) {
+        const tid = r.createdBy;
+        if (!porProfessorMap[tid]) porProfessorMap[tid] = { teacherId: tid, nome: `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim(), requisicoes: 0, aprovadas: 0, entregues: 0, custoEstimado: 0, itens: 0 };
+        porProfessorMap[tid].requisicoes++;
+        if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porProfessorMap[tid].aprovadas++;
+        if (r.status === 'ENTREGUE') porProfessorMap[tid].entregues++;
+        porProfessorMap[tid].custoEstimado += custoItens;
+        porProfessorMap[tid].itens += qtdItens;
+      }
+    }
+    const serieMensal = Object.values(serieMensalMap).sort((a, b) => a.mes.localeCompare(b.mes)).map(s => ({ ...s, custoEstimado: Math.round(s.custoEstimado * 100) / 100 }));
+    const porProfessor = Object.values(porProfessorMap).sort((a, b) => b.requisicoes - a.requisicoes).slice(0, 10).map(p => ({ ...p, custoEstimado: Math.round(p.custoEstimado * 100) / 100 }));
+
+        return {
       periodo: { inicio: params.dataInicio || null, fim: params.dataFim || null },
       escopo: params.unitId ? 'unidade' : (isCentralRole(user) ? 'rede' : 'unidade'),
       totais: {
@@ -788,6 +821,8 @@ export class MaterialRequestService {
         dataSolicitacao: r.requestedDate,
         dataAprovacao: r.approvedDate,
       })),
+      serieMensal,
+      porProfessor,
     };
   }
 }

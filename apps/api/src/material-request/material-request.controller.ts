@@ -50,8 +50,9 @@ export class MaterialRequestController {
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
     @Query('unitId') unitId?: string,
+    @Query('teacherId') teacherId?: string,
   ) {
-    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId });
+    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId, teacherId });
   }
 
   /**

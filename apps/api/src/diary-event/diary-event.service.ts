@@ -408,6 +408,27 @@ export class DiaryEventService {
     throw new ForbiddenException('Acesso negado');
   }
 
+  async uploadMedia(id: string, file: Express.Multer.File, user: JwtPayload): Promise<{ mediaUrls: string[] }> {
+    if (!file) throw new BadRequestException('Arquivo obrigatório');
+    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Arquivo muito grande (máx. 5 MB)');
+    const event = await this.prisma.diaryEvent.findUnique({ where: { id } });
+    if (!event) throw new NotFoundException('Evento não encontrado');
+    const isCreator = event.createdBy === user.sub;
+    const isUnitScope = user.unitId && event.unitId === user.unitId;
+    const isCentral = user.roles.some((r) =>
+      r.level === RoleLevel.STAFF_CENTRAL ||
+      r.level === RoleLevel.MANTENEDORA ||
+      r.level === RoleLevel.DEVELOPER
+    );
+    if (!isCreator && !isUnitScope && !isCentral) throw new ForbiddenException('Acesso negado');
+    const base64 = file.buffer.toString('base64');
+    const dataUrl = `data:${file.mimetype};base64,${base64}`;
+    const existing: string[] = Array.isArray(event.mediaUrls) ? (event.mediaUrls as string[]) : [];
+    const mediaUrls = [...existing, dataUrl];
+    await this.prisma.diaryEvent.update({ where: { id }, data: { mediaUrls } });
+    return { mediaUrls };
+  }
+
   private diffInMonths(dateOfBirth: Date, referenceDate: Date): number {
     const dob = new Date(dateOfBirth);
     const ref = new Date(referenceDate);

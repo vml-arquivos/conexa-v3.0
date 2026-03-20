@@ -273,7 +273,8 @@ export default function DiarioBordoPage() {
     categoria: 'COMPORTAMENTO',
     descricao: '',
     eventDate: new Date().toISOString().split('T')[0],
-    fotos: [] as string[], // base64 data URLs
+    fotos: [] as string[], // preview URLs (object URLs) — não enviados no JSON
+    fotosFiles: [] as File[], // arquivos originais para upload multipart
   });
   const [uploadingFoto, setUploadingFoto] = useState(false);
 
@@ -359,20 +360,9 @@ export default function DiarioBordoPage() {
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande (máx. 5 MB)'); return; }
-    setUploadingFoto(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        setOcorrForm(f => ({ ...f, fotos: [...f.fotos, dataUrl] }));
-        setUploadingFoto(false);
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      toast.error('Erro ao processar imagem');
-      setUploadingFoto(false);
-    }
-    // Reset input
+    // Usar object URL apenas para preview — não converte para base64
+    const previewUrl = URL.createObjectURL(file);
+    setOcorrForm(f => ({ ...f, fotos: [...f.fotos, previewUrl], fotosFiles: [...f.fotosFiles, file] }));
     e.target.value = '';
   }
 
@@ -383,7 +373,8 @@ export default function DiarioBordoPage() {
     setSavingOcorr(true);
     try {
       const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorrForm.categoria)?.label ?? ocorrForm.categoria;
-      await http.post('/diary-events', {
+      // 1) Criar evento SEM base64 no JSON (resolve 413)
+      const res = await http.post('/diary-events', {
         type: 'COMPORTAMENTO',
         title: `Ocorrência: ${catLabel}`,
         description: ocorrForm.descricao,
@@ -391,12 +382,24 @@ export default function DiarioBordoPage() {
         childId: criancaSelecionadaOcorr,
         classroomId,
         behaviorNotes: ocorrForm.descricao,
-        mediaUrls: ocorrForm.fotos,
+        mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
         aiContext: { categoria: ocorrForm.categoria, categoriaLabel: catLabel },
       });
+      const eventoId: string = res.data?.id;
+      // 2) Upload das fotos via multipart (sem base64 no payload)
+      if (eventoId && ocorrForm.fotosFiles.length > 0) {
+        for (const file of ocorrForm.fotosFiles) {
+          const fd = new FormData();
+          fd.append('file', file);
+          await http.post(`/diary-events/${eventoId}/media`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        }
+      }
       toast.success('Ocorrência registrada!');
-      setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: new Date().toISOString().split('T')[0], fotos: [] });
+      ocorrForm.fotos.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
+      setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: new Date().toISOString().split('T')[0], fotos: [], fotosFiles: [] });
       setCriancaSelecionadaOcorr('');
       loadOcorrencias();
     } catch (err: any) {
@@ -1484,7 +1487,10 @@ export default function DiarioBordoPage() {
                           <img src={foto} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                           <button
                             type="button"
-                            onClick={() => setOcorrForm(f => ({ ...f, fotos: f.fotos.filter((_, i) => i !== idx) }))}
+                            onClick={() => {
+                              try { URL.revokeObjectURL(ocorrForm.fotos[idx]); } catch {}
+                              setOcorrForm(f => ({ ...f, fotos: f.fotos.filter((_, i) => i !== idx), fotosFiles: f.fotosFiles.filter((_, i) => i !== idx) }));
+                            }}
                             className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
                             <X className="h-3 w-3" />
                           </button>

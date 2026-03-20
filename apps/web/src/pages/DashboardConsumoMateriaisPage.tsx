@@ -6,7 +6,7 @@ import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, Sector,
 } from 'recharts';
 import {
@@ -90,6 +90,8 @@ export default function DashboardConsumoMateriaisPage() {
   const [dataFim, setDataFim] = useState(() => new Date().toISOString().split('T')[0]);
   const [classroomId, setClassroomId] = useState('');
   const [turmas, setTurmas] = useState<{ id: string; name: string }[]>([]);
+  const [teacherId, setTeacherId] = useState('');
+  const [professores, setProfessores] = useState<{ id: string; name: string }[]>([]);
 
   const carregar = async () => {
     setLoading(true);
@@ -101,6 +103,7 @@ export default function DashboardConsumoMateriaisPage() {
       if (classroomId) params.classroomId = classroomId;
       // Aplicar filtro de unidade do contexto global (para STAFF_CENTRAL)
       if (ctxUnitId) params.unitId = ctxUnitId;
+      if (teacherId) params.teacherId = teacherId;
       const { data } = await http.get('/material-requests/relatorio-consumo', { params });
       setRelatorio(data);
     } catch (e: any) {
@@ -139,6 +142,18 @@ export default function DashboardConsumoMateriaisPage() {
   const dadosStatus = relatorio
     ? Object.entries(relatorio.porStatus).map(([k, v]) => ({ name: k, value: v }))
     : [];
+  const dadosMensal = (relatorio as any)?.serieMensal?.map((s: any) => ({
+    name: s.mes,
+    Requisições: s.requisicoes,
+    Aprovadas: s.aprovadas,
+    Pendentes: s.pendentes,
+    Rejeitadas: s.rejeitadas,
+  })) ?? [];
+  const dadosProfessor = (relatorio as any)?.porProfessor?.slice(0, 8).map((p: any) => ({
+    name: p.nome.length > 16 ? p.nome.slice(0, 16) + '…' : p.nome,
+    Requisições: p.requisicoes,
+    Aprovadas: p.aprovadas,
+  })) ?? [];
 
   return (
     <PageShell
@@ -157,7 +172,7 @@ export default function DashboardConsumoMateriaisPage() {
       )}
       {/* ─── Filtros ─── */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Data início</label>
             <input
@@ -189,6 +204,21 @@ export default function DashboardConsumoMateriaisPage() {
               ))}
             </select>
           </div>
+          {professores.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Professor (opcional)</label>
+              <select
+                value={teacherId}
+                onChange={(e) => setTeacherId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Todos os professores</option>
+                {professores.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             onClick={carregar}
             className="flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -308,6 +338,42 @@ export default function DashboardConsumoMateriaisPage() {
             )}
           </div>
 
+          {/* ─── Série mensal ─── */}
+          {dadosMensal.length > 1 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+              <h3 className="font-semibold text-gray-800 mb-4">Evolução Mensal de Requisições</h3>
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={dadosMensal} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip content={<TooltipCustom />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="Requisições" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Aprovadas" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Pendentes" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="Rejeitadas" stroke="#ef4444" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {/* ─── Por professor ─── */}
+          {dadosProfessor.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+              <h3 className="font-semibold text-gray-800 mb-4">Requisições por Professor (Top 8)</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={dadosProfessor} layout="vertical" margin={{ top: 0, right: 20, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                  <Tooltip content={<TooltipCustom />} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="Requisições" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="Aprovadas" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
           {/* ─── Taxa de aprovação ─── */}
           {relatorio.total > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
