@@ -9,6 +9,7 @@ import {
   Matches,
   IsInt,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { DiaryEventType } from '@prisma/client';
 
@@ -36,20 +37,23 @@ export class CreateDiaryEventDto {
   @Matches(CUID_REGEX, { message: 'childId deve ser um CUID válido' })
   childId: string;
 
-  @IsString()
+  // classroomId é opcional — quando ausente, o service resolve via matrícula ativa da criança
   @IsOptional()
+  @ValidateIf((o) => o.classroomId != null && o.classroomId !== '')
+  @IsString()
   @Matches(CUID_REGEX, { message: 'classroomId deve ser um CUID válido' })
   classroomId?: string;
 
-  // planningId e curriculumEntryId são opcionais para permitir registros
-  // de diário e microgestos sem vínculo obrigatório a um planejamento
-  @IsString()
+  // planningId e curriculumEntryId são opcionais — sem vínculo obrigatório a planejamento
   @IsOptional()
+  @ValidateIf((o) => o.planningId != null && o.planningId !== '')
+  @IsString()
   @Matches(CUID_REGEX, { message: 'planningId deve ser um CUID válido' })
   planningId?: string;
 
-  @IsString()
   @IsOptional()
+  @ValidateIf((o) => o.curriculumEntryId != null && o.curriculumEntryId !== '')
+  @IsString()
   @Matches(CUID_REGEX, { message: 'curriculumEntryId deve ser um CUID válido' })
   curriculumEntryId?: string;
 

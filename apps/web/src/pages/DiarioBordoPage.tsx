@@ -395,7 +395,7 @@ export default function DiarioBordoPage() {
         type: 'OBSERVACAO',
         title: `Ocorrência: ${catLabel}`,
         description: ocorrForm.descricao,
-        eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
+        eventDate: (ocorrForm.eventDate || getPedagogicalToday()) + 'T12:00:00.000Z',
         childId: criancaSelecionadaOcorr,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
