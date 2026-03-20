@@ -373,26 +373,43 @@ export default function DiarioBordoPage() {
   async function salvarOcorrencia() {
     if (!criancaSelecionadaOcorr) { toast.error('Selecione uma criança'); return; }
     if (!ocorrForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
-    if (!classroomId) { toast.error('Turma não identificada'); return; }
     setSavingOcorr(true);
     try {
+      // Resolver classroomId: usar o do estado ou buscar a primeira turma acessível
+      let resolvedClassroomId = classroomId;
+      if (!resolvedClassroomId) {
+        try {
+          const turmasRes = await http.get('/lookup/classrooms/accessible');
+          const turmas: { id: string }[] = Array.isArray(turmasRes.data) ? turmasRes.data : [];
+          if (turmas.length > 0) {
+            resolvedClassroomId = turmas[0].id;
+            setClassroomId(resolvedClassroomId);
+          }
+        } catch { /* continua sem classroomId */ }
+      }
+
       const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorrForm.categoria)?.label ?? ocorrForm.categoria;
       // 1) Criar evento SEM base64 no JSON (resolve 413)
-      const res = await http.post('/diary-events', {
-        type: 'COMPORTAMENTO',
+      // planningId e curriculumEntryId são opcionais — só incluir se existirem
+      const payload: Record<string, any> = {
+        type: 'OBSERVACAO',
         title: `Ocorrência: ${catLabel}`,
         description: ocorrForm.descricao,
         eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
         childId: criancaSelecionadaOcorr,
-        classroomId,
-        planningId: planejamentoHoje?.id,
-        curriculumEntryId: planejamentoHoje?.curriculumEntryId,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
         aiContext: { categoria: ocorrForm.categoria, categoriaLabel: catLabel },
-      });
+      };
+      // classroomId é opcional no backend — incluir apenas se resolvido
+      if (resolvedClassroomId) payload.classroomId = resolvedClassroomId;
+      if (planejamentoHoje?.id) payload.planningId = planejamentoHoje.id;
+      if (planejamentoHoje?.curriculumEntryId) payload.curriculumEntryId = planejamentoHoje.curriculumEntryId;
+
+      const res = await http.post('/diary-events', payload);
       const eventoId: string = res.data?.id;
+
       // 2) Upload das fotos via multipart (sem base64 no payload)
       if (eventoId && ocorrForm.fotosFiles.length > 0) {
         for (const file of ocorrForm.fotosFiles) {
@@ -403,7 +420,7 @@ export default function DiarioBordoPage() {
           });
         }
       }
-      toast.success('Ocorrência registrada!');
+      toast.success('Ocorrência registrada com sucesso!');
       ocorrForm.fotos.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
       setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: getPedagogicalToday(), fotos: [], fotosFiles: [] });
       setCriancaSelecionadaOcorr('');
@@ -544,69 +561,50 @@ export default function DiarioBordoPage() {
         // Chamada ainda não feita — não é erro, apenas não pré-preenche
       }
 
-      // Buscar planejamento aprovado/em execução do dia
+      // Buscar planejamento ativo do dia via endpoint dedicado (timezone-safe)
+      // Usa getPedagogicalToday() para garantir data correta em America/Sao_Paulo
       try {
-        const hoje = (() => {
-          const d = new Date();
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          return `${y}-${m}-${dd}`;
-        })();
-        const planRes = await http.get('/plannings', {
-          params: {
-            classroomId: cid,
-            startDate: hoje,
-            endDate: hoje,
-            limit: 1,
-          },
+        const hoje = getPedagogicalToday();
+        const activePlanRes = await http.get('/plannings/active-today', {
+          params: { classroomId: cid, date: hoje },
         });
-        const planData = planRes.data;
-        const planList = Array.isArray(planData) ? planData : planData?.data ?? [];
-        // Aceitar planejamentos APROVADO ou EM_EXECUCAO
-        const planHoje = planList.find((p: any) =>
-          p.status === 'APROVADO' || p.status === 'EM_EXECUCAO' || p.status === 'ACTIVE'
-        );
-        if (planHoje) {
-          const pc = typeof planHoje.pedagogicalContent === 'string'
-            ? JSON.parse(planHoje.pedagogicalContent)
-            : planHoje.pedagogicalContent;
-          // G3 FIX: extrair campos da matriz pedagógica do planejamento
-          const desc = typeof planHoje.description === 'string' && planHoje.description.startsWith('{')
-            ? (() => { try { return JSON.parse(planHoje.description); } catch { return null; } })()
-            : null;
-          const objetivosMatriz: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }> =
-            desc?.objectives ?? pc?.objetivosMatriz ?? [];
-          const camposExperiencia: string[] =
-            desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
-
-          // Buscar CurriculumEntry do dia para vincular às ocorrências
-          let curriculumEntryId: string | undefined;
-          let curriculumMatrixId: string | undefined = planHoje.curriculumMatrixId;
+        const activePlan = activePlanRes.data;
+        if (activePlan?.hasActivePlanning && activePlan.planningId) {
+          // Buscar detalhes completos do planning para exibição no painel
+          let objectives = '';
+          let activities = '';
+          let camposExperiencia: string[] = [];
+          let objetivosMatriz: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }> = [];
+          let recursos = '';
           try {
-            const entryRes = await http.get('/curriculum-matrix-entries/by-classroom-date', {
-              params: { classroomId: cid, date: hoje, days: 1 },
-            });
-            const entries = Array.isArray(entryRes.data) ? entryRes.data : entryRes.data?.data ?? [];
-            if (entries.length > 0) {
-              curriculumEntryId = entries[0].id;
-              if (!curriculumMatrixId) curriculumMatrixId = entries[0].matrixId;
-            }
+            const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
+            const planHoje = detailRes.data;
+            const pc = typeof planHoje.pedagogicalContent === 'string'
+              ? JSON.parse(planHoje.pedagogicalContent)
+              : (planHoje.pedagogicalContent ?? {});
+            const desc = typeof planHoje.description === 'string' && planHoje.description.startsWith('{')
+              ? (() => { try { return JSON.parse(planHoje.description); } catch { return null; } })()
+              : null;
+            objectives = pc?.objetivos || planHoje.objectives || desc?.objectives_text || '';
+            activities = pc?.atividades || planHoje.activities || desc?.activities || '';
+            camposExperiencia = desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
+            objetivosMatriz = desc?.objectives ?? pc?.objetivosMatriz ?? [];
+            recursos = desc?.resources || pc?.recursos || '';
           } catch {
-            // Sem entrada de matriz para hoje — não é erro crítico
+            // Detalhes não críticos — continua com dados básicos
           }
-
           setPlanejamentoHoje({
-            id: planHoje.id,
-            title: planHoje.title || 'Planejamento do Dia',
-            objectives: pc?.objetivos || planHoje.objectives || desc?.objectives_text || '',
-            activities: pc?.atividades || planHoje.activities || desc?.activities || '',
-            status: planHoje.status,
+            id: activePlan.planningId,
+            title: activePlan.title || 'Planejamento do Dia',
+            objectives,
+            activities,
+            status: activePlan.status ?? 'EM_EXECUCAO',
             camposExperiencia,
             objetivosMatriz,
-            recursos: desc?.resources || pc?.recursos || '',
-            curriculumMatrixId,
-            curriculumEntryId,
+            recursos,
+            curriculumMatrixId: undefined,
+            // curriculumEntryId vem do endpoint active-today (opcional — não bloqueia o botão)
+            curriculumEntryId: activePlan.curriculumEntryId,
           });
         }
       } catch {
@@ -1409,28 +1407,23 @@ export default function DiarioBordoPage() {
             </p>
           </div>
 
-          {/* Aviso quando não há planejamento ativo ou entrada da matriz para hoje */}
+          {/* Aviso quando não há planejamento ativo para hoje */}
           {classroomId && !planejamentoHoje && (
             <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
               <TriangleAlert className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-semibold text-yellow-800">Sem planejamento ativo para hoje</p>
                 <p className="text-xs text-yellow-700 mt-0.5">
-                  Para registrar uma ocorrência, é necessário ter um planejamento com status <strong>Em Execução</strong> vinculado à turma de hoje.
-                  Crie ou ative um planejamento antes de prosseguir.
+                  Para registrar uma ocorrência, é necessário ter um planejamento com status{' '}
+                  <strong>Aprovado</strong> ou <strong>Em Execução</strong> vinculado à turma de hoje.
                 </p>
-              </div>
-            </div>
-          )}
-          {classroomId && planejamentoHoje && !planejamentoHoje.curriculumEntryId && (
-            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
-              <TriangleAlert className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-yellow-800">Sem entrada da Matriz Curricular para hoje</p>
-                <p className="text-xs text-yellow-700 mt-0.5">
-                  O planejamento está ativo, mas não há uma entrada da Matriz Curricular para a data de hoje.
-                  Contate a coordenação para configurar a matriz antes de registrar ocorrências.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.href = '/planejamentos'}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-yellow-800 underline underline-offset-2 hover:text-yellow-900"
+                >
+                  <BookOpen className="h-3 w-3" /> Ir para Planejamentos
+                </button>
               </div>
             </div>
           )}
@@ -1565,16 +1558,14 @@ export default function DiarioBordoPage() {
                 disabled={
                   savingOcorr ||
                   !criancaSelecionadaOcorr ||
-                  !ocorrForm.descricao.trim() ||
-                  !planejamentoHoje?.id ||
-                  !planejamentoHoje?.curriculumEntryId
+                  !ocorrForm.descricao.trim()
                 }
                 title={
-                  !planejamentoHoje?.id
-                    ? 'Necessário ter planejamento ativo para registrar ocorrência'
-                    : !planejamentoHoje?.curriculumEntryId
-                    ? 'Necessário ter entrada da Matriz Curricular para hoje'
-                    : undefined
+                  !criancaSelecionadaOcorr
+                    ? 'Selecione uma criança'
+                    : !ocorrForm.descricao.trim()
+                    ? 'Descreva a ocorrência'
+                    : 'Registrar ocorrência'
                 }
                 className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >

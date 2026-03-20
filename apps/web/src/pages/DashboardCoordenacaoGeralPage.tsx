@@ -27,7 +27,9 @@ import {
   TrendingUp, Calendar, Network, RefreshCw, ChevronRight,
   Building2, GraduationCap, Bell, Star, Activity, BarChart2, Brain,
   FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers, Sparkles,
+  TriangleAlert,
 } from 'lucide-react';
+import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -183,7 +185,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const [funil, setFunil] = useState<GovernanceFunnel | null>(null);
   const [coverageFields, setCoverageFields] = useState<Array<{ field: string; pct: number }>>([]);
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'requisicoes' | 'reunioes'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'requisicoes' | 'reunioes' | 'ocorrencias'>('visao');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'otimo' | 'atencao' | 'critico'>('todas');
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -273,6 +275,7 @@ export default function DashboardCoordenacaoGeralPage() {
     { id: 'pedagogico',  label: 'Pedagógico',     icon: <Brain className="h-3.5 w-3.5" /> },
     { id: 'requisicoes', label: `Requisições${reqPendentes > 0 ? ` (${reqPendentes})` : ''}`, icon: <ShoppingCart className="h-3.5 w-3.5" /> },
     { id: 'reunioes',    label: 'Reuniões',        icon: <Calendar className="h-3.5 w-3.5" /> },
+    { id: 'ocorrencias', label: 'Ocorrências',      icon: <TriangleAlert className="h-3.5 w-3.5" /> },
   ] as const;
 
   return (
@@ -725,6 +728,15 @@ export default function DashboardCoordenacaoGeralPage() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: OCORRÊNCIAS
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'ocorrencias' && (
+        <div className="space-y-4">
+          <OcorrenciasPanel titulo="Ocorrências da Rede" />
         </div>
       )}
     </PageShell>

@@ -18,6 +18,8 @@ import { useAuth } from '../app/AuthProvider';
 import { isCentral as checkIsCentral, isUnidade as checkIsUnidade } from '../api/auth';
 import { useUnitScope } from '../contexts/UnitScopeContext';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
+import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
+import { TriangleAlert } from 'lucide-react';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -68,7 +70,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'>('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -309,6 +311,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
     { id: 'relatorios', label: 'Relatórios', icon: <TrendingUp className="h-4 w-4" /> },
     { id: 'cobertura', label: 'Cobertura', icon: <BarChart2 className="h-4 w-4" /> },
+    { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -1000,6 +1003,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Aba Ocorrências */}
+      {abaAtiva === 'ocorrencias' && (
+        <div className="space-y-4">
+          <OcorrenciasPanel titulo="Ocorrências da Unidade" />
         </div>
       )}
 
