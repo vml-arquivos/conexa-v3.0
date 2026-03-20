@@ -93,17 +93,10 @@ export class DiaryEventService {
     // Validação de acesso por nível hierárquico
     await this.validateUserAccess(user, classroom);
 
-    // OBRIGATORIEDADE PARA OCORRÊNCIAS: vínculo com Planning e CurriculumEntry
-    const isOcorrencia = createDto.tags?.includes('ocorrencia') || 
+    // Ocorrências: planningId e curriculumEntryId são opcionais.
+    // O professor pode registrar uma ocorrência mesmo sem planejamento ativo.
+    const isOcorrencia = createDto.tags?.includes('ocorrencia') ||
       ['COMPORTAMENTO', 'SAUDE', 'FAMILIA'].includes(createDto.type);
-      
-    if (isOcorrencia) {
-      if (!createDto.planningId || !createDto.curriculumEntryId) {
-        throw new BadRequestException(
-          'Ocorrências exigem vínculo obrigatório com um Planejamento ativo e uma Entrada da Matriz Curricular.',
-        );
-      }
-    }
 
     // VALIDAÇÃO OPCIONAL: Planning (somente se planningId fornecido)
     if (createDto.planningId) {
@@ -120,8 +113,9 @@ export class DiaryEventService {
         throw new BadRequestException('Planejamento cancelado não pode receber eventos');
       }
       
-      if (isOcorrencia && planning.status !== PlanningStatus.EM_EXECUCAO) {
-        throw new BadRequestException('Ocorrências só podem ser registradas em planejamentos com status EM_EXECUCAO');
+      // Ocorrências aceitam APROVADO ou EM_EXECUCAO
+      if (isOcorrencia && !([PlanningStatus.APROVADO, PlanningStatus.EM_EXECUCAO] as string[]).includes(planning.status)) {
+        throw new BadRequestException('Ocorrências só podem ser registradas em planejamentos Aprovados ou Em Execução');
       }
 
       const planningStart = new Date(planning.startDate);

@@ -10,8 +10,9 @@ import { useAuth } from '../app/AuthProvider';
 import {
   LayoutDashboard, ShoppingCart, Users, FileText,
   CheckCircle, XCircle, Clock, RefreshCw, Eye,
-  TrendingUp, AlertTriangle, BookOpen, ChevronRight,
+  TrendingUp, AlertTriangle, BookOpen, ChevronRight, TriangleAlert,
 } from 'lucide-react';
+import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface PedidoCompra {
@@ -60,7 +61,7 @@ const CAT_LABEL: Record<string, string> = {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export function DashboardDiretorPage() {
   const { user } = useAuth();
-  const [aba, setAba] = useState<'geral' | 'pedidos' | 'equipe' | 'relatorios'>('geral');
+  const [aba, setAba] = useState<'geral' | 'pedidos' | 'equipe' | 'relatorios' | 'ocorrencias'>('geral');
 
   // ── Estado: Visão Geral ──
   const [dados, setDados] = useState<DashboardData | null>(null);
@@ -236,6 +237,7 @@ export function DashboardDiretorPage() {
           { id: 'pedidos', label: `Pedidos${pedidosEnviados.length > 0 ? ` (${pedidosEnviados.length})` : ''}`, icon: ShoppingCart },
           { id: 'equipe', label: 'Equipe', icon: Users },
           { id: 'relatorios', label: 'Relatórios', icon: FileText },
+          { id: 'ocorrencias', label: 'Ocorrências', icon: TriangleAlert },
         ] as const).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -571,6 +573,13 @@ export function DashboardDiretorPage() {
               </a>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── Aba: Ocorrências ── */}
+      {aba === 'ocorrencias' && (
+        <div className="space-y-4">
+          <OcorrenciasPanel titulo="Ocorrências da Unidade" unitId={user?.unitId ?? undefined} />
         </div>
       )}
     </PageShell>

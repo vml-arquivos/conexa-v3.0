@@ -378,20 +378,22 @@ export default function DiarioBordoPage() {
     try {
       const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorrForm.categoria)?.label ?? ocorrForm.categoria;
       // 1) Criar evento SEM base64 no JSON (resolve 413)
-      const res = await http.post('/diary-events', {
-        type: 'COMPORTAMENTO',
+      // planningId e curriculumEntryId são opcionais — só incluir se existirem
+      const payload: Record<string, any> = {
+        type: 'OBSERVACAO',
         title: `Ocorrência: ${catLabel}`,
         description: ocorrForm.descricao,
         eventDate: ocorrForm.eventDate + 'T12:00:00.000Z',
         childId: criancaSelecionadaOcorr,
         classroomId,
-        planningId: planejamentoHoje?.id,
-        curriculumEntryId: planejamentoHoje?.curriculumEntryId,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
         aiContext: { categoria: ocorrForm.categoria, categoriaLabel: catLabel },
-      });
+      };
+      if (planejamentoHoje?.id) payload.planningId = planejamentoHoje.id;
+      if (planejamentoHoje?.curriculumEntryId) payload.curriculumEntryId = planejamentoHoje.curriculumEntryId;
+      const res = await http.post('/diary-events', payload);
       const eventoId: string = res.data?.id;
       // 2) Upload das fotos via multipart (sem base64 no payload)
       if (eventoId && ocorrForm.fotosFiles.length > 0) {
@@ -1541,17 +1543,14 @@ export default function DiarioBordoPage() {
                 disabled={
                   savingOcorr ||
                   !criancaSelecionadaOcorr ||
-                  !ocorrForm.descricao.trim() ||
-                  !planejamentoHoje?.id
+                  !ocorrForm.descricao.trim()
                 }
                 title={
-                  !planejamentoHoje?.id
-                    ? 'Necessário ter planejamento ativo para registrar ocorrência'
-                    : !criancaSelecionadaOcorr
+                  !criancaSelecionadaOcorr
                     ? 'Selecione uma criança'
                     : !ocorrForm.descricao.trim()
                     ? 'Descreva a ocorrência'
-                    : undefined
+                    : 'Registrar ocorrência'
                 }
                 className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
