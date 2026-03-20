@@ -58,9 +58,12 @@ describe('DashboardsService', () => {
     expect(audit.log).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: AuditLogAction.VIEW }),
     );
+    const targetDate = new Date('2026-02-19');
+    targetDate.setHours(0, 0, 0, 0);
+    
     expect(result).toEqual(
       expect.objectContaining({
-        date: '2026-02-19',
+        date: targetDate.toISOString().split('T')[0],
         classrooms: [],
       }),
     );

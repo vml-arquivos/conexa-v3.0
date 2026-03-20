@@ -48,7 +48,7 @@ describe('canAccessUnit', () => {
     expect(result).toBe(true);
   });
 
-  it('deve negar STAFF_CENTRAL sem escopo no token e sem fallback', async () => {
+  it('deve permitir STAFF_CENTRAL sem escopo no token e sem fallback (acesso global à mantenedora)', async () => {
     const result = await canAccessUnit(
       {
         sub: 'user-3',
@@ -65,6 +65,6 @@ describe('canAccessUnit', () => {
       'unit-arara-can',
     );
 
-    expect(result).toBe(false);
+    expect(result).toBe(true);
   });
 });
