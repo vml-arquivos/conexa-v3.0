@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisCacheModule } from './cache/redis-cache.module';
 import { AuthModule } from './auth/auth.module';
 import { ExampleModule } from './example/example.module';
+import { AiModule } from './ai/ai.module';
 import { DiaryEventModule } from './diary-event/diary-event.module';
 import { PlanningTemplateModule } from './planning-template/planning-template.module';
 import { PlanningModule } from './planning/planning.module';
@@ -51,6 +52,7 @@ import { CatalogModule } from './catalog/catalog.module';
     PrismaModule,
     AuthModule,
     ExampleModule,
+    AiModule,
     DiaryEventModule,
     PlanningTemplateModule,
     PlanningModule,
