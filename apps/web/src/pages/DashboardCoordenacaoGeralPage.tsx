@@ -186,7 +186,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'otimo' | 'atencao' | 'critico'>('todas');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = getPedagogicalToday();
   const ha30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
 
   const carregar = useCallback(async () => {

@@ -121,7 +121,7 @@ export default function RdxPage() {
     classroomId: '',
     tipoAtividade: '',
     campos: [] as string[],
-    dataAtividade: new Date().toISOString().split('T')[0],
+    dataAtividade: getPedagogicalToday(),
     fotos: [] as FotoItem[],
     descricao: '',
   });
@@ -243,7 +243,7 @@ export default function RdxPage() {
   }
 
   function resetForm() {
-    setForm({ classroomId: classrooms[0]?.id ?? '', tipoAtividade: '', campos: [], dataAtividade: new Date().toISOString().split('T')[0], fotos: [], descricao: '' });
+    setForm({ classroomId: classrooms[0]?.id ?? '', tipoAtividade: '', campos: [], dataAtividade: getPedagogicalToday(), fotos: [], descricao: '' });
     setEtapa(1);
     setNovaFotoUrl('');
   }

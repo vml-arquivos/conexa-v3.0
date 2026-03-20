@@ -94,7 +94,7 @@ export default function TeacherDashboardPremium() {
 
       const [childrenRes, attendanceRes] = await Promise.allSettled([
         http.get(`/classrooms/${primary.id}/children`),
-        http.get('/attendance', { params: { classroomId: primary.id, date: new Date().toISOString().split('T')[0] } }),
+        http.get('/attendance', { params: { classroomId: primary.id, date: getPedagogicalToday() } }),
       ]);
 
       const kids: ClassroomChild[] = childrenRes.status === 'fulfilled' ? childrenRes.value.data ?? [] : [];

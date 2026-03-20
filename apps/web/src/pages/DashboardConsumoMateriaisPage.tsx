@@ -88,7 +88,7 @@ export default function DashboardConsumoMateriaisPage() {
   const isCentral = roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
   const { selectedUnitId: ctxUnitId } = useUnitScope();
 
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = getPedagogicalToday();
   const tresAtras = (() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().split('T')[0]; })();
 
   const [dataInicio, setDataInicio] = useState(tresAtras);

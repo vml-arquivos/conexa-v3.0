@@ -218,7 +218,7 @@ export default function DiarioBordoPage() {
 
   // Formulário do Diário
   const [form, setForm] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getPedagogicalToday(),
     climaEmocional: 'BOM',
     momentoDestaque: '',
     reflexaoPedagogica: '',
@@ -275,7 +275,7 @@ export default function DiarioBordoPage() {
   const [ocorrForm, setOcorrForm] = useState({
     categoria: 'COMPORTAMENTO',
     descricao: '',
-    eventDate: new Date().toISOString().split('T')[0],
+    eventDate: getPedagogicalToday(),
     fotos: [] as string[], // preview URLs (object URLs) — não enviados no JSON
     fotosFiles: [] as File[], // arquivos originais para upload multipart
   });
@@ -288,7 +288,7 @@ export default function DiarioBordoPage() {
   const [criancaSelecionadaObs, setCriancaSelecionadaObs] = useState<string>('');
   const [obsForm, setObsForm] = useState({
     category: 'GERAL',
-    date: new Date().toISOString().split('T')[0],
+    date: getPedagogicalToday(),
     behaviorDescription: '',
     socialInteraction: '',
     emotionalState: '',
@@ -404,7 +404,7 @@ export default function DiarioBordoPage() {
       }
       toast.success('Ocorrência registrada!');
       ocorrForm.fotos.forEach(url => { try { URL.revokeObjectURL(url); } catch {} });
-      setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: new Date().toISOString().split('T')[0], fotos: [], fotosFiles: [] });
+      setOcorrForm({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: getPedagogicalToday(), fotos: [], fotosFiles: [] });
       setCriancaSelecionadaOcorr('');
       loadOcorrencias();
     } catch (err: any) {
@@ -453,7 +453,7 @@ export default function DiarioBordoPage() {
       });
       toast.success('Observação salva com sucesso!');
       setObsForm({
-        category: 'GERAL', date: new Date().toISOString().split('T')[0],
+        category: 'GERAL', date: getPedagogicalToday(),
         behaviorDescription: '', socialInteraction: '', emotionalState: '',
         dietaryNotes: '', sleepPattern: '', learningProgress: '',
         planningParticipation: '', psychologicalNotes: '', developmentAlerts: '', recommendations: '',
@@ -841,7 +841,7 @@ export default function DiarioBordoPage() {
       setAba('lista');
       loadDiarios();
       setForm({
-        date: new Date().toISOString().split('T')[0],
+        date: getPedagogicalToday(),
         climaEmocional: 'BOM',
         momentoDestaque: '',
         reflexaoPedagogica: '',
@@ -925,7 +925,7 @@ export default function DiarioBordoPage() {
                           </span>
                           <span className="text-xs text-gray-400 flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(diario.date || diario.createdAt).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                            {new Date(((diario.date || diario.createdAt) || '').includes('T') ? (diario.date || diario.createdAt) : (diario.date || diario.createdAt) + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
                           </span>
                           {diario.microgestos?.length > 0 && (
                             <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">
@@ -1610,7 +1610,7 @@ export default function DiarioBordoPage() {
               const cat = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorr.categoria);
               const crianca = criancas.find(c => c.id === ocorr.childId);
               const dataFormatada = ocorr.eventDate
-                ? new Date(ocorr.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                ? new Date((ocorr.eventDate || '').includes('T') ? ocorr.eventDate : (ocorr.eventDate || '') + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                 : '—';
               return (
                 <Card key={ocorr.id ?? ocorr.eventDate} className="border-2 border-orange-100 hover:border-orange-200 transition-all">

@@ -114,7 +114,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function carregarCobertura() {
     setLoadingCobertura(true);
     try {
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = getPedagogicalToday();
       const [covData, pendData] = await Promise.all([
         apiCache.get('/reports/unit/coverage', { startDate: hoje, endDate: hoje }, () =>
           http.get('/reports/unit/coverage', { params: { startDate: hoje, endDate: hoje } }).then(r => r.data)

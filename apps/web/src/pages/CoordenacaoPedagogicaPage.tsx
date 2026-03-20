@@ -97,7 +97,7 @@ export default function CoordenacaoPedagogicaPage() {
   const [formPauta, setFormPauta] = useState({
     tipo: 'SEMANAL_UNIDADE' as 'SEMANAL_UNIDADE' | 'MENSAL_GERAL',
     titulo: '',
-    data: new Date().toISOString().split('T')[0],
+    data: getPedagogicalToday(),
     participantes: '',
     pautaItens: '',
     ata: '',
@@ -126,7 +126,7 @@ export default function CoordenacaoPedagogicaPage() {
   const [formReuniao, setFormReuniao] = useState({
     tipo: 'SEMANAL' as 'SEMANAL' | 'MENSAL',
     titulo: '',
-    data: new Date().toISOString().split('T')[0],
+    data: getPedagogicalToday(),
     pauta: '',
     turmaId: '',
   });
@@ -309,7 +309,7 @@ export default function CoordenacaoPedagogicaPage() {
       toast.success('Reunião agendada com sucesso!');
       setModalReuniao(false);
       loadReunioes();
-      setFormReuniao({ tipo: 'SEMANAL', titulo: '', data: new Date().toISOString().split('T')[0], pauta: '', turmaId: '' });
+      setFormReuniao({ tipo: 'SEMANAL', titulo: '', data: getPedagogicalToday(), pauta: '', turmaId: '' });
     } catch (err: any) {
       const nova: Reuniao = {
         id: Date.now().toString(),
@@ -913,7 +913,7 @@ export default function CoordenacaoPedagogicaPage() {
                         } finally {
                           setSavingPauta(false);
                           setModalPauta(false);
-                          setFormPauta({ tipo: 'SEMANAL_UNIDADE', titulo: '', data: new Date().toISOString().split('T')[0], participantes: '', pautaItens: '', ata: '', status: 'AGENDADA' });
+                          setFormPauta({ tipo: 'SEMANAL_UNIDADE', titulo: '', data: getPedagogicalToday(), participantes: '', pautaItens: '', ata: '', status: 'AGENDADA' });
                         }
                       }}>
                       {savingPauta ? 'Salvando...' : 'Salvar Pauta'}

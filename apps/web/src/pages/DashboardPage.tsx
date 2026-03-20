@@ -27,7 +27,7 @@ export function DashboardPage() {
     return date.toISOString().split('T')[0];
   });
   const [toDate, setToDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return getPedagogicalToday();
   });
 
   // Estado do Dashboard do Professor
@@ -35,7 +35,7 @@ export function DashboardPage() {
   const [teacherLoading, setTeacherLoading] = useState(false);
   const [teacherError, setTeacherError] = useState<string | null>(null);
   const [teacherDate, setTeacherDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return getPedagogicalToday();
   });
   const [classroomId, setClassroomId] = useState('');
 

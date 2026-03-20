@@ -123,7 +123,7 @@ export class CoordenacaoService {
     const unitIdRaw = resolveUnitId(user, unitIdOverride);
     if (!unitIdRaw) throw new ForbiddenException('Selecione uma unidade para ver o dashboard da unidade');
     const unitId: string = unitIdRaw;
-
+    try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -246,13 +246,31 @@ export class CoordenacaoService {
       planejamentosParaRevisao: planejamentosRevisao,
       proximasReunioes,
     };
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+      console.error('[CoordenacaoService] getDashboardUnidade error:', error);
+      return {
+        unitId,
+        data: new Date().toISOString(),
+        alertas: { turmasSemChamadaHoje: [], planejamentosParados: [] },
+        indicadores: {
+          totalTurmas: 0, totalAlunos: 0, requisicoesPendentes: 0,
+          planejamentosRascunho: 0, planejamentosEmRevisao: 0, planejamentosPublicados: 0,
+          diariosHoje: 0, turmasComChamadaHoje: 0, reunioesAgendadas: 0, totalProfessores: 0,
+        },
+        turmas: [],
+        requisicoesPendentesDetalhes: [],
+        planejamentosParaRevisao: [],
+        proximasReunioes: [],
+      };
+    }
   }
 
   // ─── DASHBOARD GERAL ──────────────────────────────────────────────────────
 
   async getDashboardGeral(user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-
+    try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -351,6 +369,22 @@ export class CoordenacaoService {
       ultimasReunioes,
       proximasReunioes,
     };
+    } catch (error) {
+      if (error instanceof ForbiddenException) throw error;
+      console.error('[CoordenacaoService] getDashboardGeral error:', error);
+      return {
+        mantenedoraId: user.mantenedoraId,
+        data: new Date().toISOString(),
+        indicadoresGerais: {
+          totalUnidades: 0, totalAlunos: 0, totalProfessores: 0,
+          requisicoesPendentes: 0, planejamentosRascunho: 0,
+          diariosHoje: 0, reunioesAgendadas: 0,
+        },
+        consolidadoUnidades: [],
+        ultimasReunioes: [],
+        proximasReunioes: [],
+      };
+    }
   }
 
   // ─── PLANEJAMENTOS (aceita unitId override) ────────────────────────────────
