@@ -28,6 +28,7 @@ import {
   Building2, GraduationCap, Bell, Star, Activity, BarChart2, Brain,
   FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers, Sparkles,
 } from 'lucide-react';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface UnidadeConsolidado {

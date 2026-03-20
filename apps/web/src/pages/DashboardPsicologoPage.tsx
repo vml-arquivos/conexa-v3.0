@@ -25,6 +25,7 @@ import {
   TrendingUp, Calendar, Building2, Heart, Activity, Zap,
   BookOpen, ClipboardList, Bell, Filter,
 } from 'lucide-react';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Rdic {

@@ -11,6 +11,7 @@ import { getPlanningTemplatesCocris } from '../api/lookup';
 import type { PlanningTemplateCocris } from '../types/lookup';
 import { UnitSelect } from '../components/select/UnitSelect';
 import { ClassroomSelect } from '../components/select/ClassroomSelect';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 export function DashboardPage() {
   const { user } = useAuth();

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
+import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
