@@ -23,10 +23,10 @@ interface RelatorioPeriodo {
   fim: string | null;
 }
 interface Totais {
-  requisicoes: number;
-  aprovadas: number;
+  requisicoes: number; // alias: total
+  aprovadas: number;   // alias: aprovados
   pendentes: number;
-  rejeitadas: number;
+  rejeitadas: number;  // alias: rejeitados
   entregues: number;
   custoEstimadoTotal: number;
 }
@@ -65,9 +65,13 @@ interface RelatorioData {
 const TIPO_LABEL: Record<string, string> = {
   PEDAGOGICO: 'Pedagógico',
   HIGIENE: 'Higiene Pessoal',
+  HIGIENE_PESSOAL: 'Higiene Pessoal',
   LIMPEZA: 'Limpeza',
   ALIMENTACAO: 'Alimentação',
+  CONSUMIVEL: 'Consumível',
+  PERMANENTE: 'Permanente',
   OUTRO: 'Outros',
+  OUTROS: 'Outros',
 };
 const STATUS_LABEL: Record<string, { label: string; cor: string }> = {
   SOLICITADO: { label: 'Solicitado', cor: 'bg-blue-100 text-blue-700' },
@@ -118,7 +122,16 @@ export default function RelatorioConsumoMateriaisPage() {
       const raw = res.data ?? {};
       setRelatorio({
         periodo: raw.periodo ?? { inicio: null, fim: null },
-        totais: raw.totais ?? { requisicoes: 0, aprovadas: 0, pendentes: 0, rejeitadas: 0, entregues: 0, custoEstimadoTotal: 0 },
+        // Backend retorna campos flat (total, aprovados, pendentes, rejeitados, entregues)
+        // Mapeamos para a interface Totais usada pelos cards de KPI
+        totais: raw.totais ?? {
+          requisicoes: raw.total ?? 0,
+          aprovadas: raw.aprovados ?? 0,
+          pendentes: raw.pendentes ?? 0,
+          rejeitadas: raw.rejeitados ?? 0,
+          entregues: raw.entregues ?? 0,
+          custoEstimadoTotal: raw.custoEstimadoTotal ?? 0,
+        },
         porCategoria: raw.porCategoria ?? {},
         porTurma: Array.isArray(raw.porTurma) ? raw.porTurma : [],
         porStatus: raw.porStatus ?? {},
@@ -264,18 +277,48 @@ export default function RelatorioConsumoMateriaisPage() {
                 <CardTitle className="text-base text-gray-700">Por Categoria</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {Object.entries(relatorio.porCategoria).map(([tipo, dados]) => (
-                    <div key={tipo} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                      <span className="text-sm font-medium text-gray-700">{TIPO_LABEL[tipo] ?? tipo}</span>
-                      <div className="flex gap-3 text-xs">
-                        <span className="text-gray-500">Total: <strong>{dados.total}</strong></span>
-                        <span className="text-green-600">Aprovados: <strong>{dados.aprovados}</strong></span>
-                        <span className="text-yellow-600">Pendentes: <strong>{dados.pendentes}</strong></span>
-                        <span className="text-red-600">Rejeitados: <strong>{dados.rejeitados}</strong></span>
+                <div className="space-y-4">
+                  {Object.entries(relatorio.porCategoria).map(([tipo, dados]) => {
+                    const pctAprovados = dados.total > 0 ? Math.round((dados.aprovados / dados.total) * 100) : 0;
+                    const pctPendentes = dados.total > 0 ? Math.round((dados.pendentes / dados.total) * 100) : 0;
+                    const pctRejeitados = dados.total > 0 ? Math.round((dados.rejeitados / dados.total) * 100) : 0;
+                    return (
+                      <div key={tipo} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700">{TIPO_LABEL[tipo] ?? tipo}</span>
+                          <div className="flex gap-3 text-xs">
+                            <span className="text-gray-500">Total: <strong className="text-gray-700">{dados.total}</strong></span>
+                            <span className="text-green-600">Aprov.: <strong>{dados.aprovados}</strong></span>
+                            <span className="text-yellow-600">Pend.: <strong>{dados.pendentes}</strong></span>
+                            <span className="text-red-600">Rej.: <strong>{dados.rejeitados}</strong></span>
+                          </div>
+                        </div>
+                        {/* Barra de progresso segmentada */}
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full bg-green-500 transition-all duration-500"
+                            style={{ width: `${pctAprovados}%` }}
+                            title={`Aprovados: ${pctAprovados}%`}
+                          />
+                          <div
+                            className="h-full bg-yellow-400 transition-all duration-500"
+                            style={{ width: `${pctPendentes}%` }}
+                            title={`Pendentes: ${pctPendentes}%`}
+                          />
+                          <div
+                            className="h-full bg-red-400 transition-all duration-500"
+                            style={{ width: `${pctRejeitados}%` }}
+                            title={`Rejeitados: ${pctRejeitados}%`}
+                          />
+                        </div>
+                        <div className="flex gap-3 text-xs text-gray-400">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Aprovados {pctAprovados}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" />Pendentes {pctPendentes}%</span>
+                          {pctRejeitados > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Rejeitados {pctRejeitados}%</span>}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

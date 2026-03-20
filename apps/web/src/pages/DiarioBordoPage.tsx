@@ -262,6 +262,9 @@ export default function DiarioBordoPage() {
     camposExperiencia?: string[];
     objetivosMatriz?: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }>;
     recursos?: string;
+    // Vínculo com matriz curricular — necessário para registrar ocorrências
+    curriculumMatrixId?: string;
+    curriculumEntryId?: string; // entrada da matriz para o dia de hoje
   } | null>(null);
 
   // Ocorrências
@@ -382,7 +385,7 @@ export default function DiarioBordoPage() {
         childId: criancaSelecionadaOcorr,
         classroomId,
         planningId: planejamentoHoje?.id,
-        curriculumEntryId: planejamentoHoje?.curriculumMatrix?.entries?.[0]?.id || planejamentoHoje?.curriculumMatrixId,
+        curriculumEntryId: planejamentoHoje?.curriculumEntryId,
         behaviorNotes: ocorrForm.descricao,
         mediaUrls: [],
         tags: ['ocorrencia', ocorrForm.categoria.toLowerCase()],
@@ -575,6 +578,23 @@ export default function DiarioBordoPage() {
             desc?.objectives ?? pc?.objetivosMatriz ?? [];
           const camposExperiencia: string[] =
             desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
+
+          // Buscar CurriculumEntry do dia para vincular às ocorrências
+          let curriculumEntryId: string | undefined;
+          let curriculumMatrixId: string | undefined = planHoje.curriculumMatrixId;
+          try {
+            const entryRes = await http.get('/curriculum-matrix-entries/by-classroom-date', {
+              params: { classroomId: cid, date: hoje, days: 1 },
+            });
+            const entries = Array.isArray(entryRes.data) ? entryRes.data : entryRes.data?.data ?? [];
+            if (entries.length > 0) {
+              curriculumEntryId = entries[0].id;
+              if (!curriculumMatrixId) curriculumMatrixId = entries[0].matrixId;
+            }
+          } catch {
+            // Sem entrada de matriz para hoje — não é erro crítico
+          }
+
           setPlanejamentoHoje({
             id: planHoje.id,
             title: planHoje.title || 'Planejamento do Dia',
@@ -584,6 +604,8 @@ export default function DiarioBordoPage() {
             camposExperiencia,
             objetivosMatriz,
             recursos: desc?.resources || pc?.recursos || '',
+            curriculumMatrixId,
+            curriculumEntryId,
           });
         }
       } catch {
@@ -1386,6 +1408,32 @@ export default function DiarioBordoPage() {
             </p>
           </div>
 
+          {/* Aviso quando não há planejamento ativo ou entrada da matriz para hoje */}
+          {classroomId && !planejamentoHoje && (
+            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
+              <TriangleAlert className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">Sem planejamento ativo para hoje</p>
+                <p className="text-xs text-yellow-700 mt-0.5">
+                  Para registrar uma ocorrência, é necessário ter um planejamento com status <strong>Em Execução</strong> vinculado à turma de hoje.
+                  Crie ou ative um planejamento antes de prosseguir.
+                </p>
+              </div>
+            </div>
+          )}
+          {classroomId && planejamentoHoje && !planejamentoHoje.curriculumEntryId && (
+            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
+              <TriangleAlert className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-800">Sem entrada da Matriz Curricular para hoje</p>
+                <p className="text-xs text-yellow-700 mt-0.5">
+                  O planejamento está ativo, mas não há uma entrada da Matriz Curricular para a data de hoje.
+                  Contate a coordenação para configurar a matriz antes de registrar ocorrências.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Formulário de nova ocorrência */}
           <Card className="border-2 border-orange-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-orange-700"><TriangleAlert className="h-5 w-5" /> Registrar Ocorrência</CardTitle></CardHeader>
@@ -1511,7 +1559,24 @@ export default function DiarioBordoPage() {
                 </div>
               </div>
 
-              <Button onClick={salvarOcorrencia} disabled={savingOcorr || !criancaSelecionadaOcorr || !ocorrForm.descricao.trim()} className="w-full bg-orange-600 hover:bg-orange-700">
+              <Button
+                onClick={salvarOcorrencia}
+                disabled={
+                  savingOcorr ||
+                  !criancaSelecionadaOcorr ||
+                  !ocorrForm.descricao.trim() ||
+                  !planejamentoHoje?.id ||
+                  !planejamentoHoje?.curriculumEntryId
+                }
+                title={
+                  !planejamentoHoje?.id
+                    ? 'Necessário ter planejamento ativo para registrar ocorrência'
+                    : !planejamentoHoje?.curriculumEntryId
+                    ? 'Necessário ter entrada da Matriz Curricular para hoje'
+                    : undefined
+                }
+                className="w-full bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
                 {savingOcorr ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : <><Save className="h-4 w-4 mr-2" /> Registrar Ocorrência</>}
               </Button>
             </CardContent>
