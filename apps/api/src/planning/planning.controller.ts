@@ -78,6 +78,24 @@ export class PlanningController {
   }
 
   /**
+   * GET /plannings/active-today?classroomId=...&date=YYYY-MM-DD
+   * Retorna se há planejamento ativo (APROVADO ou EM_EXECUCAO) para a turma na data.
+   * Usa range UTC do dia completo para eliminar falsos negativos de timezone.
+   *
+   * Retorno:
+   * - { hasActivePlanning: true, planningId, curriculumEntryId?, title, status }
+   * - { hasActivePlanning: false }
+   */
+  @Get('active-today')
+  getActiveToday(
+    @Query('classroomId') classroomId: string,
+    @Query('date') date: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.planningService.getActiveToday(classroomId, date, user);
+  }
+
+  /**
    * GET /plannings/check-dates?classroomId=...&startDate=YYYY-MM-DD&days=N
    * Verifica se já existem planejamentos nas datas solicitadas para a turma.
    * Retorna: { occupied: string[], nextFreeDate: string }

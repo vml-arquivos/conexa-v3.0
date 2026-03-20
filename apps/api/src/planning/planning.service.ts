@@ -1108,6 +1108,87 @@ export class PlanningService {
   }
 
   /**
+   * GET /plannings/active-today
+   * Retorna se há planejamento ativo (APROVADO ou EM_EXECUCAO) para a turma na data informada.
+   * Usa filtro por range UTC do dia para cobrir timezone America/Sao_Paulo.
+   *
+   * @param classroomId - ID da turma
+   * @param date - Data no formato YYYY-MM-DD (America/Sao_Paulo)
+   * @param user - Usuário autenticado
+   * @returns { hasActivePlanning, planningId?, curriculumEntryId?, title?, status? }
+   */
+  async getActiveToday(
+    classroomId: string,
+    date: string,
+    user: JwtPayload,
+  ): Promise<{
+    hasActivePlanning: boolean;
+    planningId?: string;
+    curriculumEntryId?: string;
+    title?: string;
+    status?: string;
+  }> {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new BadRequestException('O parâmetro date deve estar no formato YYYY-MM-DD');
+    }
+    if (!classroomId) {
+      throw new BadRequestException('O parâmetro classroomId é obrigatório');
+    }
+    // Converter YYYY-MM-DD para range UTC cobrindo o dia inteiro
+    // Cobre tanto T00:00Z (frontend) quanto T03:00Z (parser SP com offset -03:00)
+    const [y, m, d] = date.split('-').map(Number);
+    const dayStartUTC = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+    const dayEndUTC   = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
+    // Escopo multi-tenant
+    const scopeWhere = getScopedWhereForPlanning(user);
+    const planning = await this.prisma.planning.findFirst({
+      where: {
+        ...scopeWhere,
+        classroomId,
+        status: { in: [PlanningStatus.APROVADO, PlanningStatus.EM_EXECUCAO] },
+        AND: [
+          { startDate: { lte: dayEndUTC } },
+          { endDate:   { gte: dayStartUTC } },
+        ],
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        curriculumMatrixId: true,
+      },
+      // Preferir EM_EXECUCAO sobre APROVADO
+      orderBy: { status: 'asc' },
+    });
+    if (!planning) {
+      return { hasActivePlanning: false };
+    }
+    // Tentar buscar curriculumEntryId para o dia (opcional — não bloqueia o fluxo)
+    let curriculumEntryId: string | undefined;
+    if (planning.curriculumMatrixId) {
+      try {
+        const entry = await this.prisma.curriculumMatrixEntry.findFirst({
+          where: {
+            matrixId: planning.curriculumMatrixId,
+            date: { gte: dayStartUTC, lte: dayEndUTC },
+          },
+          select: { id: true },
+        });
+        if (entry) curriculumEntryId = entry.id;
+      } catch {
+        // curriculumEntryId é opcional
+      }
+    }
+    return {
+      hasActivePlanning: true,
+      planningId: planning.id,
+      curriculumEntryId,
+      title: planning.title,
+      status: planning.status,
+    };
+  }
+
+  /**
    * Verifica quais datas do range já possuem planejamentos para a turma.
    * Retorna: { occupied: string[], nextFreeDate: string }
    * occupied: lista de datas YYYY-MM-DD com planejamento existente
