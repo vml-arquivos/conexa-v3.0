@@ -6,7 +6,6 @@ import {
   IsArray,
   IsObject,
   IsDateString,
-  Matches,
   IsInt,
   Min,
   ValidateIf,
@@ -34,27 +33,35 @@ export class CreateDiaryEventDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(CUID_REGEX, { message: 'childId deve ser um CUID válido' })
   childId: string;
 
-  // classroomId é opcional — quando ausente, o service resolve via matrícula ativa da criança
+  /**
+   * classroomId é OPCIONAL.
+   * Quando ausente ou inválido, o service resolve via matrícula ativa da criança.
+   * NÃO aplicar @Matches aqui — o ValidationPipe rejeitaria strings inválidas
+   * antes de chegar ao service, impedindo o fallback automático.
+   */
   @IsOptional()
-  @ValidateIf((o) => o.classroomId != null && o.classroomId !== '')
+  @ValidateIf((o) => o.classroomId != null && o.classroomId !== '' && o.classroomId !== 'undefined')
   @IsString()
-  @Matches(CUID_REGEX, { message: 'classroomId deve ser um CUID válido' })
   classroomId?: string;
 
-  // planningId e curriculumEntryId são opcionais — sem vínculo obrigatório a planejamento
+  /**
+   * planningId é OPCIONAL.
+   * Quando fornecido, o service valida a existência e o status do planejamento.
+   */
   @IsOptional()
-  @ValidateIf((o) => o.planningId != null && o.planningId !== '')
+  @ValidateIf((o) => o.planningId != null && o.planningId !== '' && o.planningId !== 'undefined')
   @IsString()
-  @Matches(CUID_REGEX, { message: 'planningId deve ser um CUID válido' })
   planningId?: string;
 
+  /**
+   * curriculumEntryId é OPCIONAL.
+   * Quando fornecido, o service valida a existência da entrada curricular.
+   */
   @IsOptional()
-  @ValidateIf((o) => o.curriculumEntryId != null && o.curriculumEntryId !== '')
+  @ValidateIf((o) => o.curriculumEntryId != null && o.curriculumEntryId !== '' && o.curriculumEntryId !== 'undefined')
   @IsString()
-  @Matches(CUID_REGEX, { message: 'curriculumEntryId deve ser um CUID válido' })
   curriculumEntryId?: string;
 
   // Micro-gestos (JSONB)

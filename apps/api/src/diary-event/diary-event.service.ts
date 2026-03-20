@@ -52,8 +52,12 @@ export class DiaryEventService {
       assertSchoolDay(eventDate, unit?.nonSchoolDays ?? [], BadRequestException);
     }
 
-    // Resolver classroomId: usar o fornecido ou buscar via matrícula ativa da criança
-    let resolvedClassroomId = createDto.classroomId;
+    // Resolver classroomId: usar o fornecido (se válido) ou buscar via matrícula ativa da criança.
+    // Ignorar valores inválidos como 'undefined', '' ou strings que não são CUID.
+    const CUID_RE = /^c[a-z0-9]{24,}$/i;
+    const rawClassroomId = createDto.classroomId;
+    let resolvedClassroomId: string | undefined =
+      rawClassroomId && CUID_RE.test(rawClassroomId) ? rawClassroomId : undefined;
     if (!resolvedClassroomId) {
       const activeEnrollment = await this.prisma.enrollment.findFirst({
         where: { childId: createDto.childId, status: 'ATIVA' },
@@ -112,10 +116,16 @@ export class DiaryEventService {
     const isOcorrencia = createDto.tags?.includes('ocorrencia') ||
       ['COMPORTAMENTO', 'SAUDE', 'FAMILIA'].includes(createDto.type);
 
-    // VALIDAÇÃO OPCIONAL: Planning (somente se planningId fornecido)
-    if (createDto.planningId) {
+    // Sanitizar planningId e curriculumEntryId — ignorar valores não-CUID
+    const resolvedPlanningId = createDto.planningId && CUID_RE.test(createDto.planningId)
+      ? createDto.planningId : undefined;
+    const resolvedCurriculumEntryId = createDto.curriculumEntryId && CUID_RE.test(createDto.curriculumEntryId)
+      ? createDto.curriculumEntryId : undefined;
+
+    // VALIDAÇÃO OPCIONAL: Planning (somente se planningId fornecido e válido)
+    if (resolvedPlanningId) {
       const planning = await this.prisma.planning.findUnique({
-        where: { id: createDto.planningId },
+        where: { id: resolvedPlanningId },
         include: { classroom: true, curriculumMatrix: true },
       });
 
@@ -145,10 +155,10 @@ export class DiaryEventService {
       }
     }
 
-    // VALIDAÇÃO OPCIONAL: CurriculumEntry (somente se curriculumEntryId fornecido)
-    if (createDto.curriculumEntryId) {
+    // VALIDAÇÃO OPCIONAL: CurriculumEntry (somente se curriculumEntryId fornecido e válido)
+    if (resolvedCurriculumEntryId) {
       const entry = await this.prisma.curriculumMatrixEntry.findUnique({
-        where: { id: createDto.curriculumEntryId },
+        where: { id: resolvedCurriculumEntryId },
       });
       if (!entry) {
         throw new NotFoundException('Entrada da matriz curricular não encontrada');
@@ -172,8 +182,8 @@ export class DiaryEventService {
         eventDate,
         childId: createDto.childId,
         classroomId: resolvedClassroomId,
-        ...(createDto.planningId ? { planningId: createDto.planningId } : {}),
-        ...(createDto.curriculumEntryId ? { curriculumEntryId: createDto.curriculumEntryId } : {}),
+        ...(resolvedPlanningId ? { planningId: resolvedPlanningId } : {}),
+        ...(resolvedCurriculumEntryId ? { curriculumEntryId: resolvedCurriculumEntryId } : {}),
 
         // Micro-gestos estruturados
         medicaoAlimentar: createDto.medicaoAlimentar ?? undefined,
