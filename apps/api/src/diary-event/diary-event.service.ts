@@ -251,11 +251,22 @@ export class DiaryEventService {
       } else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
         where.classroom = { unitId: user.unitId };
       } else if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+        // Professor vê eventos das turmas onde é professor OU que ele próprio criou.
+        // Garante que ocorrências registradas via fallback de matrícula apareçam no histórico.
         const classrooms = await this.prisma.classroomTeacher.findMany({
           where: { teacherId: user.sub, isActive: true },
           select: { classroomId: true },
         });
-        where.classroomId = { in: classrooms.map((ct) => ct.classroomId) };
+        const classroomIds = classrooms.map((ct) => ct.classroomId);
+        if (classroomIds.length > 0) {
+          where.OR = [
+            { classroomId: { in: classroomIds } },
+            { createdBy: user.sub },
+          ];
+        } else {
+          // Professor sem turma formal: ver apenas o que ele criou
+          where.createdBy = user.sub;
+        }
       }
     }
 
@@ -305,10 +316,13 @@ export class DiaryEventService {
     }
 
     if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
+      // Professor pode ver evento se é da sua turma OU se ele próprio criou
       const isTeacher = await this.prisma.classroomTeacher.findFirst({
         where: { classroomId: event.classroomId, teacherId: user.sub, isActive: true },
       });
-      if (!isTeacher) throw new NotFoundException('Evento não encontrado');
+      if (!isTeacher && event.createdBy !== user.sub) {
+        throw new NotFoundException('Evento não encontrado');
+      }
     }
 
     return event;
@@ -430,11 +444,16 @@ export class DiaryEventService {
 
     const isProfessor = user.roles.some((r) => r.level === RoleLevel.PROFESSOR);
     if (isProfessor) {
+      // Verificar se é professor da turma OU se a turma pertence à mesma mantenedora.
+      // Permite registrar ocorrência via fallback de matrícula mesmo sem classroomTeacher formal.
       const isTeacher = await this.prisma.classroomTeacher.findFirst({
         where: { classroomId: classroom.id, teacherId: user.sub, isActive: true },
       });
       if (!isTeacher) {
-        throw new ForbiddenException('Você não é professor desta turma');
+        // Fallback: turma deve pertencer à mesma mantenedora do professor
+        if (classroom.unit.mantenedoraId !== user.mantenedoraId) {
+          throw new ForbiddenException('Você não tem acesso a esta turma');
+        }
       }
       return;
     }

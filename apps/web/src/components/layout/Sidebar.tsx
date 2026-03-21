@@ -32,6 +32,7 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais',   label: 'Atendimentos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica',   label: 'Matriz 2026',            icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/painel-alergias',     label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
 ];
 
 // UNIDADE — Coordenadora Pedagógica ────────────────────────────────────────────
@@ -52,6 +53,7 @@ const COORD_PEDAGOGICO: MenuItem[] = [
   { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/reports',           label: 'Relatórios',                 icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/painel-alergias',   label: 'Alergias e Dietas',          icon: <Apple className="h-4 w-4" /> },
 ];
 
 // UNIDADE — Diretor ────────────────────────────────────────────────────────────
@@ -61,6 +63,7 @@ const DIRETOR_ITEMS: MenuItem[] = [
   { path: '/app/coordenacao',       label: 'Turmas & Equipe',        icon: <Users className="h-4 w-4" /> },
   { path: '/app/reports',           label: 'Relatórios',             icon: <BarChart2 className="h-4 w-4" /> },
   { path: '/app/planejamentos',     label: 'Planejamentos',          icon: <BookOpen className="h-4 w-4" /> },
+  { path: '/app/painel-alergias',   label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" /> },
 ];
 
 // UNIDADE — Nutricionista ──────────────────────────────────────────────────────

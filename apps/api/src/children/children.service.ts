@@ -329,7 +329,24 @@ export class ChildrenService {
    * Buscar todas as restrições alimentares ativas de uma unidade (para nutricionista)
    */
   async getAllDietaryRestrictionsByUnit(user: any, unitId?: string) {
-    const targetUnitId = unitId || user.unitId;
+    let targetUnitId = unitId || user.unitId;
+
+    // Professores podem não ter unitId no token — resolver via classroomTeacher
+    if (!targetUnitId) {
+      const isProfessor = user.roles?.some(
+        (r: any) => r.level === 'PROFESSOR' || r.level === 'PROFESSOR_AUXILIAR'
+      );
+      if (isProfessor) {
+        const ct = await this.prisma.classroomTeacher.findFirst({
+          where: { teacherId: user.sub, isActive: true },
+          include: { classroom: { select: { unitId: true } } },
+        });
+        if (ct?.classroom?.unitId) {
+          targetUnitId = ct.classroom.unitId;
+        }
+      }
+    }
+
     if (!targetUnitId) {
       throw new ForbiddenException('Unidade não identificada');
     }

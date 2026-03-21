@@ -461,11 +461,12 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Painel de Alergias e Dietas (Nutricionista) ─────────────────────
+      // ─── Painel de Alergias e Dietas ────────────────────────────────────
+      // Visível para professor, coordenação, diretor, nutri e secretaria
       {
         path: 'painel-alergias',
         element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PainelAlergiasPage />
           </RoleProtectedRoute>
         ),

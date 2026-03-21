@@ -3,16 +3,18 @@
  *
  * Exibe as ocorrências registradas pelos professores (tag 'ocorrencia')
  * com filtro por período, turma e categoria.
- * Usado em: DashboardCoordenacaoPedagogicaPage, DashboardCoordenacaoGeralPage, DashboardDiretorPage
+ * Suporta exportação para impressão/PDF via window.print().
+ * Usado em: DashboardCoordenacaoPedagogicaPage, DashboardCoordenacaoGeralPage,
+ *           DashboardDiretorPage, DashboardNutricionistaPage, professor (DiarioBordoPage)
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import http from '../../api/http';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent } from '../ui/card';
 import { LoadingState } from '../ui/LoadingState';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import {
   TriangleAlert, RefreshCw, Camera, User, BookOpen,
-  Calendar, ChevronDown, ChevronUp, Search,
+  Calendar, ChevronDown, ChevronUp, Search, Printer, FileDown,
 } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -30,18 +32,29 @@ interface Ocorrencia {
 }
 
 const CATEGORIAS: Record<string, { label: string; cor: string }> = {
-  comportamento:  { label: 'Comportamento',  cor: 'bg-orange-100 text-orange-700 border-orange-200' },
-  saude:          { label: 'Saúde',          cor: 'bg-red-100 text-red-700 border-red-200' },
-  familia:        { label: 'Família',        cor: 'bg-purple-100 text-purple-700 border-purple-200' },
-  material:       { label: 'Material',       cor: 'bg-blue-100 text-blue-700 border-blue-200' },
-  comunicacao:    { label: 'Comunicação',    cor: 'bg-teal-100 text-teal-700 border-teal-200' },
-  observacao:     { label: 'Observação',     cor: 'bg-gray-100 text-gray-700 border-gray-200' },
+  chegada_saida:              { label: 'Chegada / Saída',              cor: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  saude_lesao:                { label: 'Saúde / Lesão',                cor: 'bg-red-100 text-red-700 border-red-200' },
+  material_pertences:         { label: 'Material / Pertences',         cor: 'bg-blue-100 text-blue-700 border-blue-200' },
+  comportamento:              { label: 'Comportamento',                cor: 'bg-orange-100 text-orange-700 border-orange-200' },
+  comunicacao_responsaveis:   { label: 'Comunicação c/ responsáveis',  cor: 'bg-teal-100 text-teal-700 border-teal-200' },
+  saude:                      { label: 'Saúde',                        cor: 'bg-red-100 text-red-700 border-red-200' },
+  familia:                    { label: 'Família',                      cor: 'bg-purple-100 text-purple-700 border-purple-200' },
+  material:                   { label: 'Material',                     cor: 'bg-blue-100 text-blue-700 border-blue-200' },
+  comunicacao:                { label: 'Comunicação',                  cor: 'bg-teal-100 text-teal-700 border-teal-200' },
+  observacao:                 { label: 'Observação',                   cor: 'bg-gray-100 text-gray-700 border-gray-200' },
+  outro:                      { label: 'Outro',                        cor: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
 function getCategoriaTag(ocorr: Ocorrencia): string {
   if (ocorr.aiContext?.categoria) return ocorr.aiContext.categoria.toLowerCase();
-  const cat = ocorr.tags.find(t => t !== 'ocorrencia');
+  const cat = (ocorr.tags ?? []).find(t => t !== 'ocorrencia');
   return cat ?? 'observacao';
+}
+
+function formatData(eventDate: string): string {
+  if (!eventDate) return '—';
+  const d = new Date(eventDate.includes('T') ? eventDate : eventDate + 'T12:00:00');
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -50,15 +63,22 @@ interface OcorrenciasPanelProps {
   unitId?: string;
   /** Título do painel */
   titulo?: string;
+  /** Se true, mostra apenas as ocorrências do professor logado (para DiarioBordoPage) */
+  apenasMinhas?: boolean;
 }
 
-export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }: OcorrenciasPanelProps) {
+export function OcorrenciasPanel({
+  unitId,
+  titulo = 'Ocorrências Registradas',
+  apenasMinhas = false,
+}: OcorrenciasPanelProps) {
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandido, setExpandido] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('7d');
+  const printRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -66,7 +86,7 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
       const hoje = getPedagogicalToday();
       const params: Record<string, string> = {
         type: 'OBSERVACAO',
-        limit: '100',
+        limit: '200',
       };
       if (unitId) params.unitId = unitId;
       if (filtroPeriodo === 'hoje') {
@@ -102,14 +122,84 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
     const nomeCompleto = `${o.child?.firstName ?? ''} ${o.child?.lastName ?? ''}`.toLowerCase();
     const turma = (o.classroom?.name ?? '').toLowerCase();
     const desc = (o.description ?? '').toLowerCase();
-    const matchBusca = !busca || nomeCompleto.includes(busca.toLowerCase()) || turma.includes(busca.toLowerCase()) || desc.includes(busca.toLowerCase());
+    const matchBusca = !busca ||
+      nomeCompleto.includes(busca.toLowerCase()) ||
+      turma.includes(busca.toLowerCase()) ||
+      desc.includes(busca.toLowerCase());
     const cat = getCategoriaTag(o);
     const matchCat = !filtroCategoria || cat === filtroCategoria;
     return matchBusca && matchCat;
   });
 
+  // ─── Impressão / PDF ────────────────────────────────────────────────────────
+  function imprimir() {
+    const periodoLabel = filtroPeriodo === 'hoje' ? 'Hoje'
+      : filtroPeriodo === '7d' ? 'Últimos 7 dias'
+      : filtroPeriodo === '30d' ? 'Últimos 30 dias'
+      : 'Todos os períodos';
+
+    const linhas = filtradas.map(o => {
+      const cat = getCategoriaTag(o);
+      const catLabel = CATEGORIAS[cat]?.label ?? cat;
+      const nomeCrianca = o.child ? `${o.child.firstName} ${o.child.lastName}` : '—';
+      const nomeProfessor = o.createdByUser
+        ? `${o.createdByUser.firstName} ${o.createdByUser.lastName}`
+        : '—';
+      const turma = o.classroom?.name ?? '—';
+      const data = formatData(o.eventDate);
+      const fotos = Array.isArray(o.mediaUrls) && o.mediaUrls.length > 0
+        ? o.mediaUrls.map((url, i) =>
+            `<img src="${url}" alt="Foto ${i + 1}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;margin:2px;" />`
+          ).join('')
+        : '';
+
+      return `
+        <div style="border:1px solid #fed7aa;border-radius:8px;padding:12px;margin-bottom:10px;break-inside:avoid;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+            <div>
+              <strong style="font-size:14px;">${nomeCrianca}</strong>
+              <span style="font-size:11px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:999px;padding:1px 8px;margin-left:6px;">${catLabel}</span>
+            </div>
+            <span style="font-size:11px;color:#6b7280;">${data}</span>
+          </div>
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">
+            Turma: ${turma} &nbsp;|&nbsp; Professor(a): ${nomeProfessor}
+          </div>
+          <p style="font-size:13px;color:#374151;margin:0 0 6px;">${o.description ?? ''}</p>
+          ${fotos ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${fotos}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8"/>
+        <title>Relatório de Ocorrências</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; color: #111; }
+          h1 { font-size: 18px; margin-bottom: 4px; }
+          .sub { font-size: 12px; color: #6b7280; margin-bottom: 16px; }
+          @media print { body { margin: 10mm; } }
+        </style>
+      </head>
+      <body>
+        <h1>${titulo}</h1>
+        <p class="sub">Período: ${periodoLabel} &nbsp;|&nbsp; Total: ${filtradas.length} ocorrência(s) &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+        ${linhas || '<p style="color:#9ca3af;text-align:center;padding:20px;">Nenhuma ocorrência no período selecionado.</p>'}
+      </body>
+      </html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={printRef}>
       {/* Cabeçalho */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
@@ -121,14 +211,26 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
             </span>
           )}
         </div>
-        <button
-          onClick={carregar}
-          disabled={loading}
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Botão Imprimir / PDF */}
+          <button
+            onClick={imprimir}
+            disabled={loading || filtradas.length === 0}
+            title="Imprimir / Gerar PDF"
+            className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800 px-3 py-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Imprimir / PDF
+          </button>
+          <button
+            onClick={carregar}
+            disabled={loading}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -191,13 +293,6 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
             const cat = getCategoriaTag(ocorr);
             const catConfig = CATEGORIAS[cat] ?? CATEGORIAS['observacao'];
             const isExpanded = expandido === ocorr.id;
-            const dataFormatada = ocorr.eventDate
-              ? new Date(
-                  (ocorr.eventDate || '').includes('T')
-                    ? ocorr.eventDate
-                    : ocorr.eventDate + 'T12:00:00'
-                ).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-              : '—';
             const nomeCrianca = ocorr.child
               ? `${ocorr.child.firstName} ${ocorr.child.lastName}`
               : 'Criança não identificada';
@@ -243,7 +338,7 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {dataFormatada}
+                          {formatData(ocorr.eventDate)}
                         </span>
                       </div>
                       {/* Preview da descrição */}
@@ -260,7 +355,7 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
                   {/* Detalhes expandidos */}
                   {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-orange-100 space-y-3">
-                      <p className="text-sm text-gray-700">{ocorr.description}</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{ocorr.description}</p>
 
                       {/* Fotos */}
                       {ocorr.mediaUrls && ocorr.mediaUrls.length > 0 && (
@@ -276,6 +371,37 @@ export function OcorrenciasPanel({ unitId, titulo = 'Ocorrências Registradas' }
                           ))}
                         </div>
                       )}
+
+                      {/* Botão imprimir individual */}
+                      <div className="flex justify-end">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const win = window.open('', '_blank');
+                            if (!win) return;
+                            const fotos = Array.isArray(ocorr.mediaUrls) && ocorr.mediaUrls.length > 0
+                              ? ocorr.mediaUrls.map((url, i) =>
+                                  `<img src="${url}" alt="Foto ${i + 1}" style="width:100px;height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;margin:2px;" />`
+                                ).join('')
+                              : '';
+                            win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>Ocorrência</title><style>body{font-family:Arial,sans-serif;margin:20px;color:#111;}@media print{body{margin:10mm;}}</style></head><body>
+                              <h2 style="font-size:16px;margin-bottom:4px;">Ocorrência — ${nomeCrianca}</h2>
+                              <p style="font-size:11px;color:#6b7280;margin-bottom:12px;">
+                                Turma: ${ocorr.classroom?.name ?? '—'} &nbsp;|&nbsp; Professor(a): ${nomeProfessor} &nbsp;|&nbsp; Data: ${formatData(ocorr.eventDate)}
+                              </p>
+                              <p style="font-size:13px;color:#374151;white-space:pre-wrap;">${ocorr.description ?? ''}</p>
+                              ${fotos ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:10px;">${fotos}</div>` : ''}
+                            </body></html>`);
+                            win.document.close();
+                            win.focus();
+                            setTimeout(() => win.print(), 500);
+                          }}
+                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-1"
+                        >
+                          <Printer className="h-3 w-3" />
+                          Imprimir esta ocorrência
+                        </button>
+                      </div>
                     </div>
                   )}
                 </CardContent>

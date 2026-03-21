@@ -321,7 +321,9 @@ export default function DiarioBordoPage() {
   }, [aba, classroomId]);
 
   useEffect(() => {
-    if (aba === 'ocorrencias' && classroomId) {
+    // Carregar ocorrências ao entrar na aba — não depende de classroomId
+    // O backend filtra por createdBy quando professor não tem classroomTeacher formal
+    if (aba === 'ocorrencias') {
       loadOcorrencias();
     }
   }, [aba, classroomId]);
