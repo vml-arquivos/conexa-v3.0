@@ -52,47 +52,138 @@ function normalize(str) {
   return str.trim().replace(/\s+/g, ' ');
 }
 
-// ─── Extração de texto do PDF ─────────────────────────────────────────────────
+// ─── Extração por colunas (extract_words com coordenadas X) ──────────────────
 
-function extractPdfText(pdfPath) {
-  const script = [
-    'import pdfplumber, sys',
-    'all_text = []',
-    'with pdfplumber.open(sys.argv[1]) as pdf:',
-    '    for page in pdf.pages:',
-    '        t = page.extract_text()',
-    '        if t:',
-    '            all_text.append(t)',
-    "print('\\n'.join(all_text))",
-  ].join('\n');
+// Limites de coluna X (em pontos) mapeados do PDF real
+const COL_BOUNDS = {
+  date:             [59,  140],
+  campo:            [140, 245],
+  bnccCode:         [245, 320],
+  objetivoBNCC:     [320, 460],
+  objetivoCurriculo:[460, 645],
+  intencionalidade: [645, 800],
+};
 
-  const tmpScript = `/tmp/pdf_extract_${Date.now()}.py`;
+const SEGMENT_PAGE_HINTS = {
+  EI01: 'BEBÊS',
+  EI02: 'BEM PEQUENAS',
+  EI03: 'CRIANÇAS PEQUENAS',
+};
+
+function extractEntriesFromPdf(pdfPath, segment) {
+  const script = `
+import pdfplumber, sys, json, re
+
+COL_BOUNDS = {
+    'date':              (59,  140),
+    'campo':             (140, 245),
+    'bnccCode':          (245, 320),
+    'objetivoBNCC':      (320, 460),
+    'objetivoCurriculo': (460, 645),
+    'intencionalidade':  (645, 800),
+}
+
+SEGMENT_HEADERS = {
+    'EI01': ['BEBÊS', 'BEBE', 'BEBES'],
+    'EI02': ['BEM PEQUENAS', 'CRIANCAS BEM PEQUENAS'],
+    'EI03': ['CRIANÇAS PEQUENAS', 'CRIANCAS PEQUENAS'],
+}
+
+DATE_RE = re.compile(r'^(\\d{2})/(\\d{2})$')
+BNCC_RE = re.compile(r'^EI\\d{2}[A-Z]{2}\\d{2}$')
+
+def words_in_col(words, x0, x1):
+    return [w['text'] for w in words if w['x0'] >= x0 - 5 and w['x1'] <= x1 + 5]
+
+def is_segment_page(page_text, segment):
+    if not page_text:
+        return False
+    upper = page_text.upper()
+    for hint in SEGMENT_HEADERS.get(segment, []):
+        if hint in upper:
+            return True
+    return False
+
+def extract_segment_entries(pdf_path, segment):
+    entries = []
+    in_segment = False
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text() or ''
+            if is_segment_page(page_text, segment):
+                in_segment = True
+            elif in_segment:
+                # Verifica se entrou em outro segmento
+                for other_seg, hints in SEGMENT_HEADERS.items():
+                    if other_seg != segment:
+                        for hint in hints:
+                            if hint in page_text.upper():
+                                in_segment = False
+                                break
+                    if not in_segment:
+                        break
+            if not in_segment:
+                continue
+
+            words = page.extract_words(x_tolerance=3, y_tolerance=3)
+            # Agrupar palavras por linha (y0 similar)
+            rows = {}
+            for w in words:
+                y = round(w['top'] / 4) * 4
+                if y not in rows:
+                    rows[y] = []
+                rows[y].append(w)
+
+            for y in sorted(rows.keys()):
+                row_words = sorted(rows[y], key=lambda w: w['x0'])
+                date_words = words_in_col(row_words, *COL_BOUNDS['date'])
+                date_str = ' '.join(date_words).strip()
+                m = DATE_RE.match(date_str.split()[0] if date_str else '')
+                if not m:
+                    continue
+                day, month = m.group(1), m.group(2)
+                campo_words = words_in_col(row_words, *COL_BOUNDS['campo'])
+                bncc_words = words_in_col(row_words, *COL_BOUNDS['bnccCode'])
+                obj_bncc_words = words_in_col(row_words, *COL_BOUNDS['objetivoBNCC'])
+                obj_curr_words = words_in_col(row_words, *COL_BOUNDS['objetivoCurriculo'])
+                intenc_words = words_in_col(row_words, *COL_BOUNDS['intencionalidade'])
+
+                bncc_code = ' '.join(bncc_words).strip()
+                if not BNCC_RE.match(bncc_code):
+                    continue
+
+                entries.append({
+                    'day': day,
+                    'month': month,
+                    'campo': ' '.join(campo_words).strip(),
+                    'bnccCode': bncc_code,
+                    'objetivoBNCC': ' '.join(obj_bncc_words).strip(),
+                    'objetivoCurriculo': ' '.join(obj_curr_words).strip(),
+                    'intencionalidade': ' '.join(intenc_words).strip(),
+                    'exemploAtividade': '',
+                    'week': 1,
+                    'bimester': 1,
+                })
+    return entries
+
+result = extract_segment_entries(sys.argv[1], sys.argv[2])
+print(json.dumps(result, ensure_ascii=False))
+`;
+
+  const tmpScript = `/tmp/pdf_col_extract_${Date.now()}.py`;
   fs.writeFileSync(tmpScript, script);
   try {
-    return childProcess.execSync(`python3 "${tmpScript}" "${pdfPath}"`, {
-      maxBuffer: 50 * 1024 * 1024,
-      encoding: 'utf8',
-    });
+    const output = childProcess.execSync(
+      `python3 "${tmpScript}" "${pdfPath}" "${segment}"`,
+      { maxBuffer: 50 * 1024 * 1024, encoding: 'utf8' },
+    );
+    return JSON.parse(output);
   } finally {
     try { fs.unlinkSync(tmpScript); } catch (_) {}
   }
 }
 
-// ─── Segmentação do texto ─────────────────────────────────────────────────────
-
-function extractSegmentText(fullText, segment) {
-  const header = SEGMENT_HEADERS[segment];
-  const startIdx = fullText.indexOf(header);
-  if (startIdx < 0) return '';
-
-  let endIdx = fullText.length;
-  for (const other of ALL_SEGMENTS.filter((s) => s !== segment)) {
-    const otherIdx = fullText.indexOf(SEGMENT_HEADERS[other], startIdx + header.length);
-    if (otherIdx > startIdx && otherIdx < endIdx) endIdx = otherIdx;
-  }
-
-  return fullText.substring(startIdx, endIdx);
-}
+// (segmentação agora é feita pelo Python via extract_words por colunas)
 
 // ─── Normalização de campo de experiência ─────────────────────────────────────
 
@@ -127,95 +218,24 @@ function normalizeCampo(text, bnccCode) {
   throw new Error(`Campo de Experiência não reconhecido: "${text}" (código: ${bnccCode || 'N/A'})`);
 }
 
-// ─── Parser de entradas ───────────────────────────────────────────────────────
+// ─── Processamento de entradas brutas (retorno do Python) ─────────────────────
 
-function parseSegment(segmentText) {
+function processRawEntries(rawEntries) {
   const entries = [];
   const seenDates = new Set();
-  const lines = segmentText.split('\n');
 
-  const contextMap = [];
-  let pos = 0;
-  let ctxBim = 1;
-  let ctxWeek = 1;
-
-  for (const line of lines) {
-    const bimMatch = line.match(/(\d+)º BIMESTRE/i);
-    if (bimMatch) ctxBim = parseInt(bimMatch[1], 10);
-    const weekMatch = line.match(/SEMANA\s+(\d+)/i);
-    if (weekMatch) ctxWeek = parseInt(weekMatch[1], 10);
-    contextMap.push({ pos, bimester: ctxBim, week: ctxWeek });
-    pos += line.length + 1;
-  }
-
-  const getContext = (charPos) => {
-    let ctx = { bimester: 1, week: 1 };
-    for (const c of contextMap) {
-      if (c.pos <= charPos) ctx = c;
-      else break;
-    }
-    return ctx;
-  };
-
-  const reconstructed = lines.join('\n');
-  const entryRegex = /(\d{2})\/(\d{2})\s*[–\-]\s*([^(\n]+?)\s*\((EI\d+[A-Z]+\d+)\)/g;
-  const rawEntries = [];
-
-  let m;
-  while ((m = entryRegex.exec(reconstructed)) !== null) {
-    rawEntries.push({
-      day: m[1], month: m[2], campo: m[3].trim(), bnccCode: m[4],
-      startPos: m.index, endPos: m.index + m[0].length,
-    });
-  }
-
-  for (let i = 0; i < rawEntries.length; i++) {
-    const raw = rawEntries[i];
-    const nextStart = i + 1 < rawEntries.length ? rawEntries[i + 1].startPos : reconstructed.length;
-    const blockText = reconstructed.substring(raw.endPos, nextStart);
-
+  for (const raw of rawEntries) {
     const dateKey = `${raw.month}/${raw.day}`;
     if (seenDates.has(dateKey)) continue;
     seenDates.add(dateKey);
 
-    const ctx = getContext(raw.startPos);
-
-    const cleanLines = blockText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .filter((l) => !l.includes('MATRIZ CURRICULAR'))
-      .filter((l) => !l.includes('Associação Beneficente'))
-      .filter((l) => !l.match(/^(Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\s/i))
-      .filter((l) => !l.match(/^EI\d{2}\s*[–\-]/))
-      .filter((l) => !l.match(/^\d+º BIMESTRE/i))
-      .filter((l) => !l.match(/^SEMANA\s+\d+/i))
-      .filter((l) => !l.match(/^Situação da semana/i))
-      .filter((l) => !l.match(/^Semana de/i))
-      .filter((l) => !l.match(/^Observação:/i));
-
-    const cleanText = cleanLines.join(' ').replace(/\s+/g, ' ').trim();
-
-    const sentences = cleanText
-      .split(/\.\s+(?=[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÇ])/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 3);
-
-    const objetivoBNCC = sentences[0]
-      ? (sentences[0].endsWith('.') ? sentences[0] : sentences[0] + '.')
-      : '';
-    const objetivoCurriculo = sentences[1]
-      ? (sentences[1].endsWith('.') ? sentences[1] : sentences[1] + '.')
-      : objetivoBNCC;
-    const intencionalidade = sentences[2]
-      ? (sentences[2].endsWith('.') ? sentences[2] : sentences[2] + '.')
-      : undefined;
-    const exemploAtividade = sentences.length >= 4
-      ? sentences.slice(3).map((s) => (s.endsWith('.') ? s : s + '.')).join(' ')
-      : undefined;
-
     const date = new Date(`2026-${raw.month}-${raw.day}T12:00:00-03:00`);
-    const dayOfWeek = date.getDay();
+    if (isNaN(date.getTime())) continue;
+
+    const objetivoBNCC = normalize(raw.objetivoBNCC) || '';
+    const objetivoCurriculo = normalize(raw.objetivoCurriculo) || objetivoBNCC;
+    const intencionalidade = normalize(raw.intencionalidade) || undefined;
+    const exemploAtividade = normalize(raw.exemploAtividade) || undefined;
 
     try {
       const campo = normalizeCampo(raw.campo, raw.bnccCode);
@@ -223,7 +243,8 @@ function parseSegment(segmentText) {
         day: raw.day, month: raw.month, campo,
         bnccCode: raw.bnccCode,
         objetivoBNCC, objetivoCurriculo, intencionalidade, exemploAtividade,
-        bimester: ctx.bimester, week: ctx.week, dayOfWeek,
+        bimester: raw.bimester || 1, week: raw.week || 1,
+        dayOfWeek: date.getDay(),
       });
     } catch (e) {
       console.warn(`  [WARN] ${dateKey}: ${e.message}`);
@@ -246,7 +267,7 @@ async function findEntryByDay(matrixId, date) {
 
 // ─── Patch de um segmento ─────────────────────────────────────────────────────
 
-async function patchSegment(segment, pdfText, dryRun, force) {
+async function patchSegment(segment, pdfPath, dryRun, force, fillMissingOnly) {
   const result = {
     segment,
     matrixId: '',
@@ -277,13 +298,20 @@ async function patchSegment(segment, pdfText, dryRun, force) {
 
   result.matrixId = matrix.id;
 
-  const segmentText = extractSegmentText(pdfText, segment);
-  if (!segmentText) {
-    result.errors.push(`Segmento ${segment} não encontrado no PDF.`);
+  let rawEntries;
+  try {
+    rawEntries = extractEntriesFromPdf(pdfPath, segment);
+  } catch (e) {
+    result.errors.push(`Erro ao extrair PDF para ${segment}: ${e.message}`);
     return result;
   }
 
-  const entries = parseSegment(segmentText);
+  if (!rawEntries || rawEntries.length === 0) {
+    result.errors.push(`Segmento ${segment} não encontrado no PDF ou sem entradas válidas.`);
+    return result;
+  }
+
+  const entries = processRawEntries(rawEntries);
   result.totalExtracted = entries.length;
 
   console.log(`\n  [${segment}] Matriz: ${matrix.id} | Extraídas: ${entries.length} entradas`);
@@ -296,6 +324,25 @@ async function patchSegment(segment, pdfText, dryRun, force) {
       const existing = await findEntryByDay(matrix.id, date);
 
       if (existing) {
+        if (fillMissingOnly) {
+          // Modo fill-missing-only: só preenche campos vazios, nunca sobrescreve
+          const updateData = {};
+          if (!existing.objetivoBNCC && entry.objetivoBNCC) updateData.objetivoBNCC = entry.objetivoBNCC;
+          if (!existing.objetivoCurriculo && entry.objetivoCurriculo) updateData.objetivoCurriculo = entry.objetivoCurriculo;
+          if (!existing.intencionalidade && entry.intencionalidade) updateData.intencionalidade = entry.intencionalidade;
+          if (!existing.exemploAtividade && entry.exemploAtividade) updateData.exemploAtividade = entry.exemploAtividade;
+          if (Object.keys(updateData).length > 0) {
+            if (!dryRun) {
+              await prisma.curriculumMatrixEntry.update({ where: { id: existing.id }, data: updateData });
+            }
+            result.updated++;
+            console.log(`  [${segment}] ${dateKey} → FILL (${Object.keys(updateData).join(', ')})`);
+          } else {
+            result.unchanged++;
+          }
+          continue;
+        }
+
         const linkedEvents = await prisma.diaryEvent.count({
           where: { curriculumEntryId: existing.id },
         });
@@ -465,6 +512,7 @@ async function main() {
   const pdfPath = pdfIdx >= 0 ? args[pdfIdx + 1] : null;
   const dryRun = args.includes('--dry-run');
   const force = args.includes('--force');
+  const fillMissingOnly = args.includes('--fill-missing-only');
   const segmentIdx = args.indexOf('--segment');
   const segmentArg = segmentIdx >= 0 ? args[segmentIdx + 1] : 'ALL';
 
@@ -479,14 +527,10 @@ async function main() {
   const segments = segmentArg === 'ALL' ? ALL_SEGMENTS : [segmentArg];
 
   console.log(`\n${'='.repeat(60)}`);
-  console.log(`PATCH MATRIZ 2026 — ${dryRun ? 'DRY-RUN (simulação)' : 'APPLY (gravando no banco)'} ${force ? '(FORCE)' : ''}`);
+  console.log(`PATCH MATRIZ 2026 — ${dryRun ? 'DRY-RUN (simulação)' : 'APPLY (gravando no banco)'} ${force ? '(FORCE)' : ''} ${fillMissingOnly ? '(FILL-MISSING-ONLY)' : ''}`);
   console.log(`PDF: ${pdfPath}`);
   console.log(`Segmentos: ${segments.join(', ')}`);
   console.log(`${'='.repeat(60)}\n`);
-
-  console.log('Extraindo texto do PDF...');
-  const pdfText = extractPdfText(pdfPath);
-  console.log(`Texto extraído: ${pdfText.length} caracteres\n`);
 
   console.log('Verificando duplicatas antes do patch:');
   for (const seg of segments) {
@@ -497,7 +541,7 @@ async function main() {
   for (const seg of segments) {
     console.log(`\n${'─'.repeat(40)}`);
     console.log(`Processando segmento: ${seg}`);
-    const result = await patchSegment(seg, pdfText, dryRun, force);
+    const result = await patchSegment(seg, pdfPath, dryRun, force, fillMissingOnly);
     results.push(result);
   }
 

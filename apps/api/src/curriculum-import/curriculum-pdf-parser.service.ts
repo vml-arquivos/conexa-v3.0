@@ -42,55 +42,89 @@ const SEGMENT_HEADERS: Record<MatrixSegment, string> = {
   EI03: 'ENSINO - CRIANÇAS PEQUENAS',
 };
 
+/**
+ * Limites das colunas do PDF (coordenadas x0 em pontos).
+ *
+ * O PDF da Matriz Curricular 2026 tem 6 colunas:
+ *   DATA      :  55 – 138  (data + dia da semana)
+ *   CAMPO     : 138 – 248  (campo de experiência)
+ *   BNCC_CODE : 248 – 318  (código BNCC entre parênteses)
+ *   OBJ_BNCC  : 318 – 462  (objetivo de aprendizagem BNCC)
+ *   OBJ_CURR  : 462 – 647  (objetivo do currículo)
+ *   INTENC    : 647 – 820  (intencionalidade pedagógica)
+ */
+const COL_BOUNDS: Record<string, [number, number]> = {
+  data:      [55,  138],
+  campo:     [138, 248],
+  bncc_code: [248, 318],
+  obj_bncc:  [318, 462],
+  obj_curr:  [462, 647],
+  intenc:    [647, 820],
+};
+
 @Injectable()
 export class CurriculumPdfParserService {
   /**
    * Parse do PDF da Matriz Curricular 2026 para um segmento específico.
    *
-   * O PDF contém EI01 + EI02 + EI03 em sequência.
-   * O parser recorta o texto apenas no trecho do segmento solicitado,
-   * evitando que datas repetidas entre segmentos sejam deduplicadas incorretamente.
+   * Usa extração por colunas (extract_words + coordenadas X) para separar
+   * corretamente os 6 campos de cada linha da tabela.
    *
    * @param pdfPath  - Caminho do arquivo PDF
    * @param segment  - Segmento alvo: 'EI01' | 'EI02' | 'EI03'
    */
   async parsePdf(pdfPath: string, segment: MatrixSegment = 'EI01'): Promise<ParserResult> {
     try {
-      // Extrair texto via pdfplumber (Python) — mais fiel ao layout de tabelas
-      // Nota: a verificação de existência do arquivo é feita após o mock para facilitar testes
-      const text = await this.extractTextViaPython(pdfPath);
-
-      if (!text && !fs.existsSync(pdfPath)) {
+      if (!fs.existsSync(pdfPath)) {
         throw new BadRequestException(`Arquivo PDF não encontrado: ${pdfPath}`);
       }
 
-      if (!text || text.trim().length === 0) {
-        throw new BadRequestException('PDF está vazio ou não contém texto extraível');
-      }
+      // Extrair entradas via pdfplumber com coordenadas de coluna
+      const jsonResult = await this.extractEntriesViaPython(pdfPath, segment);
 
-      // Recortar apenas o trecho do segmento solicitado
-      const segmentText = this.extractSegmentText(text, segment);
-
-      if (!segmentText || segmentText.trim().length === 0) {
-        throw new BadRequestException(
-          `Segmento ${segment} não encontrado no PDF. Verifique o formato do arquivo.`,
-        );
-      }
-
-      // Parse do conteúdo do segmento
-      const { entries, errors } = this.extractEntries(segmentText, segment);
-
-      if (entries.length === 0) {
+      if (!jsonResult || jsonResult.length === 0) {
         throw new BadRequestException(
           `Nenhuma entrada válida encontrada para o segmento ${segment}. Verifique o formato do arquivo.`,
         );
       }
 
-      return {
-        entries,
-        totalExtracted: entries.length,
-        errors,
-      };
+      const entries: ParsedMatrixEntry[] = [];
+      const errors: string[] = [];
+
+      for (const raw of jsonResult) {
+        try {
+          const date = new Date(`2026-${raw.month}-${raw.day}T12:00:00-03:00`);
+          if (isNaN(date.getTime())) {
+            errors.push(`Data inválida: ${raw.day}/${raw.month}`);
+            continue;
+          }
+
+          const campoDeExperiencia = this.normalizeCampoDeExperiencia(raw.campo, raw.bnccCode);
+
+          entries.push({
+            date,
+            weekOfYear: raw.week || 1,
+            dayOfWeek: date.getDay(),
+            bimester: raw.bimester || 1,
+            campoDeExperiencia,
+            objetivoBNCC: raw.objetivoBNCC,
+            objetivoBNCCCode: raw.bnccCode,
+            objetivoCurriculo: raw.objetivoCurriculo || raw.objetivoBNCC,
+            intencionalidade: raw.intencionalidade || undefined,
+            exemploAtividade: raw.exemploAtividade || undefined,
+          });
+        } catch (err) {
+          errors.push(`Erro ao processar ${raw.day}/${raw.month}: ${err.message}`);
+        }
+      }
+
+      if (entries.length === 0) {
+        throw new BadRequestException(
+          `Nenhuma entrada válida encontrada para o segmento ${segment}.`,
+        );
+      }
+
+      return { entries, totalExtracted: entries.length, errors };
     } catch (error) {
       if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(`Erro ao fazer parse do PDF: ${error.message}`);
@@ -98,352 +132,249 @@ export class CurriculumPdfParserService {
   }
 
   /**
-   * Extrai o texto do PDF usando pdfplumber via Python subprocess.
-   * Mais robusto que pdf-parse para tabelas com múltiplas colunas.
-   */
-  private async extractTextViaPython(pdfPath: string): Promise<string> {
-    const { execSync } = await import('child_process');
-    const script = `
-import pdfplumber, sys
-all_text = []
-with pdfplumber.open(sys.argv[1]) as pdf:
-    for page in pdf.pages:
-        t = page.extract_text()
-        if t:
-            all_text.append(t)
-print('\\n'.join(all_text))
-`;
-    const tmpScript = path.join('/tmp', `pdf_extract_${Date.now()}.py`);
-    fs.writeFileSync(tmpScript, script);
-    try {
-      const result = execSync(`python3 "${tmpScript}" "${pdfPath}"`, {
-        maxBuffer: 50 * 1024 * 1024,
-        encoding: 'utf8',
-      });
-      return result;
-    } finally {
-      fs.unlinkSync(tmpScript);
-    }
-  }
-
-  /**
-   * Recorta o texto do PDF para o trecho correspondente ao segmento solicitado.
-   * Garante que seenDates seja isolado por segmento.
-   */
-  private extractSegmentText(fullText: string, segment: MatrixSegment): string {
-    const header = SEGMENT_HEADERS[segment];
-    const startIdx = fullText.indexOf(header);
-    if (startIdx < 0) return '';
-
-    // Encontrar o próximo cabeçalho de segmento (se existir)
-    const otherSegments = (Object.keys(SEGMENT_HEADERS) as MatrixSegment[]).filter(
-      (s) => s !== segment,
-    );
-    let endIdx = fullText.length;
-    for (const other of otherSegments) {
-      const otherHeader = SEGMENT_HEADERS[other];
-      const otherIdx = fullText.indexOf(otherHeader, startIdx + header.length);
-      if (otherIdx > startIdx && otherIdx < endIdx) {
-        endIdx = otherIdx;
-      }
-    }
-
-    return fullText.substring(startIdx, endIdx);
-  }
-
-  /**
-   * Extrai entradas do texto de um segmento.
+   * Extrai entradas do PDF usando pdfplumber com coordenadas de coluna.
    *
-   * Formato das linhas no PDF (após extração pdfplumber):
-   *   "09/02 – O eu, o outro e o nós (EI01EO03) Estabelecer vínculos... Perceber o ambiente... Favorecer a adaptação..."
-   *   "Seg vínculos afetivos com adultos..."  ← continuação da linha anterior
-   *
-   * Estratégia:
-   * 1. Encontrar todas as linhas que começam com DD/MM seguido de traço
-   * 2. Para cada linha, extrair campo de experiência, código BNCC e textos
-   * 3. Detectar semana e bimestre pelo cabeçalho anterior
+   * O script Python usa extract_words() para separar as 6 colunas da tabela
+   * com base nas coordenadas X de cada palavra, garantindo que cada campo
+   * seja extraído da coluna correta — independente do layout da linha.
    */
-  private extractEntries(
-    text: string,
+  private async extractEntriesViaPython(
+    pdfPath: string,
     segment: MatrixSegment,
-  ): { entries: ParsedMatrixEntry[]; errors: string[] } {
-    const entries: ParsedMatrixEntry[] = [];
-    const errors: string[] = [];
-    const seenDates = new Set<string>();
-    const currentYear = 2026;
-
-    // Padrão de entrada: DD/MM – <campo> (EIxxYYnn) <objetivoBNCC> <objetivoCurriculo> <intencionalidade>
-    // O dia da semana (Seg/Ter/Qua/Qui/Sex) aparece na linha seguinte, antes do restante do texto
-    const entryPattern = /(\d{2})\/(\d{2})\s*[–\-]\s*([^(]+?)\s*\((EI\d+[A-Z]+\d+)\)\s*([\s\S]*?)(?=\d{2}\/\d{2}\s*[–\-]|EI\d{2}\s*[–\-]|$)/g;
-
-    // Detectar bimestre e semana a partir de cabeçalhos
-    const bimesterPattern = /(\d+)º BIMESTRE/gi;
-    const weekPattern = /SEMANA\s+(\d+)/gi;
-
-    let currentBimester = 1;
-    let currentWeek = 1;
-
-    // Processar linha por linha para detectar contexto de bimestre/semana
-    const lines = text.split('\n');
-    let reconstructedText = '';
-
-    for (const line of lines) {
-      // Detectar bimestre
-      const bimMatch = line.match(/(\d+)º BIMESTRE/i);
-      if (bimMatch) {
-        currentBimester = parseInt(bimMatch[1], 10);
-      }
-
-      // Detectar semana
-      const weekMatch = line.match(/SEMANA\s+(\d+)/i);
-      if (weekMatch) {
-        currentWeek = parseInt(weekMatch[1], 10);
-      }
-
-      reconstructedText += line + '\n';
-    }
-
-    // Agora extrair entradas com regex
-    let match: RegExpExecArray | null;
-    entryPattern.lastIndex = 0;
-
-    // Reprocessar com contexto de bimestre/semana por posição
-    // Construir mapa de posição → {bimester, week}
-    const contextMap: Array<{ pos: number; bimester: number; week: number }> = [];
-    let ctxBim = 1;
-    let ctxWeek = 1;
-    let pos = 0;
-
-    for (const line of lines) {
-      const bimMatch = line.match(/(\d+)º BIMESTRE/i);
-      if (bimMatch) ctxBim = parseInt(bimMatch[1], 10);
-      const weekMatch = line.match(/SEMANA\s+(\d+)/i);
-      if (weekMatch) ctxWeek = parseInt(weekMatch[1], 10);
-      contextMap.push({ pos, bimester: ctxBim, week: ctxWeek });
-      pos += line.length + 1;
-    }
-
-    const getContext = (charPos: number): { bimester: number; week: number } => {
-      let ctx = { bimester: 1, week: 1 };
-      for (const c of contextMap) {
-        if (c.pos <= charPos) ctx = c;
-        else break;
-      }
-      return ctx;
-    };
-
-    // Extrair entradas
-    const entryRegex = /(\d{2})\/(\d{2})\s*[–\-]\s*([^(\n]+?)\s*\((EI\d+[A-Z]+\d+)\)/g;
-    let m: RegExpExecArray | null;
-
-    const rawEntries: Array<{
+  ): Promise<
+    Array<{
       day: string;
       month: string;
       campo: string;
       bnccCode: string;
-      startPos: number;
-      endPos: number;
-    }> = [];
+      objetivoBNCC: string;
+      objetivoCurriculo: string;
+      intencionalidade: string;
+      exemploAtividade: string;
+      week: number;
+      bimester: number;
+    }>
+  > {
+    const { execSync } = await import('child_process');
 
-    while ((m = entryRegex.exec(reconstructedText)) !== null) {
-      rawEntries.push({
-        day: m[1],
-        month: m[2],
-        campo: m[3].trim(),
-        bnccCode: m[4],
-        startPos: m.index,
-        endPos: m.index + m[0].length,
+    const colBoundsJson = JSON.stringify(COL_BOUNDS);
+    const segmentHeadersJson = JSON.stringify(SEGMENT_HEADERS);
+
+    const script = `
+import pdfplumber, json, re, sys, unicodedata
+
+PDF_PATH = sys.argv[1]
+SEGMENT = sys.argv[2]
+
+COL_BOUNDS = ${colBoundsJson}
+SEGMENT_HEADERS = ${segmentHeadersJson}
+
+CAMPO_MAP = [
+    ('o eu', 'O_EU_O_OUTRO_E_O_NOS'),
+    ('corpo', 'CORPO_GESTOS_E_MOVIMENTOS'),
+    ('gestos', 'CORPO_GESTOS_E_MOVIMENTOS'),
+    ('movimentos', 'CORPO_GESTOS_E_MOVIMENTOS'),
+    ('tracos', 'TRACOS_SONS_CORES_E_FORMAS'),
+    ('sons', 'TRACOS_SONS_CORES_E_FORMAS'),
+    ('cores', 'TRACOS_SONS_CORES_E_FORMAS'),
+    ('formas', 'TRACOS_SONS_CORES_E_FORMAS'),
+    ('escuta', 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO'),
+    ('fala', 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO'),
+    ('pensamento', 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO'),
+    ('imaginacao', 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO'),
+    ('espaco', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'),
+    ('tempo', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'),
+    ('quantidade', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'),
+    ('relacoes', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'),
+    ('transformacoes', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'),
+]
+
+BNCC_CODE_MAP = {
+    'EO': 'O_EU_O_OUTRO_E_O_NOS',
+    'CG': 'CORPO_GESTOS_E_MOVIMENTOS',
+    'TS': 'TRACOS_SONS_CORES_E_FORMAS',
+    'EF': 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+    'ET': 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+}
+
+def nfd(text):
+    return ''.join(c for c in unicodedata.normalize('NFD', text.lower()) if unicodedata.category(c) != 'Mn')
+
+def normalize_campo(text, bncc_code=''):
+    n = nfd(text)
+    for key, val in CAMPO_MAP:
+        if nfd(key) in n:
+            return val
+    if bncc_code:
+        for code_part, val in BNCC_CODE_MAP.items():
+            if code_part in bncc_code.upper():
+                return val
+    return 'DESCONHECIDO'
+
+def get_col(words, col_name, y_min, y_max):
+    x_min, x_max = COL_BOUNDS[col_name]
+    col_words = [
+        w for w in words
+        if w['x0'] >= x_min and w['x0'] < x_max
+        and w['top'] >= y_min and w['bottom'] <= y_max + 8
+    ]
+    col_words.sort(key=lambda w: (round(w['top'] / 3) * 3, w['x0']))
+    return ' '.join(w['text'] for w in col_words).strip()
+
+def clean_field(text):
+    text = re.sub(r'\\(EI\\d+[A-Z]+\\d+\\)', '', text)
+    text = re.sub(r'\\s+', ' ', text).strip()
+    return text
+
+with pdfplumber.open(PDF_PATH) as pdf:
+    # Mapear páginas por segmento
+    seg_start = {}
+    for i, page in enumerate(pdf.pages):
+        text = page.extract_text() or ''
+        for seg, marker in SEGMENT_HEADERS.items():
+            if marker in text and seg not in seg_start:
+                seg_start[seg] = i
+
+    sorted_segs = sorted(seg_start.items(), key=lambda x: x[1])
+    seg_ranges = {}
+    for idx, (seg, start) in enumerate(sorted_segs):
+        end = sorted_segs[idx+1][1] if idx+1 < len(sorted_segs) else len(pdf.pages)
+        seg_ranges[seg] = (start, end)
+
+    if SEGMENT not in seg_ranges:
+        print(json.dumps([]))
+        sys.exit(0)
+
+    pg_start, pg_end = seg_ranges[SEGMENT]
+    entries = []
+    seen_dates = set()
+    current_bimester = 1
+    current_week = 1
+
+    for i in range(pg_start, pg_end):
+        page = pdf.pages[i]
+        text = page.extract_text() or ''
+
+        # Detectar bimestre e semana pelo texto da página
+        bim_match = re.search(r'(\\d+)º BIMESTRE', text, re.IGNORECASE)
+        if bim_match:
+            current_bimester = int(bim_match.group(1))
+        week_match = re.search(r'SEMANA\\s+(\\d+)', text, re.IGNORECASE)
+        if week_match:
+            current_week = int(week_match.group(1))
+
+        words = page.extract_words(x_tolerance=3, y_tolerance=3)
+
+        # Todas as datas na página (formato DD/MM)
+        all_dates_on_page = sorted(
+            [w for w in words if re.match(r'^\\d{2}/\\d{2}$', w['text'])],
+            key=lambda w: w['top']
+        )
+
+        for di, dw in enumerate(all_dates_on_page):
+            date_str = dw['text']
+            day, month = date_str.split('/')
+            date_key = f"{month}/{day}"
+
+            if date_key in seen_dates:
+                continue
+
+            row_y_min = dw['top'] - 2
+            next_dw = all_dates_on_page[di+1] if di+1 < len(all_dates_on_page) else None
+            row_y_max = (next_dw['top'] - 2) if next_dw else (dw['top'] + 130)
+
+            # Extrair colunas
+            campo_raw = get_col(words, 'campo', row_y_min, row_y_max)
+            bncc_code_raw = get_col(words, 'bncc_code', row_y_min, row_y_max)
+            obj_bncc_raw = get_col(words, 'obj_bncc', row_y_min, row_y_max)
+            obj_curr_raw = get_col(words, 'obj_curr', row_y_min, row_y_max)
+            intenc_raw = get_col(words, 'intenc', row_y_min, row_y_max)
+
+            # Extrair código BNCC limpo
+            bncc_match = re.search(r'(EI\\d+[A-Z]+\\d+)', bncc_code_raw)
+            bncc_code = bncc_match.group(1) if bncc_match else ''
+
+            # Pular linhas sem código BNCC (feriados, formações, dias não letivos)
+            if not bncc_code:
+                continue
+
+            seen_dates.add(date_key)
+
+            campo = normalize_campo(campo_raw, bncc_code)
+            obj_bncc = clean_field(obj_bncc_raw)
+            obj_curr = clean_field(obj_curr_raw)
+            intenc = clean_field(intenc_raw)
+
+            entries.append({
+                'day': day,
+                'month': month,
+                'campo': campo,
+                'bnccCode': bncc_code,
+                'objetivoBNCC': obj_bncc,
+                'objetivoCurriculo': obj_curr,
+                'intencionalidade': intenc if intenc else '',
+                'exemploAtividade': '',
+                'week': current_week,
+                'bimester': current_bimester,
+            })
+
+    print(json.dumps(entries, ensure_ascii=False))
+`;
+
+    const tmpScript = path.join('/tmp', `pdf_col_extract_${Date.now()}.py`);
+    fs.writeFileSync(tmpScript, script);
+    try {
+      const result = execSync(`python3 "${tmpScript}" "${pdfPath}" "${segment}"`, {
+        maxBuffer: 50 * 1024 * 1024,
+        encoding: 'utf8',
       });
-    }
-
-    for (let i = 0; i < rawEntries.length; i++) {
-      const raw = rawEntries[i];
-      const nextStart = i + 1 < rawEntries.length ? rawEntries[i + 1].startPos : reconstructedText.length;
-      const blockText = reconstructedText.substring(raw.endPos, nextStart);
-
+      return JSON.parse(result.trim());
+    } finally {
       try {
-        const dateStr = `${currentYear}-${raw.month}-${raw.day}`;
-        const date = new Date(`${dateStr}T12:00:00-03:00`);
-
-        if (isNaN(date.getTime())) {
-          errors.push(`Data inválida: ${raw.day}/${raw.month}`);
-          continue;
-        }
-
-        const dateKey = `${raw.month}/${raw.day}`;
-        if (seenDates.has(dateKey)) {
-          errors.push(`Data duplicada ignorada no segmento: ${dateKey}`);
-          continue;
-        }
-        seenDates.add(dateKey);
-
-        const ctx = getContext(raw.startPos);
-        const campoDeExperiencia = this.normalizeCampoDeExperiencia(raw.campo, raw.bnccCode);
-        const dayOfWeek = this.inferDayOfWeek(date);
-
-        // Extrair textos do bloco: objetivoBNCC, objetivoCurriculo, intencionalidade
-        const { objetivoBNCC, objetivoCurriculo, intencionalidade, exemploAtividade } =
-          this.parseBlockTexts(blockText, raw.bnccCode);
-
-        if (!objetivoBNCC || objetivoBNCC.length < 5) {
-          errors.push(`Objetivo BNCC muito curto para ${dateKey}: "${objetivoBNCC}"`);
-          continue;
-        }
-
-        entries.push({
-          date,
-          weekOfYear: ctx.week,
-          dayOfWeek,
-          bimester: ctx.bimester,
-          campoDeExperiencia,
-          objetivoBNCC,
-          objetivoBNCCCode: raw.bnccCode,
-          objetivoCurriculo: objetivoCurriculo || objetivoBNCC,
-          intencionalidade: intencionalidade || undefined,
-          exemploAtividade: exemploAtividade || undefined,
-        });
-      } catch (error) {
-        errors.push(`Erro ao processar ${raw.day}/${raw.month}: ${error.message}`);
-      }
+        fs.unlinkSync(tmpScript);
+      } catch (_) {}
     }
-
-    return { entries, errors };
-  }
-
-  /**
-   * Parseia os textos do bloco após o código BNCC.
-   *
-   * O layout extraído pelo pdfplumber para uma linha de tabela é:
-   * "<objetivoBNCC completo> <objetivoCurriculo> <intencionalidade>"
-   * com o dia da semana (Seg/Ter/...) no início da próxima linha.
-   *
-   * Estratégia: dividir por sentenças e usar heurística de comprimento.
-   */
-  private parseBlockTexts(
-    blockText: string,
-    bnccCode: string,
-  ): {
-    objetivoBNCC: string;
-    objetivoCurriculo: string;
-    intencionalidade?: string;
-    exemploAtividade?: string;
-  } {
-    // Limpar o bloco: remover cabeçalhos de página e linhas de dia da semana
-    const cleanLines = blockText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0)
-      .filter((l) => !l.includes('MATRIZ CURRICULAR'))
-      .filter((l) => !l.includes('Associação Beneficente'))
-      .filter((l) => !l.match(/^(Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\s/i))
-      .filter((l) => !l.match(/^EI\d{2}\s*[–\-]/))
-      .filter((l) => !l.match(/^\d+º BIMESTRE/i))
-      .filter((l) => !l.match(/^SEMANA\s+\d+/i))
-      .filter((l) => !l.match(/^Situação da semana/i))
-      .filter((l) => !l.match(/^Semana de/i))
-      .filter((l) => !l.match(/^Observação:/i));
-
-    const cleanText = cleanLines.join(' ').replace(/\s+/g, ' ').trim();
-
-    if (!cleanText) {
-      return { objetivoBNCC: '', objetivoCurriculo: '' };
-    }
-
-    // Dividir em sentenças por ponto final seguido de maiúscula
-    const sentences = cleanText
-      .split(/\.\s+(?=[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÇ])/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 3);
-
-    if (sentences.length === 0) {
-      return { objetivoBNCC: cleanText, objetivoCurriculo: cleanText };
-    }
-
-    // Primeira sentença: objetivo BNCC (já sem o código, que foi extraído antes)
-    const objetivoBNCC = sentences[0].endsWith('.') ? sentences[0] : sentences[0] + '.';
-
-    if (sentences.length === 1) {
-      return { objetivoBNCC, objetivoCurriculo: objetivoBNCC };
-    }
-
-    // Segunda sentença: objetivo currículo
-    const objetivoCurriculo = sentences[1].endsWith('.') ? sentences[1] : sentences[1] + '.';
-
-    // Terceira sentença: intencionalidade pedagógica
-    let intencionalidade: string | undefined;
-    if (sentences.length >= 3) {
-      intencionalidade = sentences[2].endsWith('.') ? sentences[2] : sentences[2] + '.';
-    }
-
-    // Quarta sentença em diante: exemplo de atividade (se existir)
-    let exemploAtividade: string | undefined;
-    if (sentences.length >= 4) {
-      exemploAtividade = sentences
-        .slice(3)
-        .map((s) => (s.endsWith('.') ? s : s + '.'))
-        .join(' ');
-    }
-
-    return { objetivoBNCC, objetivoCurriculo, intencionalidade, exemploAtividade };
-  }
-
-  /**
-   * Infere o dia da semana a partir da data (0=Dom, 1=Seg, ..., 6=Sáb)
-   */
-  private inferDayOfWeek(date: Date): number {
-    return date.getDay();
   }
 
   /**
    * Normaliza o campo de experiência para o enum Prisma.
-   * Aceita também o código BNCC como fallback quando o texto do campo é inválido
-   * (ex: artefato de extração "---" com código EI02ET03).
+   * Aceita também o código BNCC como fallback quando o texto do campo é inválido.
    */
-  private normalizeCampoDeExperiencia(text: string, bnccCode?: string): CampoDeExperiencia {
+  normalizeCampoDeExperiencia(text: string, bnccCode?: string): CampoDeExperiencia {
     const normalized = text
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .trim();
 
+    if (normalized === 'O_EU_O_OUTRO_E_O_NOS') return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
+    if (normalized === 'CORPO_GESTOS_E_MOVIMENTOS') return CampoDeExperiencia.CORPO_GESTOS_E_MOVIMENTOS;
+    if (normalized === 'TRACOS_SONS_CORES_E_FORMAS') return CampoDeExperiencia.TRACOS_SONS_CORES_E_FORMAS;
+    if (normalized === 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO') return CampoDeExperiencia.ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO;
+    if (normalized === 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES') return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
+
+    // Texto livre
     if (normalized.includes('eu') && (normalized.includes('outro') || normalized.includes('nos'))) {
       return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
     }
-    if (
-      normalized.includes('corpo') ||
-      normalized.includes('gestos') ||
-      normalized.includes('movimentos')
-    ) {
+    if (normalized.includes('corpo') || normalized.includes('gestos') || normalized.includes('movimentos')) {
       return CampoDeExperiencia.CORPO_GESTOS_E_MOVIMENTOS;
     }
-    if (
-      normalized.includes('tracos') ||
-      normalized.includes('sons') ||
-      normalized.includes('cores') ||
-      normalized.includes('formas')
-    ) {
+    if (normalized.includes('tracos') || normalized.includes('sons') || normalized.includes('cores') || normalized.includes('formas')) {
       return CampoDeExperiencia.TRACOS_SONS_CORES_E_FORMAS;
     }
-    if (
-      normalized.includes('escuta') ||
-      normalized.includes('fala') ||
-      normalized.includes('pensamento') ||
-      normalized.includes('imaginacao')
-    ) {
+    if (normalized.includes('escuta') || normalized.includes('fala') || normalized.includes('pensamento') || normalized.includes('imaginacao')) {
       return CampoDeExperiencia.ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO;
     }
     if (
-      normalized.includes('espacos') ||
-      normalized.includes('espaco') ||
-      normalized.includes('tempos') ||
-      normalized.includes('quantidade') ||
-      normalized.includes('relacoes') ||
-      normalized.includes('transformacoes')
+      normalized.includes('espacos') || normalized.includes('espaco') ||
+      normalized.includes('tempos') || normalized.includes('quantidade') ||
+      normalized.includes('relacoes') || normalized.includes('transformacoes')
     ) {
       return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
     }
 
-    // Fallback pelo código BNCC quando o texto do campo é inválido (artefato de extração)
+    // Fallback pelo código BNCC
     if (bnccCode) {
       const code = bnccCode.toUpperCase();
       if (code.includes('EO')) return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
@@ -453,6 +384,6 @@ print('\\n'.join(all_text))
       if (code.includes('ET')) return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
     }
 
-    throw new Error(`Campo de Experiência não reconhecido: "${text}" (código: ${bnccCode ?? 'N/A'})`);
+    throw new Error(`Campo de Experiência não reconhecido: "${text}" (código: ${bnccCode || 'N/A'})`);
   }
 }
