@@ -331,24 +331,34 @@ export class ChildrenService {
   async getAllDietaryRestrictionsByUnit(user: any, unitId?: string) {
     let targetUnitId = unitId || user.unitId;
 
-    // Professores podem não ter unitId no token — resolver via classroomTeacher
+    // Professores podem não ter unitId no token — resolver via classroomTeacher ou primeira unidade da mantenedora
     if (!targetUnitId) {
       const isProfessor = user.roles?.some(
         (r: any) => r.level === 'PROFESSOR' || r.level === 'PROFESSOR_AUXILIAR'
       );
       if (isProfessor) {
+        // Tentativa 1: classroomTeacher ativo
         const ct = await this.prisma.classroomTeacher.findFirst({
           where: { teacherId: user.sub, isActive: true },
           include: { classroom: { select: { unitId: true } } },
         });
         if (ct?.classroom?.unitId) {
           targetUnitId = ct.classroom.unitId;
+        } else {
+          // Tentativa 2: primeira unidade ativa da mantenedora (professor sem vínculo formal)
+          const firstUnit = await this.prisma.unit.findFirst({
+            where: { mantenedoraId: user.mantenedoraId, isActive: true },
+            select: { id: true },
+            orderBy: { name: 'asc' },
+          });
+          if (firstUnit) targetUnitId = firstUnit.id;
         }
       }
     }
 
+    // Se ainda não resolveu, retornar lista vazia em vez de erro (professor sem unidade)
     if (!targetUnitId) {
-      throw new ForbiddenException('Unidade não identificada');
+      return [];
     }
     const restrictions = await this.prisma.dietaryRestriction.findMany({
       where: {

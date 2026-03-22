@@ -1409,26 +1409,7 @@ export default function DiarioBordoPage() {
             </p>
           </div>
 
-          {/* Aviso quando não há planejamento ativo para hoje */}
-          {classroomId && !planejamentoHoje && (
-            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-300 rounded-xl p-4">
-              <TriangleAlert className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-yellow-800">Sem planejamento ativo para hoje</p>
-                <p className="text-xs text-yellow-700 mt-0.5">
-                  Para registrar uma ocorrência, é necessário ter um planejamento com status{' '}
-                  <strong>Aprovado</strong> ou <strong>Em Execução</strong> vinculado à turma de hoje.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => window.location.href = '/planejamentos'}
-                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-yellow-800 underline underline-offset-2 hover:text-yellow-900"
-                >
-                  <BookOpen className="h-3 w-3" /> Ir para Planejamentos
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Ocorrências são independentes de planejamento */}
 
           {/* Formulário de nova ocorrência */}
           <Card className="border-2 border-orange-100">

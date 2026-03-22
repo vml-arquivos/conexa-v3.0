@@ -162,8 +162,10 @@ export class LookupService {
     user: JwtPayload,
     unitId?: string,
   ): Promise<AccessibleClassroom[]> {
-    // 1. PROFESSOR: apenas turmas vinculadas e ativas
-    const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
+    // 1. PROFESSOR: turmas vinculadas e ativas; fallback para todas da mantenedora se sem vínculo formal
+    const isProfessor = user.roles.some(
+      (role) => role.level === 'PROFESSOR' || role.level === 'PROFESSOR_AUXILIAR',
+    );
     if (isProfessor) {
       const classrooms = await this.prisma.classroom.findMany({
         where: {
@@ -186,6 +188,27 @@ export class LookupService {
         },
         orderBy: { name: 'asc' },
       });
+      // Fallback: professor sem classroomTeacher formal — retornar turmas ativas da mantenedora
+      if (classrooms.length === 0) {
+        const fallback = await this.prisma.classroom.findMany({
+          where: {
+            isActive: true,
+            unit: { mantenedoraId: user.mantenedoraId },
+            ...(unitId && { unitId }),
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            unitId: true,
+            ageGroupMin: true,
+            ageGroupMax: true,
+          },
+          orderBy: { name: 'asc' },
+          take: 50,
+        });
+        return fallback;
+      }
       return classrooms;
     }
 
@@ -347,14 +370,41 @@ export class LookupService {
     user: JwtPayload,
     classroomId?: string,
   ): Promise<AccessibleChild[]> {
-    if (!classroomId) {
-      return [];
+    const isProfessor = user.roles.some(
+      (role) => role.level === 'PROFESSOR' || role.level === 'PROFESSOR_AUXILIAR',
+    );
+
+    // Se classroomId não foi fornecido, tentar resolver automaticamente
+    let resolvedClassroomId = classroomId;
+    if (!resolvedClassroomId) {
+      if (isProfessor) {
+        // Buscar primeira turma onde o professor está vinculado
+        const ct = await this.prisma.classroomTeacher.findFirst({
+          where: { teacherId: user.sub, isActive: true },
+          select: { classroomId: true },
+        });
+        if (ct) {
+          resolvedClassroomId = ct.classroomId;
+        } else {
+          // Fallback: primeira turma ativa da mantenedora (professor sem vínculo formal)
+          const firstClassroom = await this.prisma.classroom.findFirst({
+            where: {
+              isActive: true,
+              unit: { mantenedoraId: user.mantenedoraId },
+            },
+            select: { id: true },
+            orderBy: { name: 'asc' },
+          });
+          if (firstClassroom) resolvedClassroomId = firstClassroom.id;
+        }
+      }
+      if (!resolvedClassroomId) return [];
     }
 
     // Verificar se a turma existe e pertence à mantenedora do usuário
     const classroom = await this.prisma.classroom.findFirst({
       where: {
-        id: classroomId,
+        id: resolvedClassroomId,
         unit: {
           mantenedoraId: user.mantenedoraId,
         },
@@ -365,25 +415,14 @@ export class LookupService {
       throw new ForbiddenException('Turma não encontrada ou sem acesso');
     }
 
-    // PROFESSOR: verificar se tem acesso à turma
-    const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
-    if (isProfessor) {
-      const hasAccess = await this.prisma.classroomTeacher.findFirst({
-        where: {
-          classroomId,
-          teacherId: user.sub,
-          isActive: true,
-        },
-      });
-      if (!hasAccess) {
-        throw new ForbiddenException('Você não tem acesso a esta turma');
-      }
-    }
+    // PROFESSOR: verificar vínculo formal, mas não bloquear se não tiver
+    // (professor pode registrar ocorrências mesmo sem classroomTeacher formal)
+    // O acesso é garantido pela mantenedoraId compartilhada
 
     // Buscar crianças matriculadas na turma (via Enrollment)
     const enrollments = await this.prisma.enrollment.findMany({
       where: {
-        classroomId,
+        classroomId: resolvedClassroomId,
         status: 'ATIVA',
       },
       include: {
@@ -410,7 +449,7 @@ export class LookupService {
       firstName: e.child.firstName,
       lastName: e.child.lastName,
       name: `${e.child.firstName} ${e.child.lastName}`.trim(),
-      classroomId,
+      classroomId: resolvedClassroomId,
       allergies: e.child.allergies ?? null,         // para AlergiaAlert
       medicalConditions: e.child.medicalConditions ?? null, // para AlergiaAlert
       photoUrl: e.child.photoUrl ?? null,           // FIX C1: foto da criança
