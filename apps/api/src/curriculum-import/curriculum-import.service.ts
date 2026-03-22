@@ -1,8 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MatrixCacheInvalidationService } from '../cache/matrix-cache-invalidation.service';
 import { AuditService } from '../common/services/audit.service';
-import { CurriculumPdfParserService, ParsedMatrixEntry } from './curriculum-pdf-parser.service';
+import {
+  CurriculumPdfParserService,
+  ParsedMatrixEntry,
+  MatrixSegment,
+} from './curriculum-pdf-parser.service';
 import { ImportCurriculumDto, ImportMatrixDto, ImportMode } from './dto/import-curriculum.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel, AuditLogAction, AuditLogEntity } from '@prisma/client';
@@ -28,23 +37,18 @@ export class CurriculumImportService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly pdfParser: CurriculumPdfParserService,
-  
     private readonly matrixCacheInvalidation: MatrixCacheInvalidationService,
-  
-) {}
-
+  ) {}
 
   /**
    * Importação em modo dry-run (simulação)
    */
   async importDryRun(dto: ImportCurriculumDto, user: JwtPayload): Promise<ImportResult> {
-    // Validar permissão
     this.validatePermission(user);
 
-    // Parse do PDF
-    const parserResult = await this.pdfParser.parsePdf(dto.sourceUrl);
+    const segment = (dto.segment as MatrixSegment) || 'EI01';
+    const parserResult = await this.pdfParser.parsePdf(dto.sourceUrl, segment);
 
-    // Simular upsert
     const result = await this.simulateUpsert(
       dto.mantenedoraId,
       dto.year,
@@ -68,10 +72,8 @@ export class CurriculumImportService {
    * Importação real (apply)
    */
   async importApply(matrixId: string, dto: ImportMatrixDto, user: JwtPayload): Promise<ImportResult> {
-    // Validar permissão
     this.validatePermission(user);
 
-    // Buscar matriz
     const matrix = await this.prisma.curriculumMatrix.findUnique({
       where: { id: matrixId },
     });
@@ -80,23 +82,18 @@ export class CurriculumImportService {
       throw new NotFoundException('Matriz curricular não encontrada');
     }
 
-    // Validar escopo
-    if (matrix.mantenedoraId !== user.mantenedoraId && user.roles.every(r => r.level !== RoleLevel.DEVELOPER)) {
+    if (
+      matrix.mantenedoraId !== user.mantenedoraId &&
+      user.roles.every((r) => r.level !== RoleLevel.DEVELOPER)
+    ) {
       throw new ForbiddenException('Você não tem permissão para importar esta matriz');
     }
 
-    // Parse do PDF
-    const parserResult = await this.pdfParser.parsePdf(dto.sourceUrl);
+    const segment = (matrix.segment as MatrixSegment) || 'EI01';
+    const parserResult = await this.pdfParser.parsePdf(dto.sourceUrl, segment);
 
-    // Aplicar upsert
-    const result = await this.applyUpsert(
-      matrix,
-      parserResult.entries,
-      dto.force || false,
-      user,
-    );
+    const result = await this.applyUpsert(matrix, parserResult.entries, dto.force || false, user);
 
-    // Registrar auditoria
     await this.auditService.log({
       action: AuditLogAction.IMPORT,
       entity: AuditLogEntity.CURRICULUM_MATRIX,
@@ -137,14 +134,8 @@ export class CurriculumImportService {
     version: number,
     entries: ParsedMatrixEntry[],
   ): Promise<{ inserts: number; updates: number; unchanged: number; preview: any[] }> {
-    // Buscar ou simular matriz
     const existingMatrix = await this.prisma.curriculumMatrix.findFirst({
-      where: {
-        mantenedoraId,
-        year,
-        segment,
-        version,
-      },
+      where: { mantenedoraId, year, segment, version },
     });
 
     let inserts = 0;
@@ -154,26 +145,16 @@ export class CurriculumImportService {
 
     for (const entry of entries.slice(0, 5)) {
       const pedagogicalDay = getPedagogicalDay(entry.date);
+      const existing = existingMatrix
+        ? await this.findEntryByPedagogicalDay(existingMatrix.id, entry.date)
+        : null;
 
-      if (existingMatrix) {
-        const existing = await this.prisma.curriculumMatrixEntry.findFirst({
-          where: {
-            matrixId: existingMatrix.id,
-            date: entry.date,
-          },
-        });
-
-        if (existing) {
-          // Verificar se há mudanças
-          if (this.hasChanges(existing, entry)) {
-            updates++;
-            preview.push({ action: 'UPDATE', date: pedagogicalDay, entry });
-          } else {
-            unchanged++;
-          }
+      if (existing) {
+        if (this.hasChanges(existing, entry)) {
+          updates++;
+          preview.push({ action: 'UPDATE', date: pedagogicalDay, entry });
         } else {
-          inserts++;
-          preview.push({ action: 'INSERT', date: pedagogicalDay, entry });
+          unchanged++;
         }
       } else {
         inserts++;
@@ -181,25 +162,14 @@ export class CurriculumImportService {
       }
     }
 
-    // Contar o restante sem preview
     for (const entry of entries.slice(5)) {
-      if (existingMatrix) {
-        const existing = await this.prisma.curriculumMatrixEntry.findFirst({
-          where: {
-            matrixId: existingMatrix.id,
-            date: entry.date,
-          },
-        });
+      const existing = existingMatrix
+        ? await this.findEntryByPedagogicalDay(existingMatrix.id, entry.date)
+        : null;
 
-        if (existing) {
-          if (this.hasChanges(existing, entry)) {
-            updates++;
-          } else {
-            unchanged++;
-          }
-        } else {
-          inserts++;
-        }
+      if (existing) {
+        if (this.hasChanges(existing, entry)) updates++;
+        else unchanged++;
       } else {
         inserts++;
       }
@@ -209,7 +179,18 @@ export class CurriculumImportService {
   }
 
   /**
-   * Aplica upsert real
+   * Aplica upsert real com match por range de dia pedagógico.
+   *
+   * Correção crítica: em vez de findUnique(matrixId_date) com DateTime exato,
+   * usa findFirst com range do dia pedagógico (00:00 a 23:59 no fuso -03:00).
+   * Isso evita duplicatas por drift de timezone.
+   *
+   * Proteção de integridade histórica:
+   * - Se a entry tem DiaryEvent vinculado, NÃO altera campos normativos
+   *   (objetivoBNCC, objetivoCurriculo, campoDeExperiencia, date).
+   * - Atualiza apenas intencionalidade/exemploAtividade se vierem preenchidos.
+   *
+   * Inserção canônica: grava date como T12:00:00-03:00 para minimizar drift.
    */
   private async applyUpsert(
     matrix: any,
@@ -223,36 +204,54 @@ export class CurriculumImportService {
 
     for (const entry of entries) {
       try {
-        // Verificar se já existe
-        const existing = await this.prisma.curriculumMatrixEntry.findUnique({
-          where: {
-            matrixId_date: {
-              matrixId: matrix.id,
-              date: entry.date,
-            },
-          },
-        });
+        const existing = await this.findEntryByPedagogicalDay(matrix.id, entry.date);
 
         if (existing) {
-          // Já existe: verificar se há mudanças
-          const hasChanges = this.hasChanges(existing, entry);
-          
-          if (!hasChanges) {
-            // Sem mudanças: não fazer nada
+          // Verificar se há DiaryEvent vinculado (integridade histórica)
+          const hasLinkedEvents = await this.prisma.diaryEvent.count({
+            where: { curriculumEntryId: existing.id },
+          });
+
+          if (hasLinkedEvents > 0 && !force) {
+            // Só atualiza campos não-normativos se vierem preenchidos E forem diferentes
+            const nonNormativeUpdate: any = {};
+            if (
+              entry.intencionalidade &&
+              entry.intencionalidade.length > 5 &&
+              this.normalize(existing.intencionalidade) !== this.normalize(entry.intencionalidade)
+            ) {
+              nonNormativeUpdate.intencionalidade = entry.intencionalidade;
+            }
+            if (
+              entry.exemploAtividade &&
+              entry.exemploAtividade.length > 5 &&
+              this.normalize(existing.exemploAtividade) !== this.normalize(entry.exemploAtividade)
+            ) {
+              nonNormativeUpdate.exemploAtividade = entry.exemploAtividade;
+            }
+
+            if (Object.keys(nonNormativeUpdate).length > 0) {
+              await this.prisma.curriculumMatrixEntry.update({
+                where: { id: existing.id },
+                data: nonNormativeUpdate,
+              });
+              updates++;
+            } else {
+              unchanged++;
+            }
+            continue;
+          }
+
+          // Sem eventos vinculados (ou force=true): verificar se há mudanças
+          if (!this.hasChanges(existing, entry) && !force) {
             unchanged++;
             continue;
           }
 
-          // Com mudanças: atualizar apenas se force=true ou campos não-normativos
           if (force) {
             // Force: atualiza tudo
             await this.prisma.curriculumMatrixEntry.update({
-              where: {
-                matrixId_date: {
-                  matrixId: matrix.id,
-                  date: entry.date,
-                },
-              },
+              where: { id: existing.id },
               data: {
                 weekOfYear: entry.weekOfYear,
                 dayOfWeek: entry.dayOfWeek,
@@ -261,29 +260,36 @@ export class CurriculumImportService {
                 objetivoBNCC: entry.objetivoBNCC,
                 objetivoBNCCCode: entry.objetivoBNCCCode,
                 objetivoCurriculo: entry.objetivoCurriculo,
-                intencionalidade: entry.intencionalidade,
-                exemploAtividade: entry.exemploAtividade,
+                ...(entry.intencionalidade ? { intencionalidade: entry.intencionalidade } : {}),
+                ...(entry.exemploAtividade ? { exemploAtividade: entry.exemploAtividade } : {}),
               },
             });
             updates++;
           } else {
-            // Sem force: atualiza apenas campos não-normativos se mudaram
-            const nonNormativeChanged = 
-              existing.intencionalidade !== entry.intencionalidade ||
-              existing.exemploAtividade !== entry.exemploAtividade;
-            
-            if (nonNormativeChanged) {
+            // Sem force: atualiza campos que mudaram
+            const updateData: any = {};
+            if (entry.intencionalidade) updateData.intencionalidade = entry.intencionalidade;
+            if (entry.exemploAtividade) updateData.exemploAtividade = entry.exemploAtividade;
+
+            const normativeChanged =
+              this.normalize(existing.objetivoBNCC) !== this.normalize(entry.objetivoBNCC) ||
+              this.normalize(existing.objetivoCurriculo) !== this.normalize(entry.objetivoCurriculo) ||
+              existing.campoDeExperiencia !== entry.campoDeExperiencia;
+
+            if (normativeChanged) {
+              updateData.campoDeExperiencia = entry.campoDeExperiencia;
+              updateData.objetivoBNCC = entry.objetivoBNCC;
+              updateData.objetivoBNCCCode = entry.objetivoBNCCCode;
+              updateData.objetivoCurriculo = entry.objetivoCurriculo;
+              updateData.weekOfYear = entry.weekOfYear;
+              updateData.dayOfWeek = entry.dayOfWeek;
+              updateData.bimester = entry.bimester;
+            }
+
+            if (Object.keys(updateData).length > 0) {
               await this.prisma.curriculumMatrixEntry.update({
-                where: {
-                  matrixId_date: {
-                    matrixId: matrix.id,
-                    date: entry.date,
-                  },
-                },
-                data: {
-                  intencionalidade: entry.intencionalidade,
-                  exemploAtividade: entry.exemploAtividade,
-                },
+                where: { id: existing.id },
+                data: updateData,
               });
               updates++;
             } else {
@@ -291,11 +297,14 @@ export class CurriculumImportService {
             }
           }
         } else {
-          // Não existe: inserir
+          // Não existe: inserir com data canônica (T12:00:00-03:00)
+          const ymd = getPedagogicalDay(entry.date);
+          const canonicalDate = new Date(`${ymd}T12:00:00-03:00`);
+
           await this.prisma.curriculumMatrixEntry.create({
             data: {
               matrixId: matrix.id,
-              date: entry.date,
+              date: canonicalDate,
               weekOfYear: entry.weekOfYear,
               dayOfWeek: entry.dayOfWeek,
               bimester: entry.bimester,
@@ -310,7 +319,7 @@ export class CurriculumImportService {
           inserts++;
         }
       } catch (error) {
-        // Ignorar erros de unique constraint (já existe)
+        // Ignorar erros de unique constraint (já existe com data exata)
         unchanged++;
       }
     }
@@ -319,20 +328,50 @@ export class CurriculumImportService {
   }
 
   /**
-   * Verifica se há mudanças entre entrada existente e nova
+   * Busca uma entry pelo dia pedagógico (range 00:00 a 23:59 no fuso -03:00).
+   * Evita duplicatas por drift de timezone.
+   */
+  private async findEntryByPedagogicalDay(
+    matrixId: string,
+    date: Date,
+  ) {
+    const ymd = getPedagogicalDay(date);
+    const start = new Date(`${ymd}T00:00:00-03:00`);
+    const end = new Date(`${ymd}T23:59:59-03:00`);
+
+    return this.prisma.curriculumMatrixEntry.findFirst({
+      where: {
+        matrixId,
+        date: { gte: start, lte: end },
+      },
+    });
+  }
+
+  /**
+   * Normaliza string para comparação
+   */
+  private normalize(str: string | null | undefined): string {
+    if (!str) return '';
+    return str.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Verifica se há mudanças entre entrada existente e nova.
+   * Não considera null/undefined como mudança (proteção contra sobrescrita).
    */
   private hasChanges(existing: any, entry: ParsedMatrixEntry): boolean {
-    const normalize = (str: string | null | undefined): string => {
-      if (!str) return '';
-      return str.trim().replace(/\s+/g, ' ');
-    };
+    const normativeChanged =
+      this.normalize(existing.objetivoBNCC) !== this.normalize(entry.objetivoBNCC) ||
+      this.normalize(existing.objetivoCurriculo) !== this.normalize(entry.objetivoCurriculo) ||
+      existing.campoDeExperiencia !== entry.campoDeExperiencia;
 
-    return (
-      normalize(existing.objetivoBNCC) !== normalize(entry.objetivoBNCC) ||
-      normalize(existing.objetivoCurriculo) !== normalize(entry.objetivoCurriculo) ||
-      normalize(existing.intencionalidade) !== normalize(entry.intencionalidade) ||
-      normalize(existing.exemploAtividade) !== normalize(entry.exemploAtividade)
-    );
+    const nonNormativeChanged =
+      (entry.intencionalidade &&
+        this.normalize(existing.intencionalidade) !== this.normalize(entry.intencionalidade)) ||
+      (entry.exemploAtividade &&
+        this.normalize(existing.exemploAtividade) !== this.normalize(entry.exemploAtividade));
+
+    return normativeChanged || !!nonNormativeChanged;
   }
 
   /**

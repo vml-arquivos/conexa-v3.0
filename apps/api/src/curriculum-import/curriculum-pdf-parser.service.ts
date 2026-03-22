@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as fs from 'fs';
-import { PDFParse } from 'pdf-parse';
+import * as path from 'path';
 import { CampoDeExperiencia } from '@prisma/client';
 
 /**
@@ -28,36 +28,61 @@ export interface ParserResult {
   errors: string[];
 }
 
+/**
+ * Segmentos suportados
+ */
+export type MatrixSegment = 'EI01' | 'EI02' | 'EI03';
+
+/**
+ * Cabeçalhos que delimitam cada segmento no PDF
+ */
+const SEGMENT_HEADERS: Record<MatrixSegment, string> = {
+  EI01: 'ENSINO - BEBÊS',
+  EI02: 'ENSINO - CRIANÇAS BEM PEQUENAS',
+  EI03: 'ENSINO - CRIANÇAS PEQUENAS',
+};
+
 @Injectable()
 export class CurriculumPdfParserService {
   /**
-   * Parse do PDF da Matriz Curricular 2026
-   * 
-   * @param pdfPath - Caminho do arquivo PDF
-   * @returns Resultado do parsing com entradas extraídas
+   * Parse do PDF da Matriz Curricular 2026 para um segmento específico.
+   *
+   * O PDF contém EI01 + EI02 + EI03 em sequência.
+   * O parser recorta o texto apenas no trecho do segmento solicitado,
+   * evitando que datas repetidas entre segmentos sejam deduplicadas incorretamente.
+   *
+   * @param pdfPath  - Caminho do arquivo PDF
+   * @param segment  - Segmento alvo: 'EI01' | 'EI02' | 'EI03'
    */
-  async parsePdf(pdfPath: string): Promise<ParserResult> {
+  async parsePdf(pdfPath: string, segment: MatrixSegment = 'EI01'): Promise<ParserResult> {
     try {
-      // Verificar se arquivo existe
-      if (!fs.existsSync(pdfPath)) {
+      // Extrair texto via pdfplumber (Python) — mais fiel ao layout de tabelas
+      // Nota: a verificação de existência do arquivo é feita após o mock para facilitar testes
+      const text = await this.extractTextViaPython(pdfPath);
+
+      if (!text && !fs.existsSync(pdfPath)) {
         throw new BadRequestException(`Arquivo PDF não encontrado: ${pdfPath}`);
       }
-
-      // Extrair texto do PDF usando pdf-parse v2
-      const parser = new PDFParse({ url: pdfPath });
-      const result = await parser.getText();
-      const text = result.text;
 
       if (!text || text.trim().length === 0) {
         throw new BadRequestException('PDF está vazio ou não contém texto extraível');
       }
 
-      // Parse do conteúdo
-      const { entries, errors } = this.extractEntries(text);
+      // Recortar apenas o trecho do segmento solicitado
+      const segmentText = this.extractSegmentText(text, segment);
+
+      if (!segmentText || segmentText.trim().length === 0) {
+        throw new BadRequestException(
+          `Segmento ${segment} não encontrado no PDF. Verifique o formato do arquivo.`,
+        );
+      }
+
+      // Parse do conteúdo do segmento
+      const { entries, errors } = this.extractEntries(segmentText, segment);
 
       if (entries.length === 0) {
         throw new BadRequestException(
-          'Nenhuma entrada válida foi encontrada no PDF. Verifique o formato do arquivo.',
+          `Nenhuma entrada válida encontrada para o segmento ${segment}. Verifique o formato do arquivo.`,
         );
       }
 
@@ -67,348 +92,367 @@ export class CurriculumPdfParserService {
         errors,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(
-        `Erro ao fazer parse do PDF: ${error.message}`,
-      );
+      if (error instanceof BadRequestException) throw error;
+      throw new BadRequestException(`Erro ao fazer parse do PDF: ${error.message}`);
     }
   }
 
   /**
-   * Extrai entradas do texto do PDF da Matriz Curricular 2026
-   * 
-   * Estratégia: dividir texto em blocos por data, depois parsear cada bloco
-   * 
-   * @param text - Texto extraído do PDF
-   * @returns Array de entradas parseadas e lista de erros
+   * Extrai o texto do PDF usando pdfplumber via Python subprocess.
+   * Mais robusto que pdf-parse para tabelas com múltiplas colunas.
    */
-  private extractEntries(text: string): { entries: ParsedMatrixEntry[]; errors: string[] } {
+  private async extractTextViaPython(pdfPath: string): Promise<string> {
+    const { execSync } = await import('child_process');
+    const script = `
+import pdfplumber, sys
+all_text = []
+with pdfplumber.open(sys.argv[1]) as pdf:
+    for page in pdf.pages:
+        t = page.extract_text()
+        if t:
+            all_text.append(t)
+print('\\n'.join(all_text))
+`;
+    const tmpScript = path.join('/tmp', `pdf_extract_${Date.now()}.py`);
+    fs.writeFileSync(tmpScript, script);
+    try {
+      const result = execSync(`python3 "${tmpScript}" "${pdfPath}"`, {
+        maxBuffer: 50 * 1024 * 1024,
+        encoding: 'utf8',
+      });
+      return result;
+    } finally {
+      fs.unlinkSync(tmpScript);
+    }
+  }
+
+  /**
+   * Recorta o texto do PDF para o trecho correspondente ao segmento solicitado.
+   * Garante que seenDates seja isolado por segmento.
+   */
+  private extractSegmentText(fullText: string, segment: MatrixSegment): string {
+    const header = SEGMENT_HEADERS[segment];
+    const startIdx = fullText.indexOf(header);
+    if (startIdx < 0) return '';
+
+    // Encontrar o próximo cabeçalho de segmento (se existir)
+    const otherSegments = (Object.keys(SEGMENT_HEADERS) as MatrixSegment[]).filter(
+      (s) => s !== segment,
+    );
+    let endIdx = fullText.length;
+    for (const other of otherSegments) {
+      const otherHeader = SEGMENT_HEADERS[other];
+      const otherIdx = fullText.indexOf(otherHeader, startIdx + header.length);
+      if (otherIdx > startIdx && otherIdx < endIdx) {
+        endIdx = otherIdx;
+      }
+    }
+
+    return fullText.substring(startIdx, endIdx);
+  }
+
+  /**
+   * Extrai entradas do texto de um segmento.
+   *
+   * Formato das linhas no PDF (após extração pdfplumber):
+   *   "09/02 – O eu, o outro e o nós (EI01EO03) Estabelecer vínculos... Perceber o ambiente... Favorecer a adaptação..."
+   *   "Seg vínculos afetivos com adultos..."  ← continuação da linha anterior
+   *
+   * Estratégia:
+   * 1. Encontrar todas as linhas que começam com DD/MM seguido de traço
+   * 2. Para cada linha, extrair campo de experiência, código BNCC e textos
+   * 3. Detectar semana e bimestre pelo cabeçalho anterior
+   */
+  private extractEntries(
+    text: string,
+    segment: MatrixSegment,
+  ): { entries: ParsedMatrixEntry[]; errors: string[] } {
     const entries: ParsedMatrixEntry[] = [];
     const errors: string[] = [];
     const seenDates = new Set<string>();
-    
-    // Detectar contexto (semana e bimestre)
-    const weekPattern = /SEMANA\s+(\d+)/gi;
-    const bimesterPattern = /(\d+)º\s+BIMESTRE/gi;
-    
-    let currentWeek = 1;
-    let currentBimester = 1;
     const currentYear = 2026;
-    
-    // Dividir texto em blocos por data (DD/MM\n– Dia)
-    const dateBlockPattern = /(\d{2})\/(\d{2})\s*\n\s*[–-]\s*(\w{3})/g;
-    const blocks: Array<{ date: Date; dayOfWeek: number; text: string; lineStart: number }> = [];
-    
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    
-    while ((match = dateBlockPattern.exec(text)) !== null) {
-      const [fullMatch, day, month, dayAbbrev] = match;
-      const matchIndex = match.index;
-      
-      // Salvar bloco anterior se existir
-      if (blocks.length > 0) {
-        blocks[blocks.length - 1].text = text.substring(lastIndex, matchIndex);
+
+    // Padrão de entrada: DD/MM – <campo> (EIxxYYnn) <objetivoBNCC> <objetivoCurriculo> <intencionalidade>
+    // O dia da semana (Seg/Ter/Qua/Qui/Sex) aparece na linha seguinte, antes do restante do texto
+    const entryPattern = /(\d{2})\/(\d{2})\s*[–\-]\s*([^(]+?)\s*\((EI\d+[A-Z]+\d+)\)\s*([\s\S]*?)(?=\d{2}\/\d{2}\s*[–\-]|EI\d{2}\s*[–\-]|$)/g;
+
+    // Detectar bimestre e semana a partir de cabeçalhos
+    const bimesterPattern = /(\d+)º BIMESTRE/gi;
+    const weekPattern = /SEMANA\s+(\d+)/gi;
+
+    let currentBimester = 1;
+    let currentWeek = 1;
+
+    // Processar linha por linha para detectar contexto de bimestre/semana
+    const lines = text.split('\n');
+    let reconstructedText = '';
+
+    for (const line of lines) {
+      // Detectar bimestre
+      const bimMatch = line.match(/(\d+)º BIMESTRE/i);
+      if (bimMatch) {
+        currentBimester = parseInt(bimMatch[1], 10);
       }
-      
-      // Criar novo bloco
-      try {
-        const date = new Date(`${currentYear}-${month}-${day}T00:00:00-03:00`);
-        
-        if (!isNaN(date.getTime())) {
-          const dayOfWeek = this.parseDayOfWeek(dayAbbrev);
-          
-          blocks.push({
-            date,
-            dayOfWeek,
-            text: '',
-            lineStart: text.substring(0, matchIndex).split('\n').length,
-          });
-          
-          lastIndex = matchIndex + fullMatch.length;
-        }
-      } catch (error) {
-        errors.push(`Erro ao parsear data ${day}/${month}: ${error.message}`);
-      }
-    }
-    
-    // Salvar último bloco
-    if (blocks.length > 0) {
-      blocks[blocks.length - 1].text = text.substring(lastIndex);
-    }
-    
-    // Parsear cada bloco
-    for (const block of blocks) {
-      // Detectar semana e bimestre no contexto anterior
-      const contextText = text.substring(Math.max(0, text.indexOf(block.text) - 500), text.indexOf(block.text));
-      
-      let weekMatch: RegExpExecArray | null;
-      weekPattern.lastIndex = 0;
-      while ((weekMatch = weekPattern.exec(contextText)) !== null) {
+
+      // Detectar semana
+      const weekMatch = line.match(/SEMANA\s+(\d+)/i);
+      if (weekMatch) {
         currentWeek = parseInt(weekMatch[1], 10);
       }
-      
-      let bimesterMatch: RegExpExecArray | null;
-      bimesterPattern.lastIndex = 0;
-      while ((bimesterMatch = bimesterPattern.exec(contextText)) !== null) {
-        currentBimester = parseInt(bimesterMatch[1], 10);
+
+      reconstructedText += line + '\n';
+    }
+
+    // Agora extrair entradas com regex
+    let match: RegExpExecArray | null;
+    entryPattern.lastIndex = 0;
+
+    // Reprocessar com contexto de bimestre/semana por posição
+    // Construir mapa de posição → {bimester, week}
+    const contextMap: Array<{ pos: number; bimester: number; week: number }> = [];
+    let ctxBim = 1;
+    let ctxWeek = 1;
+    let pos = 0;
+
+    for (const line of lines) {
+      const bimMatch = line.match(/(\d+)º BIMESTRE/i);
+      if (bimMatch) ctxBim = parseInt(bimMatch[1], 10);
+      const weekMatch = line.match(/SEMANA\s+(\d+)/i);
+      if (weekMatch) ctxWeek = parseInt(weekMatch[1], 10);
+      contextMap.push({ pos, bimester: ctxBim, week: ctxWeek });
+      pos += line.length + 1;
+    }
+
+    const getContext = (charPos: number): { bimester: number; week: number } => {
+      let ctx = { bimester: 1, week: 1 };
+      for (const c of contextMap) {
+        if (c.pos <= charPos) ctx = c;
+        else break;
       }
-      
+      return ctx;
+    };
+
+    // Extrair entradas
+    const entryRegex = /(\d{2})\/(\d{2})\s*[–\-]\s*([^(\n]+?)\s*\((EI\d+[A-Z]+\d+)\)/g;
+    let m: RegExpExecArray | null;
+
+    const rawEntries: Array<{
+      day: string;
+      month: string;
+      campo: string;
+      bnccCode: string;
+      startPos: number;
+      endPos: number;
+    }> = [];
+
+    while ((m = entryRegex.exec(reconstructedText)) !== null) {
+      rawEntries.push({
+        day: m[1],
+        month: m[2],
+        campo: m[3].trim(),
+        bnccCode: m[4],
+        startPos: m.index,
+        endPos: m.index + m[0].length,
+      });
+    }
+
+    for (let i = 0; i < rawEntries.length; i++) {
+      const raw = rawEntries[i];
+      const nextStart = i + 1 < rawEntries.length ? rawEntries[i + 1].startPos : reconstructedText.length;
+      const blockText = reconstructedText.substring(raw.endPos, nextStart);
+
       try {
-        const entry = this.parseBlock(block.text, block.date, block.dayOfWeek, currentWeek, currentBimester);
-        
-        const dateKey = entry.date.toISOString().split('T')[0];
-        if (!seenDates.has(dateKey)) {
-          entries.push(entry);
-          seenDates.add(dateKey);
-        } else {
-          errors.push(`Linha ${block.lineStart}: Data duplicada ignorada: ${dateKey}`);
+        const dateStr = `${currentYear}-${raw.month}-${raw.day}`;
+        const date = new Date(`${dateStr}T12:00:00-03:00`);
+
+        if (isNaN(date.getTime())) {
+          errors.push(`Data inválida: ${raw.day}/${raw.month}`);
+          continue;
         }
+
+        const dateKey = `${raw.month}/${raw.day}`;
+        if (seenDates.has(dateKey)) {
+          errors.push(`Data duplicada ignorada no segmento: ${dateKey}`);
+          continue;
+        }
+        seenDates.add(dateKey);
+
+        const ctx = getContext(raw.startPos);
+        const campoDeExperiencia = this.normalizeCampoDeExperiencia(raw.campo, raw.bnccCode);
+        const dayOfWeek = this.inferDayOfWeek(date);
+
+        // Extrair textos do bloco: objetivoBNCC, objetivoCurriculo, intencionalidade
+        const { objetivoBNCC, objetivoCurriculo, intencionalidade, exemploAtividade } =
+          this.parseBlockTexts(blockText, raw.bnccCode);
+
+        if (!objetivoBNCC || objetivoBNCC.length < 5) {
+          errors.push(`Objetivo BNCC muito curto para ${dateKey}: "${objetivoBNCC}"`);
+          continue;
+        }
+
+        entries.push({
+          date,
+          weekOfYear: ctx.week,
+          dayOfWeek,
+          bimester: ctx.bimester,
+          campoDeExperiencia,
+          objetivoBNCC,
+          objetivoBNCCCode: raw.bnccCode,
+          objetivoCurriculo: objetivoCurriculo || objetivoBNCC,
+          intencionalidade: intencionalidade || undefined,
+          exemploAtividade: exemploAtividade || undefined,
+        });
       } catch (error) {
-        errors.push(`Linha ${block.lineStart}: ${error.message}`);
+        errors.push(`Erro ao processar ${raw.day}/${raw.month}: ${error.message}`);
       }
     }
-    
+
     return { entries, errors };
   }
 
   /**
-   * Parseia um bloco de texto correspondente a uma entrada
+   * Parseia os textos do bloco após o código BNCC.
+   *
+   * O layout extraído pelo pdfplumber para uma linha de tabela é:
+   * "<objetivoBNCC completo> <objetivoCurriculo> <intencionalidade>"
+   * com o dia da semana (Seg/Ter/...) no início da próxima linha.
+   *
+   * Estratégia: dividir por sentenças e usar heurística de comprimento.
    */
-  private parseBlock(
-    text: string,
-    date: Date,
-    dayOfWeek: number,
-    weekOfYear: number,
-    bimester: number,
-  ): ParsedMatrixEntry {
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
-    // Remover linhas de cabeçalho e rodapé
-    const cleanLines = lines.filter(l => 
-      !l.includes('MATRIZ CURRICULAR') &&
-      !l.includes('Associação Beneficente') &&
-      !l.includes('-- ') &&
-      !l.includes('of 204') &&
-      !l.startsWith('Data ') &&
-      !l.startsWith('Experiência')
-    );
-    
-    // Extrair campo de experiência (primeiras linhas antes do código BNCC)
-    let campoDeExperiencia: CampoDeExperiencia | null = null;
-    let campoLines: string[] = [];
-    let bnccStartIndex = -1;
-    
-    for (let i = 0; i < cleanLines.length; i++) {
-      if (cleanLines[i].includes('(EI0')) {
-        bnccStartIndex = i;
-        break;
-      }
-      campoLines.push(cleanLines[i]);
-    }
-    
-    if (campoLines.length > 0) {
-      const campoText = campoLines.join(' ');
-      try {
-        campoDeExperiencia = this.normalizeCampoDeExperiencia(campoText);
-      } catch (error) {
-        throw new Error(`Campo de Experiência não reconhecido: ${campoText.substring(0, 50)}`);
-      }
-    }
-    
-    if (!campoDeExperiencia) {
-      throw new Error('Campo de Experiência não encontrado');
-    }
-    
-    // Extrair código BNCC e objetivos
-    const bnccCodePattern = /\(([A-Z0-9]+)\)/;
-    let objetivoBNCCCode: string | undefined;
-    let objetivoBNCC = '';
-    let objetivoCurriculo = '';
-    let intencionalidade: string | undefined;
-    let exemploAtividade: string | undefined;
-    
-    if (bnccStartIndex >= 0) {
-      // Juntar linhas restantes
-      const remainingText = cleanLines.slice(bnccStartIndex).join(' ');
-      
-      // Extrair código BNCC
-      const codeMatch = remainingText.match(bnccCodePattern);
-      if (codeMatch) {
-        objetivoBNCCCode = codeMatch[1];
-      }
-      
-      // Dividir texto em segmentos (heurística baseada em comprimento e padrões)
-      const segments = this.splitIntoSegments(remainingText);
-      
-      if (segments.length >= 2) {
-        objetivoBNCC = segments[0].replace(bnccCodePattern, '').trim();
-        objetivoCurriculo = segments[1].trim();
-        
-        if (segments.length >= 3) {
-          intencionalidade = segments[2].trim();
-        }
-        
-        if (segments.length >= 4) {
-          exemploAtividade = segments[3].trim();
-        }
-      } else {
-        // Fallback: dividir por ponto final
-        const parts = remainingText.split(/\.\s+/).filter(p => p.length > 10);
-        if (parts.length >= 2) {
-          objetivoBNCC = parts[0].replace(bnccCodePattern, '').trim() + '.';
-          objetivoCurriculo = parts.slice(1).join('. ');
-        } else {
-          objetivoBNCC = remainingText.replace(bnccCodePattern, '').trim();
-          objetivoCurriculo = remainingText.replace(bnccCodePattern, '').trim();
-        }
-      }
-    }
-    
-    // Validar campos obrigatórios
-    if (!objetivoBNCC || objetivoBNCC.length < 10) {
-      throw new Error('Objetivo BNCC não encontrado ou inválido');
-    }
-    
-    if (!objetivoCurriculo || objetivoCurriculo.length < 10) {
-      throw new Error('Objetivo Currículo não encontrado ou inválido');
-    }
-    
-    return {
-      date,
-      weekOfYear,
-      dayOfWeek,
-      bimester,
-      campoDeExperiencia,
-      objetivoBNCC,
-      objetivoBNCCCode,
-      objetivoCurriculo,
-      intencionalidade,
-      exemploAtividade,
-    };
-  }
+  private parseBlockTexts(
+    blockText: string,
+    bnccCode: string,
+  ): {
+    objetivoBNCC: string;
+    objetivoCurriculo: string;
+    intencionalidade?: string;
+    exemploAtividade?: string;
+  } {
+    // Limpar o bloco: remover cabeçalhos de página e linhas de dia da semana
+    const cleanLines = blockText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0)
+      .filter((l) => !l.includes('MATRIZ CURRICULAR'))
+      .filter((l) => !l.includes('Associação Beneficente'))
+      .filter((l) => !l.match(/^(Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\s/i))
+      .filter((l) => !l.match(/^EI\d{2}\s*[–\-]/))
+      .filter((l) => !l.match(/^\d+º BIMESTRE/i))
+      .filter((l) => !l.match(/^SEMANA\s+\d+/i))
+      .filter((l) => !l.match(/^Situação da semana/i))
+      .filter((l) => !l.match(/^Semana de/i))
+      .filter((l) => !l.match(/^Observação:/i));
 
-  /**
-   * Divide texto em segmentos (BNCC, Currículo, Intencionalidade, Exemplo)
-   * Usa heurística baseada em palavras-chave e comprimento
-   */
-  private splitIntoSegments(text: string): string[] {
-    const segments: string[] = [];
-    
-    // Remover código BNCC do início
-    const bnccCodePattern = /\(([A-Z0-9]+)\)/;
-    const cleanText = text.replace(bnccCodePattern, '').trim();
-    
-    // Dividir por frases (ponto final seguido de espaço e maiúscula)
-    const sentences = cleanText.split(/\.\s+(?=[A-Z])/).map(s => s.trim() + '.');
-    
+    const cleanText = cleanLines.join(' ').replace(/\s+/g, ' ').trim();
+
+    if (!cleanText) {
+      return { objetivoBNCC: '', objetivoCurriculo: '' };
+    }
+
+    // Dividir em sentenças por ponto final seguido de maiúscula
+    const sentences = cleanText
+      .split(/\.\s+(?=[A-ZÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÇ])/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 3);
+
     if (sentences.length === 0) {
-      return [cleanText];
+      return { objetivoBNCC: cleanText, objetivoCurriculo: cleanText };
     }
-    
-    // Primeira frase: Objetivo BNCC
-    segments.push(sentences[0]);
-    
-    // Restante: tentar identificar segmentos por palavras-chave
-    let currentSegment = '';
-    let segmentType: 'curriculo' | 'intencionalidade' | 'exemplo' = 'curriculo';
-    
-    for (let i = 1; i < sentences.length; i++) {
-      const sentence = sentences[i];
-      const lowerSentence = sentence.toLowerCase();
-      
-      // Detectar transição para intencionalidade
-      if (segmentType === 'curriculo' && (
-        lowerSentence.startsWith('favorecer') ||
-        lowerSentence.startsWith('estimular') ||
-        lowerSentence.startsWith('promover') ||
-        lowerSentence.startsWith('incentivar') ||
-        lowerSentence.startsWith('ampliar') ||
-        lowerSentence.startsWith('desenvolver') ||
-        lowerSentence.startsWith('fortalecer')
-      )) {
-        if (currentSegment) {
-          segments.push(currentSegment.trim());
-        }
-        currentSegment = sentence;
-        segmentType = 'intencionalidade';
-        continue;
-      }
-      
-      // Detectar transição para exemplo
-      if (segmentType === 'intencionalidade' && (
-        lowerSentence.includes('brincadeira') ||
-        lowerSentence.includes('atividade') ||
-        lowerSentence.includes('exploração') ||
-        lowerSentence.includes('roda de') ||
-        lowerSentence.includes('circuito') ||
-        lowerSentence.includes('cesto') ||
-        lowerSentence.includes('momento de')
-      )) {
-        if (currentSegment) {
-          segments.push(currentSegment.trim());
-        }
-        currentSegment = sentence;
-        segmentType = 'exemplo';
-        continue;
-      }
-      
-      // Acumular no segmento atual
-      currentSegment += ' ' + sentence;
+
+    // Primeira sentença: objetivo BNCC (já sem o código, que foi extraído antes)
+    const objetivoBNCC = sentences[0].endsWith('.') ? sentences[0] : sentences[0] + '.';
+
+    if (sentences.length === 1) {
+      return { objetivoBNCC, objetivoCurriculo: objetivoBNCC };
     }
-    
-    // Adicionar último segmento
-    if (currentSegment) {
-      segments.push(currentSegment.trim());
+
+    // Segunda sentença: objetivo currículo
+    const objetivoCurriculo = sentences[1].endsWith('.') ? sentences[1] : sentences[1] + '.';
+
+    // Terceira sentença: intencionalidade pedagógica
+    let intencionalidade: string | undefined;
+    if (sentences.length >= 3) {
+      intencionalidade = sentences[2].endsWith('.') ? sentences[2] : sentences[2] + '.';
     }
-    
-    return segments;
+
+    // Quarta sentença em diante: exemplo de atividade (se existir)
+    let exemploAtividade: string | undefined;
+    if (sentences.length >= 4) {
+      exemploAtividade = sentences
+        .slice(3)
+        .map((s) => (s.endsWith('.') ? s : s + '.'))
+        .join(' ');
+    }
+
+    return { objetivoBNCC, objetivoCurriculo, intencionalidade, exemploAtividade };
   }
 
   /**
-   * Parseia abreviação do dia da semana
+   * Infere o dia da semana a partir da data (0=Dom, 1=Seg, ..., 6=Sáb)
    */
-  private parseDayOfWeek(abbrev: string): number {
-    const normalized = abbrev.toLowerCase().substring(0, 3);
-    
-    const days: Record<string, number> = {
-      'seg': 1,
-      'ter': 2,
-      'qua': 3,
-      'qui': 4,
-      'sex': 5,
-      'sáb': 6,
-      'sab': 6,
-      'dom': 0,
-    };
-    
-    return days[normalized] || 1;
+  private inferDayOfWeek(date: Date): number {
+    return date.getDay();
   }
 
   /**
-   * Normaliza o campo de experiência para o enum
+   * Normaliza o campo de experiência para o enum Prisma.
+   * Aceita também o código BNCC como fallback quando o texto do campo é inválido
+   * (ex: artefato de extração "---" com código EI02ET03).
    */
-  private normalizeCampoDeExperiencia(text: string): CampoDeExperiencia {
-    const normalized = text.toLowerCase().trim();
-    
-    if (normalized.includes('eu') && (normalized.includes('outro') || normalized.includes('nós'))) {
+  private normalizeCampoDeExperiencia(text: string, bnccCode?: string): CampoDeExperiencia {
+    const normalized = text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    if (normalized.includes('eu') && (normalized.includes('outro') || normalized.includes('nos'))) {
       return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
     }
-    if (normalized.includes('corpo') || normalized.includes('gestos') || normalized.includes('movimentos')) {
+    if (
+      normalized.includes('corpo') ||
+      normalized.includes('gestos') ||
+      normalized.includes('movimentos')
+    ) {
       return CampoDeExperiencia.CORPO_GESTOS_E_MOVIMENTOS;
     }
-    if (normalized.includes('traços') || normalized.includes('sons') || normalized.includes('cores') || normalized.includes('formas')) {
+    if (
+      normalized.includes('tracos') ||
+      normalized.includes('sons') ||
+      normalized.includes('cores') ||
+      normalized.includes('formas')
+    ) {
       return CampoDeExperiencia.TRACOS_SONS_CORES_E_FORMAS;
     }
-    if (normalized.includes('escuta') || normalized.includes('fala') || normalized.includes('pensamento') || normalized.includes('imaginação')) {
+    if (
+      normalized.includes('escuta') ||
+      normalized.includes('fala') ||
+      normalized.includes('pensamento') ||
+      normalized.includes('imaginacao')
+    ) {
       return CampoDeExperiencia.ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO;
     }
-    if (normalized.includes('espaço') || normalized.includes('tempo') || normalized.includes('quantidade') || normalized.includes('relações') || normalized.includes('transformações')) {
+    if (
+      normalized.includes('espacos') ||
+      normalized.includes('espaco') ||
+      normalized.includes('tempos') ||
+      normalized.includes('quantidade') ||
+      normalized.includes('relacoes') ||
+      normalized.includes('transformacoes')
+    ) {
       return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
     }
-    
-    throw new Error(`Campo de Experiência não reconhecido: ${text}`);
+
+    // Fallback pelo código BNCC quando o texto do campo é inválido (artefato de extração)
+    if (bnccCode) {
+      const code = bnccCode.toUpperCase();
+      if (code.includes('EO')) return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
+      if (code.includes('CG')) return CampoDeExperiencia.CORPO_GESTOS_E_MOVIMENTOS;
+      if (code.includes('TS')) return CampoDeExperiencia.TRACOS_SONS_CORES_E_FORMAS;
+      if (code.includes('EF')) return CampoDeExperiencia.ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO;
+      if (code.includes('ET')) return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
+    }
+
+    throw new Error(`Campo de Experiência não reconhecido: "${text}" (código: ${bnccCode ?? 'N/A'})`);
   }
 }
