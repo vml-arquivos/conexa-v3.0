@@ -334,7 +334,7 @@ export class ChildrenService {
     // Professores podem não ter unitId no token — resolver via classroomTeacher ou primeira unidade da mantenedora
     if (!targetUnitId) {
       const isProfessor = user.roles?.some(
-        (r: any) => r.level === 'PROFESSOR' || r.level === 'PROFESSOR_AUXILIAR'
+        (r: any) => r.level === 'PROFESSOR'
       );
       if (isProfessor) {
         // Tentativa 1: classroomTeacher ativo

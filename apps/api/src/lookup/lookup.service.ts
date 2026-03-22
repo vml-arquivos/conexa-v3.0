@@ -163,9 +163,7 @@ export class LookupService {
     unitId?: string,
   ): Promise<AccessibleClassroom[]> {
     // 1. PROFESSOR: turmas vinculadas e ativas; fallback para todas da mantenedora se sem vínculo formal
-    const isProfessor = user.roles.some(
-      (role) => role.level === 'PROFESSOR' || role.level === 'PROFESSOR_AUXILIAR',
-    );
+    const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
     if (isProfessor) {
       const classrooms = await this.prisma.classroom.findMany({
         where: {
@@ -370,9 +368,7 @@ export class LookupService {
     user: JwtPayload,
     classroomId?: string,
   ): Promise<AccessibleChild[]> {
-    const isProfessor = user.roles.some(
-      (role) => role.level === 'PROFESSOR' || role.level === 'PROFESSOR_AUXILIAR',
-    );
+    const isProfessor = user.roles.some((role) => role.level === 'PROFESSOR');
 
     // Se classroomId não foi fornecido, tentar resolver automaticamente
     let resolvedClassroomId = classroomId;
