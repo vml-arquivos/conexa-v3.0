@@ -213,12 +213,20 @@ export class CurriculumImportService {
           });
 
           if (hasLinkedEvents > 0 && !force) {
-            // Só atualiza campos não-normativos se vierem preenchidos
+            // Só atualiza campos não-normativos se vierem preenchidos E forem diferentes
             const nonNormativeUpdate: any = {};
-            if (entry.intencionalidade && entry.intencionalidade.length > 5) {
+            if (
+              entry.intencionalidade &&
+              entry.intencionalidade.length > 5 &&
+              this.normalize(existing.intencionalidade) !== this.normalize(entry.intencionalidade)
+            ) {
               nonNormativeUpdate.intencionalidade = entry.intencionalidade;
             }
-            if (entry.exemploAtividade && entry.exemploAtividade.length > 5) {
+            if (
+              entry.exemploAtividade &&
+              entry.exemploAtividade.length > 5 &&
+              this.normalize(existing.exemploAtividade) !== this.normalize(entry.exemploAtividade)
+            ) {
               nonNormativeUpdate.exemploAtividade = entry.exemploAtividade;
             }
 
@@ -258,20 +266,30 @@ export class CurriculumImportService {
             });
             updates++;
           } else {
-            // Sem force: atualiza apenas campos não-normativos que mudaram
-            const nonNormativeChanged =
-              (entry.intencionalidade &&
-                existing.intencionalidade !== entry.intencionalidade) ||
-              (entry.exemploAtividade &&
-                existing.exemploAtividade !== entry.exemploAtividade);
+            // Sem force: atualiza campos que mudaram
+            const updateData: any = {};
+            if (entry.intencionalidade) updateData.intencionalidade = entry.intencionalidade;
+            if (entry.exemploAtividade) updateData.exemploAtividade = entry.exemploAtividade;
 
-            if (nonNormativeChanged) {
+            const normativeChanged =
+              this.normalize(existing.objetivoBNCC) !== this.normalize(entry.objetivoBNCC) ||
+              this.normalize(existing.objetivoCurriculo) !== this.normalize(entry.objetivoCurriculo) ||
+              existing.campoDeExperiencia !== entry.campoDeExperiencia;
+
+            if (normativeChanged) {
+              updateData.campoDeExperiencia = entry.campoDeExperiencia;
+              updateData.objetivoBNCC = entry.objetivoBNCC;
+              updateData.objetivoBNCCCode = entry.objetivoBNCCCode;
+              updateData.objetivoCurriculo = entry.objetivoCurriculo;
+              updateData.weekOfYear = entry.weekOfYear;
+              updateData.dayOfWeek = entry.dayOfWeek;
+              updateData.bimester = entry.bimester;
+            }
+
+            if (Object.keys(updateData).length > 0) {
               await this.prisma.curriculumMatrixEntry.update({
                 where: { id: existing.id },
-                data: {
-                  ...(entry.intencionalidade ? { intencionalidade: entry.intencionalidade } : {}),
-                  ...(entry.exemploAtividade ? { exemploAtividade: entry.exemploAtividade } : {}),
-                },
+                data: updateData,
               });
               updates++;
             } else {
@@ -330,23 +348,28 @@ export class CurriculumImportService {
   }
 
   /**
+   * Normaliza string para comparação
+   */
+  private normalize(str: string | null | undefined): string {
+    if (!str) return '';
+    return str.trim().replace(/\s+/g, ' ');
+  }
+
+  /**
    * Verifica se há mudanças entre entrada existente e nova.
    * Não considera null/undefined como mudança (proteção contra sobrescrita).
    */
   private hasChanges(existing: any, entry: ParsedMatrixEntry): boolean {
-    const normalize = (str: string | null | undefined): string => {
-      if (!str) return '';
-      return str.trim().replace(/\s+/g, ' ');
-    };
-
     const normativeChanged =
-      normalize(existing.objetivoBNCC) !== normalize(entry.objetivoBNCC) ||
-      normalize(existing.objetivoCurriculo) !== normalize(entry.objetivoCurriculo) ||
+      this.normalize(existing.objetivoBNCC) !== this.normalize(entry.objetivoBNCC) ||
+      this.normalize(existing.objetivoCurriculo) !== this.normalize(entry.objetivoCurriculo) ||
       existing.campoDeExperiencia !== entry.campoDeExperiencia;
 
     const nonNormativeChanged =
-      (entry.intencionalidade && normalize(existing.intencionalidade) !== normalize(entry.intencionalidade)) ||
-      (entry.exemploAtividade && normalize(existing.exemploAtividade) !== normalize(entry.exemploAtividade));
+      (entry.intencionalidade &&
+        this.normalize(existing.intencionalidade) !== this.normalize(entry.intencionalidade)) ||
+      (entry.exemploAtividade &&
+        this.normalize(existing.exemploAtividade) !== this.normalize(entry.exemploAtividade));
 
     return normativeChanged || !!nonNormativeChanged;
   }

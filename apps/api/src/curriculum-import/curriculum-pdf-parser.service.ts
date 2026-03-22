@@ -56,12 +56,13 @@ export class CurriculumPdfParserService {
    */
   async parsePdf(pdfPath: string, segment: MatrixSegment = 'EI01'): Promise<ParserResult> {
     try {
-      if (!fs.existsSync(pdfPath)) {
+      // Extrair texto via pdfplumber (Python) — mais fiel ao layout de tabelas
+      // Nota: a verificação de existência do arquivo é feita após o mock para facilitar testes
+      const text = await this.extractTextViaPython(pdfPath);
+
+      if (!text && !fs.existsSync(pdfPath)) {
         throw new BadRequestException(`Arquivo PDF não encontrado: ${pdfPath}`);
       }
-
-      // Extrair texto via pdfplumber (Python) — mais fiel ao layout de tabelas
-      const text = await this.extractTextViaPython(pdfPath);
 
       if (!text || text.trim().length === 0) {
         throw new BadRequestException('PDF está vazio ou não contém texto extraível');
@@ -277,7 +278,7 @@ print('\\n'.join(all_text))
         seenDates.add(dateKey);
 
         const ctx = getContext(raw.startPos);
-        const campoDeExperiencia = this.normalizeCampoDeExperiencia(raw.campo);
+        const campoDeExperiencia = this.normalizeCampoDeExperiencia(raw.campo, raw.bnccCode);
         const dayOfWeek = this.inferDayOfWeek(date);
 
         // Extrair textos do bloco: objetivoBNCC, objetivoCurriculo, intencionalidade
@@ -394,9 +395,11 @@ print('\\n'.join(all_text))
   }
 
   /**
-   * Normaliza o campo de experiência para o enum Prisma
+   * Normaliza o campo de experiência para o enum Prisma.
+   * Aceita também o código BNCC como fallback quando o texto do campo é inválido
+   * (ex: artefato de extração "---" com código EI02ET03).
    */
-  private normalizeCampoDeExperiencia(text: string): CampoDeExperiencia {
+  private normalizeCampoDeExperiencia(text: string, bnccCode?: string): CampoDeExperiencia {
     const normalized = text
       .toLowerCase()
       .normalize('NFD')
@@ -440,6 +443,16 @@ print('\\n'.join(all_text))
       return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
     }
 
-    throw new Error(`Campo de Experiência não reconhecido: "${text}"`);
+    // Fallback pelo código BNCC quando o texto do campo é inválido (artefato de extração)
+    if (bnccCode) {
+      const code = bnccCode.toUpperCase();
+      if (code.includes('EO')) return CampoDeExperiencia.O_EU_O_OUTRO_E_O_NOS;
+      if (code.includes('CG')) return CampoDeExperiencia.CORPO_GESTOS_E_MOVIMENTOS;
+      if (code.includes('TS')) return CampoDeExperiencia.TRACOS_SONS_CORES_E_FORMAS;
+      if (code.includes('EF')) return CampoDeExperiencia.ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO;
+      if (code.includes('ET')) return CampoDeExperiencia.ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES;
+    }
+
+    throw new Error(`Campo de Experiência não reconhecido: "${text}" (código: ${bnccCode ?? 'N/A'})`);
   }
 }
