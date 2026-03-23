@@ -120,6 +120,20 @@ export class ChildrenController {
   }
 
   /**
+   * Dashboard consolidado de saúde: alergias, dietas, condições médicas, medicamentos
+   * GET /children/health/dashboard?unitId=...&classroomId=...
+   * Retorna crianças + stats em 1 request / 1 query (sem N+1)
+   */
+  @Get('health/dashboard')
+  async getHealthDashboard(
+    @Request() req,
+    @Query('unitId') unitId?: string,
+    @Query('classroomId') classroomId?: string,
+  ) {
+    return this.childrenService.getHealthDashboard(req.user, unitId, classroomId);
+  }
+
+  /**
    * Adicionar restrição alimentar
    */
   @Post(':id/dietary-restriction')

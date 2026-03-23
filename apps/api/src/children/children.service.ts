@@ -391,6 +391,112 @@ export class ChildrenService {
   }
 
   /**
+   * Dashboard consolidado de saúde: alergias, dietas, condições médicas, medicamentos
+   * Retorna crianças com qualquer informação de saúde relevante em 1 query (sem N+1)
+   */
+  async getHealthDashboard(user: any, unitId?: string, classroomId?: string) {
+    let targetUnitId = unitId || user.unitId;
+
+    // Professores podem não ter unitId no token — resolver via classroomTeacher
+    if (!targetUnitId) {
+      const isProfessor = user.roles?.some((r: any) => r.level === 'PROFESSOR');
+      if (isProfessor) {
+        const ct = await this.prisma.classroomTeacher.findFirst({
+          where: { teacherId: user.sub, isActive: true },
+          include: { classroom: { select: { unitId: true } } },
+        });
+        if (ct?.classroom?.unitId) {
+          targetUnitId = ct.classroom.unitId;
+        } else {
+          const firstUnit = await this.prisma.unit.findFirst({
+            where: { mantenedoraId: user.mantenedoraId, isActive: true },
+            select: { id: true },
+            orderBy: { name: 'asc' },
+          });
+          if (firstUnit) targetUnitId = firstUnit.id;
+        }
+      }
+    }
+
+    if (!targetUnitId) {
+      return { children: [], stats: { total: 0, comAlergia: 0, comDieta: 0, comCondicaoMedica: 0, comMedicamento: 0, casosCriticos: 0 } };
+    }
+
+    // Filtro de turma opcional
+    const enrollmentFilter: any = { status: 'ATIVA' };
+    if (classroomId) enrollmentFilter.classroomId = classroomId;
+
+    // 1 query com todos os joins necessários — sem N+1
+    const children = await this.prisma.child.findMany({
+      where: {
+        mantenedoraId: user.mantenedoraId,
+        unitId: targetUnitId,
+        isActive: true,
+        // Apenas crianças com alguma informação de saúde relevante
+        OR: [
+          { allergies: { not: null } },
+          { medicalConditions: { not: null } },
+          { medicationNeeds: { not: null } },
+          { dietaryRestrictions: { some: { isActive: true } } },
+        ],
+        // Filtro de turma via enrollment
+        ...(classroomId ? {
+          enrollments: { some: { classroomId, status: 'ATIVA' } },
+        } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        photoUrl: true,
+        bloodType: true,
+        allergies: true,
+        medicalConditions: true,
+        medicationNeeds: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        enrollments: {
+          where: enrollmentFilter,
+          select: {
+            classroom: { select: { id: true, name: true } },
+          },
+          take: 1,
+        },
+        dietaryRestrictions: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            type: true,
+            name: true,
+            description: true,
+            severity: true,
+            allowedFoods: true,
+            forbiddenFoods: true,
+          },
+          orderBy: { severity: 'asc' },
+        },
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    // Calcular estatísticas
+    const stats = {
+      total: children.length,
+      comAlergia: children.filter(c => c.allergies || c.dietaryRestrictions.some(r => r.type === 'ALERGIA')).length,
+      comDieta: children.filter(c => c.dietaryRestrictions.some(r => r.type !== 'ALERGIA')).length,
+      comCondicaoMedica: children.filter(c => !!c.medicalConditions).length,
+      comMedicamento: children.filter(c => !!c.medicationNeeds).length,
+      casosCriticos: children.filter(c =>
+        c.dietaryRestrictions.some(r => r.severity === 'severa') ||
+        (c.allergies && c.allergies.toLowerCase().includes('severa'))
+      ).length,
+    };
+
+    return { children, stats };
+  }
+
+  /**
    * Buscar histórico de saúde da criança
    */
   async getHealthHistory(id: string, user: any) {
