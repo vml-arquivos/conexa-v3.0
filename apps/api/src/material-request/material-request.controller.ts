@@ -51,8 +51,11 @@ export class MaterialRequestController {
     @Query('dataFim') dataFim?: string,
     @Query('unitId') unitId?: string,
     @Query('teacherId') teacherId?: string,
+    // FIX P0: novos filtros opcionais
+    @Query('status') status?: string,
+    @Query('type') type?: string,
   ) {
-    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId, teacherId });
+    return this.svc.relatorioConsumo(user, { classroomId, dataInicio, dataFim, unitId, teacherId, status, type });
   }
 
   /**
