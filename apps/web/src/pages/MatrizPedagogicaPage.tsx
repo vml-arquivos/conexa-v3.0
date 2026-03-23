@@ -7,10 +7,11 @@ import {
   SEGMENTOS,
   CAMPOS_EXPERIENCIA_BNCC,
 } from '../data/matrizPedagogica2026';
+import { MATRIZ_2026, type ExemploAtividade } from '../data/matrizCompleta2026';
 import {
   Search, ChevronDown, ChevronUp, BookOpen,
   Layers, Target, Calendar, Tag, Star, Sparkles,
-  Grid, List, CheckCircle, RefreshCw, GraduationCap,
+  Grid, List, CheckCircle, RefreshCw, GraduationCap, Eye, EyeOff,
 } from 'lucide-react';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
@@ -82,7 +83,27 @@ function getCampoId(campoExperiencia: string): string {
   return CAMPO_MAP[campoExperiencia] || 'outro';
 }
 
-// ─── Card de Objetivo ─────────────────────────────────────────────────────────
+// ─── Lookup de exemplos de atividades por código BNCC ─────────────────────────
+// Construído a partir do matrizCompleta2026 que tem 4 exemplos por objetivo
+const EXEMPLOS_POR_CODIGO: Record<string, ExemploAtividade[]> = (() => {
+  const map: Record<string, ExemploAtividade[]> = {};
+  for (const seg of Object.values(MATRIZ_2026)) {
+    for (const entrada of seg) {
+      if (entrada.codigo_bncc && entrada.exemplos_atividades?.length) {
+        // Manter apenas exemplos com descrição não vazia e distinta do objetivo
+        const exemplos = entrada.exemplos_atividades.filter(
+          e => e.descricao && e.descricao.trim().length > 0
+        );
+        if (exemplos.length > 0) {
+          map[entrada.codigo_bncc] = exemplos;
+        }
+      }
+    }
+  }
+  return map;
+})();
+
+// ─── Card de Objetivo ─────────────────────────────────────────────────────
 function ObjetivoCard({ obj, compact, mostrarExemplo }: {
   obj: ObjetivoMatriz;
   compact?: boolean;
@@ -92,6 +113,14 @@ function ObjetivoCard({ obj, compact, mostrarExemplo }: {
   const campoId = getCampoId(obj.campo_experiencia);
   const campoInfo = CAMPOS_EXPERIENCIA_BNCC.find(c => c.id === campoId);
   const segInfo = SEGMENTOS[obj.segmento as keyof typeof SEGMENTOS];
+  // Exemplos do lookup local (matrizCompleta2026) — usados quando mostrarExemplo=true
+  const exemplosLookup = obj.codigo_bncc ? (EXEMPLOS_POR_CODIGO[obj.codigo_bncc] ?? []) : [];
+  // Exemplo da API (coordenação) ou fallback do lookup
+  const exemploApi = obj.exemplo_atividade && obj.exemplo_atividade !== obj.objetivo_bncc ? obj.exemplo_atividade : null;
+  // Usar exemplos do lookup quando disponíveis, senão usar exemplo da API
+  const exemplosParaExibir: ExemploAtividade[] = exemplosLookup.length > 0
+    ? exemplosLookup
+    : exemploApi ? [{ titulo: 'Exemplo de Atividade', descricao: exemploApi }] : [];
 
   return (
     <div className={`bg-white border-2 rounded-xl transition-all hover:shadow-sm ${expanded ? 'border-blue-200' : 'border-gray-100 hover:border-gray-200'}`}>
@@ -152,13 +181,22 @@ function ObjetivoCard({ obj, compact, mostrarExemplo }: {
               <p className="text-sm text-purple-800">{obj.intencionalidade_pedagogica}</p>
             </div>
           )}
-          {/* Exemplo de Atividade — visível apenas para coordenação/mantenedora (professor não vê) */}
-          {mostrarExemplo && obj.exemplo_atividade && obj.exemplo_atividade !== obj.objetivo_bncc && (
-            <div className="bg-green-50 rounded-lg p-2.5 border border-green-100">
-              <p className="text-xs font-semibold text-green-600 uppercase mb-1 flex items-center gap-1">
-                <Sparkles className="h-3 w-3" /> Exemplo de Experiência / Atividade
+          {/* Exemplos de Atividade — visíveis para coordenação sempre; para professor quando toggle ativado */}
+          {mostrarExemplo && exemplosParaExibir.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-green-600 uppercase flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Exemplos de Experiências / Atividades
+                <span className="ml-1 text-green-400 font-normal normal-case">({exemplosParaExibir.length} sugest{exemplosParaExibir.length === 1 ? 'ão' : 'ões'})</span>
               </p>
-              <p className="text-sm text-green-800">{obj.exemplo_atividade}</p>
+              {exemplosParaExibir.map((ex, i) => (
+                <div key={i} className="bg-green-50 rounded-lg p-2.5 border border-green-100">
+                  {ex.titulo && ex.titulo !== 'Exemplo de Atividade' && (
+                    <p className="text-xs font-semibold text-green-700 mb-1">{ex.titulo}</p>
+                  )}
+                  <p className="text-sm text-green-800 leading-snug">{ex.descricao}</p>
+                </div>
+              ))}
             </div>
           )}
           <div className="flex gap-2">
@@ -179,7 +217,9 @@ function ObjetivoCard({ obj, compact, mostrarExemplo }: {
 export default function MatrizPedagogicaPage() {
   const { user } = useAuth();
   const ehProfessor = isProfessor(user);
-  const mostrarExemplo = !ehProfessor;
+  // Coordenação sempre vê exemplos; professor pode ligar/desligar via toggle
+  const [professorVerExemplos, setProfessorVerExemplos] = useState(false);
+  const mostrarExemplo = ehProfessor ? professorVerExemplos : true;
 
   const [busca, setBusca] = useState('');
   const [segmentoFiltro, setSegmentoFiltro] = useState<string>('');
@@ -352,18 +392,38 @@ export default function MatrizPedagogicaPage() {
       title="Matriz Pedagógica 2026"
       subtitle="Sequência Pedagógica Piloto — Objetivos de Aprendizagem e Desenvolvimento (BNCC)"
     >
-      {/* Badge de perfil */}
-      <div className="flex items-center gap-2 mb-4">
-        {ehProfessor ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
-            <GraduationCap className="h-3.5 w-3.5" />
-            Visão do Professor — Objetivos BNCC
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-            <Sparkles className="h-3.5 w-3.5" />
-            Visão da Coordenação — Objetivos + Exemplos de Atividades
-          </span>
+      {/* Badge de perfil + Toggle de exemplos para professor */}
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          {ehProfessor ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+              <GraduationCap className="h-3.5 w-3.5" />
+              Visão do Professor — Objetivos BNCC
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+              <Sparkles className="h-3.5 w-3.5" />
+              Visão da Coordenação — Objetivos + Exemplos de Atividades
+            </span>
+          )}
+        </div>
+        {/* Toggle de exemplos de atividades — apenas para professor */}
+        {ehProfessor && (
+          <button
+            onClick={() => setProfessorVerExemplos(v => !v)}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              professorVerExemplos
+                ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+            }`}
+            title={professorVerExemplos ? 'Ocultar exemplos de atividades' : 'Exibir exemplos de atividades'}
+          >
+            {professorVerExemplos ? (
+              <><Eye className="h-3.5 w-3.5" /> Exemplos visíveis</>
+            ) : (
+              <><EyeOff className="h-3.5 w-3.5" /> Exemplos ocultos</>
+            )}
+          </button>
         )}
       </div>
       {/* Abas */}
@@ -455,7 +515,8 @@ export default function MatrizPedagogicaPage() {
             <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
               <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
               Dados carregados da API em tempo real
-              {mostrarExemplo && <span className="ml-1 font-semibold">· Exemplos de atividades visíveis (coordenação)</span>}
+              {mostrarExemplo && !ehProfessor && <span className="ml-1 font-semibold">· Exemplos de atividades visíveis (coordenação)</span>}
+              {mostrarExemplo && ehProfessor && <span className="ml-1 font-semibold text-green-600">· Exemplos de atividades ativados</span>}
             </div>
           )}
           {erroApi && matrizLocal.length > 0 && (
