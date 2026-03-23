@@ -54,4 +54,16 @@ export class LookupController {
   ) {
     return this.lookupService.getChildrenByClassroom(classroomId, user);
   }
+
+  /**
+   * GET /lookup/classrooms/:id/teachers
+   * Retorna professores vinculados a uma turma via ClassroomTeacher.
+   * Usado para auto-preencher o campo Professor ao selecionar Turma no dashboard.
+   */
+  @Get('classrooms/:id/teachers')
+  async getTeachersByClassroom(
+    @Param('id') classroomId: string,
+  ) {
+    return this.lookupService.getTeachersByClassroom(classroomId);
+  }
 }

@@ -328,36 +328,30 @@ export default function RelatorioConsumoMateriaisPage() {
                 </Label>
                 <select
                   value={filtros.classroomId}
-                  onChange={e => {
+                  onChange={async e => {
                     const newClassroomId = e.target.value;
-                    // Auto-preencher professor: buscar nos detalhes já carregados o professor único da turma
-                    let autoProfessorId = '';
-                    if (newClassroomId && relatorio?.detalhes) {
-                      // Prioridade 1: usar teacherId direto dos detalhes (campo adicionado no backend)
-                      const teacherIds = [...new Set(
-                        relatorio.detalhes
-                          .filter((d: any) => d.classroomId === newClassroomId)
-                          .map((d: any) => d.teacherId)
-                          .filter(Boolean)
-                      )];
-                      if (teacherIds.length === 1) {
-                        autoProfessorId = teacherIds[0] as string;
-                      } else if (teacherIds.length === 0) {
-                        // Fallback: comparar pelo nome da turma
-                        const turmaNome = turmas.find(t => t.id === newClassroomId)?.name ?? turmas.find(t => t.id === newClassroomId)?.nome ?? '';
-                        const profNomes = [...new Set(
-                          relatorio.detalhes
-                            .filter((d: any) => d.turma === turmaNome)
-                            .map((d: any) => d.professor)
-                            .filter(Boolean)
-                        )];
-                        if (profNomes.length === 1) {
-                          const profEncontrado = professores.find(p => (p.name ?? p.nome ?? '') === profNomes[0]);
-                          if (profEncontrado) autoProfessorId = profEncontrado.id;
-                        }
+                    // Primeiro atualiza a turma imediatamente
+                    setFiltros(f => ({ ...f, classroomId: newClassroomId, teacherId: '' }));
+                    if (!newClassroomId) return;
+                    // Auto-preencher professor via API ClassroomTeacher
+                    try {
+                      const res = await http.get(`/lookup/classrooms/${newClassroomId}/teachers`);
+                      const profs: LookupItem[] = Array.isArray(res.data) ? res.data : [];
+                      if (profs.length === 1) {
+                        // Apenas 1 professor vinculado: preenche automaticamente
+                        setFiltros(f => ({ ...f, teacherId: profs[0].id }));
+                        // Garante que o professor aparece no dropdown
+                        setProfessores(prev => {
+                          const exists = prev.some(p => p.id === profs[0].id);
+                          return exists ? prev : [...prev, profs[0]];
+                        });
+                      } else if (profs.length > 1) {
+                        // Vários professores: atualiza o dropdown com os professores da turma
+                        setProfessores(profs);
                       }
+                    } catch {
+                      // silencioso — não bloqueia
                     }
-                    setFiltros(f => ({ ...f, classroomId: newClassroomId, teacherId: autoProfessorId }));
                   }}
                   className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">Todas as turmas</option>
@@ -831,6 +825,130 @@ export default function RelatorioConsumoMateriaisPage() {
           {/* ── ABA: GRÁFICOS ────────────────────────────────────────────────── */}
           {(activeTab as string) === 'graficos' && (
             <div className="space-y-6">
+
+              {/* ── Top Produtos Mais Solicitados ──────────────────────────────── */}
+              {(() => {
+                if (!relatorio?.detalhes?.length) return null;
+                const prodMap: Record<string, { nome: string; total: number; higiene: boolean }> = {};
+                for (const d of relatorio.detalhes) {
+                  // Extrair nome do produto do título da requisição
+                  const nome = d.titulo?.replace(/^(Higiene Pessoal|Material Pedagógico|Limpeza|Alimentação|Outros?) - \d{2}\/\d{2}\/\d{4}$/, '').trim() || d.tipo;
+                  const key = d.tipo + '|' + d.titulo;
+                  if (!prodMap[key]) prodMap[key] = { nome: TIPO_LABEL[d.tipo] ?? d.tipo, total: 0, higiene: d.tipo === 'HIGIENE' || d.tipo === 'HIGIENE_PESSOAL' };
+                  prodMap[key].total += d.quantidade ?? 1;
+                }
+                const topProd = Object.values(prodMap).sort((a, b) => b.total - a.total).slice(0, 8);
+                if (!topProd.length) return null;
+                return (
+                  <Card className="border border-gray-200">
+                    <CardHeader>
+                      <CardTitle className="text-base text-gray-700 flex items-center gap-2">
+                        <Package className="h-4 w-4 text-orange-500" /> Top Tipos de Consumo por Quantidade
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={Math.max(160, topProd.length * 36)}>
+                        <BarChart data={topProd} layout="vertical" margin={{ top: 0, right: 20, left: 120, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={120} />
+                          <Tooltip formatter={(v: number) => [fmt(v), 'Itens solicitados']} />
+                          <Bar dataKey="total" name="Itens" radius={[0, 4, 4, 0]}>
+                            {topProd.map((p, i) => (
+                              <Cell key={i} fill={p.higiene ? '#06b6d4' : CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* ── Análise de Fralda por Turma (Desfralde) ───────────────────── */}
+              {(() => {
+                if (!relatorio?.detalhes?.length) return null;
+                // Filtrar requisições de higiene por turma
+                const fraldaMap: Record<string, { turma: string; total: number; tamanhos: Record<string, number> }> = {};
+                for (const d of relatorio.detalhes) {
+                  if (d.tipo !== 'HIGIENE' && d.tipo !== 'HIGIENE_PESSOAL') continue;
+                  if (!d.turma) continue;
+                  if (!fraldaMap[d.turma]) fraldaMap[d.turma] = { turma: d.turma, total: 0, tamanhos: {} };
+                  fraldaMap[d.turma].total += d.quantidade ?? 1;
+                }
+                const fraldaData = Object.values(fraldaMap).sort((a, b) => b.total - a.total);
+                if (!fraldaData.length) return null;
+                return (
+                  <Card className="border border-cyan-200 bg-cyan-50/30">
+                    <CardHeader>
+                      <CardTitle className="text-base text-cyan-800 flex items-center gap-2">
+                        🧷 Consumo de Higiene Pessoal por Turma
+                        <span className="text-xs font-normal text-cyan-600 ml-auto">Controle de desfralde e consumo</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={Math.max(120, fraldaData.length * 40)}>
+                        <BarChart data={fraldaData} layout="vertical" margin={{ top: 0, right: 20, left: 120, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e0f2fe" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="turma" tick={{ fontSize: 11 }} width={120} />
+                          <Tooltip formatter={(v: number) => [fmt(v), 'Itens de higiene']} />
+                          <Bar dataKey="total" name="Itens de Higiene" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <p className="text-xs text-cyan-600 mt-3 bg-cyan-100 rounded-lg px-3 py-2">
+                        💡 Turmas com maior consumo de higiene podem indicar crianças ainda em processo de desfralde.
+                        Use esse dado para planejar o estoque de fraldas por tamanho.
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* ── Tendência: Aumento vs Diminuição de Consumo ───────────────── */}
+              {serieMensalFmt.length >= 2 && (() => {
+                const metade = Math.floor(serieMensalFmt.length / 2);
+                const primeira = serieMensalFmt.slice(0, metade);
+                const segunda = serieMensalFmt.slice(metade);
+                const totalPrimeira = primeira.reduce((a, b) => a + b.requisicoes, 0);
+                const totalSegunda = segunda.reduce((a, b) => a + b.requisicoes, 0);
+                const varPct = totalPrimeira > 0 ? Math.round(((totalSegunda - totalPrimeira) / totalPrimeira) * 100) : 0;
+                const crescendo = varPct >= 0;
+                return (
+                  <Card className={`border ${crescendo ? 'border-orange-200 bg-orange-50/30' : 'border-green-200 bg-green-50/30'}`}>
+                    <CardHeader>
+                      <CardTitle className={`text-base flex items-center gap-2 ${crescendo ? 'text-orange-700' : 'text-green-700'}`}>
+                        {crescendo ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                        Tendência de Consumo
+                        <span className={`ml-auto text-sm font-bold ${crescendo ? 'text-orange-600' : 'text-green-600'}`}>
+                          {crescendo ? '+' : ''}{varPct}%
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-white rounded-lg p-3 text-center border">
+                          <p className="text-xs text-gray-500 mb-1">1ª metade do período</p>
+                          <p className="text-2xl font-bold text-gray-700">{fmt(totalPrimeira)}</p>
+                          <p className="text-xs text-gray-400">requisições</p>
+                        </div>
+                        <div className="bg-white rounded-lg p-3 text-center border">
+                          <p className="text-xs text-gray-500 mb-1">2ª metade do período</p>
+                          <p className={`text-2xl font-bold ${crescendo ? 'text-orange-600' : 'text-green-600'}`}>{fmt(totalSegunda)}</p>
+                          <p className="text-xs text-gray-400">requisições</p>
+                        </div>
+                      </div>
+                      <p className={`text-xs rounded-lg px-3 py-2 ${crescendo ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                        {crescendo
+                          ? `⚠️ Consumo aumentou ${varPct}% na segunda metade do período. Verifique se o estoque está adequado.`
+                          : `✅ Consumo reduziu ${Math.abs(varPct)}% na segunda metade do período. Bom controle de materiais!`
+                        }
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
               {/* Custo por Mês */}
               {serieMensalFmt.length > 0 && (
                 <Card className="border border-gray-200">

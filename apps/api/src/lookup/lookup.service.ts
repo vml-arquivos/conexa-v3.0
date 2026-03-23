@@ -461,4 +461,35 @@ export class LookupService {
   ): Promise<AccessibleChild[]> {
     return this.getAccessibleChildren(user, classroomId);
   }
+
+  /**
+   * Retorna professores vinculados a uma turma via ClassroomTeacher.
+   * Usado para auto-preencher o campo Professor no dashboard de consumo.
+   */
+  async getTeachersByClassroom(
+    classroomId: string,
+  ): Promise<AccessibleTeacher[]> {
+    if (!classroomId) return [];
+    const links = await this.prisma.classroomTeacher.findMany({
+      where: { classroomId, isActive: true },
+      include: {
+        teacher: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            unitId: true,
+          },
+        },
+      },
+      orderBy: { role: 'asc' },
+    });
+    return links.map(l => ({
+      id: l.teacher.id,
+      name: `${l.teacher.firstName} ${l.teacher.lastName}`.trim() || l.teacher.email,
+      email: l.teacher.email,
+      unitId: l.teacher.unitId || '',
+    }));
+  }
 }

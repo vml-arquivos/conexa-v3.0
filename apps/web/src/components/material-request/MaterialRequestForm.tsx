@@ -239,29 +239,59 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
           {/* Lista de itens */}
           <div className="space-y-2">
             <p className="text-sm font-semibold text-gray-600">Itens do pedido:</p>
-            {itens.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border-2 border-gray-100">
-                <input
-                  type="text"
-                  placeholder="Nome do item"
-                  value={item.item}
-                  onChange={e => updateItem(idx, 'item', e.target.value)}
-                  className="flex-1 bg-transparent text-sm outline-none"
-                />
-                <div className="flex items-center gap-1 bg-white border rounded-lg px-2 py-1">
-                  <button onClick={() => updateItem(idx, 'quantidade', Math.max(1, Number(item.quantidade) - 1))}
-                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold">-</button>
-                  <span className="w-6 text-center text-sm font-bold">{item.quantidade}</span>
-                  <button onClick={() => updateItem(idx, 'quantidade', Number(item.quantidade) + 1)}
-                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold">+</button>
+            {itens.map((item, idx) => {
+              const isFralda = /fralda/i.test(item.item);
+              return (
+                <div key={idx} className="p-3 bg-gray-50 rounded-xl border-2 border-gray-100 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nome do item"
+                      value={item.item}
+                      onChange={e => updateItem(idx, 'item', e.target.value)}
+                      className="flex-1 bg-transparent text-sm outline-none"
+                    />
+                    <div className="flex items-center gap-1 bg-white border rounded-lg px-2 py-1">
+                      <button onClick={() => updateItem(idx, 'quantidade', Math.max(1, Number(item.quantidade) - 1))}
+                        className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold">-</button>
+                      <span className="w-6 text-center text-sm font-bold">{item.quantidade}</span>
+                      <button onClick={() => updateItem(idx, 'quantidade', Number(item.quantidade) + 1)}
+                        className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold">+</button>
+                    </div>
+                    {itens.length > 1 && (
+                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Campo de tamanho: aparece automaticamente quando o item é fralda */}
+                  {isFralda && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-green-700 font-semibold">🧷 Tamanho da fralda:</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {['RN', 'P', 'M', 'G', 'XG', 'XXG', 'XXXG'].map(tam => (
+                          <button
+                            key={tam}
+                            type="button"
+                            onClick={() => updateItem(idx, 'unidade', tam)}
+                            className={`px-2 py-0.5 rounded-full text-xs font-bold border-2 transition-all ${
+                              item.unidade === tam
+                                ? 'bg-green-500 text-white border-green-500'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                            }`}
+                          >
+                            {tam}
+                          </button>
+                        ))}
+                      </div>
+                      {item.unidade && ['RN','P','M','G','XG','XXG','XXXG'].includes(item.unidade) && (
+                        <span className="text-xs text-green-600 font-medium">Tamanho {item.unidade} selecionado</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                {itens.length > 1 && (
-                  <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
             <button
               onClick={addItem}
               className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
