@@ -79,6 +79,32 @@ function entradaParaObjetivo(e: EntradaMatriz): MatrizObjective {
     exemploAtividade: undefined,
   };
 }
+/**
+ * Busca intencionalidade pedagógica no fallback local (MATRIZ_2026) por código BNCC.
+ *
+ * Regras (Opção A blindada):
+ * 1. Só é chamada quando intencionalidadePedagogica da API for null/vazio
+ * 2. Match ESTRITO por codigo_bncc (campo canônico)
+ * 3. Se houver mais de 1 resultado com o mesmo código, usa o primeiro (não há ambiguidade real)
+ * 4. Retorna null se não houver match — nunca inventa conteúdo
+ * 5. NÃO é persistida no submit — apenas visual
+ */
+function resolverIntencionalidadeFallback(
+  codigoBNCC: string | null,
+  segmento: SegmentoKey | null,
+): string | null {
+  if (!codigoBNCC || !segmento) return null;
+  const entradas = MATRIZ_2026[segmento] ?? [];
+  const match = entradas.find(
+    (e: EntradaMatriz) => e.codigo_bncc === codigoBNCC,
+  );
+  if (!match) return null;
+  // Prefere intencionalidade_pedagogica (campo estendido), depois intencionalidade (canônico)
+  const valor = match.intencionalidade_pedagogica ?? match.intencionalidade ?? null;
+  // Rejeita strings vazias ou só whitespace
+  return valor && valor.trim().length > 0 ? valor.trim() : null;
+}
+
 function buildFallback(dateISO: string, turma: { name?: string; ageGroupMin?: number | null }): { objectives: MatrizObjective[]; message: string } | null {
   const segmento = inferirSegmento(turma);
   if (!segmento) return null;
@@ -183,7 +209,16 @@ function inferTipo(numDays: number): string {
 }
 
 // ─── Componente de Objetivo da Matriz (somente leitura) ──────────────────────
-function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: number }) {
+function ObjetivoCard({
+  objetivo,
+  index,
+  segmento,
+}: {
+  objetivo: MatrizObjective;
+  index: number;
+  /** Segmento inferido da turma — usado SOMENTE para fallback visual de intencionalidade */
+  segmento?: SegmentoKey | null;
+}) {
   const colors = [
     'bg-blue-50 border-blue-200',
     'bg-green-50 border-green-200',
@@ -228,14 +263,33 @@ function ObjetivoCard({ objetivo, index }: { objetivo: MatrizObjective; index: n
           }
         </div>
         {/* Campo 3: Intencionalidade Pedagógica — sempre exibida */}
+        {/* FIX P0: quando API retorna null, tenta fallback local por codigoBNCC (apenas visual, não persiste) */}
         <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
           <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
             Intencionalidade Pedagógica
           </p>
-          {objetivo.intencionalidadePedagogica
-            ? <p className="text-sm text-indigo-800 leading-relaxed">{objetivo.intencionalidadePedagogica}</p>
-            : <p className="text-xs text-indigo-300 italic">Não cadastrada</p>
-          }
+          {(() => {
+            // 1. Valor da API — prioridade absoluta
+            const apiVal = objetivo.intencionalidadePedagogica?.trim();
+            if (apiVal) {
+              return <p className="text-sm text-indigo-800 leading-relaxed">{apiVal}</p>;
+            }
+            // 2. Fallback local por codigoBNCC — apenas quando API retornou null/vazio
+            const fbVal = resolverIntencionalidadeFallback(
+              objetivo.codigoBNCC ?? null,
+              segmento ?? null,
+            );
+            if (fbVal) {
+              return (
+                <>
+                  <p className="text-sm text-indigo-800 leading-relaxed">{fbVal}</p>
+                  <p className="text-xs text-indigo-400 italic mt-1">Sugestão local — aguardando cadastro pela coordenação</p>
+                </>
+              );
+            }
+            // 3. Sem match — mensagem neutra
+            return <p className="text-xs text-indigo-400 italic">Aguardando preenchimento pela coordenação</p>;
+          })()}
         </div>
         {/* Campo 4: Exemplo de Atividade — visível apenas quando retornado pelo backend (roles acima de PROFESSOR) */}
         {objetivo.exemploAtividade !== undefined && (
@@ -880,6 +934,7 @@ export default function PlanoDeAulaNovoPage() {
                               key={`${day.date}-${obj.codigoBNCC ?? obj.campoExperiencia}-${i}`}
                               objetivo={obj}
                               index={i}
+                              segmento={turmaSelecionada ? inferirSegmento(turmaSelecionada) : null}
                             />
                           ))}
                         </div>
