@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
@@ -24,6 +26,8 @@ import {
 
 @Injectable()
 export class PedidoCompraService {
+  private readonly logger = new Logger(PedidoCompraService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -238,59 +242,91 @@ export class PedidoCompraService {
       status?: StatusPedidoCompra;
     },
   ) {
-    const where: Record<string, unknown> = {
-      mantenedoraId: user.mantenedoraId,
-    };
+    try {
+      const where: Record<string, unknown> = {
+        mantenedoraId: user.mantenedoraId,
+      };
 
-    // Aplicar escopo por role
-    if (user.roles.some((r) => r.level === RoleLevel.PROFESSOR)) {
-      throw new ForbiddenException(
-        'Acesso negado: professores não têm acesso a pedidos de compra.',
-      );
-    }
-
-    if (user.roles.some((r) => r.level === RoleLevel.UNIDADE)) {
-      where['unitId'] = user.unitId;
-    } else if (user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL)) {
-      const staffRole = user.roles.find(
-        (r) => r.level === RoleLevel.STAFF_CENTRAL,
-      );
-      where['unitId'] = { in: staffRole?.unitScopes ?? [] };
-    }
-
-    // Aplicar filtros adicionais
-    if (filtros.unitId) {
-      // Verificar permissão para o unitId solicitado
-      if (!podeAcessarUnidade(user, filtros.unitId)) {
+      // Bloquear PROFESSOR
+      if (user.roles.some((r) => r.level === RoleLevel.PROFESSOR)) {
         throw new ForbiddenException(
-          'Acesso negado: você não tem permissão para acessar pedidos desta unidade.',
+          'Acesso negado: professores não têm acesso a pedidos de compra.',
         );
       }
-      where['unitId'] = filtros.unitId;
-    }
 
-    if (filtros.mesReferencia) where['mesReferencia'] = filtros.mesReferencia;
-    if (filtros.status) where['status'] = filtros.status;
+      // FIX P0 — Bug 1: UNIDADE sem unitId gera Prisma query sem filtro → 500
+      // Retornar 400 com mensagem clara em vez de explodir
+      if (user.roles.some((r) => r.level === RoleLevel.UNIDADE)) {
+        if (!user.unitId) {
+          throw new BadRequestException(
+            'Sua conta não está vinculada a uma unidade. Fale com a administração.',
+          );
+        }
+        where['unitId'] = user.unitId;
+      } else if (user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL)) {
+        // FIX P0 — Bug 2: STAFF_CENTRAL com unitScopes=[] → { in: [] } pode causar comportamento
+        // inesperado no Prisma. Se vazio, tratar como acesso global na mantenedora (sem filtro de unitId).
+        const staffRole = user.roles.find(
+          (r) => r.level === RoleLevel.STAFF_CENTRAL,
+        );
+        const scopes = staffRole?.unitScopes ?? [];
+        if (scopes.length > 0) {
+          where['unitId'] = { in: scopes };
+        }
+        // Se scopes vazio: acesso global na mantenedora (sem restrição de unitId)
+      }
 
-    const pedidos = await this.prisma.pedidoCompra.findMany({
-      where,
-      include: {
-        unit: { select: { id: true, name: true } },
-        itens: {
-          select: {
-            id: true,
-            categoria: true,
-            descricao: true,
-            quantidade: true,
-            unidadeMedida: true,
-            custoEstimado: true,
+      // Aplicar filtros adicionais
+      if (filtros.unitId) {
+        // Verificar permissão para o unitId solicitado
+        if (!podeAcessarUnidade(user, filtros.unitId)) {
+          throw new ForbiddenException(
+            'Acesso negado: você não tem permissão para acessar pedidos desta unidade.',
+          );
+        }
+        where['unitId'] = filtros.unitId;
+      }
+
+      if (filtros.mesReferencia) where['mesReferencia'] = filtros.mesReferencia;
+      if (filtros.status) where['status'] = filtros.status;
+
+      const pedidos = await this.prisma.pedidoCompra.findMany({
+        where,
+        include: {
+          unit: { select: { id: true, name: true } },
+          itens: {
+            select: {
+              id: true,
+              categoria: true,
+              descricao: true,
+              quantidade: true,
+              unidadeMedida: true,
+              custoEstimado: true,
+            },
           },
         },
-      },
-      orderBy: [{ mesReferencia: 'desc' }, { criadoEm: 'desc' }],
-    });
+        orderBy: [{ mesReferencia: 'desc' }, { criadoEm: 'desc' }],
+      });
 
-    return pedidos;
+      return pedidos;
+    } catch (err) {
+      // FIX P0 — Bug 3: re-lançar erros HTTP conhecidos sem transformar
+      if (
+        err instanceof ForbiddenException ||
+        err instanceof BadRequestException ||
+        err instanceof NotFoundException
+      ) {
+        throw err;
+      }
+      // Erros de Prisma/infra: logar e retornar 500 com mensagem útil (não genérica)
+      this.logger.error(
+        `[PedidoCompraService.listar] Erro ao listar pedidos para user=${user.sub}: ${(err as Error)?.message}`,
+        (err as Error)?.stack,
+      );
+      throw new InternalServerErrorException(
+        'Não foi possível carregar os pedidos de compra. Tente novamente ou contate o suporte.',
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

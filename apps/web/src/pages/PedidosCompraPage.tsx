@@ -131,9 +131,14 @@ export function PedidosCompraPage() {
         status: filtroStatus || undefined,
         unitId: (isMantenedora || isCentral) ? (ctxUnitId || undefined) : undefined,
       });
-      setPedidos(dados);
+      // FIX P0: garantir que dados é sempre array (nunca undefined/null)
+      setPedidos(Array.isArray(dados) ? dados : []);
     } catch (e: unknown) {
-      setErro(getErrorMessage(e, 'Erro ao carregar pedidos.'));
+      // FIX P0: exibir mensagem específica de 400/403 em vez de mensagem genérica
+      const msg = getErrorMessage(e, 'Erro ao carregar pedidos.');
+      setErro(msg);
+      // Garantir lista vazia para não crashar a UI
+      setPedidos([]);
     } finally { setCarregando(false); }
   }, [filtroMes, filtroStatus, ctxUnitId]);
 
