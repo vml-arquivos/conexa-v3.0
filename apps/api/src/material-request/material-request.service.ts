@@ -765,27 +765,21 @@ export class MaterialRequestService {
       where.requestedDate = dateFilter;
     }
 
+    // FIX 500: não incluir items via Prisma ORM (pode falhar no banco legado)
+    // Usar apenas campos diretos do MaterialRequest para evitar erro de serialização Decimal
     const requisicoes = await this.prisma.materialRequest.findMany({
       where: where as any,
       include: {
         classroom: { select: { name: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
-        items: { select: { quantity: true, unitPrice: true } },
       },
       orderBy: { requestedDate: 'desc' },
     });
 
-    // ─── FIX P0: Helper de normalização unificado ────────────────────────────
-    // Regra única compartilhada por KPI, porCategoria, porStatus, serieMensal e tabela:
-    // Se existir items com itens válidos → usa soma(items); senão → usa campos diretos
+    // ─── Helper de normalização: usa campos diretos do MaterialRequest
+    // (items não são incluídos para evitar erro de serialização Decimal no banco legado)
     function normalizarReq(r: (typeof requisicoes)[0]): { qtd: number; custo: number } {
-      const itemsArr = (r as any).items ?? [];
-      if (itemsArr.length > 0) {
-        const qtd = itemsArr.reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0);
-        const custo = itemsArr.reduce((s: number, i: any) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
-        return { qtd, custo };
-      }
       return {
         qtd: Number(r.quantity) || 0,
         custo: Number(r.estimatedCost) || 0,
