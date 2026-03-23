@@ -219,88 +219,106 @@ function ObjetivoCard({
   /** Segmento inferido da turma — usado SOMENTE para fallback visual de intencionalidade */
   segmento?: SegmentoKey | null;
 }) {
-  const colors = [
-    'bg-blue-50 border-blue-200',
-    'bg-green-50 border-green-200',
-    'bg-orange-50 border-orange-200',
-    'bg-pink-50 border-pink-200',
-    'bg-purple-50 border-purple-200',
-    'bg-yellow-50 border-yellow-200',
+  // Paleta de cores para o cabeçalho do card (rotaciona por índice)
+  const headerPalettes = [
+    { header: 'bg-blue-600',    badge: 'bg-blue-100 text-blue-700' },
+    { header: 'bg-violet-600',  badge: 'bg-violet-100 text-violet-700' },
+    { header: 'bg-teal-600',    badge: 'bg-teal-100 text-teal-700' },
+    { header: 'bg-rose-600',    badge: 'bg-rose-100 text-rose-700' },
+    { header: 'bg-amber-600',   badge: 'bg-amber-100 text-amber-700' },
+    { header: 'bg-cyan-600',    badge: 'bg-cyan-100 text-cyan-700' },
   ];
-  const bg = colors[index % colors.length];
+  const palette = headerPalettes[index % headerPalettes.length];
 
   return (
-    <div className={`rounded-xl border ${bg} overflow-hidden`}>
-      <div className={`px-4 py-2 flex items-center gap-2 flex-wrap border-b ${bg}`}>
-        <span className="text-xs font-bold uppercase tracking-wide text-gray-700">
-          Campo de Experiência: {objetivo.campoExperiencia.replace(/_/g, ' ')}
+    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+      {/* Cabeçalho colorido com campo de experiência e código BNCC */}
+      <div className={`${palette.header} px-4 py-2.5 flex items-center gap-2 flex-wrap`}>
+        <span className="text-xs font-bold uppercase tracking-widest text-white/80">
+          Campo de Experiência
+        </span>
+        <span className="text-sm font-semibold text-white flex-1">
+          {objetivo.campoExperiencia.replace(/_/g, ' ')}
         </span>
         {objetivo.codigoBNCC && (
-          <Badge variant="secondary" className="ml-auto text-xs font-mono">
+          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${palette.badge}`}>
             {objetivo.codigoBNCC}
-          </Badge>
+          </span>
         )}
       </div>
-      <div className="px-4 py-3 space-y-3 bg-white/80">
-        {/* Campo 1: Objetivo da BNCC — sempre exibido */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Objetivo da BNCC
-          </p>
-          {objetivo.objetivoBNCC
-            ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
-            : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
-          }
-        </div>
-        {/* Campo 2: Objetivo do Currículo em Movimento — sempre exibido */}
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Objetivo do Currículo em Movimento — DF
-          </p>
-          {objetivo.objetivoCurriculoDF
-            ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
-            : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
-          }
-        </div>
-        {/* Campo 3: Intencionalidade Pedagógica — sempre exibida */}
-        {/* FIX P0: quando API retorna null, tenta fallback local por codigoBNCC (apenas visual, não persiste) */}
-        <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
-            Intencionalidade Pedagógica
-          </p>
-          {(() => {
-            // 1. Valor da API — prioridade absoluta
-            const apiVal = objetivo.intencionalidadePedagogica?.trim();
-            if (apiVal) {
-              return <p className="text-sm text-indigo-800 leading-relaxed">{apiVal}</p>;
-            }
-            // 2. Fallback local por codigoBNCC — apenas quando API retornou null/vazio
-            const fbVal = resolverIntencionalidadeFallback(
-              objetivo.codigoBNCC ?? null,
-              segmento ?? null,
-            );
-            if (fbVal) {
-              return (
-                <>
-                  <p className="text-sm text-indigo-800 leading-relaxed">{fbVal}</p>
-                  <p className="text-xs text-indigo-400 italic mt-1">Sugestão local — aguardando cadastro pela coordenação</p>
-                </>
-              );
-            }
-            // 3. Sem match — mensagem neutra
-            return <p className="text-xs text-indigo-400 italic">Aguardando preenchimento pela coordenação</p>;
-          })()}
-        </div>
-        {/* Campo 4: Exemplo de Atividade — visível apenas quando retornado pelo backend (roles acima de PROFESSOR) */}
-        {objetivo.exemploAtividade !== undefined && (
-          <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide mb-1">
-              Exemplo de Atividade
+
+      <div className="bg-white divide-y divide-gray-100">
+        {/* ── Campo 1: Objetivo da BNCC ── borda lateral azul */}
+        <div className="flex">
+          <div className="w-1 flex-shrink-0 bg-blue-500" />
+          <div className="px-4 py-3 flex-1">
+            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">
+              📘 Objetivo da BNCC
             </p>
-            {objetivo.exemploAtividade
-              ? <p className="text-sm text-emerald-800 leading-relaxed">{objetivo.exemploAtividade}</p>
-              : <p className="text-xs text-emerald-300 italic">Não cadastrado</p>
+            {objetivo.objetivoBNCC
+              ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
+              : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
             }
+          </div>
+        </div>
+
+        {/* ── Campo 2: Objetivo do Currículo em Movimento ── borda lateral verde */}
+        <div className="flex">
+          <div className="w-1 flex-shrink-0 bg-teal-500" />
+          <div className="px-4 py-3 flex-1">
+            <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1">
+              🏛️ Objetivo do Currículo em Movimento — DF
+            </p>
+            {objetivo.objetivoCurriculoDF
+              ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
+              : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
+            }
+          </div>
+        </div>
+
+        {/* ── Campo 3: Intencionalidade Pedagógica ── borda lateral violeta */}
+        {/* FIX P0: quando API retorna null, tenta fallback local por codigoBNCC (apenas visual, não persiste) */}
+        <div className="flex bg-violet-50/40">
+          <div className="w-1 flex-shrink-0 bg-violet-500" />
+          <div className="px-4 py-3 flex-1">
+            <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest mb-1">
+              🎯 Intencionalidade Pedagógica
+            </p>
+            {(() => {
+              const apiVal = objetivo.intencionalidadePedagogica?.trim();
+              if (apiVal) {
+                return <p className="text-sm text-violet-900 leading-relaxed font-medium">{apiVal}</p>;
+              }
+              const fbVal = resolverIntencionalidadeFallback(
+                objetivo.codigoBNCC ?? null,
+                segmento ?? null,
+              );
+              if (fbVal) {
+                return (
+                  <>
+                    <p className="text-sm text-violet-800 leading-relaxed">{fbVal}</p>
+                    <p className="text-[10px] text-violet-400 italic mt-1">💡 Sugestão local — aguardando cadastro pela coordenação</p>
+                  </>
+                );
+              }
+              return <p className="text-xs text-violet-400 italic">Aguardando preenchimento pela coordenação</p>;
+            })()}
+          </div>
+        </div>
+
+        {/* ── Campo 4: Exemplo de Atividade ── borda lateral esmeralda (só para coordenação) */}
+        {objetivo.exemploAtividade !== undefined && (
+          <div className="flex bg-emerald-50/40">
+            <div className="w-1 flex-shrink-0 bg-emerald-500" />
+            <div className="px-4 py-3 flex-1">
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
+                ✨ Exemplo de Atividade
+              </p>
+              {objetivo.exemploAtividade
+                ? <p className="text-sm text-emerald-900 leading-relaxed">{objetivo.exemploAtividade}</p>
+                : <p className="text-xs text-emerald-400 italic">Não cadastrado</p>
+              }
+            </div>
           </div>
         )}
       </div>
