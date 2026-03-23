@@ -890,8 +890,10 @@ export class MaterialRequestService {
           quantidade: quantidadeNormalizada,
           status: r.status,
           prioridade: r.priority,
+          classroomId: r.classroomId || null,
           turma: r.classroom?.name || null,
           unidade: r.unit?.name || null,
+          teacherId: r.createdBy || null,
           professor: r.createdByUser
             ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
             : null,

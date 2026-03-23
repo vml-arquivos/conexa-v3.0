@@ -320,27 +320,45 @@ export default function RelatorioConsumoMateriaisPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleFiltrar}>
-            {/* Linha 1: Data Início, Data Fim, Turma, Professor */}
+            {/* Linha 1: Turma, Professor (auto-preenchido), Tipo de Consumo, Status */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Início</Label>
-                <Input type="date" value={filtros.dataInicio}
-                  onChange={e => setFiltros(f => ({ ...f, dataInicio: e.target.value }))}
-                  className="h-9 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Fim</Label>
-                <Input type="date" value={filtros.dataFim}
-                  onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))}
-                  className="h-9 text-sm" />
-              </div>
               <div>
                 <Label className="text-xs font-semibold text-gray-600 mb-1 block">
                   Turma {loadingLookup && <span className="text-gray-400 font-normal">(carregando...)</span>}
                 </Label>
                 <select
                   value={filtros.classroomId}
-                  onChange={e => setFiltros(f => ({ ...f, classroomId: e.target.value }))}
+                  onChange={e => {
+                    const newClassroomId = e.target.value;
+                    // Auto-preencher professor: buscar nos detalhes já carregados o professor único da turma
+                    let autoProfessorId = '';
+                    if (newClassroomId && relatorio?.detalhes) {
+                      // Prioridade 1: usar teacherId direto dos detalhes (campo adicionado no backend)
+                      const teacherIds = [...new Set(
+                        relatorio.detalhes
+                          .filter((d: any) => d.classroomId === newClassroomId)
+                          .map((d: any) => d.teacherId)
+                          .filter(Boolean)
+                      )];
+                      if (teacherIds.length === 1) {
+                        autoProfessorId = teacherIds[0] as string;
+                      } else if (teacherIds.length === 0) {
+                        // Fallback: comparar pelo nome da turma
+                        const turmaNome = turmas.find(t => t.id === newClassroomId)?.name ?? turmas.find(t => t.id === newClassroomId)?.nome ?? '';
+                        const profNomes = [...new Set(
+                          relatorio.detalhes
+                            .filter((d: any) => d.turma === turmaNome)
+                            .map((d: any) => d.professor)
+                            .filter(Boolean)
+                        )];
+                        if (profNomes.length === 1) {
+                          const profEncontrado = professores.find(p => (p.name ?? p.nome ?? '') === profNomes[0]);
+                          if (profEncontrado) autoProfessorId = profEncontrado.id;
+                        }
+                      }
+                    }
+                    setFiltros(f => ({ ...f, classroomId: newClassroomId, teacherId: autoProfessorId }));
+                  }}
                   className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">Todas as turmas</option>
                   {turmas.map(t => (
@@ -362,10 +380,6 @@ export default function RelatorioConsumoMateriaisPage() {
                   ))}
                 </select>
               </div>
-            </div>
-
-            {/* Linha 2: Tipo de Consumo, Status, Botão */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
               <div>
                 <Label className="text-xs font-semibold text-gray-600 mb-1 block">Tipo de Consumo</Label>
                 <select value={filtros.type}
@@ -394,6 +408,22 @@ export default function RelatorioConsumoMateriaisPage() {
                   <option value="ENTREGUE">Entregue</option>
                   <option value="RASCUNHO">Rascunho</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Linha 2: Data Início, Data Fim, Botão */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Início</Label>
+                <Input type="date" value={filtros.dataInicio}
+                  onChange={e => setFiltros(f => ({ ...f, dataInicio: e.target.value }))}
+                  className="h-9 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Fim</Label>
+                <Input type="date" value={filtros.dataFim}
+                  onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))}
+                  className="h-9 text-sm" />
               </div>
               <div className="lg:col-span-2 flex items-end">
                 <Button type="submit" disabled={loading} className="w-full h-9 bg-indigo-600 hover:bg-indigo-700 text-white">
