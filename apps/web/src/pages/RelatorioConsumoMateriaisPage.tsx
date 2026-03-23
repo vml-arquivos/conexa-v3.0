@@ -109,6 +109,9 @@ export default function RelatorioConsumoMateriaisPage() {
   const [filtros, setFiltros] = useState({
     dataInicio: '',
     dataFim: '',
+    // FIX P0: novos filtros
+    status: '',
+    type: '',
   });
 
   const carregarRelatorio = useCallback(async () => {
@@ -117,9 +120,13 @@ export default function RelatorioConsumoMateriaisPage() {
       const params = new URLSearchParams();
       if (filtros.dataInicio) params.set('dataInicio', filtros.dataInicio);
       if (filtros.dataFim) params.set('dataFim', filtros.dataFim);
+      // FIX P0: enviar filtros de status e type ao backend
+      if (filtros.status) params.set('status', filtros.status);
+      if (filtros.type) params.set('type', filtros.type);
       if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
       const res = await http.get(`/material-requests/relatorio-consumo?${params.toString()}`);
       const raw = res.data ?? {};
+      // FIX P0: todos os cards/agregações/tabela vêm do mesmo payload filtrado
       setRelatorio({
         periodo: raw.periodo ?? { inicio: null, fim: null },
         // Backend retorna campos flat (total, aprovados, pendentes, rejeitados, entregues)
@@ -142,7 +149,7 @@ export default function RelatorioConsumoMateriaisPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtros.dataInicio, filtros.dataFim, selectedUnitId, isCentral]);
+  }, [filtros.dataInicio, filtros.dataFim, filtros.status, filtros.type, selectedUnitId, isCentral]);
 
   // Carregar automaticamente ao montar e quando unidade muda
   useEffect(() => {
@@ -193,15 +200,15 @@ export default function RelatorioConsumoMateriaisPage() {
         </div>
       )}
 
-      {/* Filtros de período */}
+      {/* FIX P0: Filtros de período + categoria + status */}
       <Card className="border border-gray-200 mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-700 text-base">
-            <Filter className="h-4 w-4" /> Filtros de Período
+            <Filter className="h-4 w-4" /> Filtros
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
               <Label>Data Início</Label>
               <Input
@@ -218,6 +225,41 @@ export default function RelatorioConsumoMateriaisPage() {
                 onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))}
               />
             </div>
+            {/* FIX P0: filtro por categoria */}
+            <div>
+              <Label>Categoria</Label>
+              <select
+                value={filtros.type}
+                onChange={e => setFiltros(f => ({ ...f, type: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              >
+                <option value="">Todas as categorias</option>
+                <option value="PEDAGOGICO">Pedagógico</option>
+                <option value="HIGIENE">Higiene Pessoal</option>
+                <option value="LIMPEZA">Limpeza</option>
+                <option value="ALIMENTACAO">Alimentação</option>
+                <option value="CONSUMIVEL">Consumível</option>
+                <option value="PERMANENTE">Permanente</option>
+                <option value="OUTRO">Outros</option>
+              </select>
+            </div>
+            {/* FIX P0: filtro por status */}
+            <div>
+              <Label>Status</Label>
+              <select
+                value={filtros.status}
+                onChange={e => setFiltros(f => ({ ...f, status: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+              >
+                <option value="">Todos os status</option>
+                <option value="SOLICITADO">Solicitado</option>
+                <option value="EM_ANALISE">Em Análise</option>
+                <option value="APROVADO">Aprovado</option>
+                <option value="REJEITADO">Rejeitado</option>
+                <option value="ENTREGUE">Entregue</option>
+                <option value="RASCUNHO">Rascunho</option>
+              </select>
+            </div>
             <div className="flex items-end">
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <BarChart2 className="h-4 w-4 mr-2" />}
@@ -225,6 +267,23 @@ export default function RelatorioConsumoMateriaisPage() {
               </Button>
             </div>
           </form>
+          {/* Indicador de filtros ativos */}
+          {(filtros.status || filtros.type) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {filtros.type && (
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  Categoria: <strong>{TIPO_LABEL[filtros.type] ?? filtros.type}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, type: '' }))} className="ml-1 hover:text-blue-900">×</button>
+                </span>
+              )}
+              {filtros.status && (
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  Status: <strong>{STATUS_LABEL[filtros.status]?.label ?? filtros.status}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, status: '' }))} className="ml-1 hover:text-purple-900">×</button>
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

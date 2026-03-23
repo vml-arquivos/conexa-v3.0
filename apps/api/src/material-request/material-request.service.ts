@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreateMaterialRequestDto, MaterialRequestTypeInput } from './dto/create-material-request.dto';
@@ -719,9 +719,28 @@ export class MaterialRequestService {
 
   async relatorioConsumo(
     user: JwtPayload,
-    params: { classroomId?: string; dataInicio?: string; dataFim?: string; unitId?: string; teacherId?: string },
+    params: {
+      classroomId?: string;
+      dataInicio?: string;
+      dataFim?: string;
+      unitId?: string;
+      teacherId?: string;
+      // FIX P0: novos filtros opcionais
+      status?: string;
+      type?: string;
+    },
   ) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    // FIX P0: validação de filtros inválidos → 400 controlado, nunca 500
+    const STATUS_VALIDOS = ['SOLICITADO', 'RASCUNHO', 'EM_ANALISE', 'APROVADO', 'REJEITADO', 'ENTREGUE'];
+    const TYPES_VALIDOS = ['PEDAGOGICO', 'HIGIENE', 'LIMPEZA', 'ALIMENTACAO', 'CONSUMIVEL', 'PERMANENTE', 'OUTRO'];
+    if (params.status && !STATUS_VALIDOS.includes(params.status.toUpperCase())) {
+      throw new BadRequestException(`Status inválido: ${params.status}. Valores aceitos: ${STATUS_VALIDOS.join(', ')}`);
+    }
+    if (params.type && !TYPES_VALIDOS.includes(params.type.toUpperCase())) {
+      throw new BadRequestException(`Tipo inválido: ${params.type}. Valores aceitos: ${TYPES_VALIDOS.join(', ')}`);
+    }
 
     const where: Record<string, unknown> = { mantenedoraId: user.mantenedoraId };
 
@@ -734,6 +753,10 @@ export class MaterialRequestService {
 
     if (params.classroomId) where.classroomId = params.classroomId;
     if (params.teacherId) where.createdBy = params.teacherId;
+    // FIX P0: aplicar filtros de status e type na query
+    if (params.status) where.status = params.status.toUpperCase();
+    if (params.type) where.type = params.type.toUpperCase();
+
     if (params.dataInicio || params.dataFim) {
       const dateFilter: Record<string, Date> = {};
       const tz = 'America/Sao_Paulo';
@@ -753,25 +776,50 @@ export class MaterialRequestService {
       orderBy: { requestedDate: 'desc' },
     });
 
-    const porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number }> = {};
+    // ─── FIX P0: Helper de normalização unificado ────────────────────────────
+    // Regra única compartilhada por KPI, porCategoria, porStatus, serieMensal e tabela:
+    // Se existir items com itens válidos → usa soma(items); senão → usa campos diretos
+    function normalizarReq(r: (typeof requisicoes)[0]): { qtd: number; custo: number } {
+      const itemsArr = (r as any).items ?? [];
+      if (itemsArr.length > 0) {
+        const qtd = itemsArr.reduce((s: number, i: any) => s + (Number(i.quantity) || 0), 0);
+        const custo = itemsArr.reduce((s: number, i: any) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+        return { qtd, custo };
+      }
+      return {
+        qtd: Number(r.quantity) || 0,
+        custo: Number(r.estimatedCost) || 0,
+      };
+    }
+
+    // ─── Agregações — todas usam a mesma coleção filtrada + normalizarReq ───
+    const porCategoria: Record<string, { total: number; aprovados: number; pendentes: number; rejeitados: number; quantidade: number; custo: number }> = {};
     const porTurmaMap: Record<string, { nome: string; total: number; aprovados: number }> = {};
     const porUnidadeMap: Record<string, { nome: string; total: number; aprovados: number; pendentes: number }> = {};
     const porStatus: Record<string, number> = {};
     let custoEstimadoTotal = 0;
+    let quantidadeTotal = 0;
 
     for (const r of requisicoes) {
-      if (!porCategoria[r.type]) porCategoria[r.type] = { total: 0, aprovados: 0, pendentes: 0, rejeitados: 0 };
+      const { qtd, custo } = normalizarReq(r);
+
+      // porCategoria
+      if (!porCategoria[r.type]) porCategoria[r.type] = { total: 0, aprovados: 0, pendentes: 0, rejeitados: 0, quantidade: 0, custo: 0 };
       porCategoria[r.type].total++;
+      porCategoria[r.type].quantidade += qtd;
+      porCategoria[r.type].custo += custo;
       if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porCategoria[r.type].aprovados++;
       else if (r.status === 'REJEITADO') porCategoria[r.type].rejeitados++;
       else porCategoria[r.type].pendentes++;
 
+      // porTurma — apenas quando há classroomId real
       if (r.classroomId && r.classroom) {
         if (!porTurmaMap[r.classroomId]) porTurmaMap[r.classroomId] = { nome: r.classroom.name, total: 0, aprovados: 0 };
         porTurmaMap[r.classroomId].total++;
         if (r.status === 'APROVADO' || r.status === 'ENTREGUE') porTurmaMap[r.classroomId].aprovados++;
       }
 
+      // porUnidade
       if (r.unitId && r.unit) {
         if (!porUnidadeMap[r.unitId]) porUnidadeMap[r.unitId] = { nome: r.unit.name, total: 0, aprovados: 0, pendentes: 0 };
         porUnidadeMap[r.unitId].total++;
@@ -779,14 +827,19 @@ export class MaterialRequestService {
         else if (r.status === 'SOLICITADO' || r.status === 'RASCUNHO') porUnidadeMap[r.unitId].pendentes++;
       }
 
+      // porStatus
       porStatus[r.status] = (porStatus[r.status] || 0) + 1;
-      if (r.estimatedCost) custoEstimadoTotal += r.estimatedCost;
+
+      // KPI — FIX P0: usa normalizarReq (mesma base das agregações)
+      custoEstimadoTotal += custo;
+      quantidadeTotal += qtd;
     }
 
-    // ─── Série mensal ────────────────────────────────────────────────────────────
+    // ─── Série mensal ────────────────────────────────────────────────────────
     const serieMensalMap: Record<string, { mes: string; requisicoes: number; aprovadas: number; pendentes: number; rejeitadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
     const porProfessorMap: Record<string, { teacherId: string; nome: string; requisicoes: number; aprovadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
     for (const r of requisicoes) {
+      const { qtd: qtdItens, custo: custoItens } = normalizarReq(r);
       const d = new Date(r.requestedDate);
       const mes = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
       if (!serieMensalMap[mes]) serieMensalMap[mes] = { mes, requisicoes: 0, aprovadas: 0, pendentes: 0, rejeitadas: 0, entregues: 0, custoEstimado: 0, itens: 0 };
@@ -795,9 +848,6 @@ export class MaterialRequestService {
       else if (r.status === 'ENTREGUE') { serieMensalMap[mes].aprovadas++; serieMensalMap[mes].entregues++; }
       else if (r.status === 'REJEITADO') serieMensalMap[mes].rejeitadas++;
       else serieMensalMap[mes].pendentes++;
-      const itemsArr = (r as any).items ?? [];
-      const qtdItens = itemsArr.length > 0 ? itemsArr.reduce((s: number, i: any) => s + (i.quantity ?? 0), 0) : (r.quantity ?? 0);
-      const custoItens = itemsArr.length > 0 ? itemsArr.reduce((s: number, i: any) => s + ((i.unitPrice ?? 0) * (i.quantity ?? 0)), 0) : (r.estimatedCost ?? 0);
       serieMensalMap[mes].itens += qtdItens;
       serieMensalMap[mes].custoEstimado += custoItens;
       // Por professor
@@ -816,34 +866,46 @@ export class MaterialRequestService {
 
     return {
       periodo: { inicio: params.dataInicio || null, fim: params.dataFim || null },
+      filtros: {
+        status: params.status?.toUpperCase() || null,
+        type: params.type?.toUpperCase() || null,
+      },
       escopo: params.unitId ? 'unidade' : (isCentralRole(user) ? 'rede' : 'unidade'),
+      // FIX P0: KPI agora usa a mesma base normalizada das agregações
       total: requisicoes.length,
+      quantidadeTotal,
       aprovados: (porStatus['APROVADO'] || 0) + (porStatus['ENTREGUE'] || 0),
       pendentes: (porStatus['SOLICITADO'] || 0) + (porStatus['RASCUNHO'] || 0) + (porStatus['EM_ANALISE'] || 0),
       rejeitados: porStatus['REJEITADO'] || 0,
       entregues: porStatus['ENTREGUE'] || 0,
       custoEstimadoTotal: Math.round(custoEstimadoTotal * 100) / 100,
-      porCategoria,
+      porCategoria: Object.fromEntries(
+        Object.entries(porCategoria).map(([k, v]) => [k, { ...v, custo: Math.round(v.custo * 100) / 100 }])
+      ),
       porTurma: Object.values(porTurmaMap),
       porUnidade: Object.values(porUnidadeMap),
       porStatus,
-      detalhes: requisicoes.map(r => ({
-        id: r.id,
-        code: r.code,
-        titulo: r.title,
-        tipo: r.type,
-        quantidade: r.quantity,
-        status: r.status,
-        prioridade: r.priority,
-        turma: r.classroom?.name || null,
-        unidade: r.unit?.name || null,
-        professor: r.createdByUser
-          ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
-          : null,
-        custoEstimado: r.estimatedCost,
-        dataSolicitacao: r.requestedDate,
-        dataAprovacao: r.approvedDate,
-      })),
+      // FIX P0: tabela de detalhes usa quantidadeNormalizada (mesma base das agregações)
+      detalhes: requisicoes.map(r => {
+        const { qtd: quantidadeNormalizada, custo: custoNormalizado } = normalizarReq(r);
+        return {
+          id: r.id,
+          code: r.code,
+          titulo: r.title,
+          tipo: r.type,
+          quantidade: quantidadeNormalizada,
+          status: r.status,
+          prioridade: r.priority,
+          turma: r.classroom?.name || null,
+          unidade: r.unit?.name || null,
+          professor: r.createdByUser
+            ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
+            : null,
+          custoEstimado: Math.round(custoNormalizado * 100) / 100,
+          dataSolicitacao: r.requestedDate,
+          dataAprovacao: r.approvedDate,
+        };
+      }),
       serieMensal,
       porProfessor,
     };
