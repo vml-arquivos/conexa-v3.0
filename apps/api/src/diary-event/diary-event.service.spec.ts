@@ -15,7 +15,8 @@ describe('DiaryEventService - Ocorrências', () => {
     planning: { findUnique: jest.fn() },
     curriculumMatrixEntry: { findUnique: jest.fn() },
     diaryEvent: { create: jest.fn().mockResolvedValue({ id: 'event-1' }) },
-    classroomTeacher: { findFirst: jest.fn().mockResolvedValue({ id: 'ct-1' }) }
+    classroomTeacher: { findFirst: jest.fn().mockResolvedValue({ id: 'ct-1' }) },
+    enrollment: { findFirst: jest.fn().mockResolvedValue({ classroomId: 'class-1' }) },
   };
   
   const mockAuditService = { logCreate: jest.fn() };
