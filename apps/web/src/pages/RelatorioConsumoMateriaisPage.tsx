@@ -158,7 +158,10 @@ export default function RelatorioConsumoMateriaisPage() {
     setLoadingLookup(true);
     try {
       const params = new URLSearchParams();
-      if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
+      // Para usuários centrais: usa selectedUnitId do contexto
+      // Para usuários de unidade: usa user.unitId do JWT (sempre disponível)
+      const unitIdParaLookup = isCentral ? selectedUnitId : (user?.unitId ?? '');
+      if (unitIdParaLookup) params.set('unitId', unitIdParaLookup);
       const [turmasRes, professoresRes] = await Promise.all([
         http.get(`/lookup/classrooms/accessible?${params.toString()}`).catch(() => ({ data: [] })),
         http.get(`/lookup/teachers/accessible?${params.toString()}`).catch(() => ({ data: [] })),
@@ -170,7 +173,7 @@ export default function RelatorioConsumoMateriaisPage() {
     } finally {
       setLoadingLookup(false);
     }
-  }, [isCentral, selectedUnitId]);
+  }, [isCentral, selectedUnitId, user?.unitId]);
 
   useEffect(() => { carregarLookups(); }, [carregarLookups]);
 
@@ -223,6 +226,37 @@ export default function RelatorioConsumoMateriaisPage() {
     const segunda  = s.slice(mid).reduce((a, b) => a + b.requisicoes, 0);
     if (primeira === 0) return null;
     return Math.round(((segunda - primeira) / primeira) * 100);
+  })();
+
+  // ── Fallback: derivar porTurma e porProfessor dos detalhes quando backend retorna vazio ──
+  const porTurmaEfetivo: PorTurma[] = (() => {
+    if (relatorio?.porTurma && relatorio.porTurma.length > 0) return relatorio.porTurma;
+    if (!relatorio?.detalhes) return [];
+    const map: Record<string, PorTurma> = {};
+    for (const d of relatorio.detalhes) {
+      if (!d.turma) continue;
+      if (!map[d.turma]) map[d.turma] = { nome: d.turma, total: 0, aprovados: 0 };
+      map[d.turma].total++;
+      if (d.status === 'APROVADO' || d.status === 'ENTREGUE') map[d.turma].aprovados++;
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  })();
+
+  const porProfessorEfetivo: PorProfessor[] = (() => {
+    if (relatorio?.porProfessor && relatorio.porProfessor.length > 0) return relatorio.porProfessor;
+    if (!relatorio?.detalhes) return [];
+    const map: Record<string, PorProfessor> = {};
+    for (const d of relatorio.detalhes) {
+      if (!d.professor) continue;
+      if (!map[d.professor]) map[d.professor] = { teacherId: d.professor, nome: d.professor, requisicoes: 0, aprovadas: 0, entregues: 0, custoEstimado: 0, itens: 0 };
+      map[d.professor].requisicoes++;
+      map[d.professor].itens += d.quantidade ?? 0;
+      map[d.professor].custoEstimado += d.custoEstimado ?? 0;
+      if (d.status === 'APROVADO' || d.status === 'ENTREGUE') map[d.professor].aprovadas++;
+      if (d.status === 'ENTREGUE') map[d.professor].entregues++;
+    }
+    return Object.values(map).sort((a, b) => b.requisicoes - a.requisicoes).slice(0, 10)
+      .map(p => ({ ...p, custoEstimado: Math.round(p.custoEstimado * 100) / 100 }));
   })();
 
   // Top categorias por custo
@@ -447,7 +481,7 @@ export default function RelatorioConsumoMateriaisPage() {
                 sub={`${pct(relatorio.pendentes, relatorio.total)}% do total`} color="border-yellow-200" />
             </div>
             <div className="col-span-1">
-              <KpiCard icon={Users} label="Professores" value={fmt(relatorio.porProfessor?.length ?? 0)}
+              <KpiCard icon={Users} label="Professores" value={fmt(porProfessorEfetivo.length)}
                 sub="com requisições" color="border-teal-200" />
             </div>
           </div>
@@ -621,7 +655,7 @@ export default function RelatorioConsumoMateriaisPage() {
           {/* ── ABA: POR TURMA ───────────────────────────────────────────────── */}
           {(activeTab as string) === 'turmas' && (
             <div className="space-y-6">
-              {relatorio.porTurma.length === 0 ? (
+              {porTurmaEfetivo.length === 0 ? (
                 <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                   <BookOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-500 font-medium">Nenhum dado de turma disponível</p>
@@ -633,12 +667,12 @@ export default function RelatorioConsumoMateriaisPage() {
                     <CardHeader>
                       <CardTitle className="text-base text-gray-700 flex items-center gap-2">
                         <BookOpen className="h-4 w-4 text-teal-500" /> Consumo por Turma
-                        <span className="text-xs font-normal text-gray-400 ml-auto">{relatorio.porTurma.length} turmas</span>
+                        <span className="text-xs font-normal text-gray-400 ml-auto">{porTurmaEfetivo.length} turmas</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={Math.max(160, relatorio.porTurma.length * 40)}>
-                        <BarChart data={relatorio.porTurma} layout="vertical" margin={{ top: 0, right: 20, left: 100, bottom: 0 }}>
+                      <ResponsiveContainer width="100%" height={Math.max(160, porTurmaEfetivo.length * 40)}>
+                        <BarChart data={porTurmaEfetivo} layout="vertical" margin={{ top: 0, right: 20, left: 100, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                           <XAxis type="number" tick={{ fontSize: 11 }} />
                           <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={100} />
@@ -664,7 +698,7 @@ export default function RelatorioConsumoMateriaisPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {relatorio.porTurma.sort((a, b) => b.total - a.total).map((t, i) => (
+                          {porTurmaEfetivo.sort((a, b) => b.total - a.total).map((t, i) => (
                             <tr key={i} className="hover:bg-gray-50 transition-colors">
                               <td className="py-2 px-4 text-gray-700 font-medium">{t.nome}</td>
                               <td className="py-2 px-4 text-gray-700 text-right">{fmt(t.total)}</td>
@@ -688,7 +722,7 @@ export default function RelatorioConsumoMateriaisPage() {
           {/* ── ABA: POR PROFESSOR ───────────────────────────────────────────── */}
           {(activeTab as string) === 'professores' && (
             <div className="space-y-6">
-              {(!relatorio.porProfessor || relatorio.porProfessor.length === 0) ? (
+              {(porProfessorEfetivo.length === 0) ? (
                 <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                   <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                   <p className="text-gray-500 font-medium">Nenhum dado de professor disponível</p>
@@ -700,12 +734,12 @@ export default function RelatorioConsumoMateriaisPage() {
                     <CardHeader>
                       <CardTitle className="text-base text-gray-700 flex items-center gap-2">
                         <Users className="h-4 w-4 text-indigo-500" /> Top Professores por Consumo
-                        <span className="text-xs font-normal text-gray-400 ml-auto">{relatorio.porProfessor.length} professores</span>
+                        <span className="text-xs font-normal text-gray-400 ml-auto">{porProfessorEfetivo.length} professores</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {relatorio.porProfessor.map((p, i) => {
+                        {porProfessorEfetivo.map((p, i) => {
                           const pctAprov = pct(p.aprovadas, p.requisicoes);
                           return (
                             <div key={p.teacherId} className="flex items-center gap-3">
@@ -716,7 +750,7 @@ export default function RelatorioConsumoMateriaisPage() {
                                   <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{fmt(p.requisicoes)} req.</span>
                                 </div>
                                 <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct(p.requisicoes, relatorio.porProfessor[0].requisicoes)}%` }} />
+                                  <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct(p.requisicoes, porProfessorEfetivo[0].requisicoes)}%` }} />
                                 </div>
                               </div>
                               <div className="text-right flex-shrink-0">
@@ -745,7 +779,7 @@ export default function RelatorioConsumoMateriaisPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {relatorio.porProfessor.map((p, i) => (
+                          {porProfessorEfetivo.map((p, i) => (
                             <tr key={p.teacherId} className="hover:bg-gray-50 transition-colors">
                               <td className="py-2 px-4 text-gray-400 text-xs">{i + 1}</td>
                               <td className="py-2 px-4 text-gray-700 font-medium">{p.nome}</td>
