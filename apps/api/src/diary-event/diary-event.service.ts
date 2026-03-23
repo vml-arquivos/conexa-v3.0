@@ -266,10 +266,24 @@ export class DiaryEventService {
     }
 
     if (query.childId) where.childId = query.childId;
-    if (query.classroomId) where.classroomId = query.classroomId;
+    // Quando o escopo já usa OR (professor), não sobrescrever com classroomId raiz.
+    // Em vez disso, restringir o OR para incluir apenas a turma solicitada.
+    if (query.classroomId) {
+      if (where.OR) {
+        // Intersectar: manter o OR mas adicionar classroomId como condição AND
+        where.AND = [{ OR: where.OR }, { classroomId: query.classroomId }];
+        delete where.OR;
+      } else {
+        where.classroomId = query.classroomId;
+      }
+    }
     if (query.unitId) where.unitId = query.unitId;
     if (query.type) where.type = query.type;
     if (query.createdBy) where.createdBy = query.createdBy;
+    // Suporte a filtro por tag contida no array JSON (ex: tag=ocorrencia)
+    if (query.tag) {
+      where.tags = { array_contains: query.tag };
+    }
 
     if (query.startDate || query.endDate) {
       where.eventDate = {};

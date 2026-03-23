@@ -29,4 +29,9 @@ export class QueryDiaryEventDto {
   @IsString()
   @IsOptional()
   createdBy?: string;
+
+  /** Filtrar por tag contida no array JSON (ex: tag=ocorrencia) */
+  @IsString()
+  @IsOptional()
+  tag?: string;
 }

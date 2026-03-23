@@ -334,18 +334,13 @@ export default function DiarioBordoPage() {
   async function loadOcorrencias(childIdParam?: string) {
     setLoadingOcorr(true);
     try {
-      const params: Record<string, string> = { limit: '50' };
+      const params: Record<string, string> = { limit: '100', tag: 'ocorrencia' };
       if (childIdParam) params.childId = childIdParam;
       if (classroomId) params.classroomId = classroomId;
-      // Ocorrências são DiaryEvents com tipos de ocorrência
-      params.type = 'COMPORTAMENTO,SAUDE,FAMILIA,OUTRO,OBSERVACAO';
       const res = await http.get('/diary-events', { params });
       const lista = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-      // Filtrar apenas eventos que têm a tag 'ocorrencia'
-      const ocorr = lista.filter((e: any) => {
-        const tags = Array.isArray(e.tags) ? e.tags : [];
-        return tags.includes('ocorrencia');
-      });
+      // O servidor já filtra por tag=ocorrencia; mapear diretamente
+      const ocorr = lista;
       setOcorrencias(ocorr.map((e: any) => ({
         id: e.id,
         childId: e.childId,

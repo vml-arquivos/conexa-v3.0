@@ -85,7 +85,7 @@ export function OcorrenciasPanel({
     try {
       const hoje = getPedagogicalToday();
       const params: Record<string, string> = {
-        type: 'OBSERVACAO',
+        tag: 'ocorrencia',
         limit: '200',
       };
       if (unitId) params.unitId = unitId;
@@ -103,11 +103,8 @@ export function OcorrenciasPanel({
       }
       const res = await http.get('/diary-events', { params });
       const raw: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
-      // Filtrar apenas eventos com tag 'ocorrencia'
-      const ocorrs = raw.filter((e: any) =>
-        Array.isArray(e.tags) && e.tags.includes('ocorrencia')
-      );
-      setOcorrencias(ocorrs);
+      // O servidor já filtra por tag=ocorrencia
+      setOcorrencias(raw);
     } catch {
       setOcorrencias([]);
     } finally {

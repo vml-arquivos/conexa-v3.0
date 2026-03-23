@@ -853,8 +853,19 @@ export default function PlanoDeAulaNovoPage() {
                   max={31}
                   value={numDays}
                   onChange={e => {
-                    const v = Math.max(1, Math.min(31, Number(e.target.value) || 1));
-                    setNumDays(v);
+                    // Permitir campo vazio durante a digitação
+                    const raw = e.target.value;
+                    if (raw === '' || raw === '0') {
+                      setNumDays('' as any);
+                      return;
+                    }
+                    const v = Math.min(31, parseInt(raw, 10));
+                    if (!isNaN(v) && v >= 1) setNumDays(v);
+                  }}
+                  onBlur={e => {
+                    // Ao sair do campo, garantir valor válido
+                    const v = parseInt(e.target.value, 10);
+                    setNumDays(isNaN(v) || v < 1 ? 1 : Math.min(31, v));
                   }}
                   disabled={bloqueado}
                 />
