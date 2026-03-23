@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getAccessibleClassrooms, getAccessibleTeachers } from '../api/lookup';
-import type { AccessibleClassroom, AccessibleTeacher } from '../types/lookup';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -17,7 +15,7 @@ import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
 import {
   BarChart2, ShoppingCart, CheckCircle, XCircle,
   Clock, Package, RefreshCw, Filter, TrendingUp, TrendingDown,
-  Users, BookOpen, DollarSign, Activity,
+  Users, BookOpen, DollarSign, Activity, X,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -37,7 +35,6 @@ interface Detalhe {
   status: string; prioridade: string; turma: string | null; professor: string | null;
   unidade: string | null; custoEstimado: number | null; dataSolicitacao: string; dataAprovacao: string | null;
 }
-interface PorItem { nome: string; total: number; quantidade: number; custo: number; }
 interface RelatorioData {
   periodo: RelatorioPeriodo;
   total: number;
@@ -55,12 +52,12 @@ interface RelatorioData {
   detalhes: Detalhe[];
   filtros: { status: string | null; type: string | null };
   escopo: string;
-  porItem?: PorItem[];
 }
+interface LookupItem { id: string; name?: string; nome?: string; code?: string; }
 
 // ─── Labels e Cores ───────────────────────────────────────────────────────────
 const TIPO_LABEL: Record<string, string> = {
-  PEDAGOGICO: 'Pedagógico', HIGIENE: 'Higiene', HIGIENE_PESSOAL: 'Higiene',
+  PEDAGOGICO: 'Pedagógico', HIGIENE: 'Higiene', HIGIENE_PESSOAL: 'Higiene Pessoal',
   LIMPEZA: 'Limpeza', ALIMENTACAO: 'Alimentação', CONSUMIVEL: 'Consumível',
   PERMANENTE: 'Permanente', OUTRO: 'Outros', OUTROS: 'Outros',
 };
@@ -140,21 +137,42 @@ export default function RelatorioConsumoMateriaisPage() {
   const selectedUnitId = ctxUnitId ?? '';
   const [loading, setLoading] = useState(false);
   const [relatorio, setRelatorio] = useState<RelatorioData | null>(null);
-  const [filtros, setFiltros] = useState({ dataInicio: '', dataFim: '', status: '', type: '', classroomId: '', teacherId: '' });
   const [activeTab, setActiveTab] = useState<'overview' | 'graficos' | 'detalhes'>('overview');
 
-  // Lookup de turmas e professores para filtros
-  const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
-  const [professores, setProfessores] = useState<AccessibleTeacher[]>([]);
+  // ── Filtros ──────────────────────────────────────────────────────────────────
+  const [filtros, setFiltros] = useState({
+    dataInicio: '',
+    dataFim: '',
+    status: '',
+    type: '',
+    classroomId: '',
+    teacherId: '',
+  });
 
-  useEffect(() => {
-    getAccessibleClassrooms(selectedUnitId || undefined)
-      .then(setTurmas)
-      .catch(() => setTurmas([]));
-    getAccessibleTeachers(selectedUnitId || undefined)
-      .then(setProfessores)
-      .catch(() => setProfessores([]));
-  }, [selectedUnitId]);
+  // ── Lookup: Turmas e Professores ─────────────────────────────────────────────
+  const [turmas, setTurmas] = useState<LookupItem[]>([]);
+  const [professores, setProfessores] = useState<LookupItem[]>([]);
+  const [loadingLookup, setLoadingLookup] = useState(false);
+
+  const carregarLookups = useCallback(async () => {
+    setLoadingLookup(true);
+    try {
+      const params = new URLSearchParams();
+      if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
+      const [turmasRes, professoresRes] = await Promise.all([
+        http.get(`/lookup/classrooms/accessible?${params.toString()}`).catch(() => ({ data: [] })),
+        http.get(`/lookup/teachers/accessible?${params.toString()}`).catch(() => ({ data: [] })),
+      ]);
+      setTurmas(Array.isArray(turmasRes.data) ? turmasRes.data : []);
+      setProfessores(Array.isArray(professoresRes.data) ? professoresRes.data : []);
+    } catch {
+      // silencioso — não bloqueia o dashboard
+    } finally {
+      setLoadingLookup(false);
+    }
+  }, [isCentral, selectedUnitId]);
+
+  useEffect(() => { carregarLookups(); }, [carregarLookups]);
 
   const carregarRelatorio = useCallback(async () => {
     setLoading(true);
@@ -164,23 +182,29 @@ export default function RelatorioConsumoMateriaisPage() {
       if (filtros.dataFim) params.set('dataFim', filtros.dataFim);
       if (filtros.status) params.set('status', filtros.status);
       if (filtros.type) params.set('type', filtros.type);
-      if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
       if (filtros.classroomId) params.set('classroomId', filtros.classroomId);
       if (filtros.teacherId) params.set('teacherId', filtros.teacherId);
+      if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
       const res = await http.get(`/material-requests/relatorio-consumo?${params.toString()}`);
       setRelatorio(res.data ?? null);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao carregar relatório');
+      const msg = err?.response?.data?.message || 'Erro ao carregar relatório';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [filtros.dataInicio, filtros.dataFim, filtros.status, filtros.type, filtros.classroomId, filtros.teacherId, selectedUnitId, isCentral]);
+  }, [filtros, selectedUnitId, isCentral]);
 
   useEffect(() => { carregarRelatorio(); }, [carregarRelatorio]);
 
   function handleFiltrar(e: React.FormEvent) { e.preventDefault(); carregarRelatorio(); }
+  function limparFiltros() {
+    setFiltros({ dataInicio: '', dataFim: '', status: '', type: '', classroomId: '', teacherId: '' });
+  }
 
   const unidadeNome = accessibleUnits.find(u => u.id === selectedUnitId)?.name;
+  const turmaAtiva = turmas.find(t => t.id === filtros.classroomId);
+  const professorAtivo = professores.find(p => p.id === filtros.teacherId);
 
   // ── Métricas analíticas derivadas ──────────────────────────────────────────
   const taxaAprovacao = relatorio ? pct(relatorio.aprovados, relatorio.total) : 0;
@@ -221,13 +245,16 @@ export default function RelatorioConsumoMateriaisPage() {
     mesLabel: fmtMes(s.mes),
   })) ?? [];
 
+  // Verifica se há filtros ativos
+  const filtrosAtivos = filtros.status || filtros.type || filtros.classroomId || filtros.teacherId || filtros.dataInicio || filtros.dataFim;
+
   return (
     <PageShell
       title="Dashboard de Consumo de Materiais"
       subtitle={
         isCentral
           ? selectedUnitId ? `Unidade: ${unidadeNome ?? selectedUnitId}` : 'Toda a rede'
-          : 'Análise gerencial de requisições por categoria, turma, professor e período'
+          : 'Análise gerencial de requisições por turma, professor, categoria e período'
       }
     >
       {/* Seletor de Unidade */}
@@ -242,83 +269,115 @@ export default function RelatorioConsumoMateriaisPage() {
         </div>
       )}
 
-      {/* Filtros */}
+      {/* ── Painel de Filtros ──────────────────────────────────────────────── */}
       <Card className="border border-gray-200 mb-6">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-700 text-base">
-            <Filter className="h-4 w-4" /> Filtros
+          <CardTitle className="flex items-center justify-between text-gray-700 text-base">
+            <span className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-indigo-500" /> Filtros
+            </span>
+            {filtrosAtivos && (
+              <button type="button" onClick={limparFiltros}
+                className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors">
+                <X className="h-3 w-3" /> Limpar filtros
+              </button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div>
-              <Label>Data Início</Label>
-              <Input type="date" value={filtros.dataInicio} onChange={e => setFiltros(f => ({ ...f, dataInicio: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Data Fim</Label>
-              <Input type="date" value={filtros.dataFim} onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))} />
-            </div>
-            {turmas.length > 0 && (
+          <form onSubmit={handleFiltrar}>
+            {/* Linha 1: Data Início, Data Fim, Turma, Professor */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div>
-                <Label>Turma</Label>
-                <select value={filtros.classroomId} onChange={e => setFiltros(f => ({ ...f, classroomId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Início</Label>
+                <Input type="date" value={filtros.dataInicio}
+                  onChange={e => setFiltros(f => ({ ...f, dataInicio: e.target.value }))}
+                  className="h-9 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Data Fim</Label>
+                <Input type="date" value={filtros.dataFim}
+                  onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))}
+                  className="h-9 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">
+                  Turma {loadingLookup && <span className="text-gray-400 font-normal">(carregando...)</span>}
+                </Label>
+                <select
+                  value={filtros.classroomId}
+                  onChange={e => setFiltros(f => ({ ...f, classroomId: e.target.value }))}
+                  className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">Todas as turmas</option>
-                  {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {turmas.map(t => (
+                    <option key={t.id} value={t.id}>{t.name ?? t.nome ?? t.code ?? t.id}</option>
+                  ))}
                 </select>
               </div>
-            )}
-            {professores.length > 0 && (
               <div>
-                <Label>Professor(a)</Label>
-                <select value={filtros.teacherId} onChange={e => setFiltros(f => ({ ...f, teacherId: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">
+                  Professor {loadingLookup && <span className="text-gray-400 font-normal">(carregando...)</span>}
+                </Label>
+                <select
+                  value={filtros.teacherId}
+                  onChange={e => setFiltros(f => ({ ...f, teacherId: e.target.value }))}
+                  className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                   <option value="">Todos os professores</option>
-                  {professores.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                  {professores.map(p => (
+                    <option key={p.id} value={p.id}>{p.name ?? p.nome ?? p.id}</option>
+                  ))}
                 </select>
               </div>
-            )}
-            <div>
-              <Label>Categoria</Label>
-              <select value={filtros.type} onChange={e => setFiltros(f => ({ ...f, type: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
-                <option value="">Todas as categorias</option>
-                <option value="PEDAGOGICO">Pedagógico</option>
-                <option value="HIGIENE">Higiene</option>
-                <option value="LIMPEZA">Limpeza</option>
-                <option value="ALIMENTACAO">Alimentação</option>
-                <option value="CONSUMIVEL">Consumível</option>
-                <option value="PERMANENTE">Permanente</option>
-                <option value="OUTRO">Outros</option>
-              </select>
             </div>
-            <div>
-              <Label>Status</Label>
-              <select value={filtros.status} onChange={e => setFiltros(f => ({ ...f, status: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
-                <option value="">Todos os status</option>
-                <option value="SOLICITADO">Solicitado</option>
-                <option value="EM_ANALISE">Em Análise</option>
-                <option value="APROVADO">Aprovado</option>
-                <option value="REJEITADO">Rejeitado</option>
-                <option value="ENTREGUE">Entregue</option>
-                <option value="RASCUNHO">Rascunho</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <BarChart2 className="h-4 w-4 mr-2" />}
-                Atualizar
-              </Button>
+
+            {/* Linha 2: Tipo de Consumo, Status, Botão */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Tipo de Consumo</Label>
+                <select value={filtros.type}
+                  onChange={e => setFiltros(f => ({ ...f, type: e.target.value }))}
+                  className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  <option value="">Todos os tipos</option>
+                  <option value="HIGIENE">🧴 Higiene Pessoal (fralda, shampoo, sabonete)</option>
+                  <option value="LIMPEZA">🧹 Limpeza</option>
+                  <option value="PEDAGOGICO">📚 Pedagógico</option>
+                  <option value="ALIMENTACAO">🍽️ Alimentação</option>
+                  <option value="CONSUMIVEL">📦 Consumível</option>
+                  <option value="PERMANENTE">🏫 Permanente</option>
+                  <option value="OUTRO">📋 Outros</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-gray-600 mb-1 block">Status</Label>
+                <select value={filtros.status}
+                  onChange={e => setFiltros(f => ({ ...f, status: e.target.value }))}
+                  className="w-full h-9 border border-gray-200 rounded-md px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                  <option value="">Todos os status</option>
+                  <option value="SOLICITADO">Solicitado</option>
+                  <option value="EM_ANALISE">Em Análise</option>
+                  <option value="APROVADO">Aprovado</option>
+                  <option value="REJEITADO">Rejeitado</option>
+                  <option value="ENTREGUE">Entregue</option>
+                  <option value="RASCUNHO">Rascunho</option>
+                </select>
+              </div>
+              <div className="lg:col-span-2 flex items-end">
+                <Button type="submit" disabled={loading} className="w-full h-9 bg-indigo-600 hover:bg-indigo-700 text-white">
+                  {loading
+                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Carregando...</>
+                    : <><BarChart2 className="h-4 w-4 mr-2" /> Atualizar Dashboard</>}
+                </Button>
+              </div>
             </div>
           </form>
-          {(filtros.status || filtros.type || filtros.classroomId || filtros.teacherId) && (
+
+          {/* Tags de filtros ativos */}
+          {filtrosAtivos && (
             <div className="mt-3 flex flex-wrap gap-2">
               {filtros.type && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1">
-                  Categoria: <strong>{TIPO_LABEL[filtros.type] ?? filtros.type}</strong>
-                  <button type="button" onClick={() => setFiltros(f => ({ ...f, type: '' }))} className="ml-1 hover:text-blue-900">×</button>
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  Tipo: <strong>{TIPO_LABEL[filtros.type] ?? filtros.type}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, type: '' }))} className="ml-1 hover:text-indigo-900">×</button>
                 </span>
               )}
               {filtros.status && (
@@ -327,16 +386,28 @@ export default function RelatorioConsumoMateriaisPage() {
                   <button type="button" onClick={() => setFiltros(f => ({ ...f, status: '' }))} className="ml-1 hover:text-purple-900">×</button>
                 </span>
               )}
-              {filtros.classroomId && (
+              {filtros.classroomId && turmaAtiva && (
                 <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full flex items-center gap-1">
-                  Turma: <strong>{turmas.find(t => t.id === filtros.classroomId)?.name ?? filtros.classroomId}</strong>
+                  Turma: <strong>{turmaAtiva.name ?? turmaAtiva.nome ?? turmaAtiva.code}</strong>
                   <button type="button" onClick={() => setFiltros(f => ({ ...f, classroomId: '' }))} className="ml-1 hover:text-teal-900">×</button>
                 </span>
               )}
-              {filtros.teacherId && (
+              {filtros.teacherId && professorAtivo && (
                 <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full flex items-center gap-1">
-                  Professor: <strong>{professores.find(p => p.id === filtros.teacherId) ? `${professores.find(p => p.id === filtros.teacherId)!.firstName} ${professores.find(p => p.id === filtros.teacherId)!.lastName}` : filtros.teacherId}</strong>
+                  Professor: <strong>{professorAtivo.name ?? professorAtivo.nome}</strong>
                   <button type="button" onClick={() => setFiltros(f => ({ ...f, teacherId: '' }))} className="ml-1 hover:text-orange-900">×</button>
+                </span>
+              )}
+              {filtros.dataInicio && (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full flex items-center gap-1">
+                  De: <strong>{fmtData(filtros.dataInicio)}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, dataInicio: '' }))} className="ml-1 hover:text-gray-900">×</button>
+                </span>
+              )}
+              {filtros.dataFim && (
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full flex items-center gap-1">
+                  Até: <strong>{fmtData(filtros.dataFim)}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, dataFim: '' }))} className="ml-1 hover:text-gray-900">×</button>
                 </span>
               )}
             </div>
@@ -349,46 +420,54 @@ export default function RelatorioConsumoMateriaisPage() {
       {!loading && relatorio && (
         <>
           {/* ── KPIs Principais ─────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
-            <div className="col-span-2 md:col-span-2">
-              <KpiCard icon={ShoppingCart} label="Total de Requisições" value={fmt(relatorio.total)}
-                sub={`${fmt(relatorio.quantidadeTotal)} itens`} color="border-blue-200"
-                trend={tendencia !== null ? { value: tendencia, label: 'vs período anterior' } : undefined} />
-            </div>
-            <div className="col-span-2 md:col-span-2">
-              <KpiCard icon={DollarSign} label="Custo Total Estimado" value={fmtBRL(relatorio.custoEstimadoTotal)}
-                sub={`Ticket médio: ${fmtBRL(ticketMedio)}`} color="border-emerald-200" />
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <div className="col-span-1">
+              <KpiCard icon={ShoppingCart} label="Total Requisições" value={fmt(relatorio.total)}
+                sub={`${fmt(relatorio.quantidadeTotal)} itens`} color="border-indigo-200"
+                trend={tendencia !== null ? { value: tendencia, label: 'tendência' } : undefined} />
             </div>
             <div className="col-span-1">
-              <KpiCard icon={CheckCircle} label="Taxa Aprovação" value={`${taxaAprovacao}%`}
+              <KpiCard icon={DollarSign} label="Custo Estimado" value={fmtBRL(relatorio.custoEstimadoTotal)}
+                sub={`Ticket médio: ${fmtBRL(ticketMedio)}`} color="border-blue-200" />
+            </div>
+            <div className="col-span-1">
+              <KpiCard icon={CheckCircle} label="Aprovadas" value={`${taxaAprovacao}%`}
                 sub={`${fmt(relatorio.aprovados)} req.`} color="border-green-200" />
             </div>
             <div className="col-span-1">
-              <KpiCard icon={XCircle} label="Taxa Rejeição" value={`${taxaRejeicao}%`}
+              <KpiCard icon={XCircle} label="Rejeitadas" value={`${taxaRejeicao}%`}
                 sub={`${fmt(relatorio.rejeitados)} req.`} color="border-red-200" />
             </div>
             <div className="col-span-1">
-              <KpiCard icon={Package} label="Taxa Entrega" value={`${taxaEntrega}%`}
+              <KpiCard icon={Package} label="Entregues" value={`${taxaEntrega}%`}
                 sub={`${fmt(relatorio.entregues)} entregues`} color="border-purple-200" />
             </div>
             <div className="col-span-1">
               <KpiCard icon={Clock} label="Pendentes" value={fmt(relatorio.pendentes)}
                 sub={`${pct(relatorio.pendentes, relatorio.total)}% do total`} color="border-yellow-200" />
             </div>
+            <div className="col-span-1">
+              <KpiCard icon={Users} label="Professores" value={fmt(relatorio.porProfessor?.length ?? 0)}
+                sub="com requisições" color="border-teal-200" />
+            </div>
           </div>
 
           {/* ── Abas de Navegação ───────────────────────────────────────────── */}
           <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
-            {(['overview', 'graficos', 'detalhes'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
-                {tab === 'overview' ? 'Visão Geral' : tab === 'graficos' ? 'Gráficos' : 'Detalhes'}
+            {(['overview', 'turmas', 'professores', 'graficos', 'detalhes'] as const).map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab as any)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${(activeTab as string) === tab ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}>
+                {tab === 'overview' ? 'Visão Geral'
+                  : tab === 'turmas' ? 'Por Turma'
+                  : tab === 'professores' ? 'Por Professor'
+                  : tab === 'graficos' ? 'Gráficos'
+                  : 'Detalhes'}
               </button>
             ))}
           </div>
 
           {/* ── ABA: VISÃO GERAL ─────────────────────────────────────────────── */}
-          {activeTab === 'overview' && (
+          {(activeTab as string) === 'overview' && (
             <div className="space-y-6">
               {/* Evolução Temporal */}
               {serieMensalFmt.length > 0 && (
@@ -426,12 +505,12 @@ export default function RelatorioConsumoMateriaisPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Por Categoria — barras horizontais */}
+                {/* Por Tipo de Consumo */}
                 {topCategorias.length > 0 && (
                   <Card className="border border-gray-200">
                     <CardHeader>
                       <CardTitle className="text-base text-gray-700 flex items-center gap-2">
-                        <BookOpen className="h-4 w-4 text-indigo-500" /> Consumo por Categoria
+                        <BookOpen className="h-4 w-4 text-indigo-500" /> Consumo por Tipo
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -442,13 +521,12 @@ export default function RelatorioConsumoMateriaisPage() {
                           <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={60} />
                           <Tooltip formatter={(v: number, name: string) => [name === 'custo' ? fmtBRL(v) : fmt(v), name === 'custo' ? 'Custo' : 'Requisições']} />
                           <Bar dataKey="total" name="Requisições" radius={[0, 4, 4, 0]}>
-                            {topCategorias.map((entry, i) => (
+                            {topCategorias.map((_, i) => (
                               <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
                             ))}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
-                      {/* Participação percentual */}
                       <div className="mt-3 space-y-1">
                         {topCategorias.map((c, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
@@ -463,7 +541,7 @@ export default function RelatorioConsumoMateriaisPage() {
                   </Card>
                 )}
 
-                {/* Distribuição por Status — donut */}
+                {/* Distribuição por Status */}
                 {pieStatus.length > 0 && (
                   <Card className="border border-gray-200">
                     <CardHeader>
@@ -482,7 +560,6 @@ export default function RelatorioConsumoMateriaisPage() {
                           <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
                         </PieChart>
                       </ResponsiveContainer>
-                      {/* Participação percentual por status */}
                       <div className="mt-2 grid grid-cols-2 gap-1">
                         {pieStatus.map((s, i) => (
                           <div key={i} className="flex items-center gap-1.5 text-xs">
@@ -496,180 +573,6 @@ export default function RelatorioConsumoMateriaisPage() {
                   </Card>
                 )}
               </div>
-
-              {/* Por Turma — apenas se houver dado real */}
-              {relatorio.porTurma.length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700">Consumo por Turma</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={Math.max(120, relatorio.porTurma.length * 36)}>
-                      <BarChart data={relatorio.porTurma} layout="vertical" margin={{ top: 0, right: 20, left: 80, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11 }} />
-                        <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={80} />
-                        <Tooltip />
-                        <Bar dataKey="total" name="Requisições" fill="#6366f1" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="aprovados" name="Aprovadas" fill="#22c55e" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Por Professor — apenas se houver dado real */}
-              {relatorio.porProfessor && relatorio.porProfessor.length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700 flex items-center gap-2">
-                      <Users className="h-4 w-4 text-indigo-500" /> Top Professores por Consumo
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {relatorio.porProfessor.slice(0, 8).map((p, i) => {
-                        const pctAprov = pct(p.aprovadas, p.requisicoes);
-                        return (
-                          <div key={p.teacherId} className="flex items-center gap-3">
-                            <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-sm font-medium text-gray-700 truncate">{p.nome}</span>
-                                <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{fmt(p.requisicoes)} req.</span>
-                              </div>
-                              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct(p.requisicoes, relatorio.porProfessor[0].requisicoes)}%` }} />
-                              </div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <span className="text-xs text-green-600 font-medium">{pctAprov}% aprov.</span>
-                              {p.custoEstimado > 0 && <p className="text-xs text-gray-400">{fmtBRL(p.custoEstimado)}</p>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Top Itens por Tipo (fralda, shampoo, sabonete, papel etc.) */}
-              {relatorio.porItem && relatorio.porItem.length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700 flex items-center gap-2">
-                      <span className="text-lg">📦</span> Top Itens por Tipo de Consumo
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-100">
-                            <th className="text-left py-2 px-2 text-gray-500 font-medium">#</th>
-                            <th className="text-left py-2 px-2 text-gray-500 font-medium">Item</th>
-                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Requisições</th>
-                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Qtd Total</th>
-                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Custo Est.</th>
-                            <th className="py-2 px-2"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {relatorio.porItem.slice(0, 15).map((item, i) => {
-                            const maxTotal = relatorio.porItem![0].total;
-                            return (
-                              <tr key={item.nome} className="border-b border-gray-50 hover:bg-gray-50">
-                                <td className="py-2 px-2 text-gray-400 text-xs">{i + 1}</td>
-                                <td className="py-2 px-2">
-                                  <span className="font-medium text-gray-700">{item.nome || '—'}</span>
-                                </td>
-                                <td className="py-2 px-2 text-right text-gray-600">{fmt(item.total)}</td>
-                                <td className="py-2 px-2 text-right text-gray-600">{fmt(item.quantidade)}</td>
-                                <td className="py-2 px-2 text-right text-gray-600">{item.custo > 0 ? fmtBRL(item.custo) : '—'}</td>
-                                <td className="py-2 px-2 w-24">
-                                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct(item.total, maxTotal)}%` }} />
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* ── ABA: GRÁFICOS ────────────────────────────────────────────────── */}
-          {activeTab === 'graficos' && (
-            <div className="space-y-6">
-              {/* Custo por Mês */}
-              {serieMensalFmt.length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700">Custo Estimado por Mês</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={240}>
-                      <BarChart data={serieMensalFmt} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtBRL(v)} />
-                        <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo Estimado']} />
-                        <Bar dataKey="custoEstimado" name="Custo Estimado" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Itens por Mês */}
-              {serieMensalFmt.length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700">Volume de Itens por Mês</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={serieMensalFmt} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip formatter={(v: number) => [fmt(v), 'Itens']} />
-                        <Bar dataKey="itens" name="Itens" fill="#10b981" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Custo por Categoria */}
-              {topCategorias.filter(c => c.custo > 0).length > 0 && (
-                <Card className="border border-gray-200">
-                  <CardHeader>
-                    <CardTitle className="text-base text-gray-700">Custo por Categoria</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={topCategorias.filter(c => c.custo > 0)} layout="vertical" margin={{ top: 0, right: 20, left: 80, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => fmtBRL(v)} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
-                        <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo']} />
-                        <Bar dataKey="custo" name="Custo" radius={[0, 4, 4, 0]}>
-                          {topCategorias.filter(c => c.custo > 0).map((_, i) => (
-                            <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-              )}
 
               {/* Métricas analíticas */}
               <Card className="border border-gray-200">
@@ -715,8 +618,223 @@ export default function RelatorioConsumoMateriaisPage() {
             </div>
           )}
 
+          {/* ── ABA: POR TURMA ───────────────────────────────────────────────── */}
+          {(activeTab as string) === 'turmas' && (
+            <div className="space-y-6">
+              {relatorio.porTurma.length === 0 ? (
+                <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <BookOpen className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-500 font-medium">Nenhum dado de turma disponível</p>
+                  <p className="text-gray-400 text-sm mt-1">As requisições podem não ter turma vinculada</p>
+                </div>
+              ) : (
+                <>
+                  <Card className="border border-gray-200">
+                    <CardHeader>
+                      <CardTitle className="text-base text-gray-700 flex items-center gap-2">
+                        <BookOpen className="h-4 w-4 text-teal-500" /> Consumo por Turma
+                        <span className="text-xs font-normal text-gray-400 ml-auto">{relatorio.porTurma.length} turmas</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={Math.max(160, relatorio.porTurma.length * 40)}>
+                        <BarChart data={relatorio.porTurma} layout="vertical" margin={{ top: 0, right: 20, left: 100, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={100} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="total" name="Total" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="aprovados" name="Aprovadas" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Tabela detalhada por turma */}
+                  <Card className="border border-gray-200">
+                    <CardContent className="p-0">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Turma</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Requisições</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Aprovadas</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Taxa Aprov.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {relatorio.porTurma.sort((a, b) => b.total - a.total).map((t, i) => (
+                            <tr key={i} className="hover:bg-gray-50 transition-colors">
+                              <td className="py-2 px-4 text-gray-700 font-medium">{t.nome}</td>
+                              <td className="py-2 px-4 text-gray-700 text-right">{fmt(t.total)}</td>
+                              <td className="py-2 px-4 text-green-600 text-right">{fmt(t.aprovados)}</td>
+                              <td className="py-2 px-4 text-right">
+                                <span className={`text-xs font-medium ${pct(t.aprovados, t.total) >= 70 ? 'text-green-600' : pct(t.aprovados, t.total) >= 40 ? 'text-yellow-600' : 'text-red-500'}`}>
+                                  {pct(t.aprovados, t.total)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── ABA: POR PROFESSOR ───────────────────────────────────────────── */}
+          {(activeTab as string) === 'professores' && (
+            <div className="space-y-6">
+              {(!relatorio.porProfessor || relatorio.porProfessor.length === 0) ? (
+                <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p className="text-gray-500 font-medium">Nenhum dado de professor disponível</p>
+                  <p className="text-gray-400 text-sm mt-1">As requisições podem não ter professor vinculado</p>
+                </div>
+              ) : (
+                <>
+                  <Card className="border border-gray-200">
+                    <CardHeader>
+                      <CardTitle className="text-base text-gray-700 flex items-center gap-2">
+                        <Users className="h-4 w-4 text-indigo-500" /> Top Professores por Consumo
+                        <span className="text-xs font-normal text-gray-400 ml-auto">{relatorio.porProfessor.length} professores</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {relatorio.porProfessor.map((p, i) => {
+                          const pctAprov = pct(p.aprovadas, p.requisicoes);
+                          return (
+                            <div key={p.teacherId} className="flex items-center gap-3">
+                              <span className="text-xs text-gray-400 w-4 text-right">{i + 1}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-0.5">
+                                  <span className="text-sm font-medium text-gray-700 truncate">{p.nome}</span>
+                                  <span className="text-xs text-gray-400 ml-2 flex-shrink-0">{fmt(p.requisicoes)} req.</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct(p.requisicoes, relatorio.porProfessor[0].requisicoes)}%` }} />
+                                </div>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <span className="text-xs text-green-600 font-medium">{pctAprov}% aprov.</span>
+                                {p.custoEstimado > 0 && <p className="text-xs text-gray-400">{fmtBRL(p.custoEstimado)}</p>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Tabela detalhada por professor */}
+                  <Card className="border border-gray-200">
+                    <CardContent className="p-0">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">#</th>
+                            <th className="text-left py-2 px-4 text-xs font-semibold text-gray-500">Professor</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Requisições</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Aprovadas</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Entregues</th>
+                            <th className="text-right py-2 px-4 text-xs font-semibold text-gray-500">Custo Est.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {relatorio.porProfessor.map((p, i) => (
+                            <tr key={p.teacherId} className="hover:bg-gray-50 transition-colors">
+                              <td className="py-2 px-4 text-gray-400 text-xs">{i + 1}</td>
+                              <td className="py-2 px-4 text-gray-700 font-medium">{p.nome}</td>
+                              <td className="py-2 px-4 text-gray-700 text-right">{fmt(p.requisicoes)}</td>
+                              <td className="py-2 px-4 text-green-600 text-right">{fmt(p.aprovadas)}</td>
+                              <td className="py-2 px-4 text-purple-600 text-right">{fmt(p.entregues)}</td>
+                              <td className="py-2 px-4 text-gray-700 text-right text-xs">{p.custoEstimado > 0 ? fmtBRL(p.custoEstimado) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── ABA: GRÁFICOS ────────────────────────────────────────────────── */}
+          {(activeTab as string) === 'graficos' && (
+            <div className="space-y-6">
+              {/* Custo por Mês */}
+              {serieMensalFmt.length > 0 && (
+                <Card className="border border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="text-base text-gray-700">Custo Estimado por Mês</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={serieMensalFmt} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtBRL(v)} />
+                        <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo Estimado']} />
+                        <Bar dataKey="custoEstimado" name="Custo Estimado" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Itens por Mês */}
+              {serieMensalFmt.length > 0 && (
+                <Card className="border border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="text-base text-gray-700">Volume de Itens por Mês</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={serieMensalFmt} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(v: number) => [fmt(v), 'Itens']} />
+                        <Bar dataKey="itens" name="Itens" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Custo por Tipo de Consumo */}
+              {topCategorias.filter(c => c.custo > 0).length > 0 && (
+                <Card className="border border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="text-base text-gray-700">Custo por Tipo de Consumo</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={topCategorias.filter(c => c.custo > 0)} layout="vertical" margin={{ top: 0, right: 20, left: 80, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => fmtBRL(v)} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
+                        <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo']} />
+                        <Bar dataKey="custo" name="Custo" radius={[0, 4, 4, 0]}>
+                          {topCategorias.filter(c => c.custo > 0).map((_, i) => (
+                            <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
           {/* ── ABA: DETALHES ────────────────────────────────────────────────── */}
-          {activeTab === 'detalhes' && (
+          {(activeTab as string) === 'detalhes' && (
             <Card className="border border-gray-200">
               <CardHeader>
                 <CardTitle className="text-base text-gray-700 flex items-center justify-between">
@@ -782,7 +900,7 @@ export default function RelatorioConsumoMateriaisPage() {
       {!loading && !relatorio && (
         <div className="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-200">
           <BarChart2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-500 font-medium">Clique em "Atualizar" para carregar o dashboard</p>
+          <p className="text-gray-500 font-medium">Clique em "Atualizar Dashboard" para carregar os dados</p>
         </div>
       )}
     </PageShell>
