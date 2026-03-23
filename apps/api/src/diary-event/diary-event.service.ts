@@ -165,13 +165,8 @@ export class DiaryEventService {
       }
     }
 
-    // Validação de segmento etário (sempre aplicada)
-    const ageMonths = this.diffInMonths(child.dateOfBirth, eventDate);
-    if (ageMonths < classroom.ageGroupMin || ageMonths > classroom.ageGroupMax) {
-      throw new BadRequestException(
-        `Segmento incompatível: criança com ${ageMonths} meses fora do intervalo da turma (${classroom.ageGroupMin}-${classroom.ageGroupMax} meses).`,
-      );
-    }
+    // Validação de segmento etário removida: qualquer criança pode ter ocorrências registradas
+    // independente da faixa etária da turma (chegada/saída, saúde, material, comportamento, etc.)
 
     // Criar o evento
     const diaryEvent = await this.prisma.diaryEvent.create({

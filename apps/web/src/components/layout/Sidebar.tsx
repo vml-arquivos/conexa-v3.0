@@ -4,7 +4,7 @@ import {
   ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
-  Apple, Utensils, Shield,
+  Apple, Utensils, Shield, X,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -144,10 +144,11 @@ const DEV_EXTRA: MenuItem[] = [
 ];
 
 // ─── Componentes de navegação ─────────────────────────────────────────────────
-function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
+function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; onClick?: () => void }) {
   return (
     <Link
       to={item.path}
+      onClick={onClick}
       className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
         active
           ? 'bg-blue-600 text-white'
@@ -171,8 +172,8 @@ function NavItem({ item, active }: { item: MenuItem; active: boolean }) {
 }
 
 function NavSection({
-  titulo, items, isActive,
-}: { titulo: string; items: MenuItem[]; isActive: (path: string) => boolean }) {
+  titulo, items, isActive, onItemClick,
+}: { titulo: string; items: MenuItem[]; isActive: (path: string) => boolean; onItemClick?: () => void }) {
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
@@ -180,7 +181,7 @@ function NavSection({
       </p>
       <div className="space-y-1">
         {items.map((item) => (
-          <NavItem key={item.path} item={item} active={isActive(item.path)} />
+          <NavItem key={item.path} item={item} active={isActive(item.path)} onClick={onItemClick} />
         ))}
       </div>
     </div>
@@ -188,7 +189,11 @@ function NavSection({
 }
 
 // ─── Sidebar Principal ────────────────────────────────────────────────────────
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
 
@@ -240,17 +245,29 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
+    <aside className="w-64 bg-gray-900 text-white h-full min-h-screen flex flex-col">
       {/* Logo */}
       <div className="p-5 border-b border-gray-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">C</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-none">Conexa V3</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold leading-none">Conexa V3</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
-          </div>
+          {/* Botão fechar — só aparece em mobile */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              aria-label="Fechar menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
         {user && (
           <div className="mt-3 px-2 py-2 bg-gray-800 rounded-lg">
@@ -271,72 +288,72 @@ export function Sidebar() {
         {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
           <>
-            <NavSection titulo="Professor"    items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} />
-            <NavSection titulo="Nutricionista" items={NUTRI_ITEMS}                                        isActive={isActive} />
-            <NavSection titulo="Diretor"       items={DIRETOR_ITEMS}                                      isActive={isActive} />
-            <NavSection titulo="Unidade"       items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} />
-            <NavSection titulo="Central"       items={CENTRAL_ITEMS}                                      isActive={isActive} />
-            <NavSection titulo="Mantenedora"   items={MANTENEDORA_ITEMS}                                  isActive={isActive} />
-            <NavSection titulo="Dev — Extras"  items={DEV_EXTRA}                                          isActive={isActive} />
+            <NavSection titulo="Professor"    items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Nutricionista" items={NUTRI_ITEMS}                                        isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Diretor"       items={DIRETOR_ITEMS}                                      isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Unidade"       items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Central"       items={CENTRAL_ITEMS}                                      isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Mantenedora"   items={MANTENEDORA_ITEMS}                                  isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Dev — Extras"  items={DEV_EXTRA}                                          isActive={isActive} onItemClick={onClose} />
           </>
         )}
 
         {/* MANTENEDORA */}
         {!isDeveloper && isMantenedora && (
-          <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} />
+          <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
 
         {/* STAFF_CENTRAL — Psicóloga Central (menu dedicado) */}
         {!isDeveloper && isCentral && isPsicologa && (
-          <NavSection titulo="Psicologia" items={PSICOLOGA_ITEMS} isActive={isActive} />
+          <NavSection titulo="Psicologia" items={PSICOLOGA_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
         {/* STAFF_CENTRAL — Coordenação Geral e demais */}
         {!isDeveloper && isCentral && !isPsicologa && (
-          <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} />
+          <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Diretor */}
         {!isDeveloper && isDiretor && (
-          <NavSection titulo="Diretor" items={DIRETOR_ITEMS} isActive={isActive} />
+          <NavSection titulo="Diretor" items={DIRETOR_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Nutricionista */}
         {!isDeveloper && isNutricionista && (
-          <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} isActive={isActive} />
+          <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Coordenadora Pedagógica */}
         {!isDeveloper && isCoordPedagogico && (
           <>
-            <NavSection titulo="Gestão"      items={COORD_GESTAO}      isActive={isActive} />
-            <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  isActive={isActive} />
+            <NavSection titulo="Gestão"      items={COORD_GESTAO}      isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  isActive={isActive} onItemClick={onClose} />
           </>
         )}
 
         {/* UNIDADE — Administrativo */}
         {!isDeveloper && isAdministrativo && (
-          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} isActive={isActive} />
+          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} isActive={isActive} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Genérico (sem roleType específico) */}
         {!isDeveloper && isUnidadeGenerica && (
           <>
-            <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      isActive={isActive} />
-            <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  isActive={isActive} />
+            <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  isActive={isActive} onItemClick={onClose} />
           </>
         )}
 
         {/* PROFESSOR / PROFESSOR_AUXILIAR */}
         {!isDeveloper && !isUnidade && isProfessor && (
           <>
-            <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   isActive={isActive} />
-            <NavSection titulo="Ferramentas" items={PROFESSOR_FERRAMENTAS} isActive={isActive} />
+            <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Ferramentas" items={PROFESSOR_FERRAMENTAS} isActive={isActive} onItemClick={onClose} />
           </>
         )}
 
         {/* Fallback */}
         {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
-          <NavSection titulo="Menu" items={UNIDADE_GESTAO} isActive={isActive} />
+          <NavSection titulo="Menu" items={UNIDADE_GESTAO} isActive={isActive} onItemClick={onClose} />
         )}
 
       </nav>
@@ -344,11 +361,11 @@ export function Sidebar() {
       {/* Rodapé */}
       <div className="p-3 border-t border-gray-800 space-y-1">
         {(isUnidade || isCentral || isMantenedora || isDeveloper) && (
-          <NavSection titulo="Administração" items={adminItems} isActive={isActive} />
+          <NavSection titulo="Administração" items={adminItems} isActive={isActive} onItemClick={onClose} />
         )}
         <div className="pt-1 space-y-1">
-          <NavItem item={perfilItem} active={isActive('/app/meu-perfil')} />
-          <NavItem item={configItem} active={isActive('/app/configuracoes')} />
+          <NavItem item={perfilItem} active={isActive('/app/meu-perfil')} onClick={onClose} />
+          <NavItem item={configItem} active={isActive('/app/configuracoes')} onClick={onClose} />
         </div>
         <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
       </div>
