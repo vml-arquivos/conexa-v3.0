@@ -771,7 +771,7 @@ export class MaterialRequestService {
         classroom: { select: { name: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
         unit: { select: { id: true, name: true } },
-        items: { select: { quantity: true, unitPrice: true } },
+        items: { select: { quantity: true, unitPrice: true, productName: true } },
       },
       orderBy: { requestedDate: 'desc' },
     });
@@ -838,6 +838,7 @@ export class MaterialRequestService {
     // ─── Série mensal ────────────────────────────────────────────────────────
     const serieMensalMap: Record<string, { mes: string; requisicoes: number; aprovadas: number; pendentes: number; rejeitadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
     const porProfessorMap: Record<string, { teacherId: string; nome: string; requisicoes: number; aprovadas: number; entregues: number; custoEstimado: number; itens: number }> = {};
+    const porItemMap: Record<string, { nome: string; total: number; quantidade: number; custo: number }> = {};
     for (const r of requisicoes) {
       const { qtd: qtdItens, custo: custoItens } = normalizarReq(r);
       const d = new Date(r.requestedDate);
@@ -850,6 +851,23 @@ export class MaterialRequestService {
       else serieMensalMap[mes].pendentes++;
       serieMensalMap[mes].itens += qtdItens;
       serieMensalMap[mes].custoEstimado += custoItens;
+      // Por item (productName)
+      const itemsArrSerie = (r as any).items ?? [];
+      if (itemsArrSerie.length > 0) {
+        for (const it of itemsArrSerie) {
+          const pn: string = ((it.productName as string) || r.title || 'Sem nome').trim();
+          if (!porItemMap[pn]) porItemMap[pn] = { nome: pn, total: 0, quantidade: 0, custo: 0 };
+          porItemMap[pn].total++;
+          porItemMap[pn].quantidade += Number(it.quantity) || 0;
+          porItemMap[pn].custo += (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
+        }
+      } else {
+        const pn: string = (r.title || 'Sem nome').trim();
+        if (!porItemMap[pn]) porItemMap[pn] = { nome: pn, total: 0, quantidade: 0, custo: 0 };
+        porItemMap[pn].total++;
+        porItemMap[pn].quantidade += Number(r.quantity) || 0;
+        porItemMap[pn].custo += Number(r.estimatedCost) || 0;
+      }
       // Por professor
       if (r.createdBy && r.createdByUser) {
         const tid = r.createdBy;
@@ -908,6 +926,10 @@ export class MaterialRequestService {
       }),
       serieMensal,
       porProfessor,
+      porItem: Object.values(porItemMap)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 20)
+        .map(i => ({ ...i, custo: Math.round(i.custo * 100) / 100 })),
     };
   }
 }

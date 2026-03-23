@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { getAccessibleClassrooms, getAccessibleTeachers } from '../api/lookup';
+import type { AccessibleClassroom, AccessibleTeacher } from '../types/lookup';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -35,6 +37,7 @@ interface Detalhe {
   status: string; prioridade: string; turma: string | null; professor: string | null;
   unidade: string | null; custoEstimado: number | null; dataSolicitacao: string; dataAprovacao: string | null;
 }
+interface PorItem { nome: string; total: number; quantidade: number; custo: number; }
 interface RelatorioData {
   periodo: RelatorioPeriodo;
   total: number;
@@ -52,6 +55,7 @@ interface RelatorioData {
   detalhes: Detalhe[];
   filtros: { status: string | null; type: string | null };
   escopo: string;
+  porItem?: PorItem[];
 }
 
 // ─── Labels e Cores ───────────────────────────────────────────────────────────
@@ -136,8 +140,21 @@ export default function RelatorioConsumoMateriaisPage() {
   const selectedUnitId = ctxUnitId ?? '';
   const [loading, setLoading] = useState(false);
   const [relatorio, setRelatorio] = useState<RelatorioData | null>(null);
-  const [filtros, setFiltros] = useState({ dataInicio: '', dataFim: '', status: '', type: '' });
+  const [filtros, setFiltros] = useState({ dataInicio: '', dataFim: '', status: '', type: '', classroomId: '', teacherId: '' });
   const [activeTab, setActiveTab] = useState<'overview' | 'graficos' | 'detalhes'>('overview');
+
+  // Lookup de turmas e professores para filtros
+  const [turmas, setTurmas] = useState<AccessibleClassroom[]>([]);
+  const [professores, setProfessores] = useState<AccessibleTeacher[]>([]);
+
+  useEffect(() => {
+    getAccessibleClassrooms(selectedUnitId || undefined)
+      .then(setTurmas)
+      .catch(() => setTurmas([]));
+    getAccessibleTeachers(selectedUnitId || undefined)
+      .then(setProfessores)
+      .catch(() => setProfessores([]));
+  }, [selectedUnitId]);
 
   const carregarRelatorio = useCallback(async () => {
     setLoading(true);
@@ -148,6 +165,8 @@ export default function RelatorioConsumoMateriaisPage() {
       if (filtros.status) params.set('status', filtros.status);
       if (filtros.type) params.set('type', filtros.type);
       if (isCentral && selectedUnitId) params.set('unitId', selectedUnitId);
+      if (filtros.classroomId) params.set('classroomId', filtros.classroomId);
+      if (filtros.teacherId) params.set('teacherId', filtros.teacherId);
       const res = await http.get(`/material-requests/relatorio-consumo?${params.toString()}`);
       setRelatorio(res.data ?? null);
     } catch (err: any) {
@@ -155,7 +174,7 @@ export default function RelatorioConsumoMateriaisPage() {
     } finally {
       setLoading(false);
     }
-  }, [filtros.dataInicio, filtros.dataFim, filtros.status, filtros.type, selectedUnitId, isCentral]);
+  }, [filtros.dataInicio, filtros.dataFim, filtros.status, filtros.type, filtros.classroomId, filtros.teacherId, selectedUnitId, isCentral]);
 
   useEffect(() => { carregarRelatorio(); }, [carregarRelatorio]);
 
@@ -231,7 +250,7 @@ export default function RelatorioConsumoMateriaisPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <Label>Data Início</Label>
               <Input type="date" value={filtros.dataInicio} onChange={e => setFiltros(f => ({ ...f, dataInicio: e.target.value }))} />
@@ -240,6 +259,26 @@ export default function RelatorioConsumoMateriaisPage() {
               <Label>Data Fim</Label>
               <Input type="date" value={filtros.dataFim} onChange={e => setFiltros(f => ({ ...f, dataFim: e.target.value }))} />
             </div>
+            {turmas.length > 0 && (
+              <div>
+                <Label>Turma</Label>
+                <select value={filtros.classroomId} onChange={e => setFiltros(f => ({ ...f, classroomId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                  <option value="">Todas as turmas</option>
+                  {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            {professores.length > 0 && (
+              <div>
+                <Label>Professor(a)</Label>
+                <select value={filtros.teacherId} onChange={e => setFiltros(f => ({ ...f, teacherId: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white">
+                  <option value="">Todos os professores</option>
+                  {professores.map(p => <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <Label>Categoria</Label>
               <select value={filtros.type} onChange={e => setFiltros(f => ({ ...f, type: e.target.value }))}
@@ -274,7 +313,7 @@ export default function RelatorioConsumoMateriaisPage() {
               </Button>
             </div>
           </form>
-          {(filtros.status || filtros.type) && (
+          {(filtros.status || filtros.type || filtros.classroomId || filtros.teacherId) && (
             <div className="mt-3 flex flex-wrap gap-2">
               {filtros.type && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full flex items-center gap-1">
@@ -286,6 +325,18 @@ export default function RelatorioConsumoMateriaisPage() {
                 <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full flex items-center gap-1">
                   Status: <strong>{STATUS_LABEL[filtros.status]?.label ?? filtros.status}</strong>
                   <button type="button" onClick={() => setFiltros(f => ({ ...f, status: '' }))} className="ml-1 hover:text-purple-900">×</button>
+                </span>
+              )}
+              {filtros.classroomId && (
+                <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  Turma: <strong>{turmas.find(t => t.id === filtros.classroomId)?.name ?? filtros.classroomId}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, classroomId: '' }))} className="ml-1 hover:text-teal-900">×</button>
+                </span>
+              )}
+              {filtros.teacherId && (
+                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  Professor: <strong>{professores.find(p => p.id === filtros.teacherId) ? `${professores.find(p => p.id === filtros.teacherId)!.firstName} ${professores.find(p => p.id === filtros.teacherId)!.lastName}` : filtros.teacherId}</strong>
+                  <button type="button" onClick={() => setFiltros(f => ({ ...f, teacherId: '' }))} className="ml-1 hover:text-orange-900">×</button>
                 </span>
               )}
             </div>
@@ -498,6 +549,54 @@ export default function RelatorioConsumoMateriaisPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Top Itens por Tipo (fralda, shampoo, sabonete, papel etc.) */}
+              {relatorio.porItem && relatorio.porItem.length > 0 && (
+                <Card className="border border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="text-base text-gray-700 flex items-center gap-2">
+                      <span className="text-lg">📦</span> Top Itens por Tipo de Consumo
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-2 px-2 text-gray-500 font-medium">#</th>
+                            <th className="text-left py-2 px-2 text-gray-500 font-medium">Item</th>
+                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Requisições</th>
+                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Qtd Total</th>
+                            <th className="text-right py-2 px-2 text-gray-500 font-medium">Custo Est.</th>
+                            <th className="py-2 px-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {relatorio.porItem.slice(0, 15).map((item, i) => {
+                            const maxTotal = relatorio.porItem![0].total;
+                            return (
+                              <tr key={item.nome} className="border-b border-gray-50 hover:bg-gray-50">
+                                <td className="py-2 px-2 text-gray-400 text-xs">{i + 1}</td>
+                                <td className="py-2 px-2">
+                                  <span className="font-medium text-gray-700">{item.nome || '—'}</span>
+                                </td>
+                                <td className="py-2 px-2 text-right text-gray-600">{fmt(item.total)}</td>
+                                <td className="py-2 px-2 text-right text-gray-600">{fmt(item.quantidade)}</td>
+                                <td className="py-2 px-2 text-right text-gray-600">{item.custo > 0 ? fmtBRL(item.custo) : '—'}</td>
+                                <td className="py-2 px-2 w-24">
+                                  <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct(item.total, maxTotal)}%` }} />
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     </div>
                   </CardContent>
                 </Card>
