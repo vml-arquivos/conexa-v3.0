@@ -248,6 +248,9 @@ export default function DiarioBordoPage() {
   // Dados da turma e professor
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
+  // FIX P0: estado de loading/erro da turma para evitar spinner infinito
+  const [loadingTurma, setLoadingTurma] = useState(true);
+  const [turmaErro, setTurmaErro] = useState<string | null>(null);
   const [savingMicrogesto, setSavingMicrogesto] = useState(false);
   // Chamada do dia pré-carregada para preencher presenças automaticamente
   const [chamadaCarregada, setChamadaCarregada] = useState(false);
@@ -489,11 +492,18 @@ export default function DiarioBordoPage() {
   }
 
   async function loadTurmaECriancas() {
+    setLoadingTurma(true);
+    setTurmaErro(null);
     try {
       // Usa o endpoint de lookup que retorna turmas acessíveis ao professor
       const turmasRes = await http.get('/lookup/classrooms/accessible');
       const turmas: { id: string; name: string }[] = Array.isArray(turmasRes.data) ? turmasRes.data : [];
-      if (turmas.length === 0) return;
+      if (turmas.length === 0) {
+        // FIX P0: não deixar spinner infinito — mostrar mensagem clara
+        setTurmaErro('Você não tem turma vinculada. Fale com a coordenação.');
+        setLoadingTurma(false);
+        return;
+      }
       const cid = turmas[0].id;
       setClassroomId(cid);
 
@@ -613,7 +623,10 @@ export default function DiarioBordoPage() {
         // Sem planejamento para hoje — não é erro
       }
     } catch {
-      // sem turma vinculada
+      // FIX P0: erro ao buscar turmas — mostrar mensagem clara em vez de spinner infinito
+      setTurmaErro('Não foi possível carregar a turma. Recarregue a página.');
+    } finally {
+      setLoadingTurma(false);
     }
   }
 
@@ -1418,10 +1431,18 @@ export default function DiarioBordoPage() {
               {/* Seleção de criança */}
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Criança *</Label>
-                {!classroomId ? (
+                {/* FIX P0: usar loadingTurma/turmaErro para evitar spinner infinito */}
+                {loadingTurma ? (
                   <p className="text-sm text-gray-400 italic flex items-center gap-2"><RefreshCw className="h-4 w-4 animate-spin" /> Carregando turma...</p>
+                ) : turmaErro ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-700 font-medium">{turmaErro}</p>
+                    <button type="button" onClick={loadTurmaECriancas} className="mt-2 text-xs text-amber-600 underline hover:text-amber-800">Tentar novamente</button>
+                  </div>
                 ) : criancas.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-700">Nenhuma criança matriculada na turma. Verifique com a coordenação.</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <select
@@ -1647,13 +1668,20 @@ export default function DiarioBordoPage() {
           <Card className="border-2 border-teal-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-teal-700"><UserCircle className="h-5 w-5" /> Selecionar Criança</CardTitle></CardHeader>
             <CardContent>
-              {/* BUG D FIX: Exibir loading enquanto turma/crianças ainda estão sendo carregadas */}
-              {!classroomId ? (
+              {/* FIX P0: usar loadingTurma/turmaErro para evitar spinner infinito */}
+              {loadingTurma ? (
                 <p className="text-sm text-gray-400 italic flex items-center gap-2">
                   <RefreshCw className="h-4 w-4 animate-spin" /> Carregando turma...
                 </p>
+              ) : turmaErro ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-700 font-medium">{turmaErro}</p>
+                  <button type="button" onClick={loadTurmaECriancas} className="mt-2 text-xs text-amber-600 underline hover:text-amber-800">Tentar novamente</button>
+                </div>
               ) : criancas.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-700">Nenhuma criança matriculada na turma. Verifique com a coordenação.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {/* FIX P0.2: select pesquisável com nome completo — obrigatório para uso real */}
