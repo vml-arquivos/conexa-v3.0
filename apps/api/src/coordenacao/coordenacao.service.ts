@@ -471,8 +471,9 @@ export class CoordenacaoService {
     return this.prisma.diaryEvent.findMany({
       where,
       include: {
-        classroom: { select: { id: true, name: true } },
-        child: { select: { id: true, firstName: true, lastName: true } },
+        classroom:     { select: { id: true, name: true } },
+        child:         { select: { id: true, firstName: true, lastName: true } },
+        createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: { eventDate: 'desc' },
       take: 200,

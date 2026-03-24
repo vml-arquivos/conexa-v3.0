@@ -230,75 +230,97 @@ export class DiaryEventService {
   }
 
   /**
-   * Lista eventos com filtros
+   * Lista eventos com filtros.
+   *
+   * ESCOPO DE ACESSO:
+   * DiaryEvent possui campos raiz mantenedoraId, unitId, classroomId e createdBy.
+   * Usamos esses campos diretamente para filtrar por escopo — sem joins desnecessários.
+   *
+   * Hierarquia:
+   *   DEVELOPER      → acesso total (sem filtro)
+   *   MANTENEDORA    → filtra por mantenedoraId
+   *   STAFF_CENTRAL  → filtra por unitId IN unitScopes (coordenação geral)
+   *   UNIDADE        → filtra por unitId (coordenador/diretor da unidade)
+   *   PROFESSOR      → filtra por classroomId IN turmas_do_professor OR createdBy
    */
   async findAll(query: QueryDiaryEventDto, user: JwtPayload) {
-    const where: any = {};
+    const andConditions: any[] = [];
 
-    // ESCOPO DE ACESSO: DiaryEvent não tem mantenedoraId/unitId como campos raiz.
-    // Filtrar via relação classroom conforme o role do usuário.
-    if (!user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
-      if (user.roles.some((role) => role.level === RoleLevel.MANTENEDORA)) {
-        where.classroom = { unit: { mantenedoraId: user.mantenedoraId } };
-      } else if (user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL)) {
-        const staffRole = user.roles.find((role) => role.level === RoleLevel.STAFF_CENTRAL);
-        where.classroom = { unitId: { in: staffRole?.unitScopes || [] } };
-      } else if (user.roles.some((role) => role.level === RoleLevel.UNIDADE)) {
-        where.classroom = { unitId: user.unitId };
-      } else if (user.roles.some((role) => role.level === RoleLevel.PROFESSOR)) {
-        // Professor vê eventos das turmas onde é professor OU que ele próprio criou.
-        // Garante que ocorrências registradas via fallback de matrícula apareçam no histórico.
+    // ── 1. ESCOPO DE ACESSO ──────────────────────────────────────────────────
+    if (!user.roles.some((r) => r.level === RoleLevel.DEVELOPER)) {
+      if (user.roles.some((r) => r.level === RoleLevel.MANTENEDORA)) {
+        // Mantenedora vê tudo da sua rede
+        andConditions.push({ mantenedoraId: user.mantenedoraId });
+
+      } else if (user.roles.some((r) => r.level === RoleLevel.STAFF_CENTRAL)) {
+        // Coordenação geral: vê todas as unidades em seu escopo
+        const staffRole = user.roles.find((r) => r.level === RoleLevel.STAFF_CENTRAL);
+        const unitScopes = staffRole?.unitScopes ?? [];
+        if (unitScopes.length > 0) {
+          andConditions.push({ unitId: { in: unitScopes } });
+        } else if (user.unitId) {
+          // Fallback: usar unitId do token
+          andConditions.push({ unitId: user.unitId });
+        } else {
+          andConditions.push({ mantenedoraId: user.mantenedoraId });
+        }
+
+      } else if (user.roles.some((r) => r.level === RoleLevel.UNIDADE)) {
+        // Coordenador/Diretor de unidade: vê todos os eventos da unidade
+        andConditions.push({ unitId: user.unitId });
+
+      } else if (user.roles.some((r) => r.level === RoleLevel.PROFESSOR)) {
+        // Professor: vê eventos das suas turmas OU que ele criou
         const classrooms = await this.prisma.classroomTeacher.findMany({
           where: { teacherId: user.sub, isActive: true },
           select: { classroomId: true },
         });
         const classroomIds = classrooms.map((ct) => ct.classroomId);
         if (classroomIds.length > 0) {
-          where.OR = [
-            { classroomId: { in: classroomIds } },
-            { createdBy: user.sub },
-          ];
+          andConditions.push({
+            OR: [
+              { classroomId: { in: classroomIds } },
+              { createdBy: user.sub },
+            ],
+          });
         } else {
           // Professor sem turma formal: ver apenas o que ele criou
-          where.createdBy = user.sub;
+          andConditions.push({ createdBy: user.sub });
         }
       }
     }
 
-    if (query.childId) where.childId = query.childId;
-    // Quando o escopo já usa OR (professor), não sobrescrever com classroomId raiz.
-    // Em vez disso, restringir o OR para incluir apenas a turma solicitada.
-    if (query.classroomId) {
-      if (where.OR) {
-        // Intersectar: manter o OR mas adicionar classroomId como condição AND
-        where.AND = [{ OR: where.OR }, { classroomId: query.classroomId }];
-        delete where.OR;
-      } else {
-        where.classroomId = query.classroomId;
-      }
-    }
-    if (query.unitId) where.unitId = query.unitId;
-    if (query.type) where.type = query.type;
-    if (query.createdBy) where.createdBy = query.createdBy;
-    // Suporte a filtro por tag contida no array JSON (ex: tag=ocorrencia)
+    // ── 2. FILTROS DA QUERY ──────────────────────────────────────────────────
+    if (query.childId)     andConditions.push({ childId: query.childId });
+    if (query.classroomId) andConditions.push({ classroomId: query.classroomId });
+    if (query.unitId)      andConditions.push({ unitId: query.unitId });
+    if (query.type)        andConditions.push({ type: query.type });
+    if (query.createdBy)   andConditions.push({ createdBy: query.createdBy });
+
+    // Filtro por tag no array JSON (ex: tag=ocorrencia)
     if (query.tag) {
-      where.tags = { array_contains: query.tag };
+      andConditions.push({ tags: { array_contains: query.tag } });
     }
 
     if (query.startDate || query.endDate) {
-      where.eventDate = {};
-      if (query.startDate) where.eventDate.gte = new Date(query.startDate);
-      if (query.endDate) where.eventDate.lte = new Date(query.endDate);
+      const dateFilter: any = {};
+      if (query.startDate) dateFilter.gte = new Date(query.startDate);
+      if (query.endDate)   dateFilter.lte = new Date(query.endDate);
+      andConditions.push({ eventDate: dateFilter });
     }
+
+    // ── 3. QUERY FINAL ───────────────────────────────────────────────────────
+    const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const events = await this.prisma.diaryEvent.findMany({
       where,
       include: {
-        child: { select: { id: true, firstName: true, lastName: true } },
-        classroom: { select: { id: true, name: true } },
+        child:         { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
+        classroom:     { select: { id: true, name: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: { eventDate: 'desc' },
+      take: 500,
     });
 
     return events;

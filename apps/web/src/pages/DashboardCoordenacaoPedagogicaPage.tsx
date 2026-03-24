@@ -229,7 +229,18 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           };
         }));
       }
-      if (diarRes.status === 'fulfilled') setDiarios(diarRes.value.data ?? []);
+      if (diarRes.status === 'fulfilled') {
+        const rawDiarios: any[] = Array.isArray(diarRes.value.data) ? diarRes.value.data : [];
+        setDiarios(rawDiarios.map((d: any) => ({
+          id: d.id,
+          titulo: d.title ?? 'Diário de Bordo',
+          data: d.eventDate ? d.eventDate.slice(0, 10) : d.createdAt?.slice(0, 10) ?? '',
+          professorNome: d.createdByUser
+            ? `${d.createdByUser.firstName} ${d.createdByUser.lastName}`.trim()
+            : d.createdBy ?? 'Professor',
+          turmaNome: d.classroom?.name ?? d.classroomId ?? '—',
+        })));
+      }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
         ?? (e as { message?: string })?.message

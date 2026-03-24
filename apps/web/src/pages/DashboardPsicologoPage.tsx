@@ -26,6 +26,8 @@ import {
   BookOpen, ClipboardList, Bell, Filter,
 } from 'lucide-react';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
+import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
+import { TriangleAlert } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Rdic {
@@ -177,7 +179,7 @@ export default function DashboardPsicologoPage() {
   const [rdics, setRdics] = useState<Rdic[]>([]);
   const [observacoes, setObservacoes] = useState<Observacao[]>([]);
   const [dashboard, setDashboard] = useState<DashboardGeral | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'rdics' | 'observacoes' | 'alunos'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'rdics' | 'observacoes' | 'alunos' | 'ocorrencias'>('visao');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [busca, setBusca] = useState('');
@@ -268,6 +270,7 @@ export default function DashboardPsicologoPage() {
     { id: 'rdics',       label: `RDICs${rdicsRevisao.length > 0 ? ` (${rdicsRevisao.length})` : ''}`, icon: <FileText className="h-3.5 w-3.5" /> },
     { id: 'observacoes', label: 'Observações',     icon: <ClipboardList className="h-3.5 w-3.5" /> },
     { id: 'alunos',      label: 'Alunos',          icon: <Users className="h-3.5 w-3.5" /> },
+    { id: 'ocorrencias', label: 'Ocorrências',      icon: <TriangleAlert className="h-3.5 w-3.5" /> },
   ] as const;
 
   return (
@@ -617,6 +620,15 @@ export default function DashboardPsicologoPage() {
               </div>
             </SectionCard>
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: OCORRÊNCIAS
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'ocorrencias' && (
+        <div className="space-y-4">
+          <OcorrenciasPanel titulo="Ocorrências da Rede" />
         </div>
       )}
     </PageShell>
