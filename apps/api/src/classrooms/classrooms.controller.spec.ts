@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ClassroomsController } from './classrooms.controller';
 import { LookupService } from '../lookup/lookup.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
 import { ForbiddenException } from '@nestjs/common';
@@ -12,6 +13,17 @@ describe('ClassroomsController', () => {
 
   const mockLookupService = {
     getChildrenByClassroom: jest.fn(),
+  };
+
+  const mockPrismaService = {
+    classroomTeacher: { findMany: jest.fn().mockResolvedValue([]) },
+    classroom: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
   };
 
   const mockUserProfessor: JwtPayload = {
@@ -41,6 +53,7 @@ describe('ClassroomsController', () => {
       controllers: [ClassroomsController],
       providers: [
         { provide: LookupService, useValue: mockLookupService },
+        { provide: PrismaService, useValue: mockPrismaService },
         Reflector,
       ],
     })
