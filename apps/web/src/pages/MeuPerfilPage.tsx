@@ -61,7 +61,8 @@ export default function MeuPerfilPage() {
     setLoading(true);
     try {
       const res = await http.get('/auth/me');
-      const d = res.data;
+      // FIX: GET /auth/me retorna { user: {...} } — desempacotar antes de usar
+      const d = res.data?.user ?? res.data;
       setPerfil(d);
       setFormDados({ firstName: d.firstName, lastName: d.lastName, phone: d.phone || '' });
       setFormEmail({ email: d.email, senha: '' });
@@ -128,7 +129,8 @@ export default function MeuPerfilPage() {
 
   if (!perfil) return null;
 
-  const roleAtual = perfil.roles?.[0]?.roleType || '';
+  // FIX: backend retorna roles[0].type (não roleType) — tolerar ambos os formatos
+  const roleAtual = (perfil.roles?.[0] as any)?.type || (perfil.roles?.[0] as any)?.roleType || '';
   const iniciais = `${perfil.firstName?.[0] ?? '?'}${perfil.lastName?.[0] ?? ''}`.toUpperCase();
 
   return (
