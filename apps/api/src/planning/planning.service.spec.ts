@@ -169,6 +169,23 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
       expect(result.status).toBe(PlanningStatus.EM_REVISAO);
     });
 
+    it('deve lançar ForbiddenException se professor não-dono tentar enviar para revisão', async () => {
+      // Segurança: professor-2 não pode enviar planejamento criado por professor-1
+      const professorOutro = makeProfessor('professor-2');
+      const planningDeOutro = {
+        ...mockPlanningBase,
+        createdBy: 'professor-1', // dono é professor-1
+        status: PlanningStatus.RASCUNHO,
+      };
+
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
+      mockPrismaService.planning.findFirst.mockResolvedValue(planningDeOutro);
+
+      await expect(
+        service.submitForReview('planning-1', professorOutro),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('deve lançar BadRequestException se tentar enviar planejamento já EM_REVISAO', async () => {
       const professor = makeProfessor();
       const planningEmRevisao = { ...mockPlanningBase, status: PlanningStatus.EM_REVISAO };
