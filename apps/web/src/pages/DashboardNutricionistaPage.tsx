@@ -619,9 +619,6 @@ function AbaCardapio({ unitId }: { unitId: string }) {
     </div>
   );
 }
-    </div>
-  );
-}
 
 // ─── Sub-componente: Aba Nutrição ─────────────────────────────────────────────
 function AbaNutricao({ unitId }: { unitId: string }) {
