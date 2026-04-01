@@ -14,6 +14,8 @@ export interface MaterialRequestItem {
   item: string;
   quantidade: number;
   unidade?: string;
+  /** ID do material do catálogo (opcional — itens digitados manualmente não têm) */
+  materialId?: string | null;
 }
 
 export interface CreateMaterialRequestDto {

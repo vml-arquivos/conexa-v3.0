@@ -269,7 +269,7 @@ export class MaterialRequestService {
     const priority = dto.urgencia ? (priorityMap[dto.urgencia] ?? 'normal') : 'normal';
 
     // Normalizar itens: suporta novo formato (dto.itens) e legado (dto.item + dto.quantity)
-    const itensParaPersistir: Array<{ item: string; quantidade: number; unidade?: string }> = [];
+    const itensParaPersistir: Array<{ item: string; quantidade: number; unidade?: string; materialId?: string | null }> = [];
     if (dto.itens && dto.itens.length > 0) {
       for (const it of dto.itens) {
         if (it.item?.trim()) {
@@ -277,6 +277,7 @@ export class MaterialRequestService {
             item: it.item.trim(),
             quantidade: it.quantidade ?? 1,
             unidade: it.unidade,
+            materialId: it.materialId ?? null,
           });
         }
       }
@@ -384,10 +385,11 @@ export class MaterialRequestService {
             await this.prisma.$executeRaw(
               Prisma.sql`
                 INSERT INTO "MaterialRequestItem"
-                  (id, "materialRequestId", "productName", quantity, unit, "createdAt", "updatedAt")
+                  (id, "materialRequestId", "materialId", "productName", quantity, unit, "createdAt", "updatedAt")
                 VALUES (
                   ${itemId},
                   ${created.id},
+                  ${it.materialId ?? null},
                   ${it.item},
                   ${it.quantidade},
                   ${it.unidade ?? null},
