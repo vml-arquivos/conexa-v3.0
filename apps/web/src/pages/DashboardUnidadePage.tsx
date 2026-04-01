@@ -11,8 +11,9 @@ import {
 } from 'recharts';
 import {
   AlertTriangle, CheckCircle, Clock, ShoppingCart,
-  BookOpen, RefreshCw, ChevronRight, Package,
+  BookOpen, RefreshCw, ChevronRight, Package, TriangleAlert,
 } from 'lucide-react';
+import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 import { formatPedagogicalDate } from '../lib/formatDate';
@@ -69,7 +70,7 @@ export function DashboardUnidadePage() {
   const { user } = useAuth();
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<'pendencias' | 'alertas' | 'materiais' | 'planejamentos'>('pendencias');
+  const [abaAtiva, setAbaAtiva] = useState<'pendencias' | 'alertas' | 'materiais' | 'planejamentos' | 'ocorrencias'>('pendencias');
 
   const [turmas, setTurmas] = useState<TurmaReal[]>([]);
   const [requisicoes, setRequisicoes] = useState<RequisicaoReal[]>([]);
@@ -185,6 +186,7 @@ export function DashboardUnidadePage() {
     { id: 'alertas', label: 'Alertas', icone: <AlertTriangle className="h-4 w-4" /> },
     { id: 'materiais', label: 'Requisições', icone: <ShoppingCart className="h-4 w-4" /> },
     { id: 'planejamentos', label: 'Planejamentos', icone: <BookOpen className="h-4 w-4" /> },
+    { id: 'ocorrencias', label: 'Ocorrências', icone: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -494,6 +496,14 @@ export function DashboardUnidadePage() {
           )}
 
         </div>
+
+        {/* ─── OCORRÊNCIAS ─────────────────────────────────────────────── */}
+        {abaAtiva === 'ocorrencias' && (
+          <OcorrenciasPanel
+            titulo="Ocorrências da Unidade"
+            unitId={user?.unitId ?? undefined}
+          />
+        )}
       </div>
     </div>
   );

@@ -298,8 +298,12 @@ export class DiaryEventService {
     if (query.createdBy)   andConditions.push({ createdBy: query.createdBy });
 
     // Filtro por tag no array JSON (ex: tag=ocorrencia)
+    // IMPORTANTE: Prisma 5 + PostgreSQL — array_contains em campo Json? requer
+    // que o valor seja um ARRAY, não uma string simples.
+    // Ex correto: { tags: { array_contains: ["ocorrencia"] } }
+    // Ex errado:  { tags: { array_contains: "ocorrencia" } }  ← retorna 0 resultados
     if (query.tag) {
-      andConditions.push({ tags: { array_contains: query.tag } });
+      andConditions.push({ tags: { array_contains: [query.tag] } });
     }
 
     if (query.startDate || query.endDate) {

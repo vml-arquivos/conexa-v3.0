@@ -81,7 +81,7 @@ export function OcorrenciasPanel({
   const [busca, setBusca] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroTurma, setFiltroTurma] = useState('');
-  const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('7d');
+  const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('todos');
   const printRef = useRef<HTMLDivElement>(null);
 
   const carregar = useCallback(async () => {
