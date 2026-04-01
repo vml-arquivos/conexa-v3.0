@@ -281,9 +281,9 @@ model Mantenedora {
   alertasOperacionais  AlertaOperacional[]
   templatesOffline     TemplateOffline[]
   recadosTurma         RecadoTurma[]
-  classroomPosts       ClassroomPost[]
+   classroomPosts       ClassroomPost[]
   materiais            Material[]
-
+  cardapios            Cardapio[]
   @@index([cnpj])
   @@index([isActive])
 }
@@ -338,8 +338,8 @@ model Unit {
   pedidosCompra        PedidoCompra[]
   solicitacoesCorrecao SolicitacaoCorrecao[]
   aiContexts           AIContext[]
-
-  dailyMetrics DailyMetric[]
+  dailyMetrics         DailyMetric[]
+  cardapios            Cardapio[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
@@ -1963,4 +1963,89 @@ model Material {
   @@index([mantenedoraId])
   @@index([category])
   @@index([isActive])
+}
+
+// ============================================================================
+// 26. CARDÁPIO E NUTRIÇÃO
+// ============================================================================
+
+enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+}
+
+enum TipoRefeicao {
+  CAFE_MANHA
+  ALMOCO
+  LANCHE_TARDE
+  JANTAR
+}
+
+/// Cardápio semanal da unidade
+model Cardapio {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  /// Semana de referência: primeiro dia da semana (segunda-feira) no formato YYYY-MM-DD
+  semana        String   @db.VarChar(10)
+  titulo        String?  @db.VarChar(255)
+  observacoes   String?  @db.Text
+  publicado     Boolean  @default(false)
+  createdBy     String?  @db.VarChar(255)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mantenedora Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  refeicoes   CardapioRefeicao[]
+
+  @@unique([unitId, semana])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([semana])
+  @@map("cardapio")
+}
+
+/// Refeição de um dia dentro de um cardápio semanal
+model CardapioRefeicao {
+  id           String       @id @default(cuid())
+  cardapioId   String
+  diaSemana    DiaSemana
+  tipoRefeicao TipoRefeicao
+  observacoes  String?      @db.Text
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  cardapio Cardapio       @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
+  itens    CardapioItem[]
+
+  @@unique([cardapioId, diaSemana, tipoRefeicao])
+  @@index([cardapioId])
+  @@map("cardapio_refeicao")
+}
+
+/// Item (alimento/preparação) de uma refeição do cardápio
+model CardapioItem {
+  id         String   @id @default(cuid())
+  refeicaoId String
+  nome       String   @db.VarChar(255)
+  quantidade Decimal? @db.Decimal(10, 3)
+  unidade    String?  @db.VarChar(50)
+  /// Informação nutricional por porção (opcional)
+  calorias     Decimal? @db.Decimal(8, 2)
+  proteinas    Decimal? @db.Decimal(8, 2)
+  carboidratos Decimal? @db.Decimal(8, 2)
+  gorduras     Decimal? @db.Decimal(8, 2)
+  fibras       Decimal? @db.Decimal(8, 2)
+  sodio        Decimal? @db.Decimal(8, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  refeicao CardapioRefeicao @relation(fields: [refeicaoId], references: [id], onDelete: Cascade)
+
+  @@index([refeicaoId])
+  @@map("cardapio_item")
 }
