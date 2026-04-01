@@ -7,14 +7,14 @@
  * Usado em: DashboardCoordenacaoPedagogicaPage, DashboardCoordenacaoGeralPage,
  *           DashboardDiretorPage, DashboardNutricionistaPage, professor (DiarioBordoPage)
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import http from '../../api/http';
 import { Card, CardContent } from '../ui/card';
 import { LoadingState } from '../ui/LoadingState';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import {
   TriangleAlert, RefreshCw, Camera, User, BookOpen,
-  Calendar, ChevronDown, ChevronUp, Search, Printer, FileDown,
+  Calendar, ChevronDown, ChevronUp, Search, Printer,
 } from 'lucide-react';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -61,6 +61,8 @@ function formatData(eventDate: string): string {
 interface OcorrenciasPanelProps {
   /** Filtrar por unidade específica (opcional — se omitido, usa escopo do usuário) */
   unitId?: string;
+  /** Filtrar por turma específica (opcional — para professor ver apenas sua turma) */
+  classroomId?: string;
   /** Título do painel */
   titulo?: string;
   /** Se true, mostra apenas as ocorrências do professor logado (para DiarioBordoPage) */
@@ -69,6 +71,7 @@ interface OcorrenciasPanelProps {
 
 export function OcorrenciasPanel({
   unitId,
+  classroomId,
   titulo = 'Ocorrências Registradas',
   apenasMinhas = false,
 }: OcorrenciasPanelProps) {
@@ -77,6 +80,7 @@ export function OcorrenciasPanel({
   const [expandido, setExpandido] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('7d');
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -88,7 +92,11 @@ export function OcorrenciasPanel({
         tag: 'ocorrencia',
         limit: '200',
       };
+      // Escopo de unidade (coordenadora de unidade / STAFF_CENTRAL com unitId)
       if (unitId) params.unitId = unitId;
+      // Escopo de turma (professor — backend já filtra, mas passamos para garantir)
+      if (classroomId) params.classroomId = classroomId;
+
       if (filtroPeriodo === 'hoje') {
         params.startDate = hoje + 'T00:00:00.000Z';
         params.endDate   = hoje + 'T23:59:59.999Z';
@@ -103,16 +111,26 @@ export function OcorrenciasPanel({
       }
       const res = await http.get('/diary-events', { params });
       const raw: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
-      // O servidor já filtra por tag=ocorrencia
       setOcorrencias(raw);
     } catch {
       setOcorrencias([]);
     } finally {
       setLoading(false);
     }
-  }, [unitId, filtroPeriodo]);
+  }, [unitId, classroomId, filtroPeriodo]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Lista de turmas únicas para o filtro da coordenadora
+  const turmasUnicas = useMemo(() => {
+    const mapa = new Map<string, string>();
+    ocorrencias.forEach(o => {
+      if (o.classroom?.id && o.classroom?.name) {
+        mapa.set(o.classroom.id, o.classroom.name);
+      }
+    });
+    return Array.from(mapa.entries()).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  }, [ocorrencias]);
 
   // Filtros locais
   const filtradas = ocorrencias.filter(o => {
@@ -125,7 +143,10 @@ export function OcorrenciasPanel({
       desc.includes(busca.toLowerCase());
     const cat = getCategoriaTag(o);
     const matchCat = !filtroCategoria || cat === filtroCategoria;
-    return matchBusca && matchCat;
+    // Filtro por turma: se classroomId foi passado como prop, o backend já filtrou.
+    // O filtroTurma local é para a coordenadora que vê todas as turmas.
+    const matchTurma = !filtroTurma || o.classroom?.id === filtroTurma;
+    return matchBusca && matchCat && matchTurma;
   });
 
   // ─── Impressão / PDF ────────────────────────────────────────────────────────
@@ -248,6 +269,20 @@ export function OcorrenciasPanel({
             </button>
           ))}
         </div>
+
+        {/* Filtro por turma — exibido apenas quando a coordenadora vê múltiplas turmas */}
+        {!classroomId && turmasUnicas.length > 1 && (
+          <select
+            value={filtroTurma}
+            onChange={e => setFiltroTurma(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+          >
+            <option value="">Todas as turmas</option>
+            {turmasUnicas.map(([id, nome]) => (
+              <option key={id} value={id}>{nome}</option>
+            ))}
+          </select>
+        )}
 
         {/* Categoria */}
         <select
