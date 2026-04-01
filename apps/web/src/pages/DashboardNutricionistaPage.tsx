@@ -1305,7 +1305,6 @@ export function DashboardNutricionistaPage() {
             </div>
           )}
         </div>
-        </div>
       )}
 
       {/* ── Aba: Cardápio Semanal ── */}
