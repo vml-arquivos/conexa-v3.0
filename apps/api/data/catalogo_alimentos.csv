@@ -1,0 +1,339 @@
+nome,categoria,unidade_padrao,porcao_padrao_g,calorias_100g,proteinas_100g,carboidratos_100g,gorduras_100g,fibras_100g,sodio_100g,descricao
+Arroz branco cozido,CEREAIS_GRAOS,g,150,128,2.5,28.1,0.2,1.6,14,Arroz branco polido cozido
+Arroz integral cozido,CEREAIS_GRAOS,g,150,124,2.6,25.8,1.0,2.7,2,Arroz integral cozido
+Macarrão cozido,CEREAIS_GRAOS,g,120,111,3.8,22.3,0.5,1.8,2,Macarrão de sêmola cozido
+Macarrão integral cozido,CEREAIS_GRAOS,g,120,107,4.2,20.9,0.8,3.5,3,Macarrão integral cozido
+Pão francês,CEREAIS_GRAOS,g,50,300,9.4,58.6,3.1,2.3,592,Pão francês tradicional
+Pão de forma integral,CEREAIS_GRAOS,g,30,247,9.1,45.2,3.4,5.9,430,Pão de forma integral
+Pão de queijo,CEREAIS_GRAOS,g,40,290,5.8,42.1,10.5,0.5,320,Pão de queijo assado
+Tapioca,CEREAIS_GRAOS,g,100,358,0.2,88.7,0.0,0.9,4,Tapioca (goma de mandioca)
+Cuscuz de milho cozido,CEREAIS_GRAOS,g,150,112,2.1,23.8,0.5,1.2,210,Cuscuz de milho cozido
+Aveia em flocos,CEREAIS_GRAOS,g,40,394,13.9,66.6,8.5,9.1,5,Aveia em flocos finos
+Granola,CEREAIS_GRAOS,g,40,408,9.2,62.3,14.5,5.8,45,Granola com frutas secas
+Milho verde cozido,CEREAIS_GRAOS,g,100,86,3.2,18.7,1.2,2.0,15,Milho verde em espiga cozido
+Polenta cozida,CEREAIS_GRAOS,g,150,70,1.6,15.1,0.3,0.8,180,Polenta (fubá cozido)
+Biscoito de arroz,CEREAIS_GRAOS,g,20,385,7.2,83.6,2.1,1.8,320,Biscoito de arroz sem recheio
+Feijão carioca cozido,LEGUMINOSAS,g,86,76,4.8,13.6,0.5,8.4,2,Feijão carioca cozido
+Feijão preto cozido,LEGUMINOSAS,g,86,77,4.5,14.0,0.5,8.4,2,Feijão preto cozido
+Feijão branco cozido,LEGUMINOSAS,g,86,73,5.0,13.1,0.4,7.0,2,Feijão branco cozido
+Lentilha cozida,LEGUMINOSAS,g,80,93,6.3,16.3,0.4,7.9,2,Lentilha cozida
+Grão-de-bico cozido,LEGUMINOSAS,g,80,164,8.9,27.4,2.6,7.6,7,Grão-de-bico cozido
+Ervilha cozida,LEGUMINOSAS,g,80,69,5.4,12.4,0.2,5.5,3,Ervilha verde cozida
+Soja cozida,LEGUMINOSAS,g,80,141,12.0,11.5,6.4,6.0,1,Soja cozida
+Frango peito grelhado,PROTEINAS,g,100,159,32.0,0.0,3.2,0.0,68,Peito de frango grelhado sem pele
+Frango coxa cozida,PROTEINAS,g,100,181,25.9,0.0,8.1,0.0,82,Coxa de frango cozida sem pele
+Carne bovina patinho,PROTEINAS,g,100,219,30.7,0.0,10.4,0.0,63,Patinho bovino grelhado
+Carne bovina acém cozido,PROTEINAS,g,100,223,28.9,0.0,11.4,0.0,58,Acém bovino cozido
+Peixe tilápia grelhada,PROTEINAS,g,100,96,20.1,0.0,1.7,0.0,56,Tilápia grelhada
+Peixe atum em lata,PROTEINAS,g,100,128,28.0,0.0,1.5,0.0,396,Atum em lata em água
+Peixe sardinha,PROTEINAS,g,100,208,24.5,0.0,11.5,0.0,307,Sardinha assada
+Ovo cozido,PROTEINAS,g,50,146,13.3,0.6,9.5,0.0,124,Ovo de galinha cozido
+Ovo mexido,PROTEINAS,g,60,148,10.6,1.6,11.1,0.0,207,Ovo mexido com azeite
+Carne suína lombo,PROTEINAS,g,100,197,27.2,0.0,9.3,0.0,58,Lombo suíno grelhado
+Linguiça de frango,PROTEINAS,g,60,195,14.5,2.1,14.5,0.0,680,Linguiça de frango assada
+Frango assado,PROTEINAS,g,100,215,27.6,0.0,11.2,0.0,75,Frango assado inteiro
+Carne moída refogada,PROTEINAS,g,100,215,26.4,0.0,11.8,0.0,72,Carne moída bovina refogada
+Leite integral,LATICINIOS,ml,200,61,3.2,4.8,3.3,0.0,38,Leite de vaca integral
+Leite desnatado,LATICINIOS,ml,200,35,3.4,5.0,0.1,0.0,52,Leite de vaca desnatado
+Iogurte natural,LATICINIOS,g,150,51,3.5,3.6,2.6,0.0,40,Iogurte natural integral
+Iogurte de frutas,LATICINIOS,g,150,96,3.2,17.4,1.8,0.2,52,Iogurte de frutas
+Queijo minas frescal,LATICINIOS,g,30,264,17.4,3.0,20.2,0.0,330,Queijo minas frescal
+Queijo mussarela,LATICINIOS,g,30,300,22.2,2.4,22.4,0.0,627,Queijo mussarela
+Queijo prato,LATICINIOS,g,30,358,24.6,2.0,27.9,0.0,600,Queijo prato
+Requeijão cremoso,LATICINIOS,g,30,255,9.5,3.3,22.6,0.0,530,Requeijão cremoso
+Coalhada,LATICINIOS,g,100,62,3.8,4.5,3.1,0.0,48,Coalhada natural
+Banana nanica,FRUTAS,unidade,80,92,1.3,23.8,0.1,1.9,2,Banana nanica madura
+Banana prata,FRUTAS,unidade,80,98,1.3,26.0,0.1,1.9,2,Banana prata madura
+Maçã,FRUTAS,unidade,130,56,0.3,15.2,0.1,1.3,1,Maçã com casca
+Pera,FRUTAS,unidade,130,55,0.5,14.9,0.1,2.2,1,Pera com casca
+Laranja pera,FRUTAS,unidade,130,37,0.9,8.9,0.1,1.1,1,Laranja pera descascada
+Laranja lima,FRUTAS,unidade,130,35,0.8,8.5,0.1,1.0,1,Laranja lima descascada
+Tangerina,FRUTAS,unidade,100,38,0.9,9.5,0.2,1.3,1,Tangerina descascada
+Melancia,FRUTAS,g,200,30,0.6,7.6,0.1,0.3,1,Melancia sem casca
+Melão,FRUTAS,g,150,29,0.9,7.5,0.1,0.3,10,Melão amarelo sem casca
+Mamão papaia,FRUTAS,g,150,40,0.5,10.4,0.1,1.8,4,Mamão papaia maduro
+Mamão formosa,FRUTAS,g,150,38,0.5,9.8,0.1,1.7,3,Mamão formosa maduro
+Manga tommy,FRUTAS,g,130,64,0.4,17.0,0.3,1.6,4,Manga tommy madura
+Uva itália,FRUTAS,g,100,69,0.6,18.1,0.1,0.9,2,Uva itália com casca
+Uva rubi,FRUTAS,g,100,67,0.6,17.5,0.1,0.9,2,Uva rubi com casca
+Morango,FRUTAS,g,100,30,0.8,7.1,0.3,1.7,1,Morango fresco
+Abacaxi,FRUTAS,g,100,48,0.9,12.3,0.1,1.0,1,Abacaxi fresco sem casca
+Goiaba,FRUTAS,g,100,54,2.6,12.5,0.9,6.3,4,Goiaba vermelha
+Caju,FRUTAS,g,100,43,1.3,10.2,0.2,1.7,4,Caju fresco
+Acerola,FRUTAS,g,100,32,0.9,7.5,0.2,1.5,3,Acerola fresca
+Abacate,FRUTAS,g,100,96,1.2,6.0,8.4,6.3,4,Abacate fresco
+Kiwi,FRUTAS,g,100,61,1.1,14.7,0.5,3.0,5,Kiwi fresco sem casca
+Pêssego,FRUTAS,g,100,43,1.2,10.8,0.1,1.5,1,Pêssego fresco
+Ameixa,FRUTAS,g,100,46,0.7,11.4,0.3,1.4,1,Ameixa fresca
+Figo,FRUTAS,g,100,74,0.8,19.2,0.3,2.9,1,Figo fresco
+Coco ralado,FRUTAS,g,20,354,3.4,15.2,33.5,9.0,15,Coco ralado fresco
+Alface,VERDURAS_LEGUMES,g,50,11,1.3,1.7,0.2,1.8,9,Alface crespa crua
+Alface americana,VERDURAS_LEGUMES,g,50,10,1.2,1.6,0.2,1.7,8,Alface americana crua
+Couve manteiga,VERDURAS_LEGUMES,g,50,35,3.1,6.8,0.7,2.0,37,Couve manteiga crua
+Espinafre,VERDURAS_LEGUMES,g,50,24,2.9,3.6,0.4,2.2,79,Espinafre cru
+Brócolis,VERDURAS_LEGUMES,g,80,34,2.8,6.6,0.4,2.6,33,Brócolis cozido
+Couve-flor,VERDURAS_LEGUMES,g,80,25,1.9,5.0,0.2,2.0,30,Couve-flor cozida
+Cenoura cozida,VERDURAS_LEGUMES,g,80,41,0.9,9.6,0.2,3.2,58,Cenoura cozida
+Cenoura crua,VERDURAS_LEGUMES,g,80,34,0.9,7.7,0.2,3.2,77,Cenoura crua
+Beterraba cozida,VERDURAS_LEGUMES,g,80,43,1.7,9.9,0.1,2.0,65,Beterraba cozida
+Batata inglesa cozida,VERDURAS_LEGUMES,g,100,52,1.2,11.9,0.1,1.2,4,Batata inglesa cozida sem casca
+Batata-doce cozida,VERDURAS_LEGUMES,g,100,77,1.4,18.4,0.1,2.2,27,Batata-doce cozida
+Mandioca cozida,VERDURAS_LEGUMES,g,100,125,0.6,30.1,0.3,1.9,9,Mandioca cozida
+Inhame cozido,VERDURAS_LEGUMES,g,100,116,1.5,27.9,0.2,1.8,9,Inhame cozido
+Cará cozido,VERDURAS_LEGUMES,g,100,98,1.6,23.3,0.1,1.5,8,Cará cozido
+Abobrinha cozida,VERDURAS_LEGUMES,g,80,19,1.4,3.8,0.2,1.2,3,Abobrinha italiana cozida
+Chuchu cozido,VERDURAS_LEGUMES,g,80,20,0.8,4.5,0.2,1.5,3,Chuchu cozido
+Vagem cozida,VERDURAS_LEGUMES,g,80,28,1.8,5.8,0.2,3.4,3,Vagem cozida
+Quiabo cozido,VERDURAS_LEGUMES,g,80,25,2.0,5.2,0.1,3.2,8,Quiabo cozido
+Jiló cozido,VERDURAS_LEGUMES,g,80,22,1.4,4.6,0.3,2.5,4,Jiló cozido
+Berinjela cozida,VERDURAS_LEGUMES,g,80,24,0.9,5.5,0.2,2.5,3,Berinjela cozida
+Tomate,VERDURAS_LEGUMES,g,100,15,1.1,3.1,0.2,1.2,4,Tomate cru
+Pepino,VERDURAS_LEGUMES,g,80,13,0.7,2.9,0.1,0.7,2,Pepino cru
+Pimentão verde,VERDURAS_LEGUMES,g,80,20,0.9,4.8,0.2,1.4,3,Pimentão verde cru
+Pimentão vermelho,VERDURAS_LEGUMES,g,80,28,1.0,6.7,0.3,2.1,4,Pimentão vermelho cru
+Cebola,VERDURAS_LEGUMES,g,50,40,1.2,9.3,0.1,1.7,4,Cebola crua
+Alho,VERDURAS_LEGUMES,g,5,149,6.4,33.1,0.5,2.1,17,Alho cru
+Abóbora cozida,VERDURAS_LEGUMES,g,100,26,1.2,6.0,0.1,0.5,2,Abóbora moranga cozida
+Milho verde refogado,VERDURAS_LEGUMES,g,100,86,3.2,18.7,1.2,2.0,15,Milho verde refogado
+Ervilha fresca cozida,VERDURAS_LEGUMES,g,80,69,5.4,12.4,0.2,5.5,3,Ervilha fresca cozida
+Acelga,VERDURAS_LEGUMES,g,50,19,1.8,3.7,0.2,1.6,213,Acelga crua
+Rúcula,VERDURAS_LEGUMES,g,30,25,2.6,3.7,0.7,1.6,27,Rúcula crua
+Agrião,VERDURAS_LEGUMES,g,30,22,2.3,3.7,0.3,1.5,60,Agrião cru
+Repolho cozido,VERDURAS_LEGUMES,g,80,15,1.3,3.1,0.1,1.5,8,Repolho cozido
+Repolho roxo cru,VERDURAS_LEGUMES,g,80,22,1.4,5.2,0.2,2.1,27,Repolho roxo cru
+Aipim frito,VERDURAS_LEGUMES,g,100,228,1.2,37.5,8.5,1.9,12,Aipim frito em óleo
+Azeite de oliva,GORDURAS_OLEOS,ml,10,884,0.0,0.0,100.0,0.0,2,Azeite de oliva extra virgem
+Óleo de soja,GORDURAS_OLEOS,ml,10,884,0.0,0.0,100.0,0.0,0,Óleo de soja refinado
+Manteiga,GORDURAS_OLEOS,g,10,717,0.7,0.1,81.0,0.0,576,Manteiga com sal
+Margarina,GORDURAS_OLEOS,g,10,541,0.2,0.6,60.0,0.0,600,Margarina vegetal
+Creme de leite,GORDURAS_OLEOS,g,30,319,2.1,3.2,32.0,0.0,36,Creme de leite integral
+Açúcar cristal,ACUCARES_DOCES,g,10,387,0.0,99.7,0.0,0.0,1,Açúcar cristal refinado
+Açúcar mascavo,ACUCARES_DOCES,g,10,372,0.4,95.6,0.1,0.0,28,Açúcar mascavo
+Mel,ACUCARES_DOCES,g,15,309,0.4,84.0,0.0,0.2,4,Mel de abelha
+Doce de leite,ACUCARES_DOCES,g,30,295,6.7,54.0,7.4,0.0,130,Doce de leite cremoso
+Geleia de frutas,ACUCARES_DOCES,g,20,243,0.4,63.7,0.1,0.6,20,Geleia de frutas vermelhas
+Achocolatado em pó,ACUCARES_DOCES,g,20,390,5.5,79.8,4.5,3.5,120,Achocolatado em pó
+Chocolate ao leite,ACUCARES_DOCES,g,20,547,7.7,57.9,31.3,3.4,79,Chocolate ao leite
+Biscoito maisena,ACUCARES_DOCES,g,30,447,7.1,76.0,13.0,1.0,320,Biscoito maisena
+Biscoito de mel,ACUCARES_DOCES,g,30,420,6.5,74.0,11.5,1.5,280,Biscoito de mel
+Pudim de leite,ACUCARES_DOCES,g,100,155,4.5,22.8,5.3,0.0,68,Pudim de leite condensado
+Gelatina de frutas,ACUCARES_DOCES,g,100,59,1.8,14.0,0.0,0.0,42,Gelatina de frutas colorida
+Canjica cozida,ACUCARES_DOCES,g,150,117,2.8,26.0,0.5,1.2,5,Canjica branca cozida com leite
+Arroz doce,ACUCARES_DOCES,g,150,145,3.2,29.5,2.0,0.5,35,Arroz doce com leite e canela
+Bolo simples,ACUCARES_DOCES,g,60,350,5.5,55.0,12.0,0.8,280,Bolo simples de baunilha
+Bolo de cenoura,ACUCARES_DOCES,g,60,310,4.8,50.0,10.5,1.2,220,Bolo de cenoura com cobertura
+Suco de laranja natural,BEBIDAS,ml,200,45,0.7,10.4,0.2,0.2,1,Suco de laranja natural
+Suco de acerola,BEBIDAS,ml,200,32,0.5,7.8,0.1,0.5,2,Suco de acerola natural
+Suco de maracujá,BEBIDAS,ml,200,25,0.7,5.8,0.1,0.3,5,Suco de maracujá natural
+Suco de goiaba,BEBIDAS,ml,200,40,0.5,9.8,0.2,0.8,4,Suco de goiaba natural
+Suco de manga,BEBIDAS,ml,200,52,0.4,13.5,0.2,0.8,3,Suco de manga natural
+Vitamina de banana,BEBIDAS,ml,200,98,3.5,18.5,2.2,0.8,32,Vitamina de banana com leite
+Vitamina de mamão,BEBIDAS,ml,200,75,2.8,14.2,1.8,0.9,28,Vitamina de mamão com leite
+Água de coco,BEBIDAS,ml,200,19,0.7,3.7,0.2,0.0,105,Água de coco natural
+Chá de camomila,BEBIDAS,ml,200,1,0.0,0.2,0.0,0.0,1,Chá de camomila sem açúcar
+Leite com achocolatado,BEBIDAS,ml,200,115,5.5,17.8,3.2,0.5,82,Leite integral com achocolatado
+Frango ao molho,PREPARACOES,g,150,175,25.0,5.5,5.5,0.5,380,Frango ao molho de tomate
+Carne ensopada,PREPARACOES,g,150,210,24.0,8.0,9.0,1.5,420,Carne bovina ensopada
+Peixe ao forno,PREPARACOES,g,150,148,22.0,3.5,5.0,0.5,280,Peixe assado ao forno
+Omelete,PREPARACOES,g,100,185,12.5,2.5,13.5,0.5,310,Omelete de queijo
+Sopa de legumes,PREPARACOES,g,200,55,2.5,10.5,0.8,2.0,380,Sopa de legumes variados
+Caldo de feijão,PREPARACOES,g,200,82,4.5,14.0,1.0,3.5,280,Caldo de feijão temperado
+Purê de batata,PREPARACOES,g,150,98,2.0,18.5,2.5,1.5,320,Purê de batata com manteiga
+Purê de abóbora,PREPARACOES,g,150,58,1.5,13.5,0.5,1.2,120,Purê de abóbora
+Farofa de mandioca,PREPARACOES,g,50,358,2.5,74.0,5.5,3.5,420,Farofa de mandioca torrada
+Macarrão ao molho,PREPARACOES,g,200,145,5.5,26.0,2.5,2.0,380,Macarrão ao molho de tomate
+Frango xadrez,PREPARACOES,g,150,165,22.0,8.5,4.5,1.5,520,Frango xadrez com legumes
+Arroz com feijão,PREPARACOES,g,200,145,6.5,28.5,1.5,4.5,180,Arroz branco com feijão carioca
+Salada de frutas,PREPARACOES,g,150,58,0.8,14.5,0.2,1.5,5,Salada de frutas variadas
+Vitamina de frutas,PREPARACOES,ml,200,88,3.2,16.8,2.0,1.2,28,Vitamina de frutas com leite
+Creme de milho,PREPARACOES,g,150,98,3.0,18.5,2.0,1.5,280,Creme de milho cremoso
+Mingau de aveia,PREPARACOES,g,200,105,4.5,18.5,2.5,2.5,52,Mingau de aveia com leite
+Mingau de milho,PREPARACOES,g,200,98,3.0,20.5,1.5,1.0,48,Mingau de fubá com leite
+Canjica com amendoim,PREPARACOES,g,150,195,5.5,32.5,5.5,2.5,35,Canjica com amendoim e leite
+Pamonha,PREPARACOES,g,150,215,4.5,38.5,5.5,2.0,120,Pamonha de milho verde
+Bolinho de chuva,PREPARACOES,g,50,285,5.5,42.5,10.5,1.0,180,Bolinho de chuva com açúcar
+Pão com manteiga,PREPARACOES,g,60,345,7.5,48.5,13.5,1.5,520,Pão francês com manteiga
+Tapioca recheada,PREPARACOES,g,100,285,8.5,42.5,8.5,1.0,280,Tapioca com queijo e presunto
+Sanduíche natural,PREPARACOES,g,150,245,12.5,32.5,7.5,2.5,480,Sanduíche natural de frango
+Amendoim torrado,OLEAGINOSAS,g,30,567,25.8,16.1,49.2,8.5,18,Amendoim torrado sem sal
+Castanha de caju,OLEAGINOSAS,g,30,570,18.5,29.1,46.4,3.7,12,Castanha de caju torrada
+Castanha do pará,OLEAGINOSAS,g,20,656,14.3,12.3,66.4,7.5,3,Castanha do pará
+Nozes,OLEAGINOSAS,g,20,620,14.3,13.7,62.5,6.7,2,Nozes sem casca
+Amêndoas,OLEAGINOSAS,g,20,579,21.2,21.7,49.9,12.5,1,Amêndoas torradas sem sal
+Pasta de amendoim,OLEAGINOSAS,g,20,589,25.1,21.6,49.9,6.0,340,Pasta de amendoim integral
+Presunto,EMBUTIDOS,g,30,145,16.5,1.5,8.0,0.0,1180,Presunto cozido fatiado
+Peito de peru,EMBUTIDOS,g,30,109,18.5,2.5,2.8,0.0,980,Peito de peru defumado
+Salsicha de frango,EMBUTIDOS,g,50,180,11.5,3.5,13.5,0.0,820,Salsicha de frango cozida
+Patê de atum,EMBUTIDOS,g,30,180,15.5,2.5,11.5,0.0,580,Patê de atum
+Farinha de trigo,FARINHAS_AMIDOS,g,50,361,9.8,75.1,1.4,2.3,2,Farinha de trigo branca
+Farinha de mandioca,FARINHAS_AMIDOS,g,50,361,1.8,87.9,0.3,5.4,3,Farinha de mandioca torrada
+Fubá,FARINHAS_AMIDOS,g,50,361,7.9,77.7,1.3,3.7,1,Fubá de milho
+Amido de milho,FARINHAS_AMIDOS,g,20,381,0.3,91.2,0.1,0.9,3,Amido de milho (maisena)
+Farinha de aveia,FARINHAS_AMIDOS,g,40,389,13.2,66.6,6.9,9.1,5,Farinha de aveia
+Farinha de arroz,FARINHAS_AMIDOS,g,50,366,6.0,80.5,0.5,2.4,2,Farinha de arroz
+Molho de tomate,TEMPEROS_CONDIMENTOS,g,50,29,1.5,6.0,0.3,1.5,380,Molho de tomate industrializado
+Extrato de tomate,TEMPEROS_CONDIMENTOS,g,20,32,1.8,7.0,0.2,1.8,420,Extrato de tomate
+Sal refinado,TEMPEROS_CONDIMENTOS,g,1,0,0.0,0.0,0.0,0.0,38758,Sal refinado de cozinha
+Vinagre,TEMPEROS_CONDIMENTOS,ml,10,4,0.0,0.8,0.0,0.0,5,Vinagre de álcool
+Limão,TEMPEROS_CONDIMENTOS,g,30,30,1.1,7.3,0.3,2.5,2,Limão taiti
+Canela em pó,TEMPEROS_CONDIMENTOS,g,3,261,3.9,55.5,3.2,53.1,10,Canela em pó
+Orégano seco,TEMPEROS_CONDIMENTOS,g,2,265,9.0,64.4,4.3,42.5,25,Orégano desidratado
+Salsinha fresca,TEMPEROS_CONDIMENTOS,g,10,36,3.0,6.3,0.8,3.3,56,Salsinha fresca
+Cebolinha,TEMPEROS_CONDIMENTOS,g,10,30,1.9,6.5,0.3,2.6,17,Cebolinha verde fresca
+Coentro fresco,TEMPEROS_CONDIMENTOS,g,10,23,2.1,3.7,0.5,2.8,46,Coentro fresco
+Gengibre,TEMPEROS_CONDIMENTOS,g,10,80,1.8,17.8,0.8,2.0,13,Gengibre fresco
+Cúrcuma,TEMPEROS_CONDIMENTOS,g,3,354,7.8,64.9,9.9,21.1,38,Cúrcuma em pó (açafrão da terra)
+Sopa de macarrão,SOPAS_CALDOS,g,200,62,2.8,11.5,0.8,1.2,380,Sopa de macarrão com legumes
+Caldo de galinha,SOPAS_CALDOS,ml,200,18,1.5,2.5,0.3,0.0,680,Caldo de galinha caseiro
+Sopa de abóbora,SOPAS_CALDOS,g,200,48,1.5,10.5,0.5,1.5,280,Sopa creme de abóbora
+Sopa de lentilha,SOPAS_CALDOS,g,200,85,5.5,14.5,1.0,4.5,320,Sopa de lentilha com legumes
+Caldo verde,SOPAS_CALDOS,g,200,75,3.5,10.5,2.0,2.0,420,Caldo verde com couve
+Sopa de frango,SOPAS_CALDOS,g,200,78,7.5,8.5,1.5,1.5,380,Sopa de frango com legumes
+Iogurte grego,LATICINIOS,g,100,97,9.0,3.6,5.0,0.0,36,Iogurte grego natural
+Queijo cottage,LATICINIOS,g,100,98,11.1,3.4,4.3,0.0,364,Queijo cottage
+Leite de soja,LATICINIOS,ml,200,33,3.3,2.8,1.8,0.0,52,Leite de soja natural
+Leite de coco,LATICINIOS,ml,50,197,2.1,2.8,21.3,0.0,13,Leite de coco integral
+Creme de arroz,CEREAIS_GRAOS,g,150,88,1.8,19.5,0.5,0.5,45,Creme de arroz cozido
+Polvilho azedo,FARINHAS_AMIDOS,g,50,349,0.4,86.4,0.1,1.5,2,Polvilho azedo
+Polvilho doce,FARINHAS_AMIDOS,g,50,349,0.4,86.4,0.1,1.5,2,Polvilho doce
+Pipoca estourada,CEREAIS_GRAOS,g,30,387,12.7,77.9,4.3,14.5,8,Pipoca estourada sem sal
+Granola com mel,CEREAIS_GRAOS,g,40,415,9.5,63.5,15.0,5.5,48,Granola com mel e frutas
+Barra de cereal,CEREAIS_GRAOS,g,25,380,7.5,68.5,9.5,4.5,120,Barra de cereal com frutas
+Biscoito integral,CEREAIS_GRAOS,g,30,420,8.5,68.5,12.5,5.5,280,Biscoito integral
+Torrada integral,CEREAIS_GRAOS,g,20,380,10.5,70.5,5.5,6.5,420,Torrada integral
+Cuscuz paulista,PREPARACOES,g,150,175,8.5,28.5,3.5,2.5,380,Cuscuz paulista com legumes
+Escondidinho de frango,PREPARACOES,g,200,195,14.5,22.5,5.5,2.0,420,Escondidinho de frango com mandioca
+Lasanha de frango,PREPARACOES,g,200,245,14.5,28.5,8.5,2.0,480,Lasanha de frango com molho branco
+Quibe assado,PREPARACOES,g,100,195,15.5,14.5,8.5,1.5,380,Quibe assado de carne bovina
+Almôndegas,PREPARACOES,g,100,215,16.5,8.5,12.5,1.0,420,Almôndegas de carne bovina
+Risoto de frango,PREPARACOES,g,200,215,12.5,32.5,4.5,1.5,380,Risoto de frango com legumes
+Yakisoba de frango,PREPARACOES,g,200,195,12.5,28.5,4.5,2.5,520,Yakisoba de frango com legumes
+Frango à milanesa,PREPARACOES,g,100,245,22.5,14.5,10.5,0.8,380,Frango empanado assado
+Peixe empanado,PREPARACOES,g,100,215,18.5,15.5,8.5,0.8,320,Peixe empanado assado
+Strogonoff de frango,PREPARACOES,g,200,225,18.5,8.5,13.5,0.5,480,Strogonoff de frango com creme
+Bobó de camarão,PREPARACOES,g,200,215,12.5,22.5,8.5,2.5,520,Bobó de camarão com mandioca
+Moqueca de peixe,PREPARACOES,g,200,185,18.5,5.5,9.5,1.5,480,Moqueca de peixe com leite de coco
+Feijão tropeiro,PREPARACOES,g,150,195,10.5,28.5,5.5,6.5,380,Feijão tropeiro com farinha
+Feijoada,PREPARACOES,g,200,215,14.5,18.5,9.5,6.5,520,Feijoada com carnes variadas
+Virado de feijão,PREPARACOES,g,200,185,9.5,30.5,4.5,7.5,320,Virado de feijão com farinha
+Tutu de feijão,PREPARACOES,g,200,175,8.5,29.5,4.0,7.0,280,Tutu de feijão mineiro
+Galinhada,PREPARACOES,g,200,215,18.5,22.5,5.5,1.5,420,Galinhada com arroz
+Frango com quiabo,PREPARACOES,g,200,185,18.5,8.5,7.5,3.5,380,Frango com quiabo
+Macarrão com queijo,PREPARACOES,g,200,285,10.5,38.5,9.5,2.0,480,Macarrão gratinado com queijo
+Pizza de queijo,PREPARACOES,g,100,265,11.5,32.5,9.5,1.5,580,Pizza de queijo e tomate
+Hambúrguer de frango,PREPARACOES,g,100,215,18.5,14.5,8.5,1.0,420,Hambúrguer de frango grelhado
+Wrap de frango,PREPARACOES,g,150,245,16.5,28.5,7.5,2.5,480,Wrap de frango com legumes
+Panqueca,PREPARACOES,g,100,215,7.5,32.5,6.5,1.5,280,Panqueca de frango com molho
+Crepe doce,PREPARACOES,g,80,215,5.5,32.5,7.5,0.8,120,Crepe doce com geleia
+Waffle,PREPARACOES,g,80,285,6.5,42.5,10.5,1.0,280,Waffle com mel
+Brigadeiro,ACUCARES_DOCES,g,15,395,5.5,62.5,14.5,1.5,85,Brigadeiro de chocolate
+Beijinho,ACUCARES_DOCES,g,15,385,4.5,60.5,14.5,0.5,75,Beijinho de coco
+Cocada,ACUCARES_DOCES,g,30,415,2.5,65.5,16.5,3.5,48,Cocada de coco
+Mousse de maracujá,ACUCARES_DOCES,g,100,185,4.5,28.5,6.5,0.5,52,Mousse de maracujá
+Mousse de chocolate,ACUCARES_DOCES,g,100,245,5.5,32.5,11.5,1.5,68,Mousse de chocolate
+Sorvete de frutas,ACUCARES_DOCES,g,100,115,2.5,22.5,2.5,0.5,48,Sorvete de frutas naturais
+Picolé de frutas,ACUCARES_DOCES,g,60,52,0.5,13.5,0.1,0.2,8,Picolé de frutas sem leite
+Sagu com vinho,ACUCARES_DOCES,g,100,145,0.5,36.5,0.1,0.5,5,Sagu com suco de uva
+Compota de frutas,ACUCARES_DOCES,g,100,85,0.5,22.5,0.1,1.5,5,Compota de frutas variadas
+Maracujá,FRUTAS,g,100,68,2.4,13.9,0.7,10.4,28,Maracujá amarelo polpa
+Pitanga,FRUTAS,g,100,41,0.9,10.2,0.4,0.6,3,Pitanga fresca
+Jabuticaba,FRUTAS,g,100,58,0.7,14.9,0.1,0.6,2,Jabuticaba fresca
+Carambola,FRUTAS,g,100,31,1.0,7.1,0.3,2.8,2,Carambola fresca
+Graviola,FRUTAS,g,100,62,1.0,15.8,0.3,3.3,14,Graviola fresca
+Cupuaçu,FRUTAS,g,100,49,1.4,11.0,0.5,3.1,4,Cupuaçu fresco
+Açaí,FRUTAS,g,100,247,4.4,6.0,52.2,44.2,28,Açaí polpa congelada
+Buriti,FRUTAS,g,100,145,1.5,30.5,3.5,4.5,8,Buriti fresco
+Pequi,FRUTAS,g,100,185,2.5,12.5,14.5,5.5,4,Pequi fresco
+Cagaita,FRUTAS,g,100,38,0.8,9.5,0.2,2.5,2,Cagaita fresca
+Seriguela,FRUTAS,g,100,55,0.8,14.5,0.2,1.5,2,Seriguela fresca
+Umbu,FRUTAS,g,100,38,0.5,9.8,0.3,1.8,2,Umbu fresco
+Jaca,FRUTAS,g,100,95,1.7,23.8,0.3,1.5,3,Jaca fresca
+Sapoti,FRUTAS,g,100,83,0.4,19.9,1.1,5.6,12,Sapoti fresco
+Tamarindo,FRUTAS,g,30,239,2.8,62.5,0.6,5.1,28,Tamarindo fresco
+Fruta-do-conde,FRUTAS,g,100,94,1.7,23.6,0.6,1.9,4,Fruta-do-conde fresca
+Nêspera,FRUTAS,g,100,47,0.4,12.1,0.2,1.7,1,Nêspera fresca
+Framboesa,FRUTAS,g,100,52,1.2,11.9,0.7,6.5,1,Framboesa fresca
+Mirtilo,FRUTAS,g,100,57,0.7,14.5,0.3,2.4,1,Mirtilo fresco
+Romã,FRUTAS,g,100,83,1.7,18.7,1.2,4.0,3,Romã fresca
+Lichia,FRUTAS,g,100,66,0.8,16.5,0.4,1.3,1,Lichia fresca
+Caqui,FRUTAS,g,100,70,0.6,18.6,0.2,3.6,1,Caqui fresco
+Nectarina,FRUTAS,g,100,44,1.1,10.6,0.3,1.7,0,Nectarina fresca
+Damasco,FRUTAS,g,100,48,1.4,11.1,0.4,2.0,1,Damasco fresco
+Cereja,FRUTAS,g,100,63,1.1,16.0,0.2,2.1,0,Cereja fresca
+Amora,FRUTAS,g,100,43,1.4,9.6,0.5,5.3,1,Amora fresca
+Groselha,FRUTAS,g,100,56,1.4,13.8,0.2,4.3,2,Groselha fresca
+Manga espada,FRUTAS,g,130,60,0.4,15.8,0.3,1.6,4,Manga espada madura
+Abiu,FRUTAS,g,100,96,1.4,24.8,0.2,1.5,3,Abiu fresco
+Bacuri,FRUTAS,g,100,105,1.5,27.5,0.5,2.5,5,Bacuri fresco
+Murici,FRUTAS,g,100,72,1.2,18.5,0.8,2.8,3,Murici fresco
+Pupunha cozida,FRUTAS,g,100,155,2.5,35.5,2.5,3.5,8,Pupunha cozida
+Tomate cereja,VERDURAS_LEGUMES,g,100,18,0.9,3.9,0.2,1.2,5,Tomate cereja fresco
+Rúcula selvagem,VERDURAS_LEGUMES,g,30,25,2.6,3.7,0.7,1.6,27,Rúcula selvagem crua
+Espinafre cozido,VERDURAS_LEGUMES,g,80,23,3.0,3.7,0.3,2.4,70,Espinafre cozido
+Brócolis cru,VERDURAS_LEGUMES,g,80,34,2.8,6.6,0.4,2.6,33,Brócolis cru
+Couve de bruxelas,VERDURAS_LEGUMES,g,80,43,3.4,8.9,0.3,3.8,25,Couve de bruxelas cozida
+Aspargo,VERDURAS_LEGUMES,g,80,20,2.2,3.9,0.1,2.1,2,Aspargo cozido
+Alcachofra,VERDURAS_LEGUMES,g,80,47,3.3,10.5,0.2,5.4,94,Alcachofra cozida
+Palmito,VERDURAS_LEGUMES,g,80,28,2.7,4.6,0.2,2.0,396,Palmito em conserva
+Milho verde cru,VERDURAS_LEGUMES,g,100,86,3.2,18.7,1.2,2.0,15,Milho verde cru
+Pimentão amarelo,VERDURAS_LEGUMES,g,80,27,1.0,6.3,0.3,1.7,2,Pimentão amarelo cru
+Aipo,VERDURAS_LEGUMES,g,50,16,0.7,3.0,0.2,1.6,80,Aipo cru
+Nabo,VERDURAS_LEGUMES,g,80,28,0.9,6.4,0.1,1.8,67,Nabo cozido
+Rabanete,VERDURAS_LEGUMES,g,50,16,0.7,3.4,0.1,1.6,39,Rabanete cru
+Alho-poró,VERDURAS_LEGUMES,g,50,61,1.5,14.2,0.3,1.8,20,Alho-poró cru
+Endívia,VERDURAS_LEGUMES,g,50,17,1.3,3.4,0.2,3.1,22,Endívia crua
+Chicória,VERDURAS_LEGUMES,g,50,23,1.7,4.7,0.3,4.0,45,Chicória crua
+Mostarda folha,VERDURAS_LEGUMES,g,50,27,2.7,4.7,0.4,3.2,20,Mostarda folha crua
+Ora-pro-nóbis,VERDURAS_LEGUMES,g,50,40,4.5,6.5,0.5,3.5,45,Ora-pro-nóbis fresca
+Taioba,VERDURAS_LEGUMES,g,50,35,3.5,5.5,0.5,2.5,40,Taioba crua
+Serralha,VERDURAS_LEGUMES,g,50,28,2.8,4.5,0.4,2.8,35,Serralha crua
+Bertalha,VERDURAS_LEGUMES,g,50,22,2.2,3.8,0.3,2.2,30,Bertalha crua
+Vinagreira,VERDURAS_LEGUMES,g,50,30,2.5,5.5,0.3,3.0,25,Vinagreira (azedinha) crua
+Capuchinha,VERDURAS_LEGUMES,g,30,45,3.5,6.5,0.8,2.5,15,Capuchinha flores e folhas
+Manjericão fresco,TEMPEROS_CONDIMENTOS,g,10,23,3.2,2.7,0.6,1.6,4,Manjericão fresco
+Tomilho fresco,TEMPEROS_CONDIMENTOS,g,5,101,5.6,24.5,1.7,14.0,9,Tomilho fresco
+Alecrim fresco,TEMPEROS_CONDIMENTOS,g,5,131,3.3,20.7,5.9,14.1,26,Alecrim fresco
+Hortelã fresca,TEMPEROS_CONDIMENTOS,g,10,70,3.8,14.9,0.9,8.0,31,Hortelã fresca
+Louro seco,TEMPEROS_CONDIMENTOS,g,2,313,7.6,74.9,8.4,26.3,23,Louro seco
+Páprica doce,TEMPEROS_CONDIMENTOS,g,3,282,14.1,53.9,12.9,34.9,68,Páprica doce em pó
+Cominho,TEMPEROS_CONDIMENTOS,g,2,375,17.8,44.2,22.3,10.5,168,Cominho em pó
+Noz-moscada,TEMPEROS_CONDIMENTOS,g,2,525,5.8,49.3,36.3,20.8,16,Noz-moscada ralada
+Cravo,TEMPEROS_CONDIMENTOS,g,2,274,6.0,65.5,13.0,33.9,277,Cravo em pó
+Erva-doce,TEMPEROS_CONDIMENTOS,g,5,337,15.8,52.3,14.9,39.8,88,Erva-doce sementes
+Pimenta do reino,TEMPEROS_CONDIMENTOS,g,2,251,10.4,63.9,3.3,25.3,20,Pimenta do reino preta
+Açafrão,TEMPEROS_CONDIMENTOS,g,1,310,11.4,65.4,5.9,3.9,148,Açafrão em estigmas
+Vinagre balsâmico,TEMPEROS_CONDIMENTOS,ml,10,88,0.5,17.0,0.0,0.0,23,Vinagre balsâmico
+Shoyu,TEMPEROS_CONDIMENTOS,ml,10,53,5.6,4.9,0.6,0.8,5720,Molho shoyu
+Tahine,OLEAGINOSAS,g,20,595,17.0,21.2,53.8,9.3,115,Tahine (pasta de gergelim)
+Gergelim,OLEAGINOSAS,g,10,573,17.7,23.4,49.7,11.8,11,Gergelim torrado
+Linhaça,OLEAGINOSAS,g,10,534,18.3,28.9,42.2,27.3,30,Linhaça dourada
+Chia,OLEAGINOSAS,g,10,486,16.5,42.1,30.7,34.4,16,Semente de chia
+Quinoa cozida,CEREAIS_GRAOS,g,100,120,4.4,21.3,1.9,2.8,7,Quinoa cozida
+Trigo sarraceno,CEREAIS_GRAOS,g,100,343,13.3,71.5,3.4,10.0,1,Trigo sarraceno cru
+Amaranto cozido,CEREAIS_GRAOS,g,100,102,3.8,18.7,1.6,2.1,6,Amaranto cozido
+Teff cozido,CEREAIS_GRAOS,g,100,101,3.9,19.9,0.7,2.8,7,Teff cozido
+Sorgo cozido,CEREAIS_GRAOS,g,100,112,3.5,23.2,1.0,2.0,5,Sorgo cozido
+Cevada cozida,CEREAIS_GRAOS,g,100,123,2.3,28.2,0.4,3.8,3,Cevada perlada cozida
+Painço cozido,CEREAIS_GRAOS,g,100,119,3.5,23.7,1.0,1.3,2,Painço cozido
+Leite condensado,LATICINIOS,g,40,328,8.0,55.5,8.9,0.0,127,Leite condensado integral
+Nata,LATICINIOS,g,30,380,2.1,3.0,40.0,0.0,38,Nata (creme de leite fresco)
+Ricota,LATICINIOS,g,50,174,11.3,3.0,13.0,0.0,84,Ricota fresca
+Queijo gouda,LATICINIOS,g,30,356,24.9,2.2,27.4,0.0,819,Queijo gouda
+Queijo emmental,LATICINIOS,g,30,380,28.5,1.5,29.5,0.0,450,Queijo emmental
+Bebida láctea,LATICINIOS,ml,200,65,2.8,11.5,1.2,0.0,55,Bebida láctea fermentada
+Kefir,LATICINIOS,ml,200,52,3.5,4.8,1.5,0.0,40,Kefir de leite
+Tofu,PROTEINAS,g,100,76,8.1,1.9,4.8,0.3,7,Tofu firme
+Tempeh,PROTEINAS,g,100,193,20.3,9.4,10.8,0.0,9,Tempeh de soja
+Atum fresco grelhado,PROTEINAS,g,100,184,29.9,0.0,6.3,0.0,45,Atum fresco grelhado
+Salmão grelhado,PROTEINAS,g,100,208,20.4,0.0,13.4,0.0,59,Salmão grelhado
+Camarão cozido,PROTEINAS,g,100,99,20.9,0.9,1.1,0.0,224,Camarão cozido
+Bacalhau dessalgado,PROTEINAS,g,100,105,23.5,0.0,0.9,0.0,280,Bacalhau dessalgado cozido
+Carne de porco pernil,PROTEINAS,g,100,205,26.5,0.0,10.5,0.0,65,Pernil suíno assado
+Carne de cordeiro,PROTEINAS,g,100,235,25.5,0.0,14.5,0.0,72,Paleta de cordeiro assada
+Fígado bovino,PROTEINAS,g,100,131,20.4,3.9,4.4,0.0,76,Fígado bovino grelhado
+Coração de frango,PROTEINAS,g,100,148,17.5,0.0,8.5,0.0,95,Coração de frango grelhado
+Mexilhão cozido,PROTEINAS,g,100,86,11.9,3.7,2.2,0.0,286,Mexilhão cozido
+Lula grelhada,PROTEINAS,g,100,92,15.6,3.1,2.0,0.0,260,Lula grelhada
+Polvo cozido,PROTEINAS,g,100,82,14.9,2.2,1.0,0.0,230,Polvo cozido
+Carne de frango sobrecoxa,PROTEINAS,g,100,215,19.5,0.0,14.5,0.0,88,Sobrecoxa de frango grelhada
+Peito de frango defumado,PROTEINAS,g,30,125,19.5,2.5,4.0,0.0,980,Peito de frango defumado

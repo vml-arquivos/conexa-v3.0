@@ -2067,3 +2067,51 @@ model CardapioItem {
   @@index([refeicaoId])
   @@map("cardapio_item")
 }
+
+// ─── Módulo Nutricionista: Banco de Alimentos ────────────────────────────────
+
+enum CategoriaAlimento {
+  CEREAIS_GRAOS
+  LEGUMINOSAS
+  PROTEINAS
+  LATICINIOS
+  FRUTAS
+  VERDURAS_LEGUMES
+  GORDURAS_OLEOS
+  ACUCARES_DOCES
+  BEBIDAS
+  PREPARACOES
+  OLEAGINOSAS
+  EMBUTIDOS
+  FARINHAS_AMIDOS
+  TEMPEROS_CONDIMENTOS
+  SOPAS_CALDOS
+  OUTROS
+}
+
+/// Banco de alimentos com informações nutricionais por 100g
+model Alimento {
+  id            String             @id @default(cuid())
+  nome          String             @db.VarChar(255)
+  categoria     CategoriaAlimento
+  unidadePadrao String             @default("g") @db.VarChar(20)
+  porcaoPadrao  Decimal            @default(100) @db.Decimal(8, 2)
+  descricao     String?            @db.Text
+
+  /// Valores nutricionais por 100g do alimento
+  calorias100g     Decimal @db.Decimal(8, 2)
+  proteinas100g    Decimal @db.Decimal(8, 3)
+  carboidratos100g Decimal @db.Decimal(8, 3)
+  gorduras100g     Decimal @db.Decimal(8, 3)
+  fibras100g       Decimal @default(0) @db.Decimal(8, 3)
+  sodio100g        Decimal @default(0) @db.Decimal(8, 3)
+
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([nome])
+  @@index([categoria])
+  @@index([nome])
+  @@map("alimento")
+}

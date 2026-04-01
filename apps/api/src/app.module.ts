@@ -42,6 +42,7 @@ import { UnitsModule } from './units/units.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { CardapioModule } from './cardapio/cardapio.module';
+import { AlimentosModule } from './alimentos/alimentos.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { CardapioModule } from './cardapio/cardapio.module';
     CatalogModule,
     AnalyticsModule,
     CardapioModule,
+    AlimentosModule,
   ],
   controllers: [AppController],
   providers: [

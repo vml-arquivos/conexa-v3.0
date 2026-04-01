@@ -24,7 +24,9 @@
     "seed:arara-demo-data": "node dist/src/scripts/seed-arara-demo-data.js",
     "seed:units-cocris": "node dist/src/scripts/seed_units_cocris.js",
     "seed:units:cocris": "node prisma/seed-units-from-json.js",
-    "seed:catalog": "node scripts/seed-catalog.js"
+    "seed:catalog": "node scripts/seed-catalog.js",
+    "seed:alimentos": "node scripts/seed-alimentos.js",
+    "seed:alimentos:reset": "node scripts/seed-alimentos.js --reset"
   },
   "repository": {
     "type": "git",

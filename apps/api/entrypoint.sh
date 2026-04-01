@@ -209,7 +209,15 @@ echo "Regenerando Prisma client com schema atual..."
 npx prisma generate --schema=./prisma/schema.prisma
 echo "✅ Prisma client regenerado."
 
-# ── Passo 4: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 4: Popular banco de alimentos (idempotente) ─────────────────────────
+# Executa o seed de alimentos a cada deploy — é idempotente (upsert por nome).
+# Garante que novos alimentos adicionados ao CSV sejam inseridos automaticamente.
+if [ -f /app/scripts/seed-alimentos.js ]; then
+  echo "🥗 Populando banco de alimentos..."
+  node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
+fi
+
+# ── Passo 5: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js
