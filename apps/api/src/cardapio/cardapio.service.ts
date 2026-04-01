@@ -33,11 +33,11 @@ const INCLUDE_FULL = {
   refeicoes: {
     include: { itens: true },
     orderBy: [
-      { diaSemana: 'asc' as const },
-      { tipoRefeicao: 'asc' as const },
+      { diaSemana: 'asc' },
+      { tipoRefeicao: 'asc' },
     ],
   },
-} as const;
+};
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
