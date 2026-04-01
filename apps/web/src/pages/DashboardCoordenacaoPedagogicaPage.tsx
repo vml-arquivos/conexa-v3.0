@@ -1020,7 +1020,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Aba Ocorrências */}
       {abaAtiva === 'ocorrencias' && (
         <div className="space-y-4">
-          <OcorrenciasPanel titulo="Ocorrências da Unidade" />
+          <OcorrenciasPanel titulo="Ocorrências da Unidade" unitId={unitIdParam} />
         </div>
       )}
 

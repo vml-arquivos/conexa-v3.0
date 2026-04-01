@@ -324,12 +324,15 @@ export default function DiarioBordoPage() {
   }, [aba, classroomId]);
 
   useEffect(() => {
-    // Carregar ocorrências ao entrar na aba — não depende de classroomId
-    // O backend filtra por createdBy quando professor não tem classroomTeacher formal
-    if (aba === 'ocorrencias') {
+    // Carregar ocorrências ao entrar na aba.
+    // Aguardar classroomId ser resolvido por loadTurmaECriancas antes de buscar,
+    // garantindo que o backend filtre pelo escopo correto da turma do professor.
+    // Se classroomId ainda não está disponível, o loadingTurma ainda está em andamento
+    // e o useEffect será re-executado quando classroomId for definido.
+    if (aba === 'ocorrencias' && !loadingTurma) {
       loadOcorrencias();
     }
-  }, [aba, classroomId]);
+  }, [aba, classroomId, loadingTurma]);
 
   async function loadOcorrencias(childIdParam?: string) {
     setLoadingOcorr(true);
