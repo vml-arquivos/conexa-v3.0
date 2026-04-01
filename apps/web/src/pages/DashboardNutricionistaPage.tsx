@@ -105,13 +105,28 @@ function AbaCardapio({ unitId }: { unitId: string }) {
 
   // Estado do formulário de refeição
   const [editando, setEditando] = useState<{ dia: DiaSemana; tipo: TipoRefeicao } | null>(null);
-  const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([{ nome: '' }]);
+  const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([]);
   const [obsForm, setObsForm] = useState('');
 
-  // Banco de alimentos para o select
+  // Seletor duplo encadeado: categoria → alimento
+  const [categoriaSel, setCategoriaSel] = useState('');
+  const [alimentoSel,  setAlimentoSel]  = useState('');
+  const [pesoInput,    setPesoInput]    = useState('');
+
+  // Banco de alimentos
   const [alimentos, setAlimentos] = useState<Alimento[]>([]);
   const [loadingAlimentos, setLoadingAlimentos] = useState(false);
   const gruposAlimentos = agruparPorCategoria(alimentos);
+
+  // Alimentos filtrados pela categoria selecionada no seletor
+  const alimentosDaCategoria = categoriaSel
+    ? alimentos
+        .filter((a) => a.categoria === categoriaSel)
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    : [];
+
+  // Objeto do alimento selecionado no seletor (preview de macros)
+  const alimentoAtual = alimentos.find((a) => a.id === alimentoSel) ?? null;
 
   // Carrega alimentos ao montar
   useEffect(() => {
@@ -152,7 +167,7 @@ function AbaCardapio({ unitId }: { unitId: string }) {
 
   const abrirEdicao = (dia: DiaSemana, tipo: TipoRefeicao) => {
     const ref = cardapio?.refeicoes?.find((r) => r.diaSemana === dia && r.tipoRefeicao === tipo);
-    setItensForm(ref?.itens?.length ? ref.itens.map((i) => ({ ...i })) : [{ nome: '' }]);
+    setItensForm(ref?.itens?.length ? ref.itens.map((i) => ({ ...i })) : []);
     setObsForm(ref?.observacoes ?? '');
     setEditando({ dia, tipo });
   };
@@ -203,67 +218,40 @@ function AbaCardapio({ unitId }: { unitId: string }) {
     }
   };
 
-  const addItem = () => setItensForm((prev) => [...prev, { nome: '' }]);
   const removeItem = (idx: number) => setItensForm((prev) => prev.filter((_, i) => i !== idx));
-  const updateItem = (idx: number, field: keyof CardapioItem, value: string | number) => {
-    setItensForm((prev) => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+
+  // Adiciona o alimento selecionado com o peso informado à lista de itens
+  const adicionarAlimento = () => {
+    if (!alimentoAtual || !pesoInput) return;
+    const peso = Number(pesoInput);
+    if (peso <= 0) return;
+    const macros = calcularMacrosPorQuantidade(alimentoAtual, peso);
+    setItensForm((prev) => [
+      ...prev,
+      {
+        nome:         alimentoAtual.nome,
+        alimentoId:   alimentoAtual.id,
+        quantidade:   peso,
+        unidade:      'g',
+        calorias:     macros.calorias,
+        proteinas:    macros.proteinas,
+        carboidratos: macros.carboidratos,
+        gorduras:     macros.gorduras,
+        fibras:       macros.fibras,
+        sodio:        macros.sodio,
+      } as Partial<CardapioItem>,
+    ]);
+    // Reseta o seletor para o próximo alimento
+    setAlimentoSel('');
+    setPesoInput('');
   };
 
-  // Ao selecionar um alimento no select, preenche nome e macros proporcionais à quantidade
-  const handleSelectAlimento = (idx: number, alimentoId: string) => {
-    const alimento = alimentos.find((a) => a.id === alimentoId);
-    if (!alimento) {
-      updateItem(idx, 'nome', '');
-      return;
-    }
-    const qtd = Number(itensForm[idx]?.quantidade ?? alimento.porcaoPadrao);
-    const macros = calcularMacrosPorQuantidade(alimento, qtd || alimento.porcaoPadrao);
-    setItensForm((prev) =>
-      prev.map((item, i) =>
-        i === idx
-          ? {
-              ...item,
-              nome:         alimento.nome,
-              alimentoId:   alimento.id,
-              quantidade:   qtd || alimento.porcaoPadrao,
-              unidade:      alimento.unidadePadrao,
-              calorias:     macros.calorias,
-              proteinas:    macros.proteinas,
-              carboidratos: macros.carboidratos,
-              gorduras:     macros.gorduras,
-              fibras:       macros.fibras,
-              sodio:        macros.sodio,
-            }
-          : item
-      )
-    );
-  };
-
-  // Ao alterar quantidade, recalcula macros se o alimento já foi selecionado
-  const handleQuantidadeChange = (idx: number, qtd: number) => {
-    const item = itensForm[idx];
-    const alimento = alimentos.find((a) => a.id === (item as any).alimentoId);
-    if (alimento && qtd > 0) {
-      const macros = calcularMacrosPorQuantidade(alimento, qtd);
-      setItensForm((prev) =>
-        prev.map((it, i) =>
-          i === idx
-            ? {
-                ...it,
-                quantidade:   qtd,
-                calorias:     macros.calorias,
-                proteinas:    macros.proteinas,
-                carboidratos: macros.carboidratos,
-                gorduras:     macros.gorduras,
-                fibras:       macros.fibras,
-                sodio:        macros.sodio,
-              }
-            : it
-        )
-      );
-    } else {
-      updateItem(idx, 'quantidade', qtd);
-    }
+  // Abre o modal e reseta o seletor
+  const abrirEdicaoComReset = (dia: DiaSemana, tipo: TipoRefeicao) => {
+    setCategoriaSel('');
+    setAlimentoSel('');
+    setPesoInput('');
+    abrirEdicao(dia, tipo);
   };
 
   return (
@@ -349,7 +337,7 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                       return (
                         <td key={dia} className="p-2 align-top border-l">
                           <button
-                            onClick={() => abrirEdicao(dia, tipo)}
+                            onClick={() => abrirEdicaoComReset(dia, tipo)}
                             className="w-full min-h-[60px] text-left rounded-lg p-2 hover:bg-orange-50 border border-dashed border-gray-200 hover:border-orange-300 transition-colors"
                           >
                             {ref?.itens?.length ? (
@@ -380,132 +368,190 @@ function AbaCardapio({ unitId }: { unitId: string }) {
         </div>
       )}
 
-      {/* Modal de edição de refeição */}
+      {/* Modal de edição de refeição — Planejador Moderno */}
       {editando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl mx-4 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b bg-orange-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white">
               <div>
-                <p className="font-semibold text-gray-800">
+                <p className="font-bold text-lg tracking-tight">
                   {DIA_SEMANA_LABELS[editando.dia]} — {TIPO_REFEICAO_LABELS[editando.tipo]}
                 </p>
-                <p className="text-xs text-gray-500">Selecione os alimentos desta refeição</p>
+                <p className="text-xs text-orange-100">Planejador de Refeição · valores por peso (g)</p>
               </div>
-              <button onClick={() => setEditando(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              <button
+                onClick={() => setEditando(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white text-lg leading-none transition-colors"
+              >×</button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
-              {loadingAlimentos && (
-                <p className="text-xs text-gray-400 text-center py-2">Carregando lista de alimentos...</p>
+            {/* ── Corpo ── */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+              {/* ── Seletor duplo encadeado ── */}
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Adicionar Alimento</p>
+
+                {loadingAlimentos && (
+                  <p className="text-xs text-gray-400">Carregando banco de alimentos...</p>
+                )}
+
+                {/* Linha 1: Categoria + Alimento */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Select 1 — Categoria */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">1. Categoria</label>
+                    <select
+                      value={categoriaSel}
+                      onChange={(e) => { setCategoriaSel(e.target.value); setAlimentoSel(''); setPesoInput(''); }}
+                      className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-orange-400 transition-colors"
+                    >
+                      <option value="">— Selecione a categoria —</option>
+                      {gruposAlimentos.map((g) => (
+                        <option key={g.categoria} value={g.categoria}>{g.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Select 2 — Alimento da categoria */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">2. Alimento</label>
+                    <select
+                      value={alimentoSel}
+                      onChange={(e) => { setAlimentoSel(e.target.value); setPesoInput(''); }}
+                      disabled={!categoriaSel}
+                      className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">— Selecione o alimento —</option>
+                      {alimentosDaCategoria.map((a) => (
+                        <option key={a.id} value={a.id}>{a.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Preview nutricional do alimento selecionado (por 100g) */}
+                {alimentoAtual && (
+                  <div className="bg-white border border-orange-100 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-2 font-medium">
+                      Valores nutricionais por 100g — <span className="text-orange-600">{alimentoAtual.nome}</span>
+                    </p>
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      {[
+                        { label: 'Kcal',    value: alimentoAtual.nutricaoPor100g.calorias,     color: 'text-orange-600', bg: 'bg-orange-50' },
+                        { label: 'Prot(g)', value: alimentoAtual.nutricaoPor100g.proteinas,    color: 'text-blue-600',   bg: 'bg-blue-50'   },
+                        { label: 'Carb(g)', value: alimentoAtual.nutricaoPor100g.carboidratos, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+                        { label: 'Gord(g)', value: alimentoAtual.nutricaoPor100g.gorduras,     color: 'text-red-500',    bg: 'bg-red-50'    },
+                        { label: 'Fibr(g)', value: alimentoAtual.nutricaoPor100g.fibras,       color: 'text-green-600',  bg: 'bg-green-50'  },
+                      ].map(({ label, value, color, bg }) => (
+                        <div key={label} className={`${bg} rounded-lg py-1.5`}>
+                          <p className="text-[10px] text-gray-400">{label}</p>
+                          <p className={`text-xs font-bold ${color}`}>{Number(value).toFixed(1)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Linha 2: Peso em gramas + botão Adicionar */}
+                {alimentoAtual && (
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        3. Peso (gramas)
+                      </label>
+                      <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-orange-400 transition-colors bg-white">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder={`Ex: ${alimentoAtual.porcaoPadrao}`}
+                          value={pesoInput}
+                          onChange={(e) => setPesoInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && adicionarAlimento()}
+                          className="flex-1 px-3 py-2 text-sm focus:outline-none"
+                        />
+                        <span className="px-3 text-xs text-gray-400 border-l bg-gray-50">g</span>
+                      </div>
+                    </div>
+                    {/* Preview ao vivo do peso digitado */}
+                    {pesoInput && Number(pesoInput) > 0 && (() => {
+                      const p = Number(pesoInput);
+                      const m = calcularMacrosPorQuantidade(alimentoAtual, p);
+                      return (
+                        <div className="text-center bg-orange-100 rounded-lg px-3 py-2 min-w-[80px]">
+                          <p className="text-[10px] text-orange-600">= {p}g</p>
+                          <p className="text-sm font-bold text-orange-700">{m.calorias.toFixed(0)} kcal</p>
+                          <p className="text-[10px] text-gray-500">{m.proteinas.toFixed(1)}p · {m.carboidratos.toFixed(1)}c</p>
+                        </div>
+                      );
+                    })()}
+                    <button
+                      onClick={adicionarAlimento}
+                      disabled={!pesoInput || Number(pesoInput) <= 0}
+                      className="flex items-center gap-2 px-5 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Plus className="w-4 h-4" /> Adicionar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Lista de itens adicionados ── */}
+              {itensForm.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Itens da Refeição ({itensForm.length})
+                  </p>
+                  <div className="space-y-2">
+                    {itensForm.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 hover:border-orange-200 transition-colors group"
+                      >
+                        {/* Ícone */}
+                        <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm">🍽</span>
+                        </div>
+
+                        {/* Nome + peso */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{item.nome}</p>
+                          <p className="text-xs text-gray-400">{item.quantidade}g</p>
+                        </div>
+
+                        {/* Macros inline */}
+                        <div className="hidden sm:flex items-center gap-3 text-xs">
+                          <span className="text-orange-600 font-bold">{Number(item.calorias ?? 0).toFixed(0)} kcal</span>
+                          <span className="text-blue-500">{Number(item.proteinas ?? 0).toFixed(1)}p</span>
+                          <span className="text-yellow-500">{Number(item.carboidratos ?? 0).toFixed(1)}c</span>
+                          <span className="text-red-400">{Number(item.gorduras ?? 0).toFixed(1)}g</span>
+                        </div>
+
+                        {/* Remover */}
+                        <button
+                          onClick={() => removeItem(idx)}
+                          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all flex-shrink-0"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {/* Lista de itens */}
-              <div className="space-y-4">
-                {itensForm.map((item, idx) => {
-                  const alimentoSelecionado = alimentos.find((a) => a.id === (item as any).alimentoId);
-                  return (
-                    <div key={idx} className="border rounded-xl p-3 bg-gray-50 space-y-2">
-                      {/* Linha 1: Select de alimento + botão remover */}
-                      <div className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Alimento *</label>
-                          <select
-                            value={(item as any).alimentoId ?? ''}
-                            onChange={(e) => handleSelectAlimento(idx, e.target.value)}
-                            className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          >
-                            <option value="">— Selecione o alimento —</option>
-                            {gruposAlimentos.map((grupo) => (
-                              <optgroup key={grupo.categoria} label={`🍽 ${grupo.label}`}>
-                                {grupo.itens.map((a) => (
-                                  <option key={a.id} value={a.id}>{a.nome}</option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                        </div>
-                        {itensForm.length > 1 && (
-                          <button
-                            onClick={() => removeItem(idx)}
-                            className="mt-5 text-red-400 hover:text-red-600 flex-shrink-0"
-                            title="Remover item"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+              {itensForm.length === 0 && (
+                <div className="text-center py-8 text-gray-300">
+                  <p className="text-4xl mb-2">🥗</p>
+                  <p className="text-sm">Selecione a categoria, o alimento e o peso para começar</p>
+                </div>
+              )}
 
-                      {/* Linha 2: Quantidade + Unidade */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Quantidade</label>
-                          <input
-                            type="number"
-                            min="1"
-                            placeholder={alimentoSelecionado ? String(alimentoSelecionado.porcaoPadrao) : '150'}
-                            value={item.quantidade ?? ''}
-                            onChange={(e) => handleQuantidadeChange(idx, Number(e.target.value))}
-                            className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Unidade</label>
-                          <input
-                            type="text"
-                            placeholder="g, ml, porção"
-                            value={item.unidade ?? ''}
-                            onChange={(e) => updateItem(idx, 'unidade', e.target.value)}
-                            className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Linha 3: Macros calculados automaticamente (somente leitura visual) */}
-                      {item.calorias !== undefined && item.calorias !== null && (
-                        <div className="grid grid-cols-5 gap-1.5 pt-1">
-                          {[
-                            { label: 'Kcal',    value: item.calorias,     color: 'text-orange-600' },
-                            { label: 'Prot(g)', value: item.proteinas,    color: 'text-blue-600'   },
-                            { label: 'Carb(g)', value: item.carboidratos, color: 'text-yellow-600' },
-                            { label: 'Gord(g)', value: item.gorduras,     color: 'text-red-500'    },
-                            { label: 'Fibr(g)', value: item.fibras,       color: 'text-green-600'  },
-                          ].map(({ label, value, color }) => (
-                            <div key={label} className="bg-white border rounded-lg p-1.5 text-center">
-                              <p className="text-[10px] text-gray-400">{label}</p>
-                              <p className={`text-xs font-bold ${color}`}>
-                                {value != null ? Number(value).toFixed(1) : '—'}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={addItem}
-                className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
-              >
-                <Plus className="w-4 h-4" /> Adicionar outro alimento
-              </button>
-
-              {/* Observações */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Observações (opcional)</label>
-                <textarea
-                  value={obsForm}
-                  onChange={(e) => setObsForm(e.target.value)}
-                  placeholder="Ex: Sem glúten, opção vegetariana disponível..."
-                  rows={2}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
-                />
-              </div>
-
-              {/* Totais da refeição */}
-              {itensForm.some((i) => i.calorias != null) && (() => {
+              {/* ── Total da refeição ── */}
+              {itensForm.length > 0 && (() => {
                 const tot = itensForm.reduce(
                   (acc, i) => ({
                     calorias:     acc.calorias     + (Number(i.calorias)     || 0),
@@ -517,47 +563,62 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                   { calorias: 0, proteinas: 0, carboidratos: 0, gorduras: 0, fibras: 0 }
                 );
                 return (
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
-                    <p className="text-xs font-semibold text-orange-700 mb-2">Total da Refeição</p>
-                    <div className="grid grid-cols-5 gap-2 text-center">
+                  <div className="bg-gradient-to-r from-orange-500 to-orange-400 rounded-xl p-4 text-white">
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-3 text-orange-100">Total da Refeição</p>
+                    <div className="grid grid-cols-5 gap-3 text-center">
                       {[
-                        { label: 'Kcal',    value: tot.calorias,     color: 'text-orange-600' },
-                        { label: 'Prot(g)', value: tot.proteinas,    color: 'text-blue-600'   },
-                        { label: 'Carb(g)', value: tot.carboidratos, color: 'text-yellow-600' },
-                        { label: 'Gord(g)', value: tot.gorduras,     color: 'text-red-500'    },
-                        { label: 'Fibr(g)', value: tot.fibras,       color: 'text-green-600'  },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <p className="text-[10px] text-gray-500">{label}</p>
-                          <p className={`text-sm font-bold ${color}`}>{value.toFixed(1)}</p>
+                        { label: 'Kcal',    value: tot.calorias.toFixed(0)     },
+                        { label: 'Prot(g)', value: tot.proteinas.toFixed(1)    },
+                        { label: 'Carb(g)', value: tot.carboidratos.toFixed(1) },
+                        { label: 'Gord(g)', value: tot.gorduras.toFixed(1)     },
+                        { label: 'Fibr(g)', value: tot.fibras.toFixed(1)       },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-white/20 rounded-lg py-2">
+                          <p className="text-[10px] text-orange-100">{label}</p>
+                          <p className="text-sm font-bold">{value}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 );
               })()}
+
+              {/* ── Observações ── */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Observações (opcional)</label>
+                <textarea
+                  value={obsForm}
+                  onChange={(e) => setObsForm(e.target.value)}
+                  placeholder="Ex: Sem glúten, opção vegetariana disponível..."
+                  rows={2}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                />
+              </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex gap-3 px-6 py-4 border-t bg-gray-50">
+            {/* ── Footer ── */}
+            <div className="flex gap-3 px-6 py-4 border-t bg-gray-50 flex-shrink-0">
               <button
                 onClick={() => setEditando(null)}
-                className="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+                className="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-100 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={salvarRefeicao}
-                disabled={salvando || !itensForm.some((i) => i.nome?.trim())}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+                disabled={salvando || itensForm.length === 0}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {salvando ? 'Salvando...' : 'Salvar Refeição'}
+                {salvando ? 'Salvando...' : `Salvar Refeição (${itensForm.length} item${itensForm.length !== 1 ? 's' : ''})`}
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
     </div>
   );
 }
