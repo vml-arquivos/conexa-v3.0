@@ -46,6 +46,11 @@ export class MaterialRequestItemDto {
   @IsOptional()
   @IsString()
   unidade?: string;
+
+  /** ID do material do catálogo (opcional — itens digitados manualmente não têm) */
+  @IsOptional()
+  @IsString()
+  materialId?: string | null;
 }
 
 export class CreateMaterialRequestDto {
