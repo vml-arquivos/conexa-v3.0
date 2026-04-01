@@ -283,6 +283,7 @@ model Mantenedora {
   recadosTurma         RecadoTurma[]
   classroomPosts       ClassroomPost[]
   materiais            Material[]
+  cardapios            Cardapio[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -306,8 +307,8 @@ model Unit {
   phone String? @db.VarChar(20)
 
   // Configurações pedagógicas
-  capacity        Int    @default(100)
-  ageGroupsServed String @default("0-4") // Faixa etária atendida
+  capacity        Int      @default(100)
+  ageGroupsServed String   @default("0-4") // Faixa etária atendida
   /// Datas não letivas configuradas pela unidade (feriados, recessos, etc.)
   /// Formato: array de strings "YYYY-MM-DD" no fuso America/Sao_Paulo
   /// Exemplo: ["2026-04-21", "2026-06-19"] (Tiradentes, Corpus Christi)
@@ -340,6 +341,7 @@ model Unit {
   aiContexts           AIContext[]
 
   dailyMetrics DailyMetric[]
+  cardapios    Cardapio[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
@@ -537,7 +539,7 @@ model Child {
   medicationNeeds   String? @db.Text
 
   // Foto do aluno
-  photoUrl          String? @db.Text
+  photoUrl String? @db.Text
 
   // Status
   isActive Boolean @default(true)
@@ -549,8 +551,8 @@ model Child {
   updatedBy String?  @db.VarChar(255)
 
   // Relações
-  mantenedora         Mantenedora          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit                Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  mantenedora         Mantenedora              @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit                Unit                     @relation(fields: [unitId], references: [id], onDelete: Cascade)
   enrollments         Enrollment[]
   diaryEvents         DiaryEvent[]
   attendances         Attendance[]
@@ -635,6 +637,7 @@ model Classroom {
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
   classroomPosts   ClassroomPost[]
+
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -801,15 +804,15 @@ model Planning {
   status PlanningStatus @default(RASCUNHO)
 
   // Rastreabilidade
-  anoLetivo   Int?    // Ano letivo do planejamento (ex: 2026)
+  anoLetivo   Int? // Ano letivo do planejamento (ex: 2026)
   professorId String? @db.VarChar(255) // ID do professor responsável
 
   // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  createdBy   String?   @db.VarChar(255)
-  updatedBy   String?   @db.VarChar(255)
-  publishedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     String?   @db.VarChar(255)
+  updatedBy     String?   @db.VarChar(255)
+  publishedAt   DateTime?
   submittedAt   DateTime? // Data de envio para revisão
   reviewedAt    DateTime? // Data de aprovação ou devolução
   reviewedBy    String?   @db.VarChar(255) // ID do revisor
@@ -879,14 +882,14 @@ model DiaryEvent {
   publishedAt DateTime?
 
   // Relações
-  mantenedora     Mantenedora           @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit            Unit                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  classroom       Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  child           Child                 @relation(fields: [childId], references: [id], onDelete: Cascade)
-  planning        Planning?             @relation(fields: [planningId], references: [id], onDelete: SetNull)
+  mantenedora     Mantenedora            @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit            Unit                   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  classroom       Classroom              @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  child           Child                  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  planning        Planning?              @relation(fields: [planningId], references: [id], onDelete: SetNull)
   curriculumEntry CurriculumMatrixEntry? @relation(fields: [curriculumEntryId], references: [id], onDelete: SetNull)
-  createdByUser   User?                 @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-  reviewedByUser  User?                 @relation("ReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  createdByUser   User?                  @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  reviewedByUser  User?                  @relation("ReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([mantenedoraId])
   @@index([unitId])
@@ -1010,10 +1013,10 @@ model MaterialRequest {
   approvedBy String?  @db.VarChar(255)
 
   // Relações
-  mantenedora   Mantenedora          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit          Unit                 @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  classroom     Classroom?           @relation(fields: [classroomId], references: [id], onDelete: SetNull)
-  createdByUser User?                @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  mantenedora   Mantenedora           @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit          Unit                  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  classroom     Classroom?            @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+  createdByUser User?                 @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   items         MaterialRequestItem[]
 
   @@unique([unitId, code])
@@ -1029,7 +1032,7 @@ model MaterialRequestItem {
   id                String          @id @default(cuid())
   materialRequestId String
   materialRequest   MaterialRequest @relation(fields: [materialRequestId], references: [id], onDelete: Cascade)
-  materialId        String?         // Referência opcional ao catálogo de materiais
+  materialId        String? // Referência opcional ao catálogo de materiais
   material          Material?       @relation(fields: [materialId], references: [id], onDelete: SetNull)
   productName       String          @db.VarChar(255)
   quantity          Int
@@ -1243,7 +1246,7 @@ enum StatusPedidoCompra {
 
 /// Pedido de Compra consolidado mensalmente pela unidade para a mantenedora
 model PedidoCompra {
-  id            String @id @default(cuid())
+  id            String  @id @default(cuid())
   mantenedoraId String
   unitId        String
   fornecedorId  String?
@@ -1393,8 +1396,9 @@ model Arquivo {
   tamanhoBytes   Int
   caminho        String          @db.VarChar(500)
   uploadadoPorId String          @db.VarChar(255)
-  criadoEm      DateTime        @default(now())
-  mantenedora   Mantenedora     @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  criadoEm       DateTime        @default(now())
+  mantenedora    Mantenedora     @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
   @@index([mantenedoraId])
   @@index([entidade, entidadeId])
   @@index([uploadadoPorId])
@@ -1419,22 +1423,23 @@ enum StatusCoordenacao {
 }
 
 model CoordenacaoReuniao {
-  id             String            @id @default(cuid())
+  id             String                    @id @default(cuid())
   mantenedoraId  String
   unitId         String?
   tipo           TipoCoordenacao
-  status         StatusCoordenacao @default(RASCUNHO)
-  titulo         String            @db.VarChar(255)
-  descricao      String?           @db.Text
+  status         StatusCoordenacao         @default(RASCUNHO)
+  titulo         String                    @db.VarChar(255)
+  descricao      String?                   @db.Text
   dataRealizacao DateTime
-  localOuLink    String?           @db.VarChar(500)
-  criadoPorId    String            @db.VarChar(255)
-  publicadaEm   DateTime?
-  criadoEm      DateTime          @default(now())
-  atualizadoEm  DateTime          @updatedAt
-  mantenedora   Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  participantes CoordenacaoParticipante[]
-  atas          CoordenacaoAta[]
+  localOuLink    String?                   @db.VarChar(500)
+  criadoPorId    String                    @db.VarChar(255)
+  publicadaEm    DateTime?
+  criadoEm       DateTime                  @default(now())
+  atualizadoEm   DateTime                  @updatedAt
+  mantenedora    Mantenedora               @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  participantes  CoordenacaoParticipante[]
+  atas           CoordenacaoAta[]
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([tipo])
@@ -1443,47 +1448,50 @@ model CoordenacaoReuniao {
 }
 
 model CoordenacaoParticipante {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   reuniaoId   String
-  usuarioId   String   @db.VarChar(255)
-  nomeExterno String?  @db.VarChar(255)
-  presente    Boolean  @default(false)
-  criadoEm   DateTime @default(now())
-  reuniao    CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  usuarioId   String             @db.VarChar(255)
+  nomeExterno String?            @db.VarChar(255)
+  presente    Boolean            @default(false)
+  criadoEm    DateTime           @default(now())
+  reuniao     CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+
   @@unique([reuniaoId, usuarioId])
   @@index([reuniaoId])
   @@index([usuarioId])
 }
 
 model CoordenacaoAta {
-  id                  String   @id @default(cuid())
+  id                  String             @id @default(cuid())
   reuniaoId           String
-  conteudo            String   @db.Text
+  conteudo            String             @db.Text
   pautaJson           Json?
   encaminhamentosJson Json?
-  redigidoPorId       String   @db.VarChar(255)
-  aprovadaEm         DateTime?
-  criadoEm           DateTime @default(now())
-  atualizadoEm       DateTime @updatedAt
-  reuniao            CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+  redigidoPorId       String             @db.VarChar(255)
+  aprovadaEm          DateTime?
+  criadoEm            DateTime           @default(now())
+  atualizadoEm        DateTime           @updatedAt
+  reuniao             CoordenacaoReuniao @relation(fields: [reuniaoId], references: [id], onDelete: Cascade)
+
   @@index([reuniaoId])
 }
 
 model Formacao {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   mantenedoraId String
   unitId        String?
-  titulo        String   @db.VarChar(255)
-  descricao     String?  @db.Text
-  ministrante   String?  @db.VarChar(255)
+  titulo        String      @db.VarChar(255)
+  descricao     String?     @db.Text
+  ministrante   String?     @db.VarChar(255)
   dataInicio    DateTime
   dataFim       DateTime?
   cargaHoraria  Float?
-  modalidade    String   @db.VarChar(50)
-  criadoPorId   String   @db.VarChar(255)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-  mantenedora  Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  modalidade    String      @db.VarChar(50)
+  criadoPorId   String      @db.VarChar(255)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([dataInicio])
@@ -1507,26 +1515,27 @@ enum TipoAtendimento {
 }
 
 model AtendimentoPais {
-  id                  String            @id @default(cuid())
-  mantenedoraId       String
-  unitId              String
-  childId             String
-  responsavelNome     String            @db.VarChar(255)
-  responsavelRelacao  String?           @db.VarChar(100)
-  responsavelContato  String?           @db.VarChar(255)
-  tipo                TipoAtendimento
-  status              StatusAtendimento @default(AGENDADO)
-  dataAtendimento     DateTime
-  atendidoPorId       String            @db.VarChar(255)
-  assunto             String            @db.VarChar(500)
-  descricao           String?           @db.Text
-  encaminhamento      String?           @db.Text
-  retornoNecessario   Boolean           @default(false)
-  dataRetorno         DateTime?
-  criadoEm           DateTime           @default(now())
-  atualizadoEm       DateTime           @updatedAt
-  mantenedora        Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  child              Child              @relation(fields: [childId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(cuid())
+  mantenedoraId      String
+  unitId             String
+  childId            String
+  responsavelNome    String            @db.VarChar(255)
+  responsavelRelacao String?           @db.VarChar(100)
+  responsavelContato String?           @db.VarChar(255)
+  tipo               TipoAtendimento
+  status             StatusAtendimento @default(AGENDADO)
+  dataAtendimento    DateTime
+  atendidoPorId      String            @db.VarChar(255)
+  assunto            String            @db.VarChar(500)
+  descricao          String?           @db.Text
+  encaminhamento     String?           @db.Text
+  retornoNecessario  Boolean           @default(false)
+  dataRetorno        DateTime?
+  criadoEm           DateTime          @default(now())
+  atualizadoEm       DateTime          @updatedAt
+  mantenedora        Mantenedora       @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  child              Child             @relation(fields: [childId], references: [id], onDelete: Cascade)
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([childId])
@@ -1538,19 +1547,20 @@ model AtendimentoPais {
 // 19. RELATÓRIO DE FOTOS/EVIDÊNCIAS
 // ============================================================================
 model RelatorioFoto {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   mantenedoraId String
   unitId        String
   classroomId   String
-  titulo        String   @db.VarChar(255)
-  descricao     String?  @db.Text
+  titulo        String      @db.VarChar(255)
+  descricao     String?     @db.Text
   dataAtividade DateTime
-  criadoPorId   String   @db.VarChar(255)
-  publicado     Boolean  @default(false)
-  publicadoEm  DateTime?
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-  mantenedora  Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  criadoPorId   String      @db.VarChar(255)
+  publicado     Boolean     @default(false)
+  publicadoEm   DateTime?
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([classroomId])
@@ -1570,45 +1580,47 @@ enum StatusRDIX {
 }
 
 model RDIXTemplate {
-  id            String   @id @default(cuid())
+  id            String          @id @default(cuid())
   mantenedoraId String
-  segmento      String   @db.VarChar(50)
-  titulo        String   @db.VarChar(255)
+  segmento      String          @db.VarChar(50)
+  titulo        String          @db.VarChar(255)
   estruturaJson Json
-  ativo         Boolean  @default(true)
-  criadoPorId   String   @db.VarChar(255)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-  mantenedora  Mantenedora   @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  instancias   RDIXInstancia[]
+  ativo         Boolean         @default(true)
+  criadoPorId   String          @db.VarChar(255)
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+  mantenedora   Mantenedora     @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  instancias    RDIXInstancia[]
+
   @@index([mantenedoraId])
   @@index([segmento])
 }
 
 model RDIXInstancia {
-  id             String     @id @default(cuid())
-  mantenedoraId  String
-  unitId         String
-  templateId     String
-  childId        String
-  classroomId    String
-  periodo        String     @db.VarChar(50)
-  anoLetivo      Int
-  status         StatusRDIX @default(RASCUNHO)
-  rascunhoJson   Json?
-  conteudoFinal  Json?
-  criadoPorId    String     @db.VarChar(255)
-  revisadoPorId  String?    @db.VarChar(255)
+  id            String       @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  templateId    String
+  childId       String
+  classroomId   String
+  periodo       String       @db.VarChar(50)
+  anoLetivo     Int
+  status        StatusRDIX   @default(RASCUNHO)
+  rascunhoJson  Json?
+  conteudoFinal Json?
+  criadoPorId   String       @db.VarChar(255)
+  revisadoPorId String?      @db.VarChar(255)
   submittedAt   DateTime? // Data de envio para revisão
   reviewedAt    DateTime? // Data de aprovação ou devolução
-  reviewComment String?   @db.Text // Comentário da devolução
+  reviewComment String?      @db.Text // Comentário da devolução
   finalizadoEm  DateTime?
   publicadoEm   DateTime?
-  criadoEm      DateTime   @default(now())
-  atualizadoEm  DateTime   @updatedAt
+  criadoEm      DateTime     @default(now())
+  atualizadoEm  DateTime     @updatedAt
   mantenedora   Mantenedora  @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   template      RDIXTemplate @relation(fields: [templateId], references: [id])
   child         Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+
   @@unique([childId, classroomId, periodo, anoLetivo])
   @@index([mantenedoraId])
   @@index([unitId])
@@ -1651,10 +1663,11 @@ model AlertaOperacional {
   metadados      Json?
   resolvido      Boolean          @default(false)
   resolvidoPorId String?          @db.VarChar(255)
-  resolvidoEm   DateTime?
-  criadoEm      DateTime          @default(now())
-  mantenedora   Mantenedora      @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  notificacoes  Notificacao[]
+  resolvidoEm    DateTime?
+  criadoEm       DateTime         @default(now())
+  mantenedora    Mantenedora      @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  notificacoes   Notificacao[]
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([tipo])
@@ -1664,16 +1677,17 @@ model AlertaOperacional {
 }
 
 model Notificacao {
-  id        String   @id @default(cuid())
-  usuarioId String   @db.VarChar(255)
+  id        String             @id @default(cuid())
+  usuarioId String             @db.VarChar(255)
   alertaId  String?
-  titulo    String   @db.VarChar(255)
-  mensagem  String   @db.Text
-  lida      Boolean  @default(false)
-  lidaEm   DateTime?
-  link      String?  @db.VarChar(500)
-  criadoEm DateTime @default(now())
-  alerta   AlertaOperacional? @relation(fields: [alertaId], references: [id], onDelete: SetNull)
+  titulo    String             @db.VarChar(255)
+  mensagem  String             @db.Text
+  lida      Boolean            @default(false)
+  lidaEm    DateTime?
+  link      String?            @db.VarChar(500)
+  criadoEm  DateTime           @default(now())
+  alerta    AlertaOperacional? @relation(fields: [alertaId], references: [id], onDelete: SetNull)
+
   @@index([usuarioId])
   @@index([lida])
   @@index([criadoEm])
@@ -1683,22 +1697,23 @@ model Notificacao {
 // 22. TEMPLATE OFFLINE
 // ============================================================================
 model TemplateOffline {
-  id                   String   @id @default(cuid())
+  id                   String      @id @default(cuid())
   mantenedoraId        String
-  segmento             String   @db.VarChar(50)
+  segmento             String      @db.VarChar(50)
   semana               Int?
-  titulo               String   @db.VarChar(255)
-  campoExperiencia     String?  @db.VarChar(255)
-  objetivoBNCC         String?  @db.Text
-  objetivoCurriculo    String?  @db.Text
-  descricaoAtividade   String?  @db.Text
+  titulo               String      @db.VarChar(255)
+  campoExperiencia     String?     @db.VarChar(255)
+  objetivoBNCC         String?     @db.Text
+  objetivoCurriculo    String?     @db.Text
+  descricaoAtividade   String?     @db.Text
   materiaisNecessarios Json?
   duracaoMinutos       Int?
-  ativo                Boolean  @default(true)
-  criadoPorId          String   @db.VarChar(255)
-  criadoEm            DateTime @default(now())
-  atualizadoEm        DateTime @updatedAt
-  mantenedora         Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  ativo                Boolean     @default(true)
+  criadoPorId          String      @db.VarChar(255)
+  criadoEm             DateTime    @default(now())
+  atualizadoEm         DateTime    @updatedAt
+  mantenedora          Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
   @@index([mantenedoraId])
   @@index([segmento])
   @@index([semana])
@@ -1725,7 +1740,8 @@ model SyncMutation {
   status       StatusSync @default(PENDENTE)
   erroMsg      String?    @db.Text
   processadoEm DateTime?
-  criadoEm    DateTime   @default(now())
+  criadoEm     DateTime   @default(now())
+
   @@unique([clienteId])
   @@index([usuarioId])
   @@index([status])
@@ -1769,32 +1785,32 @@ model Fornecedor {
 
 /// Recado enviado pela coordenação para professores/turmas
 model RecadoTurma {
-  id            String    @id @default(cuid())
-  mantenedoraId String    @map("mantenedora_id")
-  unitId        String    @map("unit_id")
-  classroomId   String?   @map("classroom_id")
-  criadoPorId   String    @map("criado_por_id") @db.VarChar(255)
-  professorId   String?   @map("professor_id") @db.VarChar(255)
+  id            String  @id @default(cuid())
+  mantenedoraId String  @map("mantenedora_id")
+  unitId        String  @map("unit_id")
+  classroomId   String? @map("classroom_id")
+  criadoPorId   String  @map("criado_por_id") @db.VarChar(255)
+  professorId   String? @map("professor_id") @db.VarChar(255)
 
-  titulo        String    @db.VarChar(255)
-  mensagem      String    @db.Text
-  importante    Boolean   @default(false)
-  destinatario  String    @default("TODAS_PROFESSORAS") @db.VarChar(50)
+  titulo       String  @db.VarChar(255)
+  mensagem     String  @db.Text
+  importante   Boolean @default(false)
+  destinatario String  @default("TODAS_PROFESSORAS") @db.VarChar(50)
 
-  expiresAt     DateTime? @map("expires_at")
+  expiresAt    DateTime? @map("expires_at")
   criadoEm     DateTime  @default(now()) @map("criado_em")
   atualizadoEm DateTime  @updatedAt @map("atualizado_em")
 
-  mantenedora Mantenedora    @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora     @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   leituras    RecadoLeitura[]
 
-  @@map("recado_turma")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([classroomId])
   @@index([criadoPorId])
   @@index([destinatario])
   @@index([expiresAt])
+  @@map("recado_turma")
 }
 
 /// Confirmação de leitura de recado por professor
@@ -1806,10 +1822,10 @@ model RecadoLeitura {
 
   recado RecadoTurma @relation(fields: [recadoId], references: [id], onDelete: Cascade)
 
-  @@map("recado_leitura")
   @@unique([recadoId, userId])
   @@index([recadoId])
   @@index([userId])
+  @@map("recado_leitura")
 }
 
 // ============================================================================
@@ -1818,12 +1834,12 @@ model RecadoLeitura {
 
 /// Postagem pedagógica de uma turma (tarefa, atividade, aviso, etc.)
 model ClassroomPost {
-  id            String   @id @default(cuid())
-  mantenedoraId String   @map("mantenedora_id")
-  unitId        String   @map("unit_id")
-  classroomId   String   @map("classroom_id")
-  createdBy     String   @map("created_by") @db.VarChar(255)
-  planningId    String?  @map("planning_id")
+  id            String  @id @default(cuid())
+  mantenedoraId String  @map("mantenedora_id")
+  unitId        String  @map("unit_id")
+  classroomId   String  @map("classroom_id")
+  createdBy     String  @map("created_by") @db.VarChar(255)
+  planningId    String? @map("planning_id")
 
   title   String    @db.VarChar(255)
   content String?   @db.Text
@@ -1839,7 +1855,6 @@ model ClassroomPost {
   files        ClassroomPostFile[]
   performances StudentPostPerformance[]
 
-  @@map("classroom_post")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([classroomId])
@@ -1847,6 +1862,7 @@ model ClassroomPost {
   @@index([type])
   @@index([status])
   @@index([dueDate])
+  @@map("classroom_post")
 }
 
 /// Arquivo anexado a uma postagem pedagógica
@@ -1861,8 +1877,8 @@ model ClassroomPostFile {
 
   post ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  @@map("classroom_post_file")
   @@index([postId])
+  @@map("classroom_post_file")
 }
 
 /// Desempenho individual de aluno em uma postagem pedagógica
@@ -1881,10 +1897,10 @@ model StudentPostPerformance {
   post  ClassroomPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   child Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
 
-  @@map("student_post_performance")
   @@unique([postId, childId])
   @@index([postId])
   @@index([childId])
+  @@map("student_post_performance")
 }
 
 // ============================================================================
@@ -1903,35 +1919,35 @@ model DevelopmentObservation {
   date     DateTime @default(now())
 
   // Campos de observação (todos opcionais)
-  behaviorDescription    String? @map("behavior_description") @db.Text
-  socialInteraction      String? @map("social_interaction") @db.Text
-  emotionalState         String? @map("emotional_state") @db.Text
-  motorSkills            String? @map("motor_skills") @db.Text
-  cognitiveSkills        String? @map("cognitive_skills") @db.Text
-  languageSkills         String? @map("language_skills") @db.Text
-  healthNotes            String? @map("health_notes") @db.Text
-  dietaryNotes           String? @map("dietary_notes") @db.Text
-  sleepPattern           String? @map("sleep_pattern") @db.Text
-  learningProgress       String? @map("learning_progress") @db.Text
-  planningParticipation  String? @map("planning_participation") @db.Text
-  interests              String? @db.Text
-  challenges             String? @db.Text
-  psychologicalNotes     String? @map("psychological_notes") @db.Text
-  developmentAlerts      String? @map("development_alerts") @db.Text
-  recommendations        String? @db.Text
-  nextSteps              String? @map("next_steps") @db.Text
+  behaviorDescription   String? @map("behavior_description") @db.Text
+  socialInteraction     String? @map("social_interaction") @db.Text
+  emotionalState        String? @map("emotional_state") @db.Text
+  motorSkills           String? @map("motor_skills") @db.Text
+  cognitiveSkills       String? @map("cognitive_skills") @db.Text
+  languageSkills        String? @map("language_skills") @db.Text
+  healthNotes           String? @map("health_notes") @db.Text
+  dietaryNotes          String? @map("dietary_notes") @db.Text
+  sleepPattern          String? @map("sleep_pattern") @db.Text
+  learningProgress      String? @map("learning_progress") @db.Text
+  planningParticipation String? @map("planning_participation") @db.Text
+  interests             String? @db.Text
+  challenges            String? @db.Text
+  psychologicalNotes    String? @map("psychological_notes") @db.Text
+  developmentAlerts     String? @map("development_alerts") @db.Text
+  recommendations       String? @db.Text
+  nextSteps             String? @map("next_steps") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
 
-  @@map("development_observation")
   @@index([childId])
   @@index([classroomId])
   @@index([createdBy])
   @@index([date])
   @@index([category])
+  @@map("development_observation")
 }
 
 // ============================================================================
@@ -1940,27 +1956,114 @@ model DevelopmentObservation {
 
 /// Material do catálogo da mantenedora (referência para requisições e pedidos de compra)
 model Material {
-  id            String   @id @default(cuid())
+  id            String @id @default(cuid())
   mantenedoraId String
 
   // Identificação (nomes em inglês para compatibilidade com o service)
-  code          String   @db.VarChar(50)
-  name          String   @db.VarChar(255)
-  description   String?  @db.Text
-  category      String   @db.VarChar(50) // Ex: PEDAGOGICO, HIGIENE, ADMINISTRATIVO
-  unit          String?  @db.VarChar(50) // unidade de medida: unidade, caixa, pacote
-  referencePrice Decimal? @db.Decimal(10, 2)
-  defaultSupplier String? @db.VarChar(255)
+  code            String   @db.VarChar(50)
+  name            String   @db.VarChar(255)
+  description     String?  @db.Text
+  category        String   @db.VarChar(50) // Ex: PEDAGOGICO, HIGIENE, ADMINISTRATIVO
+  unit            String?  @db.VarChar(50) // unidade de medida: unidade, caixa, pacote
+  referencePrice  Decimal? @db.Decimal(10, 2)
+  defaultSupplier String?  @db.VarChar(255)
 
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  mantenedora Mantenedora          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora  Mantenedora           @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   requestItems MaterialRequestItem[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([category])
   @@index([isActive])
+}
+
+// ============================================================================
+// 26. CARDÁPIO E NUTRIÇÃO
+// ============================================================================
+
+enum DiaSemana {
+  SEGUNDA
+  TERCA
+  QUARTA
+  QUINTA
+  SEXTA
+}
+
+enum TipoRefeicao {
+  CAFE_MANHA
+  ALMOCO
+  LANCHE_TARDE
+  JANTAR
+}
+
+/// Cardápio semanal da unidade
+model Cardapio {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  /// Semana de referência: primeiro dia da semana (segunda-feira) no formato YYYY-MM-DD
+  semana        String   @db.VarChar(10)
+  titulo        String?  @db.VarChar(255)
+  observacoes   String?  @db.Text
+  publicado     Boolean  @default(false)
+  createdBy     String?  @db.VarChar(255)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  mantenedora Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  refeicoes   CardapioRefeicao[]
+
+  @@unique([unitId, semana])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([semana])
+  @@map("cardapio")
+}
+
+/// Refeição de um dia dentro de um cardápio semanal
+model CardapioRefeicao {
+  id           String       @id @default(cuid())
+  cardapioId   String
+  diaSemana    DiaSemana
+  tipoRefeicao TipoRefeicao
+  observacoes  String?      @db.Text
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  cardapio Cardapio       @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
+  itens    CardapioItem[]
+
+  @@unique([cardapioId, diaSemana, tipoRefeicao])
+  @@index([cardapioId])
+  @@map("cardapio_refeicao")
+}
+
+/// Item (alimento/preparação) de uma refeição do cardápio
+model CardapioItem {
+  id         String   @id @default(cuid())
+  refeicaoId String
+  nome       String   @db.VarChar(255)
+  quantidade Decimal? @db.Decimal(10, 3)
+  unidade    String?  @db.VarChar(50)
+
+  /// Informação nutricional por porção (opcional)
+  calorias     Decimal? @db.Decimal(8, 2)
+  proteinas    Decimal? @db.Decimal(8, 2)
+  carboidratos Decimal? @db.Decimal(8, 2)
+  gorduras     Decimal? @db.Decimal(8, 2)
+  fibras       Decimal? @db.Decimal(8, 2)
+  sodio        Decimal? @db.Decimal(8, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refeicao CardapioRefeicao @relation(fields: [refeicaoId], references: [id], onDelete: Cascade)
+
+  @@index([refeicaoId])
+  @@map("cardapio_item")
 }
