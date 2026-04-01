@@ -30,6 +30,10 @@ function makeCoordenador(id = 'coord-1'): JwtPayload {
 
 // --- Mocks ---
 
+// endDate no futuro para garantir que testes não quebrem por data
+const FUTURE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+const PAST_DATE = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
 const mockPlanningBase = {
   id: 'planning-1',
   mantenedoraId: 'mant-1',
@@ -38,6 +42,8 @@ const mockPlanningBase = {
   createdBy: 'professor-1',
   title: 'Planejamento de Teste',
   status: PlanningStatus.RASCUNHO,
+  startDate: FUTURE_DATE,
+  endDate: FUTURE_DATE,
   pedagogicalContent: {
     exemploAtividade: 'Exemplo secreto da coordenação',
     objetivoBNCC: 'Objetivo BNCC',
@@ -173,6 +179,42 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
       await expect(
         service.submitForReview('planning-1', professor),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('deve permitir envio para revisão de planejamento DEVOLVIDO com data no passado', async () => {
+      // Regressão: planejamentos devolvidos com período encerrado não devem ficar presos
+      const professor = makeProfessor();
+      const planningDevolvido = {
+        ...mockPlanningBase,
+        status: PlanningStatus.DEVOLVIDO,
+        endDate: PAST_DATE,
+      };
+      const planningEmRevisao = { ...planningDevolvido, status: PlanningStatus.EM_REVISAO };
+
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
+      mockPrismaService.planning.findFirst.mockResolvedValue(planningDevolvido);
+      mockPrismaService.planning.update.mockResolvedValue(planningEmRevisao);
+
+      const result = await service.submitForReview('planning-1', professor);
+      expect(result.status).toBe(PlanningStatus.EM_REVISAO);
+    });
+
+    it('deve permitir envio para revisão de planejamento RASCUNHO com data no passado', async () => {
+      // Regressão: professores que criaram planejamentos retroativos não devem ser bloqueados
+      const professor = makeProfessor();
+      const planningPassado = {
+        ...mockPlanningBase,
+        status: PlanningStatus.RASCUNHO,
+        endDate: PAST_DATE,
+      };
+      const planningEmRevisao = { ...planningPassado, status: PlanningStatus.EM_REVISAO };
+
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
+      mockPrismaService.planning.findFirst.mockResolvedValue(planningPassado);
+      mockPrismaService.planning.update.mockResolvedValue(planningEmRevisao);
+
+      const result = await service.submitForReview('planning-1', professor);
+      expect(result.status).toBe(PlanningStatus.EM_REVISAO);
     });
   });
 

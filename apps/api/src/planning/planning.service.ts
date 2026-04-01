@@ -994,17 +994,6 @@ export class PlanningService {
         throw new BadRequestException(`Planejamentos com status ${planning.status} não podem ser enviados para revisão.`);
     }
 
-    // BUG E FIX: Não permitir envio para revisão de planejamentos com período já encerrado.
-    const hoje = new Date();
-    hoje.setUTCHours(0, 0, 0, 0);
-    const endDate = new Date(planning.endDate);
-    endDate.setUTCHours(0, 0, 0, 0);
-    if (endDate < hoje) {
-        throw new ForbiddenException(
-          'Não é possível enviar para revisão um planejamento cujo período já encerrou.',
-        );
-    }
-
     // 3. Atualizar status e registrar data de submissão
     const updatedPlanning = await this.prisma.planning.update({
         where: { id },
