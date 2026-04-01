@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel } from '@prisma/client';
+import { Prisma, RoleLevel } from '@prisma/client';
 import { CreateCardapioDto } from './dto/create-cardapio.dto';
 import { CardapioRefeicaoDto } from './dto/cardapio-refeicao.dto';
 import { QueryCardapioDto } from './dto/query-cardapio.dto';
@@ -29,12 +29,12 @@ function assertAccess(user: JwtPayload, unitId: string) {
 
 // ─── include padrão ──────────────────────────────────────────────────────────
 
-const INCLUDE_FULL = {
+const INCLUDE_FULL: Prisma.CardapioInclude = {
   refeicoes: {
     include: { itens: true },
     orderBy: [
-      { diaSemana: 'asc' },
-      { tipoRefeicao: 'asc' },
+      { diaSemana: Prisma.SortOrder.asc },
+      { tipoRefeicao: Prisma.SortOrder.asc },
     ],
   },
 };
