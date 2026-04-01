@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -14,7 +16,7 @@ import {
   BookOpen, Plus, Save, Calendar, ChevronDown, ChevronUp,
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
-  Camera, UploadCloud, Trash2, TriangleAlert,
+  Camera, UploadCloud, Trash2, TriangleAlert, Pencil,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
@@ -86,6 +88,7 @@ interface Ocorrencia {
   mediaUrls?: string[];
   eventDate: string;
   createdAt?: string;
+  createdBy?: string;
   child?: { id: string; firstName: string; lastName: string; photoUrl?: string };
 }
 
@@ -207,8 +210,12 @@ function SeletorCrianca({
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
+// ─── Componente Principal ─────────────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
+  const { user } = useAuth();
+  const roles = normalizeRoles(user);
+  const isDeveloper = roles.includes('DEVELOPER');
+  const currentUserId = (user as any)?.id ?? (user as any)?.sub ?? '';
   const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>('lista');
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
@@ -284,6 +291,11 @@ export default function DiarioBordoPage() {
     fotosFiles: [] as File[], // arquivos originais para upload multipart
   });
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  // Editar/Excluir ocorrências
+  const [ocorrenciaEditando, setOcorrenciaEditando] = useState<Ocorrencia | null>(null);
+  const [editForm, setEditForm] = useState({ categoria: 'COMPORTAMENTO', descricao: '', eventDate: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   // Observações individuais
   const [observacoes, setObservacoes] = useState<ObservacaoIndividual[]>([]);
@@ -353,12 +365,64 @@ export default function DiarioBordoPage() {
         mediaUrls: Array.isArray(e.mediaUrls) ? e.mediaUrls : [],
         eventDate: e.eventDate ?? e.createdAt,
         createdAt: e.createdAt,
+        createdBy: e.createdBy,
         child: e.child,
       })));
     } catch {
       setOcorrencias([]);
     } finally {
       setLoadingOcorr(false);
+    }
+  }
+
+  // ── Editar ocorrência (professor edita a própria; DEVELOPER edita qualquer) ─────────────────────────────────────────────────────────────
+  function abrirEdicao(ocorr: Ocorrencia) {
+    setOcorrenciaEditando(ocorr);
+    setEditForm({
+      categoria: ocorr.categoria,
+      descricao: ocorr.descricao,
+      eventDate: ocorr.eventDate?.split('T')[0] ?? getPedagogicalToday(),
+    });
+  }
+
+  async function salvarEdicaoOcorrencia() {
+    if (!ocorrenciaEditando?.id) return;
+    if (!editForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
+    setSavingEdit(true);
+    try {
+      const catLabel = CATEGORIAS_OCORRENCIA.find(c => c.id === editForm.categoria)?.label ?? editForm.categoria;
+      await http.patch(`/diary-events/${ocorrenciaEditando.id}`, {
+        title: `Ocorrência: ${catLabel}`,
+        description: editForm.descricao,
+        eventDate: editForm.eventDate + 'T12:00:00.000Z',
+        aiContext: { categoria: editForm.categoria, categoriaLabel: catLabel },
+        tags: ['ocorrencia', editForm.categoria.toLowerCase()],
+      });
+      toast.success('Ocorrência atualizada!');
+      setOcorrenciaEditando(null);
+      loadOcorrencias();
+    } catch (err: any) {
+      toast.error(extractErrorMessage(err, 'Erro ao editar ocorrência'));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // ── Excluir ocorrência (professor exclui a própria; DEVELOPER exclui qualquer) ─────────────────────────────────────────────────────────────
+  async function excluirOcorrencia(ocorr: Ocorrencia) {
+    if (!ocorr.id) return;
+    const canDelete = isDeveloper || ocorr.createdBy === currentUserId;
+    if (!canDelete) { toast.error('Sem permissão para excluir esta ocorrência'); return; }
+    if (!window.confirm(`Excluir a ocorrência de ${ocorr.child?.firstName ?? 'criança'}? Esta ação não pode ser desfeita.`)) return;
+    setExcluindoId(ocorr.id);
+    try {
+      await http.delete(`/diary-events/${ocorr.id}`);
+      toast.success('Ocorrência excluída');
+      setOcorrencias(prev => prev.filter(o => o.id !== ocorr.id));
+    } catch (err: any) {
+      toast.error(extractErrorMessage(err, 'Erro ao excluir ocorrência'));
+    } finally {
+      setExcluindoId(null);
     }
   }
 
@@ -1600,12 +1664,61 @@ export default function DiarioBordoPage() {
               </div>
             )}
 
+            {/* Modal de edição de ocorrência */}
+            {ocorrenciaEditando && (
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setOcorrenciaEditando(null)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-gray-800 text-lg">Editar Ocorrência</h3>
+                    <button onClick={() => setOcorrenciaEditando(null)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Categoria</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {CATEGORIAS_OCORRENCIA.map(cat => (
+                        <button key={cat.id} type="button"
+                          onClick={() => setEditForm(f => ({ ...f, categoria: cat.id }))}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                            editForm.categoria === cat.id
+                              ? 'border-orange-500 bg-orange-50 text-orange-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300'
+                          }`}>
+                          <span>{cat.emoji}</span> {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Data</Label>
+                    <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      value={editForm.eventDate}
+                      onChange={e => setEditForm(f => ({ ...f, eventDate: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-1 block">Descrição *</Label>
+                    <Textarea rows={4} value={editForm.descricao}
+                      onChange={e => setEditForm(f => ({ ...f, descricao: e.target.value }))}
+                      placeholder="Descreva a ocorrência..." />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setOcorrenciaEditando(null)}>Cancelar</Button>
+                    <Button className="flex-1 bg-orange-600 hover:bg-orange-700" onClick={salvarEdicaoOcorrencia} disabled={savingEdit}>
+                      {savingEdit ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</> : <><Save className="h-4 w-4 mr-2" /> Salvar alterações</>}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {ocorrencias.map(ocorr => {
               const cat = CATEGORIAS_OCORRENCIA.find(c => c.id === ocorr.categoria);
               const crianca = criancas.find(c => c.id === ocorr.childId);
               const dataFormatada = ocorr.eventDate
                 ? new Date((ocorr.eventDate || '').includes('T') ? ocorr.eventDate : (ocorr.eventDate || '') + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
                 : '—';
+              // Regras de RBAC: professor edita/exclui as próprias; DEVELOPER exclui qualquer
+              const canEdit = ocorr.createdBy === currentUserId || isDeveloper;
+              const canDelete = isDeveloper || ocorr.createdBy === currentUserId;
               return (
                 <Card key={ocorr.id ?? ocorr.eventDate} className="border-2 border-orange-100 hover:border-orange-200 transition-all">
                   <CardContent className="pt-4">
@@ -1629,6 +1742,26 @@ export default function DiarioBordoPage() {
                             {cat?.emoji} {cat?.label ?? ocorr.categoria}
                           </span>
                           <span className="text-xs text-gray-400 ml-auto">{dataFormatada}</span>
+                          {/* Botões de ação */}
+                          {canEdit && (
+                            <button
+                              title="Editar ocorrência"
+                              onClick={() => abrirEdicao(ocorr)}
+                              className="ml-1 p-1 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              title="Excluir ocorrência"
+                              onClick={() => excluirOcorrencia(ocorr)}
+                              disabled={excluindoId === ocorr.id}
+                              className="p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                              {excluindoId === ocorr.id
+                                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                : <Trash2 className="h-3.5 w-3.5" />}
+                            </button>
+                          )}
                         </div>
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{ocorr.descricao}</p>
                         {/* Fotos */}
