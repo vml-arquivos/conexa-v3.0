@@ -1,22 +1,22 @@
 categoria,codigo,descricao,unidade_medida,preco_unit,fornecedor,fonte
-HIGIENE,HIG-001,Algodão bola 100g,UN,7.92,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-002,Termômetro branco,UN,19.40,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-003,Colônia infantil 750ml,UN,53.01,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-004,"Compressa estéril 7,5x7,5cm",PCT,2.98,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-005,Copo infantil com tampa e alça,UN,19.20,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-006,Creme para assaduras 45g,UN,21.18,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-007,Creme para pentear infantil 1kg,UN,44.62,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-008,Creme para pentear infantil 200ml,UN,13.77,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-009,Curativo transparente c/40,CX,20.38,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-010,Escova de dente infantil,UN,4.50,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-011,Esparadrapo impermeável 12mm x 3m,UN,6.51,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-012,Fralda descartável XG,PCT,60.99,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-013,Fralda descartável XXG,PCT,60.99,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-014,Lenço umedecido refil 400un,RF,18.06,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-015,Loção hidratante infantil 200ml,UN,12.38,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-016,Óleo corporal baby 100ml,UN,15.75,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-017,Sabonete líquido infantil 500ml,UN,29.72,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-018,Xuxa / liguinha colorida pacote,PCT,13.00,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-019,Xuxa rabicó colorida pacote,PCT,7.00,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-020,Shampoo infantil 480ml,UN,15.30,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
-HIGIENE,HIG-021,"Esparadrapo transparente 10cm x 4,5m",UN,69.90,PEDIDO HIGIENE ARARA 2026,catalogo_materiais_higiene_pedagogico.csv
+HIGIENE,HIG-001,Algodão Apolo Bola 100g,UN,7.92,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-002,Aparelho Termômetro Branco Encart,UN,19.40,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-003,Colônia CH Bebê Blue/Rose 750ml,UN,53.01,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-004,"Compressa Cremer 11 Fios 7,5cm x 7,5cm Estéril c/10un",PCT,2.98,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-005,Copo Infantil com Tampa e Alça,UNID,19.20,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-006,Creme Assaduras Baruel Baby Preventivo 45g,UN,21.18,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-007,Creme Pentear Infantil Salon Line Melancia Kids 1kg,UN,44.62,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-008,Creme Pentear Infantil Skalinha Bebê Camomila 200ml,UN,13.77,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-009,Curativo Band-Aid Transparente c/40un,CX,20.38,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-010,Escova de Dente Infantil,UN,4.50,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-011,Esparadrapo 3M Impermeável Bege 12mm x 3m,PCT,6.51,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-012,Fralda Descartável XG,PCT,60.99,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-013,Fralda Descartável XXG,PCT,60.99,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-014,Lenço Umedecido Refil c/400un,RF,18.06,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-015,Loção Hidratante Infantil Skalinha Lavanda 200ml,UN,12.38,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-016,Óleo Corporal Muriel Baby Rosa 100ml,UN,15.75,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-017,Sabonete Líquido Dermacream Glicerina Baby Love & Care 500ml,UN,29.72,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-018,Xuxa Laycrinha Colorida c/100,PCT,13.00,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-019,Xuxa Rabico Liguinha Colorida c/100,PCT,7.00,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-020,Shampoo Infantil Tra La La 480ml,UN,15.30,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
+HIGIENE,HIG-021,"Esparadrapo Transparente 10cm x 4,5m",UN,69.90,IDEAL LIMPEZA E DESCARTAVEIS BBL LTDA,PEDIDOHIGIENEARARA.pdf
