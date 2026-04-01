@@ -1,10 +1,22 @@
-import { useState, useRef } from 'react';
+/**
+ * MaterialRequestForm — redesign
+ *
+ * UX:
+ * - Uma única página, sem etapas/navegação
+ * - Cada linha de item tem: select de categoria + select de produto + quantidade
+ * - Produtos filtrados pela categoria selecionada na mesma linha
+ * - Possível pedir de múltiplas categorias no mesmo pedido
+ * - Catálogo carregado uma única vez (GET /materials/catalog sem filtro)
+ * - Fallback para input manual quando catálogo vazio ou erro
+ * - Lógica de fralda preservada
+ */
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Plus, Trash2, Send, CheckCircle, Search, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Send, CheckCircle, Loader2 } from 'lucide-react';
 import { createMaterialRequest, type MaterialCategory, type MaterialRequestItem } from '../../api/material-request';
 import { getErrorMessage } from '../../utils/errorMessage';
-import { useMaterialsCatalog, type CatalogMaterial } from '../../hooks/useMaterialsCatalog';
+import http from '../../api/http';
 
 interface MaterialRequestFormProps {
   classroomId?: string;
@@ -14,49 +26,32 @@ interface MaterialRequestFormProps {
   isProfessor?: boolean;
 }
 
-// ─── Categorias disponíveis para PROFESSOR: apenas Pedagógico e Higiene Pessoal ─
-const CATEGORIAS_PROFESSOR = [
-  {
-    value: 'PEDAGOGICO' as MaterialCategory,
-    label: 'Material Pedagógico',
-    icon: '📚',
-    cor: 'border-blue-300 bg-blue-50',
-  },
-  {
-    value: 'HIGIENE' as MaterialCategory,
-    label: 'Higiene Pessoal',
-    icon: '🧴',
-    cor: 'border-green-300 bg-green-50',
-  },
-  {
-    value: 'OUTRO' as MaterialCategory,
-    label: 'Outros',
-    icon: '📦',
-    cor: 'border-gray-300 bg-gray-50',
-  },
+export interface CatalogMaterial {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  unit: string | null;
+  referencePrice: number | null;
+}
+
+// ─── Categorias ───────────────────────────────────────────────────────────────
+const CATEGORIAS_PROFESSOR: { value: MaterialCategory; label: string }[] = [
+  { value: 'PEDAGOGICO', label: 'Material Pedagógico' },
+  { value: 'HIGIENE',    label: 'Higiene Pessoal' },
+  { value: 'OUTRO',      label: 'Outros' },
 ];
 
-// ─── Categorias completas para coordenação/gestão ─────────────────────────────
-const CATEGORIAS_GESTAO = [
+const CATEGORIAS_GESTAO: { value: MaterialCategory; label: string }[] = [
   ...CATEGORIAS_PROFESSOR,
-  {
-    value: 'LIMPEZA' as MaterialCategory,
-    label: 'Limpeza',
-    icon: '🧹',
-    cor: 'border-yellow-300 bg-yellow-50',
-  },
-  {
-    value: 'ALIMENTACAO' as MaterialCategory,
-    label: 'Alimentação',
-    icon: '🍎',
-    cor: 'border-orange-300 bg-orange-50',
-  },
+  { value: 'LIMPEZA',     label: 'Limpeza' },
+  { value: 'ALIMENTACAO', label: 'Alimentação' },
 ];
 
 const URGENCIAS = [
-  { value: 'BAIXA' as const, label: 'Sem pressa', desc: 'Pode esperar alguns dias', cor: 'border-green-300 bg-green-50 text-green-700' },
-  { value: 'MEDIA' as const, label: 'Esta semana', desc: 'Preciso em breve', cor: 'border-yellow-300 bg-yellow-50 text-yellow-700' },
-  { value: 'ALTA' as const, label: 'Urgente', desc: 'Preciso hoje ou amanhã', cor: 'border-red-300 bg-red-50 text-red-700' },
+  { value: 'BAIXA' as const, label: 'Sem pressa' },
+  { value: 'MEDIA' as const, label: 'Esta semana' },
+  { value: 'ALTA'  as const, label: 'Urgente' },
 ];
 
 const JUSTIFICATIVAS_PRONTAS = [
@@ -68,182 +63,137 @@ const JUSTIFICATIVAS_PRONTAS = [
   'Projeto temático em andamento',
 ];
 
-// ─── Componente de autocomplete de produto do catálogo ───────────────────────
-interface CatalogSelectProps {
-  catalogMaterials: CatalogMaterial[];
-  catalogLoading: boolean;
-  catalogError: string | null;
-  value: string;
-  materialId: string | null;
-  onChange: (nome: string, material: CatalogMaterial | null) => void;
-  placeholder?: string;
-}
-
-function CatalogSelect({ catalogMaterials, catalogLoading, catalogError, value, materialId, onChange, placeholder }: CatalogSelectProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const filtered = query.trim().length > 0
-    ? catalogMaterials.filter(m => m.name.toLowerCase().includes(query.toLowerCase()))
-    : catalogMaterials;
-
-  function selectMaterial(m: CatalogMaterial) {
-    onChange(m.name, m);
-    setQuery('');
-    setOpen(false);
-  }
-
-  function handleInputChange(v: string) {
-    setQuery(v);
-    onChange(v, null); // limpa materialId ao digitar manualmente
-    setOpen(true);
-  }
-
-  // Se catálogo vazio ou erro, fallback para input manual
-  if (catalogError || (catalogMaterials.length === 0 && !catalogLoading)) {
-    return (
-      <div className="flex-1">
-        <input
-          type="text"
-          placeholder={placeholder ?? 'Nome do item'}
-          value={value}
-          onChange={e => onChange(e.target.value, null)}
-          className="w-full bg-transparent text-sm outline-none"
-        />
-        {catalogError && (
-          <p className="text-xs text-amber-600 mt-0.5">{catalogError}</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 relative">
-      <div className="flex items-center gap-1">
-        {catalogLoading ? (
-          <Loader2 className="h-3 w-3 text-gray-400 animate-spin shrink-0" />
-        ) : (
-          <Search className="h-3 w-3 text-gray-400 shrink-0" />
-        )}
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder={catalogLoading ? 'Carregando catálogo...' : (placeholder ?? 'Buscar produto do catálogo...')}
-          value={open ? query : (value || '')}
-          onFocus={() => { setOpen(true); setQuery(''); }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          onChange={e => handleInputChange(e.target.value)}
-          className="w-full bg-transparent text-sm outline-none"
-          disabled={catalogLoading}
-        />
-        {value && !open && (
-          <span className="text-xs text-blue-600 font-medium shrink-0">✓</span>
-        )}
-      </div>
-      {/* Dropdown de sugestões */}
-      {open && filtered.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 bg-white border-2 border-blue-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
-          {filtered.slice(0, 20).map(m => (
-            <button
-              key={m.id}
-              type="button"
-              onMouseDown={() => selectMaterial(m)}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-gray-50 last:border-0"
-            >
-              <span className="font-medium text-gray-800 truncate">{m.name}</span>
-              <span className="text-xs text-gray-400 shrink-0">{m.unit ?? 'UN'}</span>
-            </button>
-          ))}
-          {filtered.length > 20 && (
-            <p className="px-3 py-2 text-xs text-gray-400 text-center">
-              +{filtered.length - 20} resultados — refine a busca
-            </p>
-          )}
-        </div>
-      )}
-      {/* Opção de digitar manualmente */}
-      {open && query.trim().length > 0 && !filtered.some(m => m.name.toLowerCase() === query.toLowerCase()) && (
-        <div className="absolute top-full left-0 right-0 z-50 bg-white border-2 border-gray-200 rounded-xl shadow-lg mt-1">
-          <button
-            type="button"
-            onMouseDown={() => { onChange(query, null); setOpen(false); setQuery(''); }}
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-600"
-          >
-            <span className="text-gray-400">+ Adicionar: </span>
-            <span className="font-medium">"{query}"</span>
-            <span className="text-xs text-gray-400 ml-1">(item personalizado)</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Item de requisição com materialId opcional ───────────────────────────────
+// ─── Tipo de item ─────────────────────────────────────────────────────────────
 interface RequisicaoItem extends MaterialRequestItem {
+  categoria: MaterialCategory;
   materialId?: string | null;
 }
 
+function itemVazio(categoria: MaterialCategory = 'PEDAGOGICO'): RequisicaoItem {
+  return { categoria, item: '', quantidade: 1, unidade: 'unidade(s)', materialId: null };
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isProfessor = false }: MaterialRequestFormProps) {
   const CATEGORIAS = isProfessor ? CATEGORIAS_PROFESSOR : CATEGORIAS_GESTAO;
 
-  const [loading, setLoading] = useState(false);
-  const [enviado, setEnviado] = useState(false);
-  const [etapa, setEtapa] = useState<1 | 2 | 3>(1);
-  const [categoria, setCategoria] = useState<MaterialCategory>('PEDAGOGICO');
-  const [urgencia, setUrgencia] = useState<'BAIXA' | 'MEDIA' | 'ALTA'>('BAIXA');
-  const [justificativa, setJustificativa] = useState('');
+  // Catálogo completo carregado uma única vez
+  const [catalog, setCatalog] = useState<CatalogMaterial[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogLoading(true);
+    http.get('/materials/catalog')
+      .then(res => {
+        if (!cancelled) setCatalog(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogError('Catálogo indisponível — você pode digitar o nome do item.');
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const [loading, setLoading]               = useState(false);
+  const [enviado, setEnviado]               = useState(false);
+  const [urgencia, setUrgencia]             = useState<'BAIXA' | 'MEDIA' | 'ALTA'>('BAIXA');
+  const [justificativa, setJustificativa]   = useState('');
   const [justificativaCustom, setJustificativaCustom] = useState('');
-  const [itens, setItens] = useState<RequisicaoItem[]>([{ item: '', quantidade: 1, unidade: 'unidade(s)', materialId: null }]);
+  const [itens, setItens]                   = useState<RequisicaoItem[]>([itemVazio('PEDAGOGICO')]);
 
-  // Catálogo do backend — carrega quando categoria muda (exceto OUTRO)
-  const catalogCategory = categoria !== 'OUTRO' ? categoria : null;
-  const { materials: catalogMaterials, loading: catalogLoading, error: catalogError } = useMaterialsCatalog(catalogCategory);
-
-  const categoriaAtual = CATEGORIAS.find(c => c.value === categoria) ?? CATEGORIAS[0];
-
+  // ─── Helpers de item ───────────────────────────────────────────────────────
   function addItem() {
-    setItens([...itens, { item: '', quantidade: 1, unidade: 'unidade(s)', materialId: null }]);
+    // Sugere a mesma categoria do último item
+    const ultima = itens[itens.length - 1]?.categoria ?? 'PEDAGOGICO';
+    setItens(prev => [...prev, itemVazio(ultima)]);
   }
 
   function removeItem(idx: number) {
-    if (itens.length > 1) setItens(itens.filter((_, i) => i !== idx));
+    if (itens.length > 1) setItens(prev => prev.filter((_, i) => i !== idx));
   }
 
-  function updateItem(idx: number, field: keyof RequisicaoItem, val: string | number | null) {
-    const u = [...itens];
-    u[idx] = { ...u[idx], [field]: val };
-    setItens(u);
+  function updateCategoria(idx: number, cat: MaterialCategory) {
+    setItens(prev => {
+      const u = [...prev];
+      // Ao trocar categoria, limpa produto e materialId mas mantém quantidade
+      u[idx] = { ...u[idx], categoria: cat, item: '', materialId: null, unidade: 'unidade(s)' };
+      return u;
+    });
   }
 
-  function updateItemFromCatalog(idx: number, nome: string, material: CatalogMaterial | null) {
-    const u = [...itens];
-    u[idx] = {
-      ...u[idx],
-      item: nome,
-      materialId: material?.id ?? null,
-      unidade: material?.unit ?? u[idx].unidade ?? 'unidade(s)',
-    };
-    setItens(u);
+  function updateProduto(idx: number, materialId: string) {
+    const mat = catalog.find(m => m.id === materialId);
+    if (!mat) return;
+    setItens(prev => {
+      const u = [...prev];
+      u[idx] = {
+        ...u[idx],
+        item: mat.name,
+        materialId: mat.id,
+        unidade: mat.unit ?? 'unidade(s)',
+      };
+      return u;
+    });
   }
 
+  function updateItemManual(idx: number, nome: string) {
+    setItens(prev => {
+      const u = [...prev];
+      u[idx] = { ...u[idx], item: nome, materialId: null };
+      return u;
+    });
+  }
+
+  function updateQtd(idx: number, delta: number) {
+    setItens(prev => {
+      const u = [...prev];
+      u[idx] = { ...u[idx], quantidade: Math.max(1, (u[idx].quantidade ?? 1) + delta) };
+      return u;
+    });
+  }
+
+  function updateUnidade(idx: number, unidade: string) {
+    setItens(prev => {
+      const u = [...prev];
+      u[idx] = { ...u[idx], unidade };
+      return u;
+    });
+  }
+
+  // ─── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit() {
     const itensValidos = itens.filter(i => i.item.trim());
     if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
     const motivo = justificativa || justificativaCustom;
     if (!motivo.trim()) { toast.error('Informe o motivo do pedido'); return; }
+
+    // Agrupa por categoria e cria uma requisição por categoria
+    // (o backend aceita uma categoria por requisição)
+    const porCategoria = new Map<MaterialCategory, RequisicaoItem[]>();
+    for (const it of itensValidos) {
+      const arr = porCategoria.get(it.categoria) ?? [];
+      arr.push(it);
+      porCategoria.set(it.categoria, arr);
+    }
+
     try {
       setLoading(true);
-      await createMaterialRequest({
-        classroomId,
-        categoria,
-        titulo: `${categoriaAtual.label} - ${new Date().toLocaleDateString('pt-BR')}`,
-        descricao: '',
-        itens: itensValidos,
-        justificativa: motivo,
-        urgencia,
-      });
+      for (const [cat, its] of porCategoria) {
+        const catLabel = CATEGORIAS.find(c => c.value === cat)?.label ?? cat;
+        await createMaterialRequest({
+          classroomId,
+          categoria: cat,
+          titulo: `${catLabel} - ${new Date().toLocaleDateString('pt-BR')}`,
+          descricao: '',
+          itens: its.map(i => ({ item: i.item, quantidade: i.quantidade, unidade: i.unidade, materialId: i.materialId })),
+          justificativa: motivo,
+          urgencia,
+        });
+      }
       setEnviado(true);
       onSuccess?.();
     } catch (error: unknown) {
@@ -253,6 +203,7 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
     }
   }
 
+  // ─── Tela de sucesso ───────────────────────────────────────────────────────
   if (enviado) {
     return (
       <div className="text-center py-12">
@@ -261,16 +212,10 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
         </div>
         <h3 className="text-xl font-bold text-gray-800 mb-2">Pedido enviado!</h3>
         <p className="text-gray-500 text-sm mb-6">A coordenação vai analisar e te dar um retorno em breve.</p>
-        {isProfessor && (
-          <p className="text-xs text-blue-600 bg-blue-50 rounded-xl px-4 py-2 inline-block mb-4">
-            📋 Lembrete: requisições são para <strong>Material Pedagógico</strong>, <strong>Higiene Pessoal</strong> e <strong>Outros</strong>
-          </p>
-        )}
         <Button
           onClick={() => {
             setEnviado(false);
-            setEtapa(1);
-            setItens([{ item: '', quantidade: 1, unidade: 'unidade(s)', materialId: null }]);
+            setItens([itemVazio('PEDAGOGICO')]);
             setJustificativa('');
             setJustificativaCustom('');
           }}
@@ -282,241 +227,242 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
     );
   }
 
+  // ─── Formulário principal ──────────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {/* Banner informativo para professor */}
+      {/* Banner informativo */}
       {isProfessor && (
         <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
           <span className="text-lg">ℹ️</span>
-          <p>Como professor(a), você pode solicitar <strong>Material Pedagógico</strong>, <strong>Higiene Pessoal</strong> e <strong>Outros</strong> para a sua turma.</p>
+          <p>Solicite <strong>Material Pedagógico</strong>, <strong>Higiene Pessoal</strong> e <strong>Outros</strong> para a sua turma. Você pode misturar categorias no mesmo pedido.</p>
         </div>
       )}
 
-      {/* Indicador de etapas */}
-      <div className="flex items-center gap-2">
-        {[1, 2, 3].map(n => (
-          <div key={n} className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${etapa >= n ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-400'}`}>{n}</div>
-            {n < 3 && <div className={`h-1 w-8 rounded-full ${etapa > n ? 'bg-blue-500' : 'bg-gray-100'}`} />}
-          </div>
-        ))}
-        <span className="text-sm text-gray-500 ml-2">
-          {etapa === 1 ? 'Que tipo de material?' : etapa === 2 ? 'Quais itens?' : 'Qual a urgência?'}
-        </span>
+      {/* Status do catálogo */}
+      {catalogLoading && (
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Carregando catálogo de materiais...
+        </div>
+      )}
+      {!catalogLoading && catalog.length > 0 && (
+        <p className="text-xs text-green-600 font-medium">
+          ✓ {catalog.length} produtos disponíveis no catálogo
+        </p>
+      )}
+      {catalogError && (
+        <p className="text-xs text-amber-600">{catalogError}</p>
+      )}
+
+      {/* ── Lista de itens ── */}
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-gray-700">Itens do pedido:</p>
+
+        {itens.map((item, idx) => {
+          const produtosDaCategoria = catalog.filter(m => m.category === item.categoria);
+          const isFralda = /fralda/i.test(item.item);
+
+          return (
+            <div
+              key={idx}
+              className={`p-3 rounded-xl border-2 space-y-3 ${item.materialId ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}
+            >
+              {/* Linha 1: Categoria + Produto + Qtd + Remover */}
+              <div className="flex flex-wrap items-center gap-2">
+
+                {/* Select de Categoria */}
+                <select
+                  value={item.categoria}
+                  onChange={e => updateCategoria(idx, e.target.value as MaterialCategory)}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 shrink-0"
+                >
+                  {CATEGORIAS.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+
+                {/* Select de Produto (ou input manual se catálogo vazio) */}
+                {!catalogLoading && produtosDaCategoria.length > 0 ? (
+                  <select
+                    value={item.materialId ?? ''}
+                    onChange={e => {
+                      if (e.target.value === '') {
+                        updateItemManual(idx, '');
+                      } else {
+                        updateProduto(idx, e.target.value);
+                      }
+                    }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  >
+                    <option value="">— Selecione o produto —</option>
+                    {produtosDaCategoria.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  /* Fallback: input manual */
+                  <input
+                    type="text"
+                    placeholder={catalogLoading ? 'Carregando...' : 'Nome do item'}
+                    value={item.item}
+                    onChange={e => updateItemManual(idx, e.target.value)}
+                    disabled={catalogLoading}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                )}
+
+                {/* Quantidade */}
+                <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => updateQtd(idx, -1)}
+                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold text-lg leading-none"
+                  >−</button>
+                  <span className="w-7 text-center text-sm font-bold">{item.quantidade}</span>
+                  <button
+                    type="button"
+                    onClick={() => updateQtd(idx, +1)}
+                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold text-lg leading-none"
+                  >+</button>
+                </div>
+
+                {/* Remover */}
+                {itens.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    className="text-red-400 hover:text-red-600 shrink-0"
+                    title="Remover item"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Unidade do catálogo */}
+              {item.materialId && item.unidade && item.unidade !== 'unidade(s)' && (
+                <p className="text-xs text-blue-600 pl-1">Unidade: {item.unidade}</p>
+              )}
+
+              {/* Seletor de tamanho de fralda */}
+              {isFralda && (
+                <div className="flex items-center gap-2 flex-wrap pl-1">
+                  <span className="text-xs text-green-700 font-semibold">🧷 Tamanho:</span>
+                  {['RN', 'P', 'M', 'G', 'XG', 'XXG', 'XXXG'].map(tam => (
+                    <button
+                      key={tam}
+                      type="button"
+                      onClick={() => updateUnidade(idx, tam)}
+                      className={`px-2 py-0.5 rounded-full text-xs font-bold border-2 transition-all ${
+                        item.unidade === tam
+                          ? 'bg-green-500 text-white border-green-500'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
+                      }`}
+                    >
+                      {tam}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Botão adicionar item */}
+        <button
+          type="button"
+          onClick={addItem}
+          className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
+        >
+          <Plus className="h-4 w-4" /> Adicionar outro item
+        </button>
       </div>
 
-      {/* ETAPA 1: Categoria — mesma página, sem navegação */}
-      {etapa === 1 && (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">Toque na categoria do material que você precisa:</p>
-          <div className="grid grid-cols-2 gap-3">
-            {CATEGORIAS.map(cat => (
-              <button
-                key={cat.value}
-                onClick={() => { setCategoria(cat.value); setEtapa(2); }}
-                className={`p-4 rounded-2xl border-2 text-left transition-all hover:shadow-md active:scale-95 ${categoria === cat.value ? cat.cor + ' border-opacity-100' : 'bg-white border-gray-100 hover:border-blue-200'}`}
-              >
-                <span className="text-3xl block mb-2">{cat.icon}</span>
-                <p className="font-bold text-sm text-gray-800">{cat.label}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ETAPA 2: Itens — catálogo carregado na mesma página, alternância de categoria atualiza lista */}
-      {etapa === 2 && (
-        <div className="space-y-4">
-          {/* Cabeçalho com voltar e troca de categoria */}
-          <div className="flex items-center justify-between">
-            <button onClick={() => setEtapa(1)} className="text-sm text-blue-500 hover:text-blue-700">← Voltar</button>
-            {/* Alternância rápida de categoria na mesma página */}
-            <div className="flex gap-1">
-              {CATEGORIAS.filter(c => c.value !== 'OUTRO').map(cat => (
-                <button
-                  key={cat.value}
-                  onClick={() => {
-                    setCategoria(cat.value);
-                    // Limpar itens ao trocar categoria para evitar mistura
-                    setItens([{ item: '', quantidade: 1, unidade: 'unidade(s)', materialId: null }]);
-                  }}
-                  className={`px-2 py-1 rounded-lg text-xs font-semibold border-2 transition-all ${
-                    categoria === cat.value
-                      ? cat.cor + ' border-opacity-100'
-                      : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  {cat.icon} {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Indicador de catálogo carregado */}
-          {catalogLoading && (
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Carregando catálogo de {categoriaAtual.label}...
-            </div>
-          )}
-          {!catalogLoading && catalogMaterials.length > 0 && (
-            <p className="text-xs text-green-600 font-medium">
-              ✓ {catalogMaterials.length} produtos disponíveis no catálogo — busque pelo nome
-            </p>
-          )}
-
-          {/* Lista de itens com Select/autocomplete do catálogo */}
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-gray-600">Itens do pedido:</p>
-            {itens.map((item, idx) => {
-              const isFralda = /fralda/i.test(item.item);
-              const temMaterialId = !!item.materialId;
-              return (
-                <div key={idx} className={`p-3 rounded-xl border-2 space-y-2 ${temMaterialId ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className="flex items-center gap-2">
-                    <CatalogSelect
-                      catalogMaterials={catalogMaterials}
-                      catalogLoading={catalogLoading}
-                      catalogError={catalogError}
-                      value={item.item}
-                      materialId={item.materialId ?? null}
-                      onChange={(nome, material) => updateItemFromCatalog(idx, nome, material)}
-                      placeholder={categoria === 'OUTRO' ? 'Nome do item' : 'Buscar produto do catálogo...'}
-                    />
-                    <div className="flex items-center gap-1 bg-white border rounded-lg px-2 py-1 shrink-0">
-                      <button
-                        onClick={() => updateItem(idx, 'quantidade', Math.max(1, Number(item.quantidade) - 1))}
-                        className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold"
-                      >-</button>
-                      <span className="w-6 text-center text-sm font-bold">{item.quantidade}</span>
-                      <button
-                        onClick={() => updateItem(idx, 'quantidade', Number(item.quantidade) + 1)}
-                        className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-500 font-bold"
-                      >+</button>
-                    </div>
-                    {itens.length > 1 && (
-                      <button onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600 shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  {/* Unidade do catálogo */}
-                  {temMaterialId && item.unidade && item.unidade !== 'unidade(s)' && (
-                    <p className="text-xs text-blue-600">Unidade: {item.unidade}</p>
-                  )}
-                  {/* Campo de tamanho: aparece automaticamente quando o item é fralda */}
-                  {isFralda && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <span className="text-xs text-green-700 font-semibold">🧷 Tamanho da fralda:</span>
-                      <div className="flex gap-1 flex-wrap">
-                        {['RN', 'P', 'M', 'G', 'XG', 'XXG', 'XXXG'].map(tam => (
-                          <button
-                            key={tam}
-                            type="button"
-                            onClick={() => updateItem(idx, 'unidade', tam)}
-                            className={`px-2 py-0.5 rounded-full text-xs font-bold border-2 transition-all ${
-                              item.unidade === tam
-                                ? 'bg-green-500 text-white border-green-500'
-                                : 'bg-white text-gray-600 border-gray-300 hover:border-green-400'
-                            }`}
-                          >
-                            {tam}
-                          </button>
-                        ))}
-                      </div>
-                      {item.unidade && ['RN','P','M','G','XG','XXG','XXXG'].includes(item.unidade) && (
-                        <span className="text-xs text-green-600 font-medium">Tamanho {item.unidade} selecionado</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      {/* ── Urgência ── */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Urgência:</p>
+        <div className="flex gap-2">
+          {URGENCIAS.map(u => (
             <button
-              onClick={addItem}
-              className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
+              key={u.value}
+              type="button"
+              onClick={() => setUrgencia(u.value)}
+              className={`flex-1 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
+                urgencia === u.value
+                  ? u.value === 'BAIXA'
+                    ? 'bg-green-100 border-green-400 text-green-700'
+                    : u.value === 'MEDIA'
+                    ? 'bg-yellow-100 border-yellow-400 text-yellow-700'
+                    : 'bg-red-100 border-red-400 text-red-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
             >
-              <Plus className="h-4 w-4" /> Adicionar outro item
+              {u.label}
             </button>
-          </div>
+          ))}
+        </div>
+      </div>
 
-          <Button
-            onClick={() => { if (itens.some(i => i.item.trim())) setEtapa(3); else toast.error('Adicione pelo menos um item'); }}
-            className="w-full h-12 rounded-xl bg-blue-500 hover:bg-blue-600 font-bold"
-          >
-            Continuar
-          </Button>
+      {/* ── Motivo ── */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Por que você precisa?</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {JUSTIFICATIVAS_PRONTAS.map(j => (
+            <button
+              key={j}
+              type="button"
+              onClick={() => { setJustificativa(j); setJustificativaCustom(''); }}
+              className={`px-3 py-1.5 rounded-full border-2 text-sm transition-all ${
+                justificativa === j
+                  ? 'bg-blue-500 text-white border-blue-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+              }`}
+            >
+              {j}
+            </button>
+          ))}
+        </div>
+        <textarea
+          placeholder="Ou escreva o motivo aqui..."
+          value={justificativaCustom}
+          onChange={e => { setJustificativaCustom(e.target.value); setJustificativa(''); }}
+          className="w-full border-2 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+          rows={3}
+        />
+      </div>
+
+      {/* ── Resumo ── */}
+      {itens.some(i => i.item.trim()) && (
+        <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100">
+          <p className="text-xs font-semibold text-blue-600 mb-2">Resumo do pedido:</p>
+          {Array.from(new Set(itens.filter(i => i.item.trim()).map(i => i.categoria))).map(cat => {
+            const catLabel = CATEGORIAS.find(c => c.value === cat)?.label ?? cat;
+            const catItens = itens.filter(i => i.categoria === cat && i.item.trim());
+            return (
+              <div key={cat} className="mb-1">
+                <p className="text-sm font-bold text-gray-700">{catLabel}</p>
+                {catItens.map((it, i) => (
+                  <p key={i} className="text-xs text-gray-500 pl-2">· {it.item} × {it.quantidade}</p>
+                ))}
+              </div>
+            );
+          })}
+          <p className="text-xs text-gray-500 mt-2">
+            {itens.filter(i => i.item.trim()).length} item(ns) · {URGENCIAS.find(u => u.value === urgencia)?.label}
+          </p>
+          {classroomName && <p className="text-xs text-gray-500">Turma: {classroomName}</p>}
         </div>
       )}
 
-      {/* ETAPA 3: Urgência + Motivo */}
-      {etapa === 3 && (
-        <div className="space-y-4">
-          <button onClick={() => setEtapa(2)} className="text-sm text-blue-500 hover:text-blue-700">← Voltar</button>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-600 mb-2">Qual a urgência?</p>
-            <div className="grid grid-cols-3 gap-3">
-              {URGENCIAS.map(u => (
-                <button
-                  key={u.value}
-                  onClick={() => setUrgencia(u.value)}
-                  className={`p-3 rounded-2xl border-2 text-center transition-all ${urgencia === u.value ? u.cor : 'bg-white border-gray-100 hover:border-gray-300'}`}
-                >
-                  <p className="font-bold text-sm">{u.label}</p>
-                  <p className="text-xs mt-0.5 opacity-70">{u.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-gray-600 mb-2">Por que você precisa?</p>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {JUSTIFICATIVAS_PRONTAS.map(j => (
-                <button
-                  key={j}
-                  onClick={() => { setJustificativa(j); setJustificativaCustom(''); }}
-                  className={`px-3 py-1.5 rounded-full border-2 text-sm transition-all ${justificativa === j ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
-                >
-                  {j}
-                </button>
-              ))}
-            </div>
-            <textarea
-              placeholder="Ou escreva o motivo aqui..."
-              value={justificativaCustom}
-              onChange={e => { setJustificativaCustom(e.target.value); setJustificativa(''); }}
-              className="w-full border-2 rounded-xl p-3 text-sm resize-none"
-              rows={3}
-            />
-          </div>
-
-          {/* Resumo */}
-          <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100">
-            <p className="text-xs font-semibold text-blue-600 mb-2">Resumo do pedido:</p>
-            <p className="text-sm font-bold">{categoriaAtual.icon} {categoriaAtual.label}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              {itens.filter(i => i.item.trim()).length} item(ns) · {URGENCIAS.find(u => u.value === urgencia)?.label}
-            </p>
-            {itens.filter(i => i.item.trim() && i.materialId).length > 0 && (
-              <p className="text-xs text-blue-600 mt-0.5">
-                ✓ {itens.filter(i => i.item.trim() && i.materialId).length} item(ns) do catálogo oficial
-              </p>
-            )}
-            {classroomName && <p className="text-xs text-gray-500">Turma: {classroomName}</p>}
-          </div>
-
-          <Button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-base"
-          >
-            <Send className="h-5 w-5 mr-2" />
-            {loading ? 'Enviando...' : 'Enviar pedido'}
-          </Button>
-        </div>
-      )}
+      {/* ── Botão enviar ── */}
+      <Button
+        onClick={handleSubmit}
+        disabled={loading}
+        className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-base"
+      >
+        <Send className="h-5 w-5 mr-2" />
+        {loading ? 'Enviando...' : 'Enviar pedido'}
+      </Button>
     </div>
   );
 }

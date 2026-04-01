@@ -1,37 +1,37 @@
 categoria,codigo,descricao,unidade_medida,preco_unit,fornecedor,fonte
-PEDAGOGICO,PED-001,Balão nº 09 vermelho pct c/50,PCT,17.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-002,Balão nº 09 azul cobalto pct c/50,PCT,17.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-003,Balão nº 09 verde bandeira pct c/50,PCT,17.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-004,Balão nº 09 branco polar pct c/50,PCT,17.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-005,Cola isopor / EVA 90g,UN,8.40,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-006,Emborrachado EVA branco pct c/10,PCT,17.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-007,Emborrachado EVA amarelo pct c/10,PCT,17.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-008,Emborrachado EVA azul claro pct c/10,PCT,17.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-009,Emborrachado EVA cinza pct c/10,PCT,17.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-010,Emborrachado EVA rosa claro pct c/10,PCT,17.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-011,Fita crepe 48mm x 50m,UN,15.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-012,Fita crepe 18mm x 50m,UN,5.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-013,Fita kraft 48mm x 50m,UN,75.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-014,Fita kraft 18mm x 50m,UN,28.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-015,Fita PVC transparente 45mm x 45m,UN,5.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-016,Lastex 10m cores,UN,1.20,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-017,Maleta cristal organizadora,UN,19.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-018,Massa de modelar 12 cores 135g,UN,4.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-019,Palito de picolé c/100,PCT,5.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-020,Papel cartolina branca pct c/100,PCT,89.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-021,Papel cartolina dupla face azul pct c/20,PCT,26.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-022,Papel cartolina dupla face rosa pct c/20,PCT,26.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-023,Papel cartolina dupla face roxo pct c/20,PCT,26.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-024,Papel de seda pink pct c/100,PCT,35.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-025,Papel de seda rosa pct c/100,PCT,35.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-026,Papel de seda verde folha pct c/100,PCT,35.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-027,Papel kraft 66 x 96 100 folhas,PCT,84.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-028,Plástico adesivo 45cm x 25m,RL,89.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-029,Quadro de aviso display A4,UN,23.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-030,Saco de celofane 15 x 22 c/50,PCT,8.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-031,Saco de celofane 25 x 35 c/50,PCT,18.50,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-032,Saco transparente 30 x 45 c/50,PCT,39.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-033,Tecido Oxford cores,MT,15.90,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-034,TNT rolo 50m branco,RL,84.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-035,TNT rolo 50m azul marinho,RL,84.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
-PEDAGOGICO,PED-036,TNT rolo 50m rosa,RL,84.99,Papelaria impacto,catalogo_materiais_higiene_pedagogico.csv
+PEDAGOGICO,PED-001,Balão nº 09 Vermelho pct c/50,PCT,17.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-002,Balão São Roque Imperial nº 09 Azul Cobalto pct c/50,PCT,17.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-003,Balão São Roque Imperial nº 09 Verde Bandeira pct c/50,PCT,17.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-004,Balão São Roque nº 09 Branco Polar pct c/50,PCT,17.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-005,Cola Isopor / EVA Transparente 90g,UN,8.40,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-006,Emborrachado Branco 40cm x 48cm pct c/10,PCT,17.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-007,Emborrachado Amarelo 40cm x 48cm pct c/10,PCT,17.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-008,Emborrachado Azul Claro 40cm x 48cm pct c/10,PCT,17.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-009,Emborrachado Cinza 40cm x 48cm pct c/10,PCT,17.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-010,Emborrachado Rosa Claro 40cm x 48cm pct c/10,PCT,17.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-011,Fita Crepe 101 LA 48mm x 50m 3M,UN,15.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-012,Fita Crepe 18mm x 50m 3M,UN,5.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-013,Fita Papel Kraft Scotch 3M 48mm x 50m,UN,75.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-014,Fita Papel Kraft Scotch 3M 18mm x 50m,UN,28.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-015,Fita PVC Scotch Transparente 45mm x 45m 3M,UN,5.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-016,Lastex Italo 10m Cores,UN,1.20,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-017,Maleta 205 Novaonda Cristal Polibras,UN,19.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-018,Massa de Modelar 12 Cores 135g Make+,UN,4.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-019,Palito de Picolé Ponta Redonda c/100,PCT,5.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-020,Papel Cartolina Comum Branca pct c/100 fls,PCT,89.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-021,Papel Cartolina Dupla Face Azul pct c/20 fls,PCT,26.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-022,Papel Cartolina Dupla Face Rosa pct c/20 fls,PCT,26.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-023,Papel Cartolina Dupla Face Roxo pct c/20 fls,PCT,26.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-024,Papel de Seda 48x60cm Color pct c/100 Pink,PCT,35.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-025,Papel de Seda 48x60cm Color pct c/100 Rosa,PCT,35.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-026,Papel de Seda 48x60cm pct c/100 Verde Folha,PCT,35.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-027,Papel Kraft 80g 66x96cm pct c/100 fls,PCT,84.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-028,Plástico Adesivo 80 Micras 45cm x 25m,RL,89.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-029,Quadro de Aviso Display Multiuso A4 Cristal Waleu,UN,23.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-030,Saco de Celofane Incolor 15x22cm c/50,PCT,8.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-031,Saco de Celofane Incolor 25x35cm c/50,PCT,18.50,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-032,Saco Transparente n8 30x45cm c/50 Cristal,PCT,39.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-033,Tecido Oxford Cores Metro,MT,15.90,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-034,TNT Rolo 50 Metros Branco Make+,RL,84.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-035,TNT Rolo 50 Metros Azul Marinho Make+,RL,84.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
+PEDAGOGICO,PED-036,TNT Rolo 50 Metros Rosa Make+,RL,84.99,BSB Papelaria Impacto,Papelariaimpacto.pdf
