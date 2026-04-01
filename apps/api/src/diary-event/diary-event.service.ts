@@ -313,8 +313,12 @@ export class DiaryEventService {
       andConditions.push({ eventDate: dateFilter });
     }
 
-    // ── 3. QUERY FINAL ───────────────────────────────────────────────────────
+    // ── 3. QUERY FINAL ───────────────────────────────────────────────
     const where = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    // Respeitar limit/skip enviados pelo cliente (com teto de segurança em 1000)
+    const takeVal = query.limit ? Math.min(parseInt(query.limit, 10), 1000) : 500;
+    const skipVal = query.skip  ? parseInt(query.skip, 10) : 0;
 
     const events = await this.prisma.diaryEvent.findMany({
       where,
@@ -324,9 +328,9 @@ export class DiaryEventService {
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: { eventDate: 'desc' },
-      take: 500,
+      take: takeVal,
+      skip: skipVal,
     });
-
     return events;
   }
 
