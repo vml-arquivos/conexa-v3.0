@@ -264,7 +264,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function rejeitarRequisicao(id: string, motivo: string) {
     try {
       setProcessando(id);
-      await http.patch(`/material-requests/${id}/review`, { decision: 'REJECTED' });
+      await http.patch(`/material-requests/${id}/review`, { decision: 'REJECTED', notes: motivo });
       toast.success('Pedido devolvido ao professor');
       setRequisicoes(prev => prev.filter(r => r.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');
