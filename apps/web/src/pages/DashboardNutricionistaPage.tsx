@@ -19,6 +19,10 @@ import {
   DIAS_SEMANA, TIPOS_REFEICAO, DIA_SEMANA_LABELS, TIPO_REFEICAO_LABELS,
   type Cardapio, type CardapioItem, type DiaSemana, type TipoRefeicao, type NutricaoResponse,
 } from '../api/cardapio';
+import {
+  listAlimentos, agruparPorCategoria, calcularMacrosPorQuantidade,
+  type Alimento,
+} from '../api/alimentos';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface DietaryRestriction {
@@ -103,6 +107,20 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   const [editando, setEditando] = useState<{ dia: DiaSemana; tipo: TipoRefeicao } | null>(null);
   const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([{ nome: '' }]);
   const [obsForm, setObsForm] = useState('');
+
+  // Banco de alimentos para o select
+  const [alimentos, setAlimentos] = useState<Alimento[]>([]);
+  const [loadingAlimentos, setLoadingAlimentos] = useState(false);
+  const gruposAlimentos = agruparPorCategoria(alimentos);
+
+  // Carrega alimentos ao montar
+  useEffect(() => {
+    setLoadingAlimentos(true);
+    listAlimentos({ limit: 500 })
+      .then((res) => setAlimentos(res.data))
+      .catch(() => setAlimentos([]))
+      .finally(() => setLoadingAlimentos(false));
+  }, []);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -189,6 +207,63 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   const removeItem = (idx: number) => setItensForm((prev) => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: keyof CardapioItem, value: string | number) => {
     setItensForm((prev) => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+  };
+
+  // Ao selecionar um alimento no select, preenche nome e macros proporcionais à quantidade
+  const handleSelectAlimento = (idx: number, alimentoId: string) => {
+    const alimento = alimentos.find((a) => a.id === alimentoId);
+    if (!alimento) {
+      updateItem(idx, 'nome', '');
+      return;
+    }
+    const qtd = Number(itensForm[idx]?.quantidade ?? alimento.porcaoPadrao);
+    const macros = calcularMacrosPorQuantidade(alimento, qtd || alimento.porcaoPadrao);
+    setItensForm((prev) =>
+      prev.map((item, i) =>
+        i === idx
+          ? {
+              ...item,
+              nome:         alimento.nome,
+              alimentoId:   alimento.id,
+              quantidade:   qtd || alimento.porcaoPadrao,
+              unidade:      alimento.unidadePadrao,
+              calorias:     macros.calorias,
+              proteinas:    macros.proteinas,
+              carboidratos: macros.carboidratos,
+              gorduras:     macros.gorduras,
+              fibras:       macros.fibras,
+              sodio:        macros.sodio,
+            }
+          : item
+      )
+    );
+  };
+
+  // Ao alterar quantidade, recalcula macros se o alimento já foi selecionado
+  const handleQuantidadeChange = (idx: number, qtd: number) => {
+    const item = itensForm[idx];
+    const alimento = alimentos.find((a) => a.id === (item as any).alimentoId);
+    if (alimento && qtd > 0) {
+      const macros = calcularMacrosPorQuantidade(alimento, qtd);
+      setItensForm((prev) =>
+        prev.map((it, i) =>
+          i === idx
+            ? {
+                ...it,
+                quantidade:   qtd,
+                calorias:     macros.calorias,
+                proteinas:    macros.proteinas,
+                carboidratos: macros.carboidratos,
+                gorduras:     macros.gorduras,
+                fibras:       macros.fibras,
+                sodio:        macros.sodio,
+              }
+            : it
+        )
+      );
+    } else {
+      updateItem(idx, 'quantidade', qtd);
+    }
   };
 
   return (
@@ -308,62 +383,116 @@ function AbaCardapio({ unitId }: { unitId: string }) {
       {/* Modal de edição de refeição */}
       {editando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl mx-4 overflow-hidden">
+            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b bg-orange-50">
               <div>
                 <p className="font-semibold text-gray-800">
                   {DIA_SEMANA_LABELS[editando.dia]} — {TIPO_REFEICAO_LABELS[editando.tipo]}
                 </p>
-                <p className="text-xs text-gray-500">Adicione os alimentos desta refeição</p>
+                <p className="text-xs text-gray-500">Selecione os alimentos desta refeição</p>
               </div>
               <button onClick={() => setEditando(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+
+            <div className="p-6 space-y-4 max-h-[72vh] overflow-y-auto">
+              {loadingAlimentos && (
+                <p className="text-xs text-gray-400 text-center py-2">Carregando lista de alimentos...</p>
+              )}
+
               {/* Lista de itens */}
-              <div className="space-y-3">
-                {itensForm.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-start">
-                    <div className="flex-1 space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Nome do alimento / preparação *"
-                        value={item.nome ?? ''}
-                        onChange={(e) => updateItem(idx, 'nome', e.target.value)}
-                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                      />
+              <div className="space-y-4">
+                {itensForm.map((item, idx) => {
+                  const alimentoSelecionado = alimentos.find((a) => a.id === (item as any).alimentoId);
+                  return (
+                    <div key={idx} className="border rounded-xl p-3 bg-gray-50 space-y-2">
+                      {/* Linha 1: Select de alimento + botão remover */}
+                      <div className="flex gap-2 items-center">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Alimento *</label>
+                          <select
+                            value={(item as any).alimentoId ?? ''}
+                            onChange={(e) => handleSelectAlimento(idx, e.target.value)}
+                            className="w-full border rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+                          >
+                            <option value="">— Selecione o alimento —</option>
+                            {gruposAlimentos.map((grupo) => (
+                              <optgroup key={grupo.categoria} label={`🍽 ${grupo.label}`}>
+                                {grupo.itens.map((a) => (
+                                  <option key={a.id} value={a.id}>{a.nome}</option>
+                                ))}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                        {itensForm.length > 1 && (
+                          <button
+                            onClick={() => removeItem(idx)}
+                            className="mt-5 text-red-400 hover:text-red-600 flex-shrink-0"
+                            title="Remover item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Linha 2: Quantidade + Unidade */}
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          placeholder="Qtd (ex: 150)"
-                          value={item.quantidade ?? ''}
-                          onChange={(e) => updateItem(idx, 'quantidade', Number(e.target.value))}
-                          className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Unidade (g, ml, porção)"
-                          value={item.unidade ?? ''}
-                          onChange={(e) => updateItem(idx, 'unidade', e.target.value)}
-                          className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                        />
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Quantidade</label>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder={alimentoSelecionado ? String(alimentoSelecionado.porcaoPadrao) : '150'}
+                            value={item.quantidade ?? ''}
+                            onChange={(e) => handleQuantidadeChange(idx, Number(e.target.value))}
+                            className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Unidade</label>
+                          <input
+                            type="text"
+                            placeholder="g, ml, porção"
+                            value={item.unidade ?? ''}
+                            onChange={(e) => updateItem(idx, 'unidade', e.target.value)}
+                            className="w-full border rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+                          />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <input type="number" placeholder="Kcal" value={item.calorias ?? ''} onChange={(e) => updateItem(idx, 'calorias', Number(e.target.value))} className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300" />
-                        <input type="number" placeholder="Prot (g)" value={item.proteinas ?? ''} onChange={(e) => updateItem(idx, 'proteinas', Number(e.target.value))} className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300" />
-                        <input type="number" placeholder="Carb (g)" value={item.carboidratos ?? ''} onChange={(e) => updateItem(idx, 'carboidratos', Number(e.target.value))} className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-300" />
-                      </div>
+
+                      {/* Linha 3: Macros calculados automaticamente (somente leitura visual) */}
+                      {item.calorias !== undefined && item.calorias !== null && (
+                        <div className="grid grid-cols-5 gap-1.5 pt-1">
+                          {[
+                            { label: 'Kcal',    value: item.calorias,     color: 'text-orange-600' },
+                            { label: 'Prot(g)', value: item.proteinas,    color: 'text-blue-600'   },
+                            { label: 'Carb(g)', value: item.carboidratos, color: 'text-yellow-600' },
+                            { label: 'Gord(g)', value: item.gorduras,     color: 'text-red-500'    },
+                            { label: 'Fibr(g)', value: item.fibras,       color: 'text-green-600'  },
+                          ].map(({ label, value, color }) => (
+                            <div key={label} className="bg-white border rounded-lg p-1.5 text-center">
+                              <p className="text-[10px] text-gray-400">{label}</p>
+                              <p className={`text-xs font-bold ${color}`}>
+                                {value != null ? Number(value).toFixed(1) : '—'}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {itensForm.length > 1 && (
-                      <button onClick={() => removeItem(idx)} className="mt-2 text-red-400 hover:text-red-600">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <button onClick={addItem} className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700">
-                <Plus className="w-4 h-4" /> Adicionar alimento
+
+              <button
+                onClick={addItem}
+                className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 font-medium"
+              >
+                <Plus className="w-4 h-4" /> Adicionar outro alimento
               </button>
+
+              {/* Observações */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Observações (opcional)</label>
                 <textarea
@@ -374,9 +503,47 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
                 />
               </div>
+
+              {/* Totais da refeição */}
+              {itensForm.some((i) => i.calorias != null) && (() => {
+                const tot = itensForm.reduce(
+                  (acc, i) => ({
+                    calorias:     acc.calorias     + (Number(i.calorias)     || 0),
+                    proteinas:    acc.proteinas    + (Number(i.proteinas)    || 0),
+                    carboidratos: acc.carboidratos + (Number(i.carboidratos) || 0),
+                    gorduras:     acc.gorduras     + (Number(i.gorduras)     || 0),
+                    fibras:       acc.fibras       + (Number(i.fibras)       || 0),
+                  }),
+                  { calorias: 0, proteinas: 0, carboidratos: 0, gorduras: 0, fibras: 0 }
+                );
+                return (
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-orange-700 mb-2">Total da Refeição</p>
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      {[
+                        { label: 'Kcal',    value: tot.calorias,     color: 'text-orange-600' },
+                        { label: 'Prot(g)', value: tot.proteinas,    color: 'text-blue-600'   },
+                        { label: 'Carb(g)', value: tot.carboidratos, color: 'text-yellow-600' },
+                        { label: 'Gord(g)', value: tot.gorduras,     color: 'text-red-500'    },
+                        { label: 'Fibr(g)', value: tot.fibras,       color: 'text-green-600'  },
+                      ].map(({ label, value, color }) => (
+                        <div key={label}>
+                          <p className="text-[10px] text-gray-500">{label}</p>
+                          <p className={`text-sm font-bold ${color}`}>{value.toFixed(1)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
+
+            {/* Footer */}
             <div className="flex gap-3 px-6 py-4 border-t bg-gray-50">
-              <button onClick={() => setEditando(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-100">
+              <button
+                onClick={() => setEditando(null)}
+                className="flex-1 px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+              >
                 Cancelar
               </button>
               <button
