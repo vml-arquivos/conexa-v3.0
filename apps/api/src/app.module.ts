@@ -41,6 +41,7 @@ import { InsightsModule } from './insights/insights.module';
 import { UnitsModule } from './units/units.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { CardapioModule } from './cardapio/cardapio.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     UnitsModule,
     CatalogModule,
     AnalyticsModule,
+    CardapioModule,
   ],
   controllers: [AppController],
   providers: [

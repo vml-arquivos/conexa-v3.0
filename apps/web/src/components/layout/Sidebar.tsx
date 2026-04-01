@@ -68,11 +68,8 @@ const DIRETOR_ITEMS: MenuItem[] = [
 
 // UNIDADE — Nutricionista ──────────────────────────────────────────────────────
 const NUTRI_ITEMS: MenuItem[] = [
-  { path: '/app/nutricionista',                 label: 'Painel da Nutricionista', icon: <Utensils className="h-4 w-4" /> },
-  { path: '/app/painel-alergias',               label: 'Alergias e Dietas',       icon: <Apple className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/material-requests',             label: 'Requisições Alimentação', icon: <ShoppingCart className="h-4 w-4" /> },
-  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',       icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',    icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/nutricionista',   label: 'Painel da Nutricionista', icon: <Utensils className="h-4 w-4" /> },
+  { path: '/app/painel-alergias', label: 'Alergias e Dietas',       icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
 ];
 
 // UNIDADE — Administrativo ─────────────────────────────────────────────────────
