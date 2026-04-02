@@ -301,17 +301,20 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Dashboard da Nutricionista ───────────────────────────────────────────
+      // ─── Dashboard da Nutricionista ───────────────────────────────────────────────────────────────────────────────────────
       {
         path: 'nutricionista',
         element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+          // FASE 1: restrito a UNIDADE_NUTRICIONISTA (RoleType específico).
+          // UNIDADE genérico (diretor, coord, administrativo) não acessa este painel.
+          // MANTENEDORA e DEVELOPER mantêm acesso para suporte e auditoria.
+          <RoleProtectedRoute allowedRoles={['UNIDADE_NUTRICIONISTA', 'MANTENEDORA', 'DEVELOPER']}>
             <DashboardNutricionistaPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Dashboard de Unidade ─────────────────────────────────────────────
+      // ─── Dashboard de Unidade ───────────────────────────────────────────────────────────────────────────────────────
       {
         path: 'unidade',
         element: (

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { Prisma, RoleLevel } from '@prisma/client';
+import { Prisma, RoleLevel, RoleType } from '@prisma/client';
 import { CreateCardapioDto } from './dto/create-cardapio.dto';
 import { CardapioRefeicaoDto } from './dto/cardapio-refeicao.dto';
 import { QueryCardapioDto } from './dto/query-cardapio.dto';
@@ -14,6 +14,15 @@ function resolveUnitId(user: JwtPayload, dtoUnitId?: string): string {
   return uid;
 }
 
+// FASE 1: RoleTypes que têm acesso legítimo ao módulo de cardápio.
+// Professor e outros perfis de UNIDADE sem tipo específico não devem operar cardápios.
+const CARDAPIO_ALLOWED_TYPES: RoleType[] = [
+  RoleType.UNIDADE_NUTRICIONISTA,
+  RoleType.UNIDADE_DIRETOR,
+  RoleType.UNIDADE_COORDENADOR_PEDAGOGICO,
+  RoleType.UNIDADE_ADMINISTRATIVO,
+];
+
 function assertAccess(user: JwtPayload, unitId: string) {
   const level = user.roles[0]?.level;
   if (level === RoleLevel.DEVELOPER || level === RoleLevel.MANTENEDORA) return;
@@ -23,8 +32,19 @@ function assertAccess(user: JwtPayload, unitId: string) {
       throw new ForbiddenException('Sem acesso a esta unidade');
     return;
   }
-  // UNIDADE / PROFESSOR
-  if (user.unitId !== unitId) throw new ForbiddenException('Sem acesso a esta unidade');
+  // UNIDADE: validar RoleType específico (FASE 1 — escopo correto)
+  if (level === RoleLevel.UNIDADE) {
+    const hasAllowedType = user.roles.some((r) =>
+      CARDAPIO_ALLOWED_TYPES.includes(r.type as RoleType),
+    );
+    if (!hasAllowedType)
+      throw new ForbiddenException('Perfil sem acesso ao módulo de cardápio');
+    if (user.unitId !== unitId)
+      throw new ForbiddenException('Sem acesso a esta unidade');
+    return;
+  }
+  // PROFESSOR e demais: sem acesso ao módulo de cardápio
+  throw new ForbiddenException('Sem acesso ao módulo de cardápio');
 }
 
 // ─── include padrão ──────────────────────────────────────────────────────────
