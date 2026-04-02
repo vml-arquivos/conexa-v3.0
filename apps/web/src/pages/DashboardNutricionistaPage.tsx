@@ -12,6 +12,7 @@ import {
   RefreshCw, Plus, ChevronDown, ChevronUp, Filter,
   CheckCircle, Clock, XCircle, Printer, BookOpen,
   BarChart2, ChevronLeft, ChevronRight, Save, Trash2,
+  Settings, GripVertical,
 } from 'lucide-react';
 import {
   listCardapios, createCardapio, upsertRefeicao, deleteCardapio, calcularNutricao,
@@ -23,6 +24,11 @@ import {
   listAlimentos, agruparPorCategoria, calcularMacrosPorQuantidade,
   type Alimento,
 } from '../api/alimentos';
+import {
+  listTodasConfiguracoesRefeicao, createConfiguracaoRefeicao,
+  updateConfiguracaoRefeicao, removeConfiguracaoRefeicao,
+  type ConfiguracaoRefeicao,
+} from '../api/configuracao-refeicao';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface DietaryRestriction {
@@ -759,11 +765,195 @@ function AbaNutricao({ unitId }: { unitId: string }) {
   );
 }
 
+// ─── Sub-componente: Aba Configurações de Refeição ──────────────────────────
+function AbaConfiguracoes({ unitId }: { unitId: string }) {
+  const [configs, setConfigs] = useState<ConfiguracaoRefeicao[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [novoNome, setNovoNome] = useState('');
+  const [novoHorario, setNovoHorario] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const data = await listTodasConfiguracoesRefeicao(unitId);
+      setConfigs(data);
+    } catch {
+      setErro('Erro ao carregar configurações de refeição.');
+    } finally {
+      setLoading(false);
+    }
+  }, [unitId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const handleAdicionar = async () => {
+    if (!novoNome.trim()) return;
+    setSalvando(true);
+    try {
+      await createConfiguracaoRefeicao({
+        unitId,
+        nome: novoNome.trim(),
+        horario: novoHorario.trim() || undefined,
+        ordem: configs.filter((c) => c.ativo).length,
+      });
+      setNovoNome('');
+      setNovoHorario('');
+      await carregar();
+    } catch (e: any) {
+      setErro(e?.response?.data?.message || 'Erro ao adicionar refeição.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleToggleAtivo = async (config: ConfiguracaoRefeicao) => {
+    try {
+      if (config.ativo) {
+        await removeConfiguracaoRefeicao(config.id);
+      } else {
+        await updateConfiguracaoRefeicao(config.id, { ativo: true });
+      }
+      await carregar();
+    } catch {
+      setErro('Erro ao alterar status da refeição.');
+    }
+  };
+
+  const ativas = configs.filter((c) => c.ativo);
+  const inativas = configs.filter((c) => !c.ativo);
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="bg-white rounded-xl border p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Settings className="w-5 h-5 text-orange-500" />
+          <h2 className="text-lg font-semibold text-gray-800">Configurações de Refeição</h2>
+        </div>
+        <p className="text-sm text-gray-500">
+          Personalize os tipos de refeição da sua unidade (ex: Colação, Lanche da Manhã).
+          Essas refeições ficarão disponíveis no planejador de cardápio.
+        </p>
+      </div>
+
+      {/* Formulário de adição */}
+      <div className="bg-white rounded-xl border p-6">
+        <h3 className="text-sm font-semibold text-gray-700 mb-4">Adicionar Nova Refeição</h3>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="text"
+            placeholder="Nome da refeição (ex: Colação)"
+            value={novoNome}
+            onChange={(e) => setNovoNome(e.target.value)}
+            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            maxLength={100}
+          />
+          <input
+            type="text"
+            placeholder="Horário (ex: 09:30)"
+            value={novoHorario}
+            onChange={(e) => setNovoHorario(e.target.value)}
+            className="w-36 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            maxLength={5}
+            pattern="\d{2}:\d{2}"
+          />
+          <button
+            onClick={handleAdicionar}
+            disabled={salvando || !novoNome.trim()}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            {salvando ? 'Salvando...' : 'Adicionar'}
+          </button>
+        </div>
+        {erro && (
+          <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>
+        )}
+      </div>
+
+      {/* Lista de refeições ativas */}
+      <div className="bg-white rounded-xl border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-700">Refeições Ativas ({ativas.length})</h3>
+          <button onClick={carregar} className="text-gray-400 hover:text-gray-600">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+        {loading ? (
+          <div className="text-center py-8 text-gray-400">Carregando...</div>
+        ) : ativas.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <GripVertical className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">Nenhuma refeição configurada ainda.</p>
+            <p className="text-xs mt-1">Adicione refeições personalizadas acima.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {ativas.map((config) => (
+              <div
+                key={config.id}
+                className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+              >
+                <div className="flex items-center gap-3">
+                  <GripVertical className="w-4 h-4 text-gray-400" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{config.nome}</p>
+                    {config.horario && (
+                      <p className="text-xs text-gray-500">Horário: {config.horario}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleAtivo(config)}
+                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+                >
+                  Desativar
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Lista de refeições inativas */}
+      {inativas.length > 0 && (
+        <div className="bg-white rounded-xl border p-6">
+          <h3 className="text-sm font-semibold text-gray-500 mb-4">Refeições Inativas ({inativas.length})</h3>
+          <div className="space-y-2">
+            {inativas.map((config) => (
+              <div
+                key={config.id}
+                className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg opacity-60"
+              >
+                <div>
+                  <p className="text-sm font-medium text-gray-600 line-through">{config.nome}</p>
+                  {config.horario && (
+                    <p className="text-xs text-gray-400">Horário: {config.horario}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleToggleAtivo(config)}
+                  className="text-xs text-green-600 hover:text-green-800 px-2 py-1 rounded hover:bg-green-50"
+                >
+                  Reativar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export function DashboardNutricionistaPage() {
   const { user } = useAuth();
   const unitId = (user as any)?.unitId ?? '';
-  const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao'>('dietas');
+  const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao' | 'configuracoes'>('dietas');
 
   // ── Estado: Dietas ──
   const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
@@ -922,6 +1112,7 @@ export function DashboardNutricionistaPage() {
     { id: 'turmas', label: 'Resumo por Turma', icon: Users },
     { id: 'cardapio', label: 'Cardápio Semanal', icon: BookOpen },
     { id: 'nutricao', label: 'Cálculo Nutricional', icon: BarChart2 },
+    { id: 'configuracoes', label: 'Configurações', icon: Settings },
   ] as const;
 
   return (
@@ -1318,6 +1509,13 @@ export function DashboardNutricionistaPage() {
       {/* ── Aba: Cálculo Nutricional ── */}
       {aba === 'nutricao' && unitId && <AbaNutricao unitId={unitId} />}
       {aba === 'nutricao' && !unitId && (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
+        </div>
+      )}
+      {/* ── Aba: Configurações de Refeição ── */}
+      {aba === 'configuracoes' && unitId && <AbaConfiguracoes unitId={unitId} />}
+      {aba === 'configuracoes' && !unitId && (
         <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
           <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
         </div>

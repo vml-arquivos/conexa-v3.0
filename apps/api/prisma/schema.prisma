@@ -340,8 +340,9 @@ model Unit {
   solicitacoesCorrecao SolicitacaoCorrecao[]
   aiContexts           AIContext[]
 
-  dailyMetrics DailyMetric[]
-  cardapios    Cardapio[]
+  dailyMetrics          DailyMetric[]
+  cardapios             Cardapio[]
+  configuracoesRefeicao ConfiguracaoRefeicao[]
 
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
@@ -2032,14 +2033,18 @@ model CardapioRefeicao {
   diaSemana    DiaSemana
   tipoRefeicao TipoRefeicao
   observacoes  String?      @db.Text
+  /// Referência opcional à configuração de refeição customizada da unidade (Fase 2)
+  configuracaoRefeicaoId String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  cardapio Cardapio       @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
-  itens    CardapioItem[]
+  cardapio             Cardapio              @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
+  configuracaoRefeicao ConfiguracaoRefeicao? @relation(fields: [configuracaoRefeicaoId], references: [id], onDelete: SetNull)
+  itens                CardapioItem[]
 
   @@unique([cardapioId, diaSemana, tipoRefeicao])
   @@index([cardapioId])
+  @@index([configuracaoRefeicaoId])
   @@map("cardapio_refeicao")
 }
 
@@ -2114,4 +2119,33 @@ model Alimento {
   @@index([categoria])
   @@index([nome])
   @@map("alimento")
+}
+
+// ─── Módulo Nutricionista: Refeições Configuráveis por Unidade (Fase 2) ───────
+
+/// Configuração de refeições personalizadas por unidade escolar
+/// Permite que cada unidade defina seus próprios tipos de refeição
+/// (ex: Colação, Lanche da Manhã, Café da Tarde)
+model ConfiguracaoRefeicao {
+  id      String @id @default(cuid())
+  unitId  String
+
+  /// Nome da refeição (ex: "Colação", "Lanche da Manhã", "Café da Tarde")
+  nome    String @db.VarChar(100)
+  /// Horário sugerido da refeição no formato HH:MM (ex: "09:30")
+  horario String? @db.VarChar(5)
+  /// Ordem de exibição na interface (0 = primeira)
+  ordem   Int     @default(0)
+  ativo   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit      Unit               @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  refeicoes CardapioRefeicao[]
+
+  @@unique([unitId, nome])
+  @@index([unitId])
+  @@index([ativo])
+  @@map("configuracao_refeicao")
 }

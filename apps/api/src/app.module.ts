@@ -43,6 +43,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { CardapioModule } from './cardapio/cardapio.module';
 import { AlimentosModule } from './alimentos/alimentos.module';
+import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { AlimentosModule } from './alimentos/alimentos.module';
     AnalyticsModule,
     CardapioModule,
     AlimentosModule,
+    ConfiguracaoRefeicaoModule,
   ],
   controllers: [AppController],
   providers: [
