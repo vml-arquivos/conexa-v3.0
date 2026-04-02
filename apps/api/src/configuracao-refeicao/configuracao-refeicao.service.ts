@@ -8,10 +8,12 @@ import { CreateConfiguracaoRefeicaoDto } from './dto/create-configuracao-refeica
 
 // ─── Helper de acesso ────────────────────────────────────────────────────────
 function assertUnitAccess(user: JwtPayload, unitId: string): void {
-  const isGlobal =
-    user.roleLevel === RoleLevel.DEVELOPER ||
-    user.roleLevel === RoleLevel.MANTENEDORA ||
-    user.roleLevel === RoleLevel.STAFF_CENTRAL;
+  const isGlobal = user.roles.some(
+    (r) =>
+      r.level === RoleLevel.DEVELOPER ||
+      r.level === RoleLevel.MANTENEDORA ||
+      r.level === RoleLevel.STAFF_CENTRAL,
+  );
   if (!isGlobal && user.unitId !== unitId) {
     throw new ForbiddenException('Acesso negado a esta unidade');
   }
@@ -43,7 +45,6 @@ export class ConfiguracaoRefeicaoService {
   async create(dto: CreateConfiguracaoRefeicaoDto, user: JwtPayload) {
     assertUnitAccess(user, dto.unitId);
 
-    // Verificar se já existe uma configuração com o mesmo nome para a unidade
     const existing = await this.prisma.configuracaoRefeicao.findUnique({
       where: { unitId_nome: { unitId: dto.unitId, nome: dto.nome } },
     });
@@ -76,7 +77,6 @@ export class ConfiguracaoRefeicaoService {
     if (!config) throw new NotFoundException('Configuração de refeição não encontrada');
     assertUnitAccess(user, config.unitId);
 
-    // Verificar conflito de nome se estiver sendo alterado
     if (dto.nome && dto.nome !== config.nome) {
       const conflict = await this.prisma.configuracaoRefeicao.findUnique({
         where: { unitId_nome: { unitId: config.unitId, nome: dto.nome } },
@@ -107,7 +107,6 @@ export class ConfiguracaoRefeicaoService {
     if (!config) throw new NotFoundException('Configuração de refeição não encontrada');
     assertUnitAccess(user, config.unitId);
 
-    // Soft delete: desativar em vez de excluir para preservar histórico de cardápios
     return this.prisma.configuracaoRefeicao.update({
       where: { id },
       data: { ativo: false },
@@ -117,8 +116,9 @@ export class ConfiguracaoRefeicaoService {
   // ── Excluir permanentemente (apenas DEVELOPER/MANTENEDORA) ────────────────
   async hardDelete(id: string, user: JwtPayload) {
     if (
-      user.roleLevel !== RoleLevel.DEVELOPER &&
-      user.roleLevel !== RoleLevel.MANTENEDORA
+      !user.roles.some(
+        (r) => r.level === RoleLevel.DEVELOPER || r.level === RoleLevel.MANTENEDORA,
+      )
     ) {
       throw new ForbiddenException('Apenas administradores podem excluir permanentemente');
     }
