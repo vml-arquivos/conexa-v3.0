@@ -233,9 +233,12 @@ export function Sidebar({ onClose }: SidebarProps) {
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
   const perfilItem: MenuItem = { path: '/app/meu-perfil',    label: 'Meu Perfil',    icon: <UserCircle className="h-4 w-4" /> };
 
+  // adminItems: exibido apenas para perfis com acesso administrativo real.
+  // Nutricionista (isNutricionista) NÃO recebe este bloco — ela não gerencia
+  // usuários, turmas ou unidades administrativas.
   const adminItems: MenuItem[] = [
-    { path: '/app/admin/usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> },
-    { path: '/app/admin/turmas',   label: 'Turmas',   icon: <GraduationCap className="h-4 w-4" /> },
+    ...(!isNutricionista ? [{ path: '/app/admin/usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> }] : []),
+    ...(!isNutricionista ? [{ path: '/app/admin/turmas',   label: 'Turmas',   icon: <GraduationCap className="h-4 w-4" /> }] : []),
     ...(isMantenedora || isCentral || isDeveloper
       ? [{ path: '/app/admin/unidades', label: 'Unidades', icon: <Building2 className="h-4 w-4" /> }]
       : []),
@@ -357,7 +360,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Rodapé */}
       <div className="p-3 border-t border-gray-800 space-y-1">
-        {(isUnidade || isCentral || isMantenedora || isDeveloper) && (
+        {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
           <NavSection titulo="Administração" items={adminItems} isActive={isActive} onItemClick={onClose} />
         )}
         <div className="pt-1 space-y-1">

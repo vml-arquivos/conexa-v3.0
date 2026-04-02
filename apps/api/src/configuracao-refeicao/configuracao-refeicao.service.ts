@@ -3,8 +3,17 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, RoleType } from '@prisma/client';
 import { CreateConfiguracaoRefeicaoDto } from './dto/create-configuracao-refeicao.dto';
+
+// FASE 1: RoleTypes com acesso legítimo à configuração de refeições da unidade.
+// Professor e outros perfis de UNIDADE sem tipo específico não devem operar este módulo.
+const CONFIGURACAO_ALLOWED_TYPES: RoleType[] = [
+  RoleType.UNIDADE_NUTRICIONISTA,
+  RoleType.UNIDADE_DIRETOR,
+  RoleType.UNIDADE_COORDENADOR_PEDAGOGICO,
+  RoleType.UNIDADE_ADMINISTRATIVO,
+];
 
 // ─── Helper de acesso ────────────────────────────────────────────────────────
 function assertUnitAccess(user: JwtPayload, unitId: string): void {
@@ -14,9 +23,22 @@ function assertUnitAccess(user: JwtPayload, unitId: string): void {
       r.level === RoleLevel.MANTENEDORA ||
       r.level === RoleLevel.STAFF_CENTRAL,
   );
-  if (!isGlobal && user.unitId !== unitId) {
-    throw new ForbiddenException('Acesso negado a esta unidade');
+  if (isGlobal) return;
+
+  // UNIDADE: validar RoleType específico
+  const isUnidade = user.roles.some((r) => r.level === RoleLevel.UNIDADE);
+  if (isUnidade) {
+    const hasAllowedType = user.roles.some((r) =>
+      CONFIGURACAO_ALLOWED_TYPES.includes(r.type as RoleType),
+    );
+    if (!hasAllowedType)
+      throw new ForbiddenException('Perfil sem acesso à configuração de refeições');
+    if (user.unitId !== unitId)
+      throw new ForbiddenException('Acesso negado a esta unidade');
+    return;
   }
+
+  throw new ForbiddenException('Acesso negado a esta unidade');
 }
 
 @Injectable()
