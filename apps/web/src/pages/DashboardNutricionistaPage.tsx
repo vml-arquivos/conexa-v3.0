@@ -2850,7 +2850,11 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
 }
 
 // ─── AbaHistorico ─────────────────────────────────────────────────────────────────────────────────
-function AbaHistorico({ unitId }: { unitId: string }) {
+// PARTES 2+3+4 (PR fix/nutri-historico-acoes-cardapio):
+// Causa raiz: o componente não tinha nenhuma ação — apenas leitura.
+// Correção: barra de ações por status (Publicar/Despublicar/Editar/PDF/Imprimir/Relatório Nutricional)
+// adicionada no cabeçalho de cada card expandido.
+function AbaHistorico({ unitId, onEditarNoPlayjador }: { unitId: string; onEditarNoPlayjador?: (semana: string) => void }) {
   const PAGE_SIZE = 10;
   const [cardapios, setCardapios] = useState<Cardapio[]>([]);
   const [total, setTotal] = useState(0);
@@ -2860,6 +2864,11 @@ function AbaHistorico({ unitId }: { unitId: string }) {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [expandido, setExpandido] = useState<string | null>(null);
+  // Estado para relatório nutricional inline
+  const [nutricao, setNutricao] = useState<Record<string, NutricaoResponse | null>>({});
+  const [loadingNutricao, setLoadingNutricao] = useState<Record<string, boolean>>({});
+  // Estado para ações em andamento (publicar/despublicar)
+  const [loadingAcao, setLoadingAcao] = useState<Record<string, boolean>>({});
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -2885,9 +2894,81 @@ function AbaHistorico({ unitId }: { unitId: string }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const totalPaginas = Math.ceil(total / PAGE_SIZE);
-
   const contarItens = (c: Cardapio) =>
     c.refeicoes.reduce((acc, r) => acc + r.itens.length, 0);
+
+  // ── Ação: Publicar / Despublicar ──────────────────────────────────────────
+  const handlePublicar = async (c: Cardapio) => {
+    const novoStatus = !c.publicado;
+    const confirmMsg = novoStatus
+      ? `Publicar o cardápio da semana ${formatarSemana(c.semana)}? Ele ficará visível para os professores.`
+      : `Despublicar o cardápio da semana ${formatarSemana(c.semana)}?`;
+    if (!window.confirm(confirmMsg)) return;
+    setLoadingAcao((prev) => ({ ...prev, [c.id]: true }));
+    try {
+      await updateCardapio(c.id, { publicado: novoStatus });
+      await carregar();
+    } catch {
+      alert('Erro ao alterar status do cardápio. Tente novamente.');
+    } finally {
+      setLoadingAcao((prev) => ({ ...prev, [c.id]: false }));
+    }
+  };
+
+  // ── Ação: Relatório Nutricional inline ────────────────────────────────────
+  const handleRelatorio = async (c: Cardapio) => {
+    if (nutricao[c.id] !== undefined) {
+      // toggle: se já carregado, esconde
+      setNutricao((prev) => {
+        const next = { ...prev };
+        if (next[c.id] !== undefined) delete next[c.id];
+        return next;
+      });
+      return;
+    }
+    setLoadingNutricao((prev) => ({ ...prev, [c.id]: true }));
+    try {
+      const dados = await calcularNutricao(c.id);
+      setNutricao((prev) => ({ ...prev, [c.id]: dados }));
+    } catch {
+      alert('Erro ao carregar relatório nutricional.');
+    } finally {
+      setLoadingNutricao((prev) => ({ ...prev, [c.id]: false }));
+    }
+  };
+
+  // ── Ação: Imprimir / PDF ──────────────────────────────────────────────────
+  const handleImprimir = (c: Cardapio) => {
+    // PDF funcional mínimo via window.print() com conteúdo do cardápio em nova janela
+    const janela = window.open('', '_blank', 'width=900,height=700');
+    if (!janela) { window.print(); return; }
+    const linhas = c.refeicoes.map((r) =>
+      `<tr><td>${DIA_SEMANA_LABELS[r.diaSemana]}</td><td>${TIPO_REFEICAO_LABELS[r.tipoRefeicao]}</td>` +
+      `<td>${r.itens.map((i) => i.nome + (i.quantidade ? ' ' + i.quantidade + (i.unidade ?? 'g') : '')).join(', ')}</td>` +
+      `<td style="text-align:right">${r.totaisNutricionais?.calorias.toFixed(0) ?? '—'} kcal</td></tr>`
+    ).join('');
+    janela.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>Cardápio — ${formatarSemana(c.semana)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; padding: 24px; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        .status { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px;
+          background:${c.publicado ? '#dcfce7' : '#fef9c3'}; color:${c.publicado ? '#166534' : '#854d0e'}; }
+        table { width:100%; border-collapse:collapse; margin-top:16px; }
+        th { background:#f3f4f6; text-align:left; padding:6px 8px; font-size:11px; }
+        td { padding:5px 8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+        @media print { button { display:none; } }
+      </style></head><body>
+      <h1>Cardápio Semanal — ${formatarSemana(c.semana)}</h1>
+      <span class="status">${c.publicado ? 'Publicado' : 'Rascunho'}</span>
+      ${c.titulo ? `<p style="color:#6b7280;margin-top:4px">${c.titulo}</p>` : ''}
+      <table><thead><tr><th>Dia</th><th>Refeição</th><th>Itens</th><th>Calorias</th></tr></thead>
+      <tbody>${linhas}</tbody></table>
+      ${c.observacoes ? `<p style="margin-top:16px;background:#fefce8;padding:8px;border-radius:6px"><strong>Obs:</strong> ${c.observacoes}</p>` : ''}
+      <button onclick="window.print()" style="margin-top:20px;padding:8px 16px;background:#16a34a;color:white;border:none;border-radius:6px;cursor:pointer">Imprimir / Salvar PDF</button>
+    </body></html>`);
+    janela.document.close();
+  };
 
   return (
     <div className="space-y-4">
@@ -2930,7 +3011,6 @@ function AbaHistorico({ unitId }: { unitId: string }) {
           <RefreshCw className="w-4 h-4" /> Limpar
         </button>
       </div>
-
       {/* Contador */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-500">
@@ -2938,7 +3018,6 @@ function AbaHistorico({ unitId }: { unitId: string }) {
         </span>
         <span className="text-sm text-gray-400">Página {pagina + 1} de {totalPaginas || 1}</span>
       </div>
-
       {/* Lista */}
       {loading ? (
         <div className="text-center py-12 text-gray-400"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" /><p>Carregando...</p></div>
@@ -2952,6 +3031,7 @@ function AbaHistorico({ unitId }: { unitId: string }) {
         <div className="space-y-2">
           {cardapios.map((c) => (
             <div key={c.id} className="bg-white rounded-xl border overflow-hidden">
+              {/* ── Cabeçalho do card (clicável para expandir) ── */}
               <button
                 onClick={() => setExpandido(expandido === c.id ? null : c.id)}
                 className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -2973,6 +3053,103 @@ function AbaHistorico({ unitId }: { unitId: string }) {
                 </div>
               </button>
 
+              {/* ── Barra de ações — visível sempre que expandido ── */}
+              {expandido === c.id && (
+                <div className="border-t bg-gray-50 px-4 py-2 flex flex-wrap items-center gap-2">
+                  {/* Publicar / Despublicar */}
+                  {!c.publicado ? (
+                    <button
+                      onClick={() => handlePublicar(c)}
+                      disabled={loadingAcao[c.id]}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 transition-colors"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      {loadingAcao[c.id] ? 'Publicando...' : 'Publicar'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handlePublicar(c)}
+                      disabled={loadingAcao[c.id]}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-yellow-100 text-yellow-800 hover:bg-yellow-200 disabled:opacity-60 transition-colors border border-yellow-300"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      {loadingAcao[c.id] ? 'Processando...' : 'Despublicar'}
+                    </button>
+                  )}
+
+                  {/* Editar no planejador */}
+                  {onEditarNoPlayjador && (
+                    <button
+                      onClick={() => onEditarNoPlayjador(c.semana)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                    >
+                      <FileEdit className="w-3.5 h-3.5" />
+                      Editar no Planejador
+                    </button>
+                  )}
+
+                  {/* Relatório Nutricional */}
+                  <button
+                    onClick={() => handleRelatorio(c)}
+                    disabled={loadingNutricao[c.id]}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 disabled:opacity-60 transition-colors"
+                  >
+                    <BarChart2 className="w-3.5 h-3.5" />
+                    {loadingNutricao[c.id] ? 'Carregando...' : nutricao[c.id] !== undefined ? 'Fechar Relatório' : 'Relatório Nutricional'}
+                  </button>
+
+                  {/* Imprimir / PDF */}
+                  <button
+                    onClick={() => handleImprimir(c)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300 transition-colors"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Imprimir / PDF
+                  </button>
+                </div>
+              )}
+
+              {/* ── Relatório Nutricional inline ── */}
+              {expandido === c.id && nutricao[c.id] && (
+                <div className="border-t px-4 py-3 bg-purple-50">
+                  <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4" />
+                    Relatório Nutricional — {formatarSemana(c.semana)}
+                  </h4>
+                  {/* Totais semanais */}
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-3">
+                    {[
+                      { label: 'Calorias', value: nutricao[c.id]!.totalSemanal.calorias.toFixed(0), unit: 'kcal' },
+                      { label: 'Proteínas', value: nutricao[c.id]!.totalSemanal.proteinas.toFixed(1), unit: 'g' },
+                      { label: 'Carboidratos', value: nutricao[c.id]!.totalSemanal.carboidratos.toFixed(1), unit: 'g' },
+                      { label: 'Gorduras', value: nutricao[c.id]!.totalSemanal.gorduras.toFixed(1), unit: 'g' },
+                      { label: 'Fibras', value: nutricao[c.id]!.totalSemanal.fibras.toFixed(1), unit: 'g' },
+                      { label: 'Sódio', value: nutricao[c.id]!.totalSemanal.sodio.toFixed(0), unit: 'mg' },
+                    ].map((m) => (
+                      <div key={m.label} className="bg-white rounded-lg p-2 text-center border border-purple-100">
+                        <div className="text-xs text-gray-500">{m.label}</div>
+                        <div className="font-semibold text-gray-800 text-sm">{m.value}</div>
+                        <div className="text-xs text-gray-400">{m.unit} / semana</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Média diária */}
+                  <p className="text-xs text-purple-700">
+                    <strong>Média diária:</strong>{' '}
+                    {nutricao[c.id]!.mediadiaria.calorias.toFixed(0)} kcal ·
+                    P: {nutricao[c.id]!.mediadiaria.proteinas.toFixed(1)}g ·
+                    C: {nutricao[c.id]!.mediadiaria.carboidratos.toFixed(1)}g ·
+                    G: {nutricao[c.id]!.mediadiaria.gorduras.toFixed(1)}g ·
+                    F: {nutricao[c.id]!.mediadiaria.fibras.toFixed(1)}g ·
+                    Na: {nutricao[c.id]!.mediadiaria.sodio.toFixed(0)}mg
+                  </p>
+                  <p className="text-xs text-purple-500 mt-1 italic">
+                    Indicadores baseados nos itens cadastrados no cardápio. Valores calculados pelo backend via GET /cardapios/:id/nutricao.
+                  </p>
+                </div>
+              )}
+
+              {/* ── Conteúdo expandido: refeições ── */}
               {expandido === c.id && (
                 <div className="border-t px-4 py-3 space-y-3">
                   {c.refeicoes.length === 0 ? (
@@ -3020,7 +3197,6 @@ function AbaHistorico({ unitId }: { unitId: string }) {
           ))}
         </div>
       )}
-
       {/* Paginação */}
       {totalPaginas > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
@@ -3058,7 +3234,6 @@ function AbaHistorico({ unitId }: { unitId: string }) {
     </div>
   );
 }
-
 // ─── Módulo Cardápios Unificado ──────────────────────────────────────────────
 // Une planejador semanal + histórico em uma única seção com sub-tabs locais
 function ModuloCardapios({ unitId }: { unitId: string }) {
@@ -3094,7 +3269,12 @@ function ModuloCardapios({ unitId }: { unitId: string }) {
 
       {/* Conteúdo da sub-tab */}
       {subTab === 'planejador' && <AbaCardapio unitId={unitId} />}
-      {subTab === 'historico' && <AbaHistorico unitId={unitId} />}
+      {subTab === 'historico' && (
+        <AbaHistorico
+          unitId={unitId}
+          onEditarNoPlayjador={(_semana) => setSubTab('planejador')}
+        />
+      )}
     </div>
   );
 }
