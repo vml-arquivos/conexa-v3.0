@@ -2149,6 +2149,46 @@ function AbaHistorico({ unitId }: { unitId: string }) {
   );
 }
 
+// ─── Módulo Cardápios Unificado ──────────────────────────────────────────────
+// Une planejador semanal + histórico em uma única seção com sub-tabs locais
+function ModuloCardapios({ unitId }: { unitId: string }) {
+  const [subTab, setSubTab] = useState<'planejador' | 'historico'>('planejador');
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs locais */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setSubTab('planejador')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            subTab === 'planejador'
+              ? 'bg-white text-orange-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          Planejador Semanal
+        </button>
+        <button
+          onClick={() => setSubTab('historico')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            subTab === 'historico'
+              ? 'bg-white text-orange-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-800'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          Histórico e Filtros
+        </button>
+      </div>
+
+      {/* Conteúdo da sub-tab */}
+      {subTab === 'planejador' && <AbaCardapio unitId={unitId} />}
+      {subTab === 'historico' && <AbaHistorico unitId={unitId} />}
+    </div>
+  );
+}
+
 // ─── Tipos de seção da sidebar ──────────────────────────────────────────────
 type SecaoNutri =
   | 'visao-geral'
@@ -2844,10 +2884,10 @@ function DashboardNutricionistaPage() {
           : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {/* ── Seção: Cardápios (planejador semanal + histórico) ── */}
+      {/* ── Seção: Cardápios (planejador semanal + histórico unificados) ── */}
       {secao === 'cardapios' && (
         unitId
-          ? <AbaCardapio unitId={unitId} />
+          ? <ModuloCardapios unitId={unitId} />
           : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
