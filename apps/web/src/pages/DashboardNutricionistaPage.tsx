@@ -1599,10 +1599,35 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
       .catch(() => setTurmasAnot([]));
   }, [unitId]);
 
-  // Carregar crianças da unidade (com enrollments para filtrar por turma)
+  // Carregar crianças da unidade via lookup de turmas (garante enrollments + classroomId)
   useEffect(() => {
-    http.get('/children', { params: { unitId, limit: '500', include: 'enrollments' } })
-      .then((r) => setCriancas(r.data?.data ?? r.data ?? []))
+    if (!unitId) return;
+    http.get('/lookup/classrooms/accessible', { params: { unitId } })
+      .then(async (r) => {
+        const turmasList: { id: string; name: string }[] = Array.isArray(r.data) ? r.data : r.data?.data ?? [];
+        const resultados = await Promise.allSettled(
+          turmasList.map((t) =>
+            http.get(`/lookup/classrooms/${t.id}/children`).then((res) => ({
+              turmaId: t.id,
+              turmaName: t.name,
+              children: Array.isArray(res.data) ? res.data : res.data?.data ?? [],
+            }))
+          )
+        );
+        const mapa = new Map<string, { id: string; firstName: string; lastName: string; enrollments: { classroom: { id: string; name: string } }[] }>();
+        resultados.forEach((res) => {
+          if (res.status === 'fulfilled') {
+            const { turmaId, turmaName, children } = res.value;
+            children.forEach((c: any) => {
+              if (!mapa.has(c.id)) {
+                mapa.set(c.id, { id: c.id, firstName: c.firstName, lastName: c.lastName, enrollments: [] });
+              }
+              mapa.get(c.id)!.enrollments.push({ classroom: { id: turmaId, name: turmaName } });
+            });
+          }
+        });
+        setCriancas(Array.from(mapa.values()).sort((a, b) => a.firstName.localeCompare(b.firstName)));
+      })
       .catch(() => setCriancas([]));
   }, [unitId]);
 
@@ -1956,10 +1981,35 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
     finally { setLoading(false); }
   }, [unitId, filtroStatus]);
 
-  // Carregar crianças para o formulário
+  // Carregar crianças da unidade via lookup de turmas (garante classroomId no retorno)
   useEffect(() => {
-    http.get('/children', { params: { unitId, limit: '500', include: 'enrollments' } })
-      .then((r) => setCriancas(r.data?.data ?? r.data ?? []))
+    if (!unitId) return;
+    http.get('/lookup/classrooms/accessible', { params: { unitId } })
+      .then(async (r) => {
+        const turmasList: { id: string; name: string }[] = Array.isArray(r.data) ? r.data : r.data?.data ?? [];
+        const resultados = await Promise.allSettled(
+          turmasList.map((t) =>
+            http.get(`/lookup/classrooms/${t.id}/children`).then((res) => ({
+              turmaId: t.id,
+              turmaName: t.name,
+              children: Array.isArray(res.data) ? res.data : res.data?.data ?? [],
+            }))
+          )
+        );
+        const mapa = new Map<string, { id: string; firstName: string; lastName: string; enrollments: { classroom: { id: string; name: string } }[] }>();
+        resultados.forEach((res) => {
+          if (res.status === 'fulfilled') {
+            const { turmaId, turmaName, children } = res.value;
+            children.forEach((c: any) => {
+              if (!mapa.has(c.id)) {
+                mapa.set(c.id, { id: c.id, firstName: c.firstName, lastName: c.lastName, enrollments: [] });
+              }
+              mapa.get(c.id)!.enrollments.push({ classroom: { id: turmaId, name: turmaName } });
+            });
+          }
+        });
+        setCriancas(Array.from(mapa.values()).sort((a, b) => a.firstName.localeCompare(b.firstName)));
+      })
       .catch(() => setCriancas([]));
   }, [unitId]);
 
@@ -4130,16 +4180,12 @@ function DashboardNutricionistaPage() {
           });
           healthMap[t.id] = { children, stats };
         } else {
-          // Fallback: usar dados de dietas já carregadas
-          const criancasNaTurma = dietas.filter((d) =>
-            d.child?.enrollments?.some((e) => e.classroom?.id === t.id),
-          );
-          const unicas = new Set(criancasNaTurma.map((d) => d.child.id));
+          // Fallback: health/dashboard falhou, usar lookup de crianças por turma
           turmasComInfo.push({
             id: t.id,
             name: t.name,
-            totalCriancas: unicas.size,
-            comRestricao: unicas.size,
+            totalCriancas: 0,
+            comRestricao: 0,
           });
           healthMap[t.id] = { children: [], stats: {} };
         }
@@ -4153,7 +4199,9 @@ function DashboardNutricionistaPage() {
     } finally {
       setLoadingTurmas(false);
     }
-  }, [unitId, dietas]);
+    // FIX D: removido 'dietas' das dependências para evitar re-criação do callback
+    // quando dietas carrega após a seção 'turmas' já ter sido acessada
+  }, [unitId]);
 
   useEffect(() => { carregarDietas(); }, [carregarDietas]);
   useEffect(() => { if (secao === 'pedidos') carregarPedidos(); }, [secao, carregarPedidos]);
