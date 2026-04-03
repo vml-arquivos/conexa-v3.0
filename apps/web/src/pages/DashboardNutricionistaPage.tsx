@@ -1678,9 +1678,11 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
 function AbaTurmasNutricional({
   turmas,
   dietas,
+  healthPorTurma = {},
 }: {
   turmas: { id: string; name: string; totalCriancas: number; comRestricao: number }[];
   dietas: DietaryRestriction[];
+  healthPorTurma?: Record<string, { children: any[]; stats: any }>;
 }) {
   const [expandida, setExpandida] = useState<string | null>(null);
 
@@ -1688,9 +1690,15 @@ function AbaTurmasNutricional({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {turmas.map((t) => {
         const pct = t.totalCriancas > 0 ? Math.round((t.comRestricao / t.totalCriancas) * 100) : 0;
+        // Preferir dados ricos do health dashboard; fallback para dietas já carregadas
+        const healthData = healthPorTurma[t.id];
+        const criancasRicas: any[] = healthData?.children ?? [];
+        const stats = healthData?.stats ?? {};
         const dietasDaTurma = dietas.filter((d) =>
           d.isActive && d.child?.enrollments?.some((e) => e.classroom?.id === t.id)
         );
+        // Usar crianças do health dashboard se disponível
+        const temDadosRicos = criancasRicas.length > 0;
         const aberta = expandida === t.id;
         return (
           <div key={t.id} className="bg-white rounded-xl border p-5 flex flex-col gap-3">
@@ -1703,6 +1711,23 @@ function AbaTurmasNutricional({
                 </span>
               )}
             </div>
+            {/* KPIs da turma */}
+            {temDadosRicos && (
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-xs text-gray-400">Total</p>
+                  <p className="font-bold text-gray-800">{stats.total ?? criancasRicas.length}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-2">
+                  <p className="text-xs text-red-400">Alergias</p>
+                  <p className="font-bold text-red-700">{stats.comAlergia ?? 0}</p>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-2">
+                  <p className="text-xs text-orange-400">Dietas</p>
+                  <p className="font-bold text-orange-700">{stats.comDieta ?? 0}</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Crianças com restrição</span>
@@ -1716,28 +1741,62 @@ function AbaTurmasNutricional({
               </div>
               <p className="text-xs text-gray-400">{pct}% das crianças têm alguma restrição</p>
             </div>
-            {dietasDaTurma.length > 0 && (
+            {(temDadosRicos ? criancasRicas.length > 0 : dietasDaTurma.length > 0) && (
               <button
                 onClick={() => setExpandida(aberta ? null : t.id)}
                 className="flex items-center gap-1 text-xs text-orange-600 hover:underline mt-1 self-start"
               >
-                {aberta ? '▲ Ocultar detalhes' : '▼ Ver restrições da turma'}
+                {aberta ? '▲ Ocultar detalhes' : '▼ Ver crianças com restrições'}
               </button>
             )}
             {aberta && (
               <div className="space-y-2 border-t pt-3 mt-1">
-                {dietasDaTurma.map((d) => (
-                  <div key={d.id} className="flex items-start gap-2 text-xs">
-                    <span className="mt-0.5">{SEVERITY_CONFIG[d.severity ?? '']?.icon ?? '⚠️'}</span>
-                    <div>
-                      <p className="font-medium text-gray-800">{d.child.firstName} {d.child.lastName}</p>
-                      <p className="text-gray-500">{d.name} — {TYPE_LABEL[d.type] ?? d.type}</p>
-                      {d.forbiddenFoods && (
-                        <p className="text-red-600 mt-0.5">⛔ {d.forbiddenFoods}</p>
+                {temDadosRicos ? (
+                  // Dados ricos do health dashboard
+                  criancasRicas.map((c: any) => (
+                    <div key={c.id} className="bg-gray-50 rounded-lg p-3 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">
+                          {c.firstName?.[0]}{c.lastName?.[0]}
+                        </div>
+                        <p className="font-medium text-gray-800 text-sm">{c.firstName} {c.lastName}</p>
+                      </div>
+                      {c.allergies && (
+                        <p className="text-xs text-red-600">⛔ Alergia: {c.allergies}</p>
+                      )}
+                      {c.dietaryRestrictions?.map((r: any) => (
+                        <div key={r.id} className="text-xs">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1 ${
+                            r.severity === 'severa' ? 'bg-red-100 text-red-700' :
+                            r.severity === 'moderada' ? 'bg-orange-100 text-orange-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>{r.severity ?? 'leve'}</span>
+                          <span className="text-gray-700">{r.name ?? r.type}</span>
+                          {r.forbiddenFoods && (
+                            <p className="text-red-500 mt-0.5">⛔ {r.forbiddenFoods}</p>
+                          )}
+                        </div>
+                      ))}
+                      {c.medicalConditions && (
+                        <p className="text-xs text-blue-600">🏥 {c.medicalConditions}</p>
                       )}
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  // Fallback: dados das dietas já carregadas
+                  dietasDaTurma.map((d) => (
+                    <div key={d.id} className="flex items-start gap-2 text-xs">
+                      <span className="mt-0.5">{SEVERITY_CONFIG[d.severity ?? '']?.icon ?? '⚠️'}</span>
+                      <div>
+                        <p className="font-medium text-gray-800">{d.child.firstName} {d.child.lastName}</p>
+                        <p className="text-gray-500">{d.name} — {TYPE_LABEL[d.type] ?? d.type}</p>
+                        {d.forbiddenFoods && (
+                          <p className="text-red-600 mt-0.5">⛔ {d.forbiddenFoods}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -2276,6 +2335,8 @@ function DashboardNutricionistaPage() {
   // ── Estado: Turmas ──
   const [turmas, setTurmas] = useState<{ id: string; name: string; totalCriancas: number; comRestricao: number }[]>([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
+  // Dados ricos do health dashboard por turma (classroomId -> children)
+  const [healthPorTurma, setHealthPorTurma] = useState<Record<string, { children: any[]; stats: any }>>({});
 
   // Alias para compatibilidade com blocos legados que usam 'aba'
   const _ = aba; void _;
@@ -2316,29 +2377,72 @@ function DashboardNutricionistaPage() {
 
   // ── Carregar Turmas ──
   const carregarTurmas = useCallback(async () => {
+    if (!unitId) return;
     setLoadingTurmas(true);
     try {
-      const { data: classData } = await http.get('/lookup/classrooms/accessible');
-      const turmasList = Array.isArray(classData) ? classData : classData?.data ?? [];
-      const turmasComInfo = turmasList.map((t: { id: string; name: string; _count?: { children: number } }) => {
-        const criancasNaTurma = dietas.filter((d) =>
-          d.child?.enrollments?.some((e) => e.classroom?.id === t.id),
-        );
-        const unicas = new Set(criancasNaTurma.map((d) => d.child.id));
-        return {
-          id: t.id,
-          name: t.name,
-          totalCriancas: t._count?.children ?? 0,
-          comRestricao: unicas.size,
-        };
+      // 1. Buscar lista de turmas acessíveis
+      const { data: classData } = await http.get('/lookup/classrooms/accessible', {
+        params: { unitId },
       });
+      const turmasList: { id: string; name: string }[] = Array.isArray(classData)
+        ? classData
+        : classData?.data ?? [];
+
+      // 2. Para cada turma, buscar health dashboard com dados reais de crianças
+      const resultados = await Promise.allSettled(
+        turmasList.map((t) =>
+          http.get('/children/health/dashboard', {
+            params: { unitId, classroomId: t.id },
+          }).then((r) => ({ id: t.id, name: t.name, data: r.data }))
+        )
+      );
+
+      const turmasComInfo: { id: string; name: string; totalCriancas: number; comRestricao: number }[] = [];
+      const healthMap: Record<string, { children: any[]; stats: any }> = {};
+
+      resultados.forEach((res, idx) => {
+        const t = turmasList[idx];
+        if (res.status === 'fulfilled') {
+          const { data } = res.value;
+          const children: any[] = data?.children ?? [];
+          const stats = data?.stats ?? {};
+          // total de crianças matriculadas na turma (via lookup)
+          // comRestricao = crianças com alguma restrição ativa
+          const comRestricao = children.filter(
+            (c: any) => c.dietaryRestrictions?.length > 0 || c.allergies
+          ).length;
+          turmasComInfo.push({
+            id: t.id,
+            name: t.name,
+            totalCriancas: stats.total ?? children.length,
+            comRestricao,
+          });
+          healthMap[t.id] = { children, stats };
+        } else {
+          // Fallback: usar dados de dietas já carregadas
+          const criancasNaTurma = dietas.filter((d) =>
+            d.child?.enrollments?.some((e) => e.classroom?.id === t.id),
+          );
+          const unicas = new Set(criancasNaTurma.map((d) => d.child.id));
+          turmasComInfo.push({
+            id: t.id,
+            name: t.name,
+            totalCriancas: unicas.size,
+            comRestricao: unicas.size,
+          });
+          healthMap[t.id] = { children: [], stats: {} };
+        }
+      });
+
       setTurmas(turmasComInfo);
+      setHealthPorTurma(healthMap);
     } catch {
       setTurmas([]);
+      setHealthPorTurma({});
     } finally {
       setLoadingTurmas(false);
     }
-  }, [dietas]);
+  }, [unitId, dietas]);
 
   useEffect(() => { carregarDietas(); }, [carregarDietas]);
   useEffect(() => { if (secao === 'pedidos') carregarPedidos(); }, [secao, carregarPedidos]);
@@ -2883,7 +2987,7 @@ function DashboardNutricionistaPage() {
               <p className="font-medium">Nenhuma turma encontrada</p>
             </div>
           ) : (
-            <AbaTurmasNutricional turmas={turmas} dietas={dietas} />
+            <AbaTurmasNutricional turmas={turmas} dietas={dietas} healthPorTurma={healthPorTurma} />
           )}
         </div>
       )}
