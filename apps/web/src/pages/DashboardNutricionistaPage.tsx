@@ -463,11 +463,28 @@ function AbaCardapio({ unitId }: { unitId: string }) {
 
                 {/* Linha 2: Peso em gramas + botão Adicionar */}
                 {alimentoAtual && (
+                  <div className="space-y-2">
+                    {/* Atalhos rápidos de quantidade */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">3. Peso (gramas) — atalhos rápidos ou digite</label>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {[1, 5, 10, 20, 50, 100, 150, 200].map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => setPesoInput(String(Number(pesoInput || 0) + g))}
+                            className="px-2.5 py-1 text-xs font-semibold rounded-md border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-200 active:scale-95 transition-all"
+                          >+{g}g</button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setPesoInput('')}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-md border border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100 active:scale-95 transition-all"
+                        >Zerar</button>
+                      </div>
+                    </div>
                   <div className="flex gap-3 items-end">
                     <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        3. Peso (gramas)
-                      </label>
                       <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden focus-within:border-orange-400 transition-colors bg-white">
                         <input
                           type="number"
@@ -500,6 +517,7 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                     >
                       <Plus className="w-4 h-4" /> Adicionar
                     </button>
+                  </div>
                   </div>
                 )}
               </div>
