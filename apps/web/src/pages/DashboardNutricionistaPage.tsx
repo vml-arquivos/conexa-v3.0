@@ -663,15 +663,72 @@ function AbaNutricao({ unitId }: { unitId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* Navegação de semana */}
+      {/* Navegação de semana + ações */}
       <div className="flex items-center justify-between bg-white rounded-xl border p-4">
         <button onClick={() => setSemana(getSemanaAnterior(semana))} className="flex items-center gap-1 px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">
           <ChevronLeft className="w-4 h-4" /> Anterior
         </button>
         <p className="font-semibold text-gray-800">{formatarSemana(semana)}</p>
-        <button onClick={() => setSemana(getProximaSemana(semana))} className="flex items-center gap-1 px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-          Próxima <ChevronRight className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {nutricao && (
+            <button
+              onClick={() => {
+                const linhas = [
+                  ['Semana', semana],
+                  [''],
+                  ['Dia', 'Refeição', 'Kcal', 'Proteínas (g)', 'Carboidratos (g)', 'Gorduras (g)', 'Fibras (g)', 'Sódio (mg)'],
+                  ...nutricao.resumoDiario.flatMap((d) =>
+                    d.refeicoes.map((r) => [
+                      d.dia, r.refeicao,
+                      r.calorias.toFixed(0), r.proteinas.toFixed(1),
+                      r.carboidratos.toFixed(1), r.gorduras.toFixed(1),
+                      r.fibras.toFixed(1), r.sodio.toFixed(0),
+                    ])
+                  ),
+                  [''],
+                  ['TOTAL SEMANAL', '',
+                    nutricao.totalSemanal.calorias.toFixed(0),
+                    nutricao.totalSemanal.proteinas.toFixed(1),
+                    nutricao.totalSemanal.carboidratos.toFixed(1),
+                    nutricao.totalSemanal.gorduras.toFixed(1),
+                    nutricao.totalSemanal.fibras.toFixed(1),
+                    nutricao.totalSemanal.sodio.toFixed(0),
+                  ],
+                  ['MÉDIA DIÁRIA', '',
+                    nutricao.mediadiaria.calorias,
+                    nutricao.mediadiaria.proteinas,
+                    nutricao.mediadiaria.carboidratos,
+                    nutricao.mediadiaria.gorduras,
+                    nutricao.mediadiaria.fibras,
+                    nutricao.mediadiaria.sodio,
+                  ],
+                ];
+                const csv = linhas.map((l) => l.join(';')).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `relatorio-nutricional-${semana}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="no-print flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              title="Exportar relatório como CSV"
+            >
+              ↓ CSV
+            </button>
+          )}
+          <button
+            onClick={() => window.print()}
+            className="no-print flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+            title="Imprimir ou salvar como PDF"
+          >
+            <Printer className="w-4 h-4" /> PDF
+          </button>
+          <button onClick={() => setSemana(getProximaSemana(semana))} className="flex items-center gap-1 px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            Próxima <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {erro && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{erro}</div>}
