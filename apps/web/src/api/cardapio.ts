@@ -112,12 +112,18 @@ export interface NutricaoResponse {
 export async function listCardapios(params: {
   unitId?: string;
   semana?: string;
+  publicado?: boolean;
+  dataInicio?: string;
+  dataFim?: string;
   limit?: number;
   skip?: number;
 }): Promise<CardapioListResponse> {
   const q = new URLSearchParams();
   if (params.unitId) q.set('unitId', params.unitId);
   if (params.semana) q.set('semana', params.semana);
+  if (params.publicado !== undefined) q.set('publicado', String(params.publicado));
+  if (params.dataInicio) q.set('dataInicio', params.dataInicio);
+  if (params.dataFim) q.set('dataFim', params.dataFim);
   if (params.limit !== undefined) q.set('limit', String(params.limit));
   if (params.skip !== undefined) q.set('skip', String(params.skip));
   const res = await apiClient.get(`/cardapios?${q.toString()}`);

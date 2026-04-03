@@ -12,7 +12,7 @@ import {
   RefreshCw, Plus, ChevronDown, ChevronUp, Filter,
   CheckCircle, Clock, XCircle, Printer, BookOpen,
   BarChart2, ChevronLeft, ChevronRight, Save, Trash2,
-  Settings, GripVertical,
+  Settings, GripVertical, History, Eye, FileEdit, X, FileText, Download,
 } from 'lucide-react';
 import {
   listCardapios, createCardapio, upsertRefeicao, deleteCardapio, calcularNutricao,
@@ -101,14 +101,14 @@ function calcIdade(dob: string): string {
   return `${anos} ano${anos !== 1 ? 's' : ''}`;
 }
 
-// ─── Sub-componente: Aba Cardápio ─────────────────────────────────────────────
+// ─── Sub-componente: Aba Cardápio ─────────────────────────────────────────────────────────────────────────────────
 function AbaCardapio({ unitId }: { unitId: string }) {
   const [semana, setSemana] = useState(getSemanaAtual);
   const [cardapio, setCardapio] = useState<Cardapio | null>(null);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
-
+  const [nonSchoolDays, setNonSchoolDays] = useState<string[]>([]);
   // Estado do formulário de refeição
   const [editando, setEditando] = useState<{ dia: DiaSemana; tipo: TipoRefeicao } | null>(null);
   const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([]);
@@ -157,6 +157,14 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   }, [unitId, semana]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Carrega dias não letivos da unidade
+  useEffect(() => {
+    if (!unitId) return;
+    http.get(`/units/${unitId}`)
+      .then((res) => setNonSchoolDays(res.data?.nonSchoolDays ?? []))
+      .catch(() => setNonSchoolDays([]));
+  }, [unitId]);
 
   const criarCardapio = async () => {
     setSalvando(true);
@@ -337,11 +345,24 @@ function AbaCardapio({ unitId }: { unitId: string }) {
               <thead>
                 <tr className="bg-gray-50 border-b">
                   <th className="text-left p-3 font-medium text-gray-600 w-32">Refeição</th>
-                  {DIAS_SEMANA.map((dia) => (
-                    <th key={dia} className="text-center p-3 font-medium text-gray-600">
-                      {DIA_SEMANA_LABELS[dia]}
-                    </th>
-                  ))}
+                  {DIAS_SEMANA.map((dia, idx) => {
+                    const dataStr = (() => {
+                      const d = new Date(semana + 'T12:00:00');
+                      d.setDate(d.getDate() + idx);
+                      return d.toISOString().slice(0, 10);
+                    })();
+                    const isNonSchool = nonSchoolDays.includes(dataStr);
+                    return (
+                      <th key={dia} className={`text-center p-3 font-medium ${
+                        isNonSchool ? 'text-gray-400 bg-gray-100' : 'text-gray-600'
+                      }`}>
+                        <span title={isNonSchool ? 'Dia não letivo' : undefined}>
+                          {DIA_SEMANA_LABELS[dia]}
+                          {isNonSchool && <span className="ml-1 text-xs text-red-400" title="Dia não letivo">⛔</span>}
+                        </span>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
@@ -953,9 +974,21 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
   const [configs, setConfigs] = useState<ConfiguracaoRefeicao[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState<string | null>(null);
   const [novoNome, setNovoNome] = useState('');
   const [novoHorario, setNovoHorario] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editNome, setEditNome] = useState('');
+  const [editHorario, setEditHorario] = useState('');
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  const mostrarSucesso = (msg: string) => {
+    setSucesso(msg);
+    setTimeout(() => setSucesso(null), 3000);
+  };
+
+  const validarHorario = (h: string) => !h || /^\d{2}:\d{2}$/.test(h);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -973,8 +1006,9 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
   useEffect(() => { carregar(); }, [carregar]);
 
   const handleAdicionar = async () => {
-    if (!novoNome.trim()) return;
-    setSalvando(true);
+    if (!novoNome.trim()) { setErro('Informe o nome da refeição.'); return; }
+    if (!validarHorario(novoHorario.trim())) { setErro('Horário inválido. Use o formato HH:MM (ex: 09:30).'); return; }
+    setSalvando(true); setErro(null);
     try {
       await createConfiguracaoRefeicao({
         unitId,
@@ -984,6 +1018,7 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
       });
       setNovoNome('');
       setNovoHorario('');
+      mostrarSucesso('Refeição adicionada com sucesso.');
       await carregar();
     } catch (e: any) {
       setErro(e?.response?.data?.message || 'Erro ao adicionar refeição.');
@@ -992,12 +1027,46 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
     }
   };
 
+  const iniciarEdicao = (config: ConfiguracaoRefeicao) => {
+    setEditandoId(config.id);
+    setEditNome(config.nome);
+    setEditHorario(config.horario ?? '');
+    setErro(null);
+  };
+
+  const cancelarEdicao = () => {
+    setEditandoId(null);
+    setEditNome('');
+    setEditHorario('');
+  };
+
+  const salvarEdicao = async (id: string) => {
+    if (!editNome.trim()) { setErro('O nome não pode ser vazio.'); return; }
+    if (!validarHorario(editHorario.trim())) { setErro('Horário inválido. Use HH:MM.'); return; }
+    setSalvandoEdicao(true); setErro(null);
+    try {
+      await updateConfiguracaoRefeicao(id, {
+        nome: editNome.trim(),
+        horario: editHorario.trim() || undefined,
+      });
+      cancelarEdicao();
+      mostrarSucesso('Refeição atualizada com sucesso.');
+      await carregar();
+    } catch (e: any) {
+      setErro(e?.response?.data?.message || 'Erro ao salvar edição.');
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
   const handleToggleAtivo = async (config: ConfiguracaoRefeicao) => {
     try {
       if (config.ativo) {
         await removeConfiguracaoRefeicao(config.id);
+        mostrarSucesso(`Refeição "${config.nome}" desativada.`);
       } else {
         await updateConfiguracaoRefeicao(config.id, { ativo: true });
+        mostrarSucesso(`Refeição "${config.nome}" reativada.`);
       }
       await carregar();
     } catch {
@@ -1055,6 +1124,11 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
         {erro && (
           <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{erro}</p>
         )}
+        {sucesso && (
+          <p className="mt-3 text-sm text-green-600 bg-green-50 rounded-lg px-3 py-2 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" /> {sucesso}
+          </p>
+        )}
       </div>
 
       {/* Lista de refeições ativas */}
@@ -1078,23 +1152,71 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
             {ativas.map((config) => (
               <div
                 key={config.id}
-                className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                className="border border-green-200 rounded-lg bg-green-50 p-3"
               >
-                <div className="flex items-center gap-3">
-                  <GripVertical className="w-4 h-4 text-gray-400" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{config.nome}</p>
-                    {config.horario && (
-                      <p className="text-xs text-gray-500">Horário: {config.horario}</p>
-                    )}
+                {editandoId === config.id ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={editNome}
+                        onChange={(e) => setEditNome(e.target.value)}
+                        className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                        maxLength={100}
+                        placeholder="Nome da refeição"
+                      />
+                      <input
+                        type="text"
+                        value={editHorario}
+                        onChange={(e) => setEditHorario(e.target.value)}
+                        className="w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                        placeholder="HH:MM"
+                        maxLength={5}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => salvarEdicao(config.id)}
+                        disabled={salvandoEdicao}
+                        className="flex items-center gap-1 px-3 py-1 bg-orange-500 text-white rounded text-xs font-medium hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        <Save className="w-3 h-3" /> {salvandoEdicao ? 'Salvando...' : 'Salvar'}
+                      </button>
+                      <button
+                        onClick={cancelarEdicao}
+                        className="flex items-center gap-1 px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300"
+                      >
+                        <X className="w-3 h-3" /> Cancelar
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={() => handleToggleAtivo(config)}
-                  className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
-                >
-                  Desativar
-                </button>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <GripVertical className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{config.nome}</p>
+                        {config.horario && (
+                          <p className="text-xs text-gray-500">Horário: {config.horario}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => iniciarEdicao(config)}
+                        className="text-xs text-orange-600 hover:text-orange-800 px-2 py-1 rounded hover:bg-orange-50 flex items-center gap-1"
+                      >
+                        <FileEdit className="w-3 h-3" /> Editar
+                      </button>
+                      <button
+                        onClick={() => handleToggleAtivo(config)}
+                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
+                      >
+                        Desativar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -1128,15 +1250,907 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
           </div>
         </div>
       )}
+}
+
+// ─── AbaObservacoesProfessores ─────────────────────────────────────────────────────────────────────────────────
+interface DiaryEventItem {
+  id: string;
+  type: string;
+  title?: string;
+  description?: string;
+  occurredAt: string;
+  createdBy?: string;
+  child?: { id: string; firstName: string; lastName: string };
+  classroom?: { id: string; name: string };
+}
+
+const DIARY_TYPE_LABEL: Record<string, string> = {
+  REFEICAO: 'Refeição',
+  ALIMENTACAO: 'Alimentação',
+  SAUDE: 'Saúde',
+  COMPORTAMENTO: 'Comportamento',
+  SONO: 'Sono',
+  ATIVIDADE: 'Atividade',
+  OCORRENCIA: 'Ocorrência',
+  OUTRO: 'Outro',
+};
+
+function AbaObservacoesProfessores({ unitId }: { unitId: string }) {
+  const [eventos, setEventos] = useState<DiaryEventItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filtroTipo, setFiltroTipo] = useState<'REFEICAO' | 'ALIMENTACAO' | ''>('REFEICAO');
+  const [busca, setBusca] = useState('');
+  const [dataInicio, setDataInicio] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
+  });
+  const [dataFim, setDataFim] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = { unitId, limit: '200', startDate: dataInicio, endDate: dataFim };
+      if (filtroTipo) params.type = filtroTipo;
+      const res = await http.get('/diary-events', { params });
+      setEventos(res.data?.data ?? res.data ?? []);
+    } catch {
+      setEventos([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [unitId, filtroTipo, dataInicio, dataFim]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const filtrados = eventos.filter((e) => {
+    if (!busca) return true;
+    const q = busca.toLowerCase();
+    return (
+      e.child?.firstName?.toLowerCase().includes(q) ||
+      e.child?.lastName?.toLowerCase().includes(q) ||
+      e.classroom?.name?.toLowerCase().includes(q) ||
+      e.description?.toLowerCase().includes(q) ||
+      e.title?.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por criança, turma ou descrição..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          />
+        </div>
+        <select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value as 'REFEICAO' | 'ALIMENTACAO' | '')}
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+        >
+          <option value="REFEICAO">Refeições</option>
+          <option value="ALIMENTACAO">Alimentação</option>
+          <option value="">Todos os tipos</option>
+        </select>
+        <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        <button onClick={carregar} disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+        </button>
+      </div>
+
+      {/* Resumo */}
+      <div className="text-sm text-gray-500">{filtrados.length} registro{filtrados.length !== 1 ? 's' : ''} encontrado{filtrados.length !== 1 ? 's' : ''}</div>
+
+      {/* Lista */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Carregando observações...</div>
+      ) : filtrados.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <Eye className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium">Nenhuma observação encontrada</p>
+          <p className="text-sm mt-1">Os professores ainda não registraram observações alimentares no período selecionado.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtrados.map((e) => (
+            <div key={e.id} className="bg-white rounded-xl border p-4 flex gap-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-lg">
+                {e.type === 'REFEICAO' ? '🍽️' : '🥕'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-800 text-sm">
+                    {e.child ? `${e.child.firstName} ${e.child.lastName}` : 'Criança não identificada'}
+                  </span>
+                  {e.classroom && (
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{e.classroom.name}</span>
+                  )}
+                  <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                    {DIARY_TYPE_LABEL[e.type] ?? e.type}
+                  </span>
+                </div>
+                {e.title && <p className="text-sm font-medium text-gray-700 mt-1">{e.title}</p>}
+                {e.description && <p className="text-sm text-gray-600 mt-0.5">{e.description}</p>}
+                <p className="text-xs text-gray-400 mt-1">
+                  {new Date(e.occurredAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  {e.createdBy && ` — por ${e.createdBy}`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
-export function DashboardNutricionistaPage() {
-  const { user } = useAuth();
+// ─── AbaAnotacoesNutricionais ─────────────────────────────────────────────────────────────────────────────────
+interface DevObservation {
+  id: string;
+  childId: string;
+  dietaryNotes?: string;
+  recommendations?: string;
+  healthNotes?: string;
+  date: string;
+  createdBy: string;
+  child?: { id: string; firstName: string; lastName: string };
+}
+
+function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: string }) {
+  const [criancas, setCriancas] = useState<{ id: string; firstName: string; lastName: string; enrollments?: { classroom?: { name: string } }[] }[]>([]);
+  const [criancaSelecionada, setCriancaSelecionada] = useState<string>('');
+  const [observacoes, setObservacoes] = useState<DevObservation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [form, setForm] = useState({ dietaryNotes: '', recommendations: '', healthNotes: '' });
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
+
+  // Carregar crianças da unidade
+  useEffect(() => {
+    http.get('/children', { params: { unitId, limit: '500' } })
+      .then((r) => setCriancas(r.data?.data ?? r.data ?? []))
+      .catch(() => setCriancas([]));
+  }, [unitId]);
+
+  // Carregar observações da criança selecionada
+  const carregarObs = useCallback(async () => {
+    if (!criancaSelecionada) return;
+    setLoading(true);
+    try {
+      const r = await http.get('/development-observations', {
+        params: { childId: criancaSelecionada, category: 'NUTRICAO', limit: '50' },
+      });
+      setObservacoes(r.data?.data ?? r.data ?? []);
+    } catch { setObservacoes([]); }
+    finally { setLoading(false); }
+  }, [criancaSelecionada]);
+
+  useEffect(() => { carregarObs(); }, [carregarObs]);
+
+  const salvar = async () => {
+    if (!criancaSelecionada) { setErro('Selecione uma criança.'); return; }
+    if (!form.dietaryNotes && !form.recommendations && !form.healthNotes) {
+      setErro('Preencha pelo menos um campo.'); return;
+    }
+    setSalvando(true); setErro(''); setSucesso('');
+    try {
+      if (editandoId) {
+        await http.patch(`/development-observations/${editandoId}`, {
+          dietaryNotes: form.dietaryNotes || undefined,
+          recommendations: form.recommendations || undefined,
+          healthNotes: form.healthNotes || undefined,
+        });
+      } else {
+        await http.post('/development-observations', {
+          childId: criancaSelecionada,
+          category: 'NUTRICAO',
+          createdBy: userId,
+          date: new Date().toISOString(),
+          dietaryNotes: form.dietaryNotes || undefined,
+          recommendations: form.recommendations || undefined,
+          healthNotes: form.healthNotes || undefined,
+        });
+      }
+      setSucesso('Anotação salva com sucesso.');
+      setForm({ dietaryNotes: '', recommendations: '', healthNotes: '' });
+      setEditandoId(null);
+      carregarObs();
+    } catch { setErro('Erro ao salvar. Tente novamente.'); }
+    finally { setSalvando(false); }
+  };
+
+  const iniciarEdicao = (obs: DevObservation) => {
+    setEditandoId(obs.id);
+    setForm({
+      dietaryNotes: obs.dietaryNotes ?? '',
+      recommendations: obs.recommendations ?? '',
+      healthNotes: obs.healthNotes ?? '',
+    });
+    setSucesso(''); setErro('');
+  };
+
+  const cancelarEdicao = () => {
+    setEditandoId(null);
+    setForm({ dietaryNotes: '', recommendations: '', healthNotes: '' });
+    setErro(''); setSucesso('');
+  };
+
+  const criancasFiltradas = criancas.filter((c) => {
+    const q = busca.toLowerCase();
+    return !q || `${c.firstName} ${c.lastName}`.toLowerCase().includes(q);
+  });
+
+  const criancaAtual = criancas.find((c) => c.id === criancaSelecionada);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Coluna esquerda: seletor de criança */}
+      <div className="bg-white rounded-xl border p-4 space-y-3 lg:col-span-1">
+        <h3 className="font-semibold text-gray-800 text-sm">Selecionar Criança</h3>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar criança..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          />
+        </div>
+        <div className="space-y-1 max-h-96 overflow-y-auto">
+          {criancasFiltradas.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => { setCriancaSelecionada(c.id); setEditandoId(null); setForm({ dietaryNotes: '', recommendations: '', healthNotes: '' }); }}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                criancaSelecionada === c.id
+                  ? 'bg-orange-50 text-orange-700 font-medium border border-orange-200'
+                  : 'hover:bg-gray-50 text-gray-700'
+              }`}
+            >
+              {c.firstName} {c.lastName}
+              {c.enrollments?.[0]?.classroom?.name && (
+                <span className="text-xs text-gray-400 ml-1">({c.enrollments[0].classroom.name})</span>
+              )}
+            </button>
+          ))}
+          {criancasFiltradas.length === 0 && (
+            <p className="text-center text-sm text-gray-400 py-4">Nenhuma criança encontrada.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Coluna direita: formulário e histórico */}
+      <div className="lg:col-span-2 space-y-4">
+        {!criancaSelecionada ? (
+          <div className="bg-white rounded-xl border p-12 text-center text-gray-400">
+            <FileEdit className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <p className="font-medium">Selecione uma criança</p>
+            <p className="text-sm mt-1">Escolha uma criança na lista ao lado para ver ou criar anotações nutricionais.</p>
+          </div>
+        ) : (
+          <>
+            {/* Formulário */}
+            <div className="bg-white rounded-xl border p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-800">
+                  {editandoId ? 'Editar Anotação' : 'Nova Anotação'} — {criancaAtual?.firstName} {criancaAtual?.lastName}
+                </h3>
+                {editandoId && (
+                  <button onClick={cancelarEdicao} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Cancelar edição
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Observações Alimentares</label>
+                  <textarea
+                    rows={3}
+                    value={form.dietaryNotes}
+                    onChange={(e) => setForm((f) => ({ ...f, dietaryNotes: e.target.value }))}
+                    placeholder="Descrição sobre alimentação, aceitação de alimentos, preferências..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Recomendações Nutricionais</label>
+                  <textarea
+                    rows={2}
+                    value={form.recommendations}
+                    onChange={(e) => setForm((f) => ({ ...f, recommendations: e.target.value }))}
+                    placeholder="Orientações, adaptações, substituições recomendadas..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Observações de Saúde Relacionadas</label>
+                  <textarea
+                    rows={2}
+                    value={form.healthNotes}
+                    onChange={(e) => setForm((f) => ({ ...f, healthNotes: e.target.value }))}
+                    placeholder="Condições de saúde relevantes para a alimentação..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+              </div>
+              {erro && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{erro}</p>}
+              {sucesso && <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">{sucesso}</p>}
+              <button
+                onClick={salvar}
+                disabled={salvando}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {salvando ? 'Salvando...' : editandoId ? 'Atualizar Anotação' : 'Salvar Anotação'}
+              </button>
+            </div>
+
+            {/* Histórico */}
+            <div className="bg-white rounded-xl border p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-800">Histórico de Anotações</h3>
+                <button onClick={carregarObs} className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Atualizar
+                </button>
+              </div>
+              {loading ? (
+                <p className="text-center text-sm text-gray-400 py-6">Carregando...</p>
+              ) : observacoes.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-6">Nenhuma anotação registrada para esta criança.</p>
+              ) : (
+                <div className="space-y-3">
+                  {observacoes.map((obs) => (
+                    <div key={obs.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          {new Date(obs.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                        <button
+                          onClick={() => iniciarEdicao(obs)}
+                          className="text-xs text-orange-600 hover:underline flex items-center gap-1"
+                        >
+                          <FileEdit className="w-3 h-3" /> Editar
+                        </button>
+                      </div>
+                      {obs.dietaryNotes && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Observações Alimentares</p>
+                          <p className="text-sm text-gray-700 mt-0.5">{obs.dietaryNotes}</p>
+                        </div>
+                      )}
+                      {obs.recommendations && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Recomendações</p>
+                          <p className="text-sm text-gray-700 mt-0.5">{obs.recommendations}</p>
+                        </div>
+                      )}
+                      {obs.healthNotes && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Saúde</p>
+                          <p className="text-sm text-gray-700 mt-0.5">{obs.healthNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── AbaTurmasNutricional ─────────────────────────────────────────────────────────────────────────────────
+function AbaTurmasNutricional({
+  turmas,
+  dietas,
+}: {
+  turmas: { id: string; name: string; totalCriancas: number; comRestricao: number }[];
+  dietas: DietaryRestriction[];
+}) {
+  const [expandida, setExpandida] = useState<string | null>(null);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {turmas.map((t) => {
+        const pct = t.totalCriancas > 0 ? Math.round((t.comRestricao / t.totalCriancas) * 100) : 0;
+        const dietasDaTurma = dietas.filter((d) =>
+          d.isActive && d.child?.enrollments?.some((e) => e.classroom?.id === t.id)
+        );
+        const aberta = expandida === t.id;
+        return (
+          <div key={t.id} className="bg-white rounded-xl border p-5 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-gray-800">{t.name}</p>
+              {t.comRestricao > 0 && (
+                <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+                  <AlertTriangle className="w-3 h-3" />
+                  {t.comRestricao} restr.
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Crianças com restrição</span>
+                <span className="font-medium">{t.comRestricao} / {t.totalCriancas}</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${pct > 30 ? 'bg-orange-400' : 'bg-green-400'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-400">{pct}% das crianças têm alguma restrição</p>
+            </div>
+            {dietasDaTurma.length > 0 && (
+              <button
+                onClick={() => setExpandida(aberta ? null : t.id)}
+                className="flex items-center gap-1 text-xs text-orange-600 hover:underline mt-1 self-start"
+              >
+                {aberta ? '▲ Ocultar detalhes' : '▼ Ver restrições da turma'}
+              </button>
+            )}
+            {aberta && (
+              <div className="space-y-2 border-t pt-3 mt-1">
+                {dietasDaTurma.map((d) => (
+                  <div key={d.id} className="flex items-start gap-2 text-xs">
+                    <span className="mt-0.5">{SEVERITY_CONFIG[d.severity ?? '']?.icon ?? '⚠️'}</span>
+                    <div>
+                      <p className="font-medium text-gray-800">{d.child.firstName} {d.child.lastName}</p>
+                      <p className="text-gray-500">{d.name} — {TYPE_LABEL[d.type] ?? d.type}</p>
+                      {d.forbiddenFoods && (
+                        <p className="text-red-600 mt-0.5">⛔ {d.forbiddenFoods}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── AbaRelatorioConsolidado ─────────────────────────────────────────────────────────────────────────────────
+function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
+  const hoje = new Date();
+  const [dataInicio, setDataInicio] = useState(
+    new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
+  );
+  const [dataFim, setDataFim] = useState(hoje.toISOString().split('T')[0]);
+  const [cardapios, setCardapios] = useState<Cardapio[]>([]);
+  const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [gerado, setGerado] = useState(false);
+
+  const gerar = async () => {
+    setLoading(true); setGerado(false);
+    try {
+      const [cRes, dRes] = await Promise.all([
+        http.get('/cardapios', { params: { unitId, dataInicio, dataFim, limit: '100' } }),
+        http.get('/children/dietary-restrictions/unidade', { params: { unitId, limit: '500' } }),
+      ]);
+      setCardapios(cRes.data?.data ?? cRes.data ?? []);
+      setDietas(dRes.data?.data ?? dRes.data ?? []);
+      setGerado(true);
+    } catch { /* silencioso */ }
+    finally { setLoading(false); }
+  };
+
+  const exportarCSV = () => {
+    const linhas: string[] = [
+      `Relatório Nutricional Consolidado`,
+      `Período: ${dataInicio} a ${dataFim}`,
+      `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
+      '',
+      '=== CARDÁPIOS PUBLICADOS ===',
+      'Semana,Status,Publicado Em',
+      ...cardapios.map((c) =>
+        `${c.semana},${c.publicado ? 'Publicado' : 'Rascunho'},${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '-'}`
+      ),
+      '',
+      '=== RESTRIÇÕES ALIMENTARES ATIVAS ===',
+      'Criança,Tipo,Descrição,Turma',
+      ...dietas.map((d) => {
+        const nome = `${d.child?.firstName ?? ''} ${d.child?.lastName ?? ''}`.trim();
+        const turma = d.child?.enrollments?.map((e: any) => e.classroom?.name).filter(Boolean).join('; ') || 'Não atribuída';
+        return `${nome},${d.type},"${d.description ?? ''}",${turma}`;
+      }),
+    ];
+    const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio-nutricional-${dataInicio}-${dataFim}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Totais
+  const totalPublicados = cardapios.filter((c) => c.publicado).length;
+  const totalRascunhos = cardapios.filter((c) => !c.publicado).length;
+  const restricoesPorTipo = dietas.reduce<Record<string, number>>((acc, d) => {
+    acc[d.type] = (acc[d.type] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6">
+      {/* Filtros */}
+      <div className="bg-white rounded-xl border p-5">
+        <h3 className="font-semibold text-gray-800 mb-4">Parâmetros do Relatório</h3>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Data Início</label>
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Data Fim</label>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <button
+            onClick={gerar}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+          >
+            <FileText className="w-4 h-4" />
+            {loading ? 'Gerando...' : 'Gerar Relatório'}
+          </button>
+          {gerado && (
+            <button
+              onClick={exportarCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+            >
+              <Download className="w-4 h-4" /> Exportar CSV
+            </button>
+          )}
+          {gerado && (
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700"
+            >
+              <Printer className="w-4 h-4" /> Imprimir
+            </button>
+          )}
+        </div>
+      </div>
+
+      {gerado && (
+        <>
+          {/* Cards de resumo */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Cardápios Publicados', value: totalPublicados, color: 'green' },
+              { label: 'Rascunhos', value: totalRascunhos, color: 'yellow' },
+              { label: 'Restrições Ativas', value: dietas.length, color: 'red' },
+              { label: 'Tipos de Restrição', value: Object.keys(restricoesPorTipo).length, color: 'blue' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className={`bg-white rounded-xl border p-4 border-l-4 border-l-${color}-400`}>
+                <p className="text-xs text-gray-500">{label}</p>
+                <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Cardápios */}
+          <div className="bg-white rounded-xl border p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Cardápios no Período ({cardapios.length})</h3>
+            {cardapios.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Nenhum cardápio encontrado no período.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500 text-xs">
+                      <th className="pb-2">Semana</th>
+                      <th className="pb-2">Status</th>
+                      <th className="pb-2">Publicado Em</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {cardapios.map((c) => (
+                      <tr key={c.id}>
+                        <td className="py-2 font-medium">{c.semana}</td>
+                        <td className="py-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            c.publicado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {c.publicado ? 'Publicado' : 'Rascunho'}
+                          </span>
+                        </td>
+                        <td className="py-2 text-gray-500">
+                          {c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Restrições */}
+          <div className="bg-white rounded-xl border p-5">
+            <h3 className="font-semibold text-gray-800 mb-3">Restrições Alimentares Ativas ({dietas.length})</h3>
+            {dietas.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Nenhuma restrição cadastrada.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-gray-500 text-xs">
+                      <th className="pb-2">Criança</th>
+                      <th className="pb-2">Tipo</th>
+                      <th className="pb-2">Descrição</th>
+                      <th className="pb-2">Turma</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {dietas.map((d) => {
+                      const nome = `${d.child?.firstName ?? ''} ${d.child?.lastName ?? ''}`.trim();
+                      const turma = d.child?.enrollments?.map((e: any) => e.classroom?.name).filter(Boolean).join(', ') || 'Não atribuída';
+                      return (
+                        <tr key={d.id}>
+                          <td className="py-2 font-medium">{nome || '—'}</td>
+                          <td className="py-2">
+                            <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">{d.type}</span>
+                          </td>
+                          <td className="py-2 text-gray-600 max-w-xs truncate">{d.description ?? '—'}</td>
+                          <td className="py-2 text-gray-500">{turma}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── AbaHistorico ─────────────────────────────────────────────────────────────────────────────────
+function AbaHistorico({ unitId }: { unitId: string }) {
+  const PAGE_SIZE = 10;
+  const [cardapios, setCardapios] = useState<Cardapio[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [pagina, setPagina] = useState(0);
+  const [filtroPublicado, setFiltroPublicado] = useState<'' | 'true' | 'false'>('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [expandido, setExpandido] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listCardapios({
+        unitId,
+        publicado: filtroPublicado === '' ? undefined : filtroPublicado === 'true',
+        dataInicio: dataInicio || undefined,
+        dataFim: dataFim || undefined,
+        limit: PAGE_SIZE,
+        skip: pagina * PAGE_SIZE,
+      });
+      setCardapios(res.data);
+      setTotal(res.total);
+    } catch {
+      setCardapios([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [unitId, filtroPublicado, dataInicio, dataFim, pagina]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const totalPaginas = Math.ceil(total / PAGE_SIZE);
+
+  const contarItens = (c: Cardapio) =>
+    c.refeicoes.reduce((acc, r) => acc + r.itens.length, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="bg-white rounded-xl border p-4 flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Status</label>
+          <select
+            value={filtroPublicado}
+            onChange={(e) => { setFiltroPublicado(e.target.value as '' | 'true' | 'false'); setPagina(0); }}
+            className="border rounded-lg px-3 py-1.5 text-sm"
+          >
+            <option value="">Todos</option>
+            <option value="true">Publicados</option>
+            <option value="false">Rascunhos</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">De (semana)</label>
+          <input
+            type="date"
+            value={dataInicio}
+            onChange={(e) => { setDataInicio(e.target.value); setPagina(0); }}
+            className="border rounded-lg px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-500">Até (semana)</label>
+          <input
+            type="date"
+            value={dataFim}
+            onChange={(e) => { setDataFim(e.target.value); setPagina(0); }}
+            className="border rounded-lg px-3 py-1.5 text-sm"
+          />
+        </div>
+        <button
+          onClick={() => { setFiltroPublicado(''); setDataInicio(''); setDataFim(''); setPagina(0); }}
+          className="ml-auto flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        >
+          <RefreshCw className="w-4 h-4" /> Limpar
+        </button>
+      </div>
+
+      {/* Contador */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-gray-500">
+          {total} cardápio{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}
+        </span>
+        <span className="text-sm text-gray-400">Página {pagina + 1} de {totalPaginas || 1}</span>
+      </div>
+
+      {/* Lista */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-400"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" /><p>Carregando...</p></div>
+      ) : cardapios.length === 0 ? (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <History className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium">Nenhum cardápio encontrado</p>
+          <p className="text-sm mt-1">Ajuste os filtros ou crie um novo cardápio na aba &ldquo;Cardápio Semanal&rdquo;.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {cardapios.map((c) => (
+            <div key={c.id} className="bg-white rounded-xl border overflow-hidden">
+              <button
+                onClick={() => setExpandido(expandido === c.id ? null : c.id)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    c.publicado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {c.publicado ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                    {c.publicado ? 'Publicado' : 'Rascunho'}
+                  </span>
+                  <span className="font-medium text-gray-800">{formatarSemana(c.semana)}</span>
+                  {c.titulo && <span className="text-sm text-gray-500">— {c.titulo}</span>}
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <span>{c.refeicoes.length} refeições</span>
+                  <span>{contarItens(c)} itens</span>
+                  {expandido === c.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </div>
+              </button>
+
+              {expandido === c.id && (
+                <div className="border-t px-4 py-3 space-y-3">
+                  {c.refeicoes.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">Nenhuma refeição registrada neste cardápio.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {c.refeicoes.map((r) => (
+                        <div key={r.id} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-600">
+                              {DIA_SEMANA_LABELS[r.diaSemana]} — {TIPO_REFEICAO_LABELS[r.tipoRefeicao]}
+                            </span>
+                            <span className="text-xs text-gray-400">{r.itens.length} item{r.itens.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <ul className="space-y-0.5">
+                            {r.itens.slice(0, 5).map((item, idx) => (
+                              <li key={idx} className="text-xs text-gray-700 flex justify-between">
+                                <span>{item.nome}</span>
+                                {item.quantidade && <span className="text-gray-400">{item.quantidade}{item.unidade ?? 'g'}</span>}
+                              </li>
+                            ))}
+                            {r.itens.length > 5 && (
+                              <li className="text-xs text-gray-400 italic">+{r.itens.length - 5} mais...</li>
+                            )}
+                          </ul>
+                          {r.totaisNutricionais && (
+                            <div className="mt-2 pt-2 border-t flex gap-2 text-xs text-gray-500">
+                              <span>{r.totaisNutricionais.calorias.toFixed(0)} kcal</span>
+                              <span>· P: {r.totaisNutricionais.proteinas.toFixed(1)}g</span>
+                              <span>· C: {r.totaisNutricionais.carboidratos.toFixed(1)}g</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {c.observacoes && (
+                    <p className="text-sm text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                      <strong>Obs:</strong> {c.observacoes}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            onClick={() => setPagina((p) => Math.max(0, p - 1))}
+            disabled={pagina === 0}
+            className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-40"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {Array.from({ length: Math.min(totalPaginas, 7) }, (_, i) => {
+            const p = pagina < 4 ? i : pagina - 3 + i;
+            if (p >= totalPaginas) return null;
+            return (
+              <button
+                key={p}
+                onClick={() => setPagina(p)}
+                className={`w-8 h-8 rounded-lg text-sm font-medium ${
+                  p === pagina ? 'bg-green-600 text-white' : 'border hover:bg-gray-50'
+                }`}
+              >
+                {p + 1}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setPagina((p) => Math.min(totalPaginas - 1, p + 1))}
+            disabled={pagina >= totalPaginas - 1}
+            className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-40"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Componente Principal ─────────────────────────────────────────────────────────────────────────────────
+function DashboardNutricionistaPage()  const { user } = useAuth();
   const unitId = (user as any)?.unitId ?? '';
-  const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao' | 'configuracoes'>('dietas');
+  const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao' | 'configuracoes' | 'historico' | 'observacoes' | 'anotacoes' | 'relatorio'>('dietas');
 
   // ── Estado: Dietas ──
   const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
@@ -1288,15 +2302,18 @@ export function DashboardNutricionistaPage() {
   const totalAlergias = dietas.filter((d) => d.type === 'ALERGIA' && d.isActive).length;
   const totalSeveras = dietas.filter((d) => d.severity === 'severa' && d.isActive).length;
   const totalCriancasComRestricao = new Set(dietas.filter((d) => d.isActive).map((d) => d.child.id)).size;
-
   const ABAS = [
     { id: 'dietas', label: 'Dietas e Restrições', icon: Apple },
     { id: 'pedidos', label: 'Pedidos de Alimentação', icon: ShoppingCart },
     { id: 'turmas', label: 'Resumo por Turma', icon: Users },
+    { id: 'observacoes', label: 'Obs. dos Professores', icon: Eye },
+    { id: 'anotacoes', label: 'Anotações Nutricionais', icon: FileEdit },
     { id: 'cardapio', label: 'Cardápio Semanal', icon: BookOpen },
+    { id: 'historico', label: 'Histórico de Cardápios', icon: History },
     { id: 'nutricao', label: 'Cálculo Nutricional', icon: BarChart2 },
+    { id: 'relatorio', label: 'Relatório Consolidado', icon: FileText },
     { id: 'configuracoes', label: 'Configurações', icon: Settings },
-  ] as const;
+  ];
 
   return (
     <PageShell
@@ -1652,42 +2669,27 @@ export function DashboardNutricionistaPage() {
               <p className="font-medium">Nenhuma turma encontrada</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {turmas.map((t) => {
-                const pct = t.totalCriancas > 0 ? Math.round((t.comRestricao / t.totalCriancas) * 100) : 0;
-                return (
-                  <div key={t.id} className="bg-white rounded-xl border p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="font-semibold text-gray-800">{t.name}</p>
-                      {t.comRestricao > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
-                          <AlertTriangle className="w-3 h-3" />
-                          {t.comRestricao} restr.
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Crianças com restrição</span>
-                        <span className="font-medium">{t.comRestricao} / {t.totalCriancas}</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all ${pct > 30 ? 'bg-orange-400' : 'bg-green-400'}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400">{pct}% das crianças têm alguma restrição</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <AbaTurmasNutricional turmas={turmas} dietas={dietas} />
           )}
         </div>
       )}
 
-      {/* ── Aba: Cardápio Semanal ── */}
+      {/* ── Aba: Observações dos Professores ── */}
+      {aba === 'observacoes' && unitId && <AbaObservacoesProfessores unitId={unitId} />}
+      {aba === 'observacoes' && !unitId && (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
+        </div>
+      )}
+
+      {/* ── Aba: Anotações Nutricionais ── */}
+      {aba === 'anotacoes' && unitId && <AbaAnotacoesNutricionais unitId={unitId} userId={(user as any)?.id ?? ''} />}
+      {aba === 'anotacoes' && !unitId && (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
+        </div>
+      )}
+
       {aba === 'cardapio' && unitId && <AbaCardapio unitId={unitId} />}
       {aba === 'cardapio' && !unitId && (
         <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
@@ -1702,6 +2704,22 @@ export function DashboardNutricionistaPage() {
           <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
         </div>
       )}
+      {/* ── Aba: Histórico de Cardápios ── */}
+      {aba === 'historico' && unitId && <AbaHistorico unitId={unitId} />}
+      {aba === 'historico' && !unitId && (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
+        </div>
+      )}
+
+      {/* ── Aba: Relatório Consolidado ── */}
+      {aba === 'relatorio' && unitId && <AbaRelatorioConsolidado unitId={unitId} />}
+      {aba === 'relatorio' && !unitId && (
+        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
+        </div>
+      )}
+
       {/* ── Aba: Configurações de Refeição ── */}
       {aba === 'configuracoes' && unitId && <AbaConfiguracoes unitId={unitId} />}
       {aba === 'configuracoes' && !unitId && (

@@ -107,6 +107,7 @@ export class UnitsService {
         email: true,
         phone: true,
         isActive: true,
+        nonSchoolDays: true,
         createdAt: true,
         updatedAt: true,
         _count: {

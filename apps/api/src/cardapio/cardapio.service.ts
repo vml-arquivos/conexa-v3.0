@@ -75,7 +75,15 @@ export class CardapioService {
 
     const where: Record<string, unknown> = { mantenedoraId: user.mantenedoraId };
     if (unitId) where.unitId = unitId;
-    if (query.semana) where.semana = query.semana;
+    if (query.semana) {
+      where.semana = query.semana;
+    } else if (query.dataInicio || query.dataFim) {
+      const semanaFilter: Record<string, string> = {};
+      if (query.dataInicio) semanaFilter.gte = query.dataInicio;
+      if (query.dataFim)   semanaFilter.lte = query.dataFim;
+      where.semana = semanaFilter;
+    }
+    if (query.publicado !== undefined) where.publicado = query.publicado === 'true';
 
     const [total, items] = await this.prisma.$transaction([
       this.prisma.cardapio.count({ where }),
