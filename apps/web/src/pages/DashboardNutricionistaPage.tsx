@@ -181,7 +181,10 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   const salvarRefeicao = async () => {
     if (!cardapio || !editando) return;
     const itensFiltrados = itensForm.filter((i) => i.nome?.trim());
-    if (itensFiltrados.length === 0) return;
+    if (itensFiltrados.length === 0) {
+      setErro('Adicione pelo menos um alimento antes de salvar a refeição.');
+      return;
+    }
     setSalvando(true);
     setErro('');
     try {
@@ -393,9 +396,15 @@ function AbaCardapio({ unitId }: { unitId: string }) {
               >×</button>
             </div>
 
-            {/* ── Corpo ── */}
+             {/* ── Corpo ── */}
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
-
+              {/* ── Erro do modal ── */}
+              {erro && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                  <span className="text-red-500 mt-0.5">&#9888;</span>
+                  <span>{erro}</span>
+                </div>
+              )}
               {/* ── Seletor duplo encadeado ── */}
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
                 <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Adicionar Alimento</p>
@@ -550,9 +559,10 @@ function AbaCardapio({ unitId }: { unitId: string }) {
               )}
 
               {itensForm.length === 0 && (
-                <div className="text-center py-8 text-gray-300">
+                <div className="text-center py-8 text-gray-400">
                   <p className="text-4xl mb-2">🥗</p>
-                  <p className="text-sm">Selecione a categoria, o alimento e o peso para começar</p>
+                  <p className="text-sm font-medium text-gray-500">Nenhum alimento adicionado ainda</p>
+                  <p className="text-xs text-gray-400 mt-1">1. Escolha a categoria &rarr; 2. Selecione o alimento &rarr; 3. Informe o peso &rarr; clique em <strong>Adicionar</strong></p>
                 </div>
               )}
 
@@ -612,11 +622,11 @@ function AbaCardapio({ unitId }: { unitId: string }) {
               </button>
               <button
                 onClick={salvarRefeicao}
-                disabled={salvando || itensForm.length === 0}
+                disabled={salvando}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
               >
                 <Save className="w-4 h-4" />
-                {salvando ? 'Salvando...' : `Salvar Refeição (${itensForm.length} item${itensForm.length !== 1 ? 's' : ''})`}
+                {salvando ? 'Salvando...' : itensForm.length === 0 ? 'Salvar Refeição' : `Salvar Refeição (${itensForm.length} item${itensForm.length !== 1 ? 's' : ''})`}
               </button>
             </div>
           </div>
