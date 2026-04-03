@@ -283,7 +283,8 @@ model Mantenedora {
   recadosTurma         RecadoTurma[]
   classroomPosts       ClassroomPost[]
   materiais            Material[]
-  cardapios            Cardapio[]
+  cardapios                    Cardapio[]
+  acompanhamentosNutricionais  AcompanhamentoNutricional[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -563,7 +564,8 @@ model Child {
   atendimentosPais    AtendimentoPais[]
   rdixInstancias      RDIXInstancia[]
   studentPostPerfs    StudentPostPerformance[]
-  developmentObs      DevelopmentObservation[]
+  developmentObs              DevelopmentObservation[]
+  acompanhamentosNutricionais AcompanhamentoNutricional[]
 
   @@index([mantenedoraId])
   @@index([unitId])
@@ -2038,8 +2040,8 @@ model CardapioRefeicao {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  cardapio             Cardapio              @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
-  configuracaoRefeicao ConfiguracaoRefeicao? @relation(fields: [configuracaoRefeicaoId], references: [id], onDelete: SetNull)
+  cardapio             Cardapio               @relation(fields: [cardapioId], references: [id], onDelete: Cascade)
+  configuracaoRefeicao ConfiguracaoRefeicao?  @relation(fields: [configuracaoRefeicaoId], references: [id], onDelete: SetNull)
   itens                CardapioItem[]
 
   @@unique([cardapioId, diaSemana, tipoRefeicao])
@@ -2148,4 +2150,57 @@ model ConfiguracaoRefeicao {
   @@index([unitId])
   @@index([ativo])
   @@map("configuracao_refeicao")
+}
+
+// ============================================================================
+// 28. ACOMPANHAMENTO INDIVIDUAL NUTRICIONAL
+// ============================================================================
+
+/// Status do caso de acompanhamento nutricional individual
+enum StatusCasoNutricional {
+  MONITORAMENTO
+  ATENCAO_MODERADA
+  ATENCAO_ALTA
+  CRITICO
+}
+
+/// Acompanhamento nutricional individual de uma criança
+/// Criado pela Nutricionista para crianças que precisam de atenção especial
+model AcompanhamentoNutricional {
+  id            String  @id @default(cuid())
+  mantenedoraId String  @map("mantenedora_id")
+  unitId        String  @map("unit_id")
+  childId       String  @map("child_id")
+  criadoPorId   String  @map("criado_por_id") @db.VarChar(255)
+
+  // Identificação do caso
+  motivoAcompanhamento String  @map("motivo_acompanhamento") @db.Text
+  statusCaso           StatusCasoNutricional @default(MONITORAMENTO) @map("status_caso")
+  ativo                Boolean @default(true)
+
+  // Plano de cuidado
+  objetivos              String? @db.Text
+  condutaAtual           String? @map("conduta_atual") @db.Text
+  restricoesOperacionais String? @map("restricoes_operacionais") @db.Text
+  substituicoesSeguras   String? @map("substituicoes_seguras") @db.Text
+  orientacoesProfCozinha String? @map("orientacoes_prof_cozinha") @db.Text
+  frequenciaRevisao      String? @map("frequencia_revisao") @db.VarChar(100)
+  proximaReavaliacao     DateTime? @map("proxima_reavaliacao")
+
+  // Timestamps
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  // Relações
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([childId]) // uma criança tem no máximo 1 caso ativo por vez
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([childId])
+  @@index([statusCaso])
+  @@index([ativo])
+  @@index([proximaReavaliacao])
+  @@map("acompanhamento_nutricional")
 }

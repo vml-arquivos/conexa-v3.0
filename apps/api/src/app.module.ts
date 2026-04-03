@@ -44,6 +44,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { CardapioModule } from './cardapio/cardapio.module';
 import { AlimentosModule } from './alimentos/alimentos.module';
 import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
+import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/acompanhamento-nutricional.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao
     CardapioModule,
     AlimentosModule,
     ConfiguracaoRefeicaoModule,
+    AcompanhamentoNutricionalModule,
   ],
   controllers: [AppController],
   providers: [
