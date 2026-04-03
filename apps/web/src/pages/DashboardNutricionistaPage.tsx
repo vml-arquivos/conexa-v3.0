@@ -21,7 +21,7 @@ import {
   Settings, GripVertical, History, Eye, FileEdit, X, FileText, Download,
 } from 'lucide-react';
 import {
-  listCardapios, createCardapio, upsertRefeicao, deleteCardapio, calcularNutricao,
+  listCardapios, createCardapio, updateCardapio, upsertRefeicao, deleteCardapio, calcularNutricao,
   getSemanaAtual, getSemanaAnterior, getProximaSemana, formatarSemana,
   DIAS_SEMANA, TIPOS_REFEICAO, DIA_SEMANA_LABELS, TIPO_REFEICAO_LABELS,
   type Cardapio, type CardapioItem, type DiaSemana, type TipoRefeicao, type NutricaoResponse,
@@ -237,6 +237,25 @@ function AbaCardapio({ unitId }: { unitId: string }) {
     }
   };
 
+  const publicarCardapio = async () => {
+    if (!cardapio) return;
+    const novoStatus = !cardapio.publicado;
+    const msg = novoStatus
+      ? 'Publicar este cardápio? Ele ficará visível para professores e gestão.'
+      : 'Despublicar este cardápio? Ele voltará para rascunho.';
+    if (!confirm(msg)) return;
+    setSalvando(true);
+    setErro('');
+    try {
+      const atualizado = await updateCardapio(cardapio.id, { publicado: novoStatus });
+      setCardapio(atualizado);
+    } catch (e: any) {
+      setErro(e?.response?.data?.message ?? 'Erro ao atualizar status do cardápio.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const excluirCardapio = async () => {
     if (!cardapio) return;
     if (!confirm('Excluir o cardápio desta semana? Esta ação não pode ser desfeita.')) return;
@@ -354,17 +373,37 @@ function AbaCardapio({ unitId }: { unitId: string }) {
             <div>
               <p className="font-semibold text-gray-800">{cardapio.titulo ?? `Cardápio ${formatarSemana(semana)}`}</p>
               <p className="text-xs text-gray-500">
-                {cardapio.publicado ? '✅ Publicado' : '📝 Rascunho'} —{' '}
-                {cardapio.refeicoes?.length ?? 0} refeições cadastradas
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  cardapio.publicado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {cardapio.publicado ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                  {cardapio.publicado ? 'Publicado' : 'Rascunho'}
+                </span>
+                {' '}— {cardapio.refeicoes?.length ?? 0} refeições cadastradas
               </p>
             </div>
             <div className="flex items-center gap-2 no-print">
+              {/* Botão Publicar / Despublicar */}
+              <button
+                onClick={publicarCardapio}
+                disabled={salvando}
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${
+                  cardapio.publicado
+                    ? 'border border-yellow-300 text-yellow-700 hover:bg-yellow-50'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+                title={cardapio.publicado ? 'Voltar para rascunho' : 'Publicar cardápio'}
+              >
+                {cardapio.publicado
+                  ? <><Clock className="w-4 h-4" /> Despublicar</>
+                  : <><CheckCircle className="w-4 h-4" /> Publicar</>}
+              </button>
               <button
                 onClick={() => window.print()}
                 className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
                 title="Imprimir ou salvar como PDF"
               >
-                <Printer className="w-4 h-4" /> Imprimir / PDF
+                <Printer className="w-4 h-4" /> PDF
               </button>
               <button
                 onClick={excluirCardapio}
@@ -772,7 +811,8 @@ function AbaNutricao({ unitId }: { unitId: string }) {
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const [faixaEtaria, setFaixaEtaria] = useState<string>('4-6');
-
+  // PARTE 4+5: alertas de dietas especiais
+  const [restricoes, setRestricoes] = useState<DietaryRestriction[]>([]);
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro('');
@@ -790,8 +830,14 @@ function AbaNutricao({ unitId }: { unitId: string }) {
       setLoading(false);
     }
   }, [unitId, semana]);
-
   useEffect(() => { carregar(); }, [carregar]);
+  // Carrega restrições/alergias para alertas de dietas especiais
+  useEffect(() => {
+    if (!unitId) return;
+    http.get(`/dietary-restrictions/unidade/${unitId}?limit=200`)
+      .then((r) => setRestricoes(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
+      .catch(() => setRestricoes([]));
+  }, [unitId]);
 
   const DIA_LABELS: Record<string, string> = {
     SEGUNDA: 'Segunda', TERCA: 'Terça', QUARTA: 'Quarta', QUINTA: 'Quinta', SEXTA: 'Sexta',
@@ -1020,11 +1066,61 @@ function AbaNutricao({ unitId }: { unitId: string }) {
           </div>
         </div>
       )}
+      {/* PARTE 4+5: Alertas de Dietas Especiais */}
+      {restricoes.length > 0 && (
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-orange-500" />
+            <h3 className="font-semibold text-gray-800">Alertas de Dietas Especiais</h3>
+            <span className="ml-auto text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+              {restricoes.length} criança{restricoes.length !== 1 ? 's' : ''} com restrição
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Atenção ao planejar o cardápio: as crianças abaixo possuem restrições alimentares ativas que devem ser consideradas.
+          </p>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {restricoes.map((r) => {
+              const sev = SEVERITY_CONFIG[r.severity ?? ''] ?? SEVERITY_CONFIG['leve'];
+              const turma = r.child?.enrollments?.[0]?.classroom?.name ?? 'Sem turma';
+              return (
+                <div key={r.id} className={`flex items-start gap-3 p-3 rounded-lg border ${sev.bg} border-opacity-50`}>
+                  <span className="text-lg mt-0.5">{sev.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-800 text-sm">
+                        {r.child?.firstName} {r.child?.lastName}
+                      </span>
+                      <span className="text-xs text-gray-500">{turma}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${sev.color} ${sev.bg}`}>
+                        {sev.label}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                        {TYPE_LABEL[r.type] ?? r.type}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-700 mt-1 font-medium">{r.name}</p>
+                    {r.forbiddenFoods && (
+                      <p className="text-xs text-red-700 mt-0.5">
+                        <span className="font-semibold">Proibido:</span> {r.forbiddenFoods}
+                      </p>
+                    )}
+                    {r.allowedFoods && (
+                      <p className="text-xs text-green-700 mt-0.5">
+                        <span className="font-semibold">Permitido:</span> {r.allowedFoods}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-// ─── Sub-componente: Aba Configurações de Refeição ──────────────────────────
+// ─── Sub-componente: Aba Configurações de Refeição ──────────────────
 function AbaConfiguracoes({ unitId }: { unitId: string }) {
   const [configs, setConfigs] = useState<ConfiguracaoRefeicao[]>([]);
   const [loading, setLoading] = useState(false);

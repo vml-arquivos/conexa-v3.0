@@ -18,15 +18,20 @@ export class CardapioController {
   constructor(private readonly svc: CardapioService) {}
 
   /** GET /cardapios — listar cardápios da unidade */
+  // PARTE 6: PROFESSOR pode listar cardápios publicados (compartilhamento controlado)
   @Get()
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   findAll(@Query() query: QueryCardapioDto, @CurrentUser() user: JwtPayload) {
+    // Professores só vêem cardápios publicados
+    const isProfessorOnly = user.roles?.every((r: any) => r.level === 'PROFESSOR');
+    if (isProfessorOnly) query.publicado = 'true';
     return this.svc.findAll(query, user);
   }
 
   /** GET /cardapios/:id — buscar cardápio por ID */
+  // PARTE 6: PROFESSOR pode ver cardápios publicados
   @Get(':id')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   findOne(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.svc.findOne(id, user);
   }

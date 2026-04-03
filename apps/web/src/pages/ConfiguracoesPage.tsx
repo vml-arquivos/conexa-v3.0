@@ -110,8 +110,19 @@ export default function ConfiguracoesPage() {
     if (typeof r === 'object' && r.level) return r.level;
     return '';
   };
+  const extractType = (r: any): string => {
+    if (!r || typeof r !== 'object') return '';
+    return r.type || r.roleId || '';
+  };
   const userRole = user?.role || extractLevel(user?.roles?.[0]) || '';
-  const isAdmin = ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE'].includes(userRole);
+  // RBAC: Nutricionista tem level UNIDADE mas NÃO deve ver gestão de usuários/unidade.
+  // Verificar o type específico para excluir UNIDADE_NUTRICIONISTA do isAdmin.
+  const userRoleType = extractType(user?.roles?.[0]) || '';
+  const isNutricionistaUser = userRoleType === 'UNIDADE_NUTRICIONISTA' ||
+    (Array.isArray(user?.roles) && user.roles.some((r: any) => extractType(r) === 'UNIDADE_NUTRICIONISTA'));
+  // isAdmin: apenas perfis com gestão administrativa real (exclui Nutricionista explicitamente)
+  const isAdmin = !isNutricionistaUser &&
+    ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE'].includes(userRole);
   const isDev = userRole === 'DEVELOPER';
 
   useEffect(() => { loadPerfil(); }, []);
@@ -264,7 +275,7 @@ export default function ConfiguracoesPage() {
   if (loading) return <LoadingState message="Carregando configurações..." />;
 
   return (
-    <PageShell title="Configurações" subtitle="Gerencie seu perfil, unidade, usuários e preferências do sistema">
+    <PageShell title="Configurações" subtitle={isNutricionistaUser ? 'Gerencie seu perfil e preferências' : 'Gerencie seu perfil, unidade, usuários e preferências do sistema'}>
       <div className="flex flex-col md:flex-row gap-6">
         {/* Menu lateral */}
         <aside className="w-full md:w-56 flex-shrink-0">
