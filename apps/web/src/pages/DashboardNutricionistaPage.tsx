@@ -1755,123 +1755,287 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
 }
 
 // ─── AbaTurmasNutricional ─────────────────────────────────────────────────────────────────────────────────
-function AbaTurmasNutricional({
-  turmas,
+// ─── Tipos internos para TurmaCard ──────────────────────────────────────────
+interface CriancaTurma {
+  id: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  photoUrl?: string;
+  allergies?: string | null;
+  medicalConditions?: string | null;
+  medicationNeeds?: string | null;
+  dietaryRestrictions?: { id: string; type: string; name: string; severity?: string; forbiddenFoods?: string }[];
+}
+interface PresencaAluno {
+  id: string;
+  nome: string;
+  status: string | null;
+  registrado: boolean;
+}
+interface ObsAlimentacao {
+  id: string;
+  childId: string;
+  title: string;
+  description: string;
+  eventDate: string;
+  medicaoAlimentar?: Record<string, number>;
+}
+interface DiagnosticoPeso {
+  childId: string;
+  peso?: number;
+  altura?: number;
+  data?: string;
+  obs?: string;
+}
+
+function TurmaCard({
+  turma,
+  unitId,
+  healthData,
   dietas,
-  healthPorTurma = {},
 }: {
-  turmas: { id: string; name: string; totalCriancas: number; comRestricao: number }[];
+  turma: { id: string; name: string; totalCriancas: number; comRestricao: number };
+  unitId: string;
+  healthData?: { children: CriancaTurma[]; stats: Record<string, number> };
   dietas: DietaryRestriction[];
-  healthPorTurma?: Record<string, { children: any[]; stats: any }>;
 }) {
-  const [expandida, setExpandida] = useState<string | null>(null);
+  const hoje = new Date().toISOString().split('T')[0];
+  const [aba, setAba] = useState<'alunos' | 'presenca' | 'alimentacao' | 'peso'>('alunos');
+  const [expandida, setExpandida] = useState(false);
+  const [criancas, setCriancas] = useState<CriancaTurma[]>([]);
+  const [loadingCriancas, setLoadingCriancas] = useState(false);
+  const [presenca, setPresenca] = useState<{ alunos: PresencaAluno[]; presentes: number; ausentes: number; total: number } | null>(null);
+  const [loadingPresenca, setLoadingPresenca] = useState(false);
+  const [obsAlim, setObsAlim] = useState<ObsAlimentacao[]>([]);
+  const [loadingObs, setLoadingObs] = useState(false);
+  const [novaObs, setNovaObs] = useState({ childId: '', titulo: '', descricao: '' });
+  const [salvandoObs, setSalvandoObs] = useState(false);
+  const [formAberto, setFormAberto] = useState(false);
+  const [diagnosticos, setDiagnosticos] = useState<DiagnosticoPeso[]>([]);
+  const [loadingDiag, setLoadingDiag] = useState(false);
+  const [formPeso, setFormPeso] = useState({ childId: '', peso: '', altura: '', obs: '' });
+  const [salvandoPeso, setSalvandoPeso] = useState(false);
+  const [formPesoAberto, setFormPesoAberto] = useState(false);
+
+  const carregarCriancas = useCallback(async () => {
+    setLoadingCriancas(true);
+    try {
+      const { data } = await http.get('/children/health/dashboard', {
+        params: { unitId, classroomId: turma.id },
+      });
+      setCriancas(data?.children ?? []);
+    } catch {
+      try {
+        const { data } = await http.get(`/lookup/classrooms/${turma.id}/children`);
+        setCriancas(Array.isArray(data) ? data : data?.data ?? []);
+      } catch { setCriancas([]); }
+    } finally { setLoadingCriancas(false); }
+  }, [unitId, turma.id]);
+
+  const carregarPresenca = useCallback(async () => {
+    setLoadingPresenca(true);
+    try {
+      const { data } = await http.get('/attendance/today', {
+        params: { classroomId: turma.id, date: hoje },
+      });
+      setPresenca({
+        alunos: data?.alunos ?? [],
+        presentes: data?.presentes ?? 0,
+        ausentes: data?.ausentes ?? 0,
+        total: data?.totalAlunos ?? 0,
+      });
+    } catch { setPresenca(null); }
+    finally { setLoadingPresenca(false); }
+  }, [turma.id, hoje]);
+
+  const carregarObs = useCallback(async () => {
+    setLoadingObs(true);
+    try {
+      const { data } = await http.get('/diary-events', {
+        params: { classroomId: turma.id, type: 'REFEICAO', limit: '50' },
+      });
+      const lista = Array.isArray(data) ? data : data?.data ?? [];
+      setObsAlim(lista.map((e: Record<string, unknown>) => ({
+        id: e.id as string,
+        childId: e.childId as string,
+        title: e.title as string,
+        description: e.description as string,
+        eventDate: e.eventDate as string,
+        medicaoAlimentar: e.medicaoAlimentar as Record<string, number> | undefined,
+      })));
+    } catch { setObsAlim([]); }
+    finally { setLoadingObs(false); }
+  }, [turma.id]);
+
+  const carregarDiagnosticos = useCallback(async () => {
+    setLoadingDiag(true);
+    try {
+      const { data } = await http.get('/diary-events', {
+        params: { classroomId: turma.id, type: 'SAUDE', limit: '100' },
+      });
+      const lista = Array.isArray(data) ? data : data?.data ?? [];
+      const diags: DiagnosticoPeso[] = (lista as Record<string, unknown>[])
+        .filter((e) => {
+          const m = e.medicaoAlimentar as Record<string, unknown> | undefined;
+          return m && (m.peso || m.altura);
+        })
+        .map((e) => {
+          const m = e.medicaoAlimentar as Record<string, number>;
+          return {
+            childId: e.childId as string,
+            peso: m?.peso,
+            altura: m?.altura,
+            data: e.eventDate as string,
+            obs: e.description as string,
+          };
+        });
+      setDiagnosticos(diags);
+    } catch { setDiagnosticos([]); }
+    finally { setLoadingDiag(false); }
+  }, [turma.id]);
+
+  useEffect(() => {
+    if (!expandida) return;
+    if (aba === 'alunos' && criancas.length === 0) carregarCriancas();
+    if (aba === 'presenca') carregarPresenca();
+    if (aba === 'alimentacao') carregarObs();
+    if (aba === 'peso') carregarDiagnosticos();
+  }, [expandida, aba, criancas.length, carregarCriancas, carregarPresenca, carregarObs, carregarDiagnosticos]);
+
+  const salvarObs = async () => {
+    if (!novaObs.childId || !novaObs.titulo || !novaObs.descricao) return;
+    setSalvandoObs(true);
+    try {
+      await http.post('/diary-events', {
+        classroomId: turma.id,
+        unitId,
+        childId: novaObs.childId,
+        type: 'REFEICAO',
+        title: novaObs.titulo,
+        description: novaObs.descricao,
+        eventDate: hoje,
+        status: 'PUBLICADO',
+      });
+      setNovaObs({ childId: '', titulo: '', descricao: '' });
+      setFormAberto(false);
+      await carregarObs();
+    } catch { /* silencioso */ }
+    finally { setSalvandoObs(false); }
+  };
+
+  const salvarPeso = async () => {
+    if (!formPeso.childId || (!formPeso.peso && !formPeso.altura)) return;
+    setSalvandoPeso(true);
+    try {
+      await http.post('/diary-events', {
+        classroomId: turma.id,
+        unitId,
+        childId: formPeso.childId,
+        type: 'SAUDE',
+        title: 'Diagnóstico Nutricional',
+        description: formPeso.obs || `Peso: ${formPeso.peso}kg | Altura: ${formPeso.altura}cm`,
+        eventDate: hoje,
+        status: 'PUBLICADO',
+        medicaoAlimentar: {
+          ...(formPeso.peso ? { peso: Number(formPeso.peso) } : {}),
+          ...(formPeso.altura ? { altura: Number(formPeso.altura) } : {}),
+        },
+      });
+      setFormPeso({ childId: '', peso: '', altura: '', obs: '' });
+      setFormPesoAberto(false);
+      await carregarDiagnosticos();
+    } catch { /* silencioso */ }
+    finally { setSalvandoPeso(false); }
+  };
+
+  const pct = turma.totalCriancas > 0 ? Math.round((turma.comRestricao / turma.totalCriancas) * 100) : 0;
+  const allCriancas: CriancaTurma[] = criancas.length > 0 ? criancas : (healthData?.children ?? []);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {turmas.map((t) => {
-        const pct = t.totalCriancas > 0 ? Math.round((t.comRestricao / t.totalCriancas) * 100) : 0;
-        // Preferir dados ricos do health dashboard; fallback para dietas já carregadas
-        const healthData = healthPorTurma[t.id];
-        const criancasRicas: any[] = healthData?.children ?? [];
-        const stats = healthData?.stats ?? {};
-        const dietasDaTurma = dietas.filter((d) =>
-          d.isActive && d.child?.enrollments?.some((e) => e.classroom?.id === t.id)
-        );
-        // Usar crianças do health dashboard se disponível
-        const temDadosRicos = criancasRicas.length > 0;
-        const aberta = expandida === t.id;
-        return (
-          <div key={t.id} className="bg-white rounded-xl border p-5 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-gray-800">{t.name}</p>
-              {t.comRestricao > 0 && (
-                <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
-                  <AlertTriangle className="w-3 h-3" />
-                  {t.comRestricao} restr.
-                </span>
-              )}
-            </div>
-            {/* KPIs da turma */}
-            {temDadosRicos && (
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-gray-50 rounded-lg p-2">
-                  <p className="text-xs text-gray-400">Total</p>
-                  <p className="font-bold text-gray-800">{stats.total ?? criancasRicas.length}</p>
-                </div>
-                <div className="bg-red-50 rounded-lg p-2">
-                  <p className="text-xs text-red-400">Alergias</p>
-                  <p className="font-bold text-red-700">{stats.comAlergia ?? 0}</p>
-                </div>
-                <div className="bg-orange-50 rounded-lg p-2">
-                  <p className="text-xs text-orange-400">Dietas</p>
-                  <p className="font-bold text-orange-700">{stats.comDieta ?? 0}</p>
-                </div>
-              </div>
+    <div className="bg-white rounded-xl border flex flex-col">
+      <div className="p-4 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-gray-800">{turma.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {turma.totalCriancas} aluno{turma.totalCriancas !== 1 ? 's' : ''}
+            {turma.comRestricao > 0 && (
+              <span className="ml-2 text-orange-600">• {turma.comRestricao} c/ restrição</span>
             )}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Crianças com restrição</span>
-                <span className="font-medium">{t.comRestricao} / {t.totalCriancas}</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${pct > 30 ? 'bg-orange-400' : 'bg-green-400'}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-400">{pct}% das crianças têm alguma restrição</p>
-            </div>
-            {(temDadosRicos ? criancasRicas.length > 0 : dietasDaTurma.length > 0) && (
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {turma.comRestricao > 0 && (
+            <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+              <AlertTriangle className="w-3 h-3" />{turma.comRestricao}
+            </span>
+          )}
+          <button
+            onClick={() => setExpandida(!expandida)}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+          >
+            {expandida ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+      <div className="px-4 pb-3">
+        <div className="w-full bg-gray-100 rounded-full h-1.5">
+          <div
+            className={`h-1.5 rounded-full ${pct > 30 ? 'bg-orange-400' : 'bg-green-400'}`}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-400 mt-1">{pct}% com alguma restrição</p>
+      </div>
+      {expandida && (
+        <div className="border-t">
+          <div className="flex border-b overflow-x-auto">
+            {([
+              { id: 'alunos', label: 'Alunos' },
+              { id: 'presenca', label: 'Presença' },
+              { id: 'alimentacao', label: 'Alimentação' },
+              { id: 'peso', label: 'Peso/Altura' },
+            ] as { id: typeof aba; label: string }[]).map((item) => (
               <button
-                onClick={() => setExpandida(aberta ? null : t.id)}
-                className="flex items-center gap-1 text-xs text-orange-600 hover:underline mt-1 self-start"
+                key={item.id}
+                onClick={() => setAba(item.id)}
+                className={`px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  aba === item.id
+                    ? 'border-orange-500 text-orange-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
               >
-                {aberta ? '▲ Ocultar detalhes' : '▼ Ver crianças com restrições'}
+                {item.label}
               </button>
-            )}
-            {aberta && (
-              <div className="space-y-2 border-t pt-3 mt-1">
-                {temDadosRicos ? (
-                  // Dados ricos do health dashboard
-                  criancasRicas.map((c: any) => (
-                    <div key={c.id} className="bg-gray-50 rounded-lg p-3 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">
-                          {c.firstName?.[0]}{c.lastName?.[0]}
-                        </div>
-                        <p className="font-medium text-gray-800 text-sm">{c.firstName} {c.lastName}</p>
+            ))}
+          </div>
+          <div className="p-4">
+            {aba === 'alunos' && (
+              <div className="space-y-2">
+                {loadingCriancas ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Carregando alunos...</p>
+                ) : allCriancas.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Nenhum aluno matriculado.</p>
+                ) : (
+                  allCriancas.map((c) => (
+                    <div key={c.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-bold text-xs flex-shrink-0">
+                        {c.firstName?.[0]}{c.lastName?.[0]}
                       </div>
-                      {c.allergies && (
-                        <p className="text-xs text-red-600">⛔ Alergia: {c.allergies}</p>
-                      )}
-                      {c.dietaryRestrictions?.map((r: any) => (
-                        <div key={r.id} className="text-xs">
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mr-1 ${
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{c.firstName} {c.lastName}</p>
+                        {c.allergies && (
+                          <p className="text-xs text-red-600 mt-0.5">⛔ {c.allergies}</p>
+                        )}
+                        {(c.dietaryRestrictions ?? []).map((r) => (
+                          <span key={r.id} className={`inline-block mr-1 mt-0.5 px-1.5 py-0.5 rounded text-xs ${
                             r.severity === 'severa' ? 'bg-red-100 text-red-700' :
                             r.severity === 'moderada' ? 'bg-orange-100 text-orange-700' :
                             'bg-yellow-100 text-yellow-700'
-                          }`}>{r.severity ?? 'leve'}</span>
-                          <span className="text-gray-700">{r.name ?? r.type}</span>
-                          {r.forbiddenFoods && (
-                            <p className="text-red-500 mt-0.5">⛔ {r.forbiddenFoods}</p>
-                          )}
-                        </div>
-                      ))}
-                      {c.medicalConditions && (
-                        <p className="text-xs text-blue-600">🏥 {c.medicalConditions}</p>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  // Fallback: dados das dietas já carregadas
-                  dietasDaTurma.map((d) => (
-                    <div key={d.id} className="flex items-start gap-2 text-xs">
-                      <span className="mt-0.5">{SEVERITY_CONFIG[d.severity ?? '']?.icon ?? '⚠️'}</span>
-                      <div>
-                        <p className="font-medium text-gray-800">{d.child.firstName} {d.child.lastName}</p>
-                        <p className="text-gray-500">{d.name} — {TYPE_LABEL[d.type] ?? d.type}</p>
-                        {d.forbiddenFoods && (
-                          <p className="text-red-600 mt-0.5">⛔ {d.forbiddenFoods}</p>
+                          }`}>{r.name ?? r.type}</span>
+                        ))}
+                        {c.medicalConditions && (
+                          <p className="text-xs text-blue-600 mt-0.5">🏥 {c.medicalConditions}</p>
                         )}
                       </div>
                     </div>
@@ -1879,13 +2043,263 @@ function AbaTurmasNutricional({
                 )}
               </div>
             )}
+            {aba === 'presenca' && (
+              <div className="space-y-3">
+                {loadingPresenca ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Carregando presença...</p>
+                ) : !presenca ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Chamada não realizada hoje.</p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-green-50 rounded-lg p-2">
+                        <p className="text-xs text-green-600">Presentes</p>
+                        <p className="font-bold text-green-700">{presenca.presentes}</p>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-2">
+                        <p className="text-xs text-red-600">Ausentes</p>
+                        <p className="font-bold text-red-700">{presenca.ausentes}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2">
+                        <p className="text-xs text-gray-500">Total</p>
+                        <p className="font-bold text-gray-700">{presenca.total}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {presenca.alunos.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between text-xs py-1 border-b last:border-0">
+                          <span className="text-gray-700">{a.nome}</span>
+                          <span className={`px-2 py-0.5 rounded-full font-medium ${
+                            a.status === 'PRESENTE' ? 'bg-green-100 text-green-700' :
+                            a.status === 'AUSENTE' ? 'bg-red-100 text-red-700' :
+                            a.status === 'JUSTIFICADO' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>
+                            {a.status ?? 'N/R'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {aba === 'alimentacao' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-medium text-gray-600">Observações de alimentação</p>
+                  <button
+                    onClick={() => setFormAberto(!formAberto)}
+                    className="flex items-center gap-1 text-xs px-2 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                  >
+                    <Plus className="w-3 h-3" /> Nova
+                  </button>
+                </div>
+                {formAberto && (
+                  <div className="bg-orange-50 rounded-lg p-3 space-y-2 border border-orange-200">
+                    <select
+                      value={novaObs.childId}
+                      onChange={(e) => setNovaObs({ ...novaObs, childId: e.target.value })}
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                    >
+                      <option value="">Selecionar aluno...</option>
+                      {allCriancas.map((c) => (
+                        <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Título (ex: Recusou o almoço)"
+                      value={novaObs.titulo}
+                      onChange={(e) => setNovaObs({ ...novaObs, titulo: e.target.value })}
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                    />
+                    <textarea
+                      placeholder="Descrição detalhada..."
+                      value={novaObs.descricao}
+                      onChange={(e) => setNovaObs({ ...novaObs, descricao: e.target.value })}
+                      rows={2}
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300 resize-none"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={salvarObs}
+                        disabled={salvandoObs}
+                        className="flex items-center gap-1 text-xs px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        <Save className="w-3 h-3" /> {salvandoObs ? 'Salvando...' : 'Salvar'}
+                      </button>
+                      <button
+                        onClick={() => setFormAberto(false)}
+                        className="text-xs px-3 py-1.5 border rounded hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {loadingObs ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Carregando...</p>
+                ) : obsAlim.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Nenhuma observação registrada.</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {obsAlim.map((o) => {
+                      const crianca = allCriancas.find((c) => c.id === o.childId);
+                      return (
+                        <div key={o.id} className="bg-gray-50 rounded-lg p-2.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-medium text-gray-800">
+                              {crianca ? `${crianca.firstName} ${crianca.lastName}` : o.childId.slice(0, 8)}
+                            </p>
+                            <span className="text-[10px] text-gray-400">
+                              {new Date(o.eventDate).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-orange-700">{o.title}</p>
+                          <p className="text-xs text-gray-600">{o.description}</p>
+                          {o.medicaoAlimentar && (
+                            <div className="flex gap-3 text-[10px] text-gray-500">
+                              {o.medicaoAlimentar.peso && <span>Peso: {o.medicaoAlimentar.peso}kg</span>}
+                              {o.medicaoAlimentar.altura && <span>Altura: {o.medicaoAlimentar.altura}cm</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {aba === 'peso' && (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-medium text-gray-600">Diagnóstico nutricional</p>
+                  <button
+                    onClick={() => setFormPesoAberto(!formPesoAberto)}
+                    className="flex items-center gap-1 text-xs px-2 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                  >
+                    <Plus className="w-3 h-3" /> Registrar
+                  </button>
+                </div>
+                {formPesoAberto && (
+                  <div className="bg-orange-50 rounded-lg p-3 space-y-2 border border-orange-200">
+                    <select
+                      value={formPeso.childId}
+                      onChange={(e) => setFormPeso({ ...formPeso, childId: e.target.value })}
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                    >
+                      <option value="">Selecionar aluno...</option>
+                      {allCriancas.map((c) => (
+                        <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
+                      ))}
+                    </select>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        placeholder="Peso (kg)"
+                        value={formPeso.peso}
+                        onChange={(e) => setFormPeso({ ...formPeso, peso: e.target.value })}
+                        className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Altura (cm)"
+                        value={formPeso.altura}
+                        onChange={(e) => setFormPeso({ ...formPeso, altura: e.target.value })}
+                        className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Observação (opcional)"
+                      value={formPeso.obs}
+                      onChange={(e) => setFormPeso({ ...formPeso, obs: e.target.value })}
+                      className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={salvarPeso}
+                        disabled={salvandoPeso}
+                        className="flex items-center gap-1 text-xs px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
+                      >
+                        <Save className="w-3 h-3" /> {salvandoPeso ? 'Salvando...' : 'Salvar'}
+                      </button>
+                      <button
+                        onClick={() => setFormPesoAberto(false)}
+                        className="text-xs px-3 py-1.5 border rounded hover:bg-gray-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {loadingDiag ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Carregando...</p>
+                ) : diagnosticos.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-4">Nenhum diagnóstico registrado.</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {diagnosticos.map((d, i) => {
+                      const crianca = allCriancas.find((c) => c.id === d.childId);
+                      const imc = d.peso && d.altura ? (d.peso / ((d.altura / 100) ** 2)).toFixed(1) : null;
+                      return (
+                        <div key={i} className="bg-gray-50 rounded-lg p-2.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-medium text-gray-800">
+                              {crianca ? `${crianca.firstName} ${crianca.lastName}` : d.childId.slice(0, 8)}
+                            </p>
+                            {d.data && (
+                              <span className="text-[10px] text-gray-400">
+                                {new Date(d.data).toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-4 mt-1 text-xs text-gray-600">
+                            {d.peso && <span>Peso: <strong>{d.peso}kg</strong></span>}
+                            {d.altura && <span>Altura: <strong>{d.altura}cm</strong></span>}
+                            {imc && <span>IMC: <strong className={Number(imc) > 25 ? 'text-orange-600' : Number(imc) < 18.5 ? 'text-blue-600' : 'text-green-600'}>{imc}</strong></span>}
+                          </div>
+                          {d.obs && <p className="text-xs text-gray-500 mt-0.5">{d.obs}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }
 
+function AbaTurmasNutricional({
+  turmas,
+  dietas,
+  healthPorTurma = {},
+  unitId,
+}: {
+  turmas: { id: string; name: string; totalCriancas: number; comRestricao: number }[];
+  dietas: DietaryRestriction[];
+  healthPorTurma?: Record<string, { children: CriancaTurma[]; stats: Record<string, number> }>;
+  unitId: string;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {turmas.map((t) => (
+        <TurmaCard
+          key={t.id}
+          turma={t}
+          unitId={unitId}
+          healthData={healthPorTurma[t.id]}
+          dietas={dietas}
+        />
+      ))}
+    </div>
+  );
+}
 // ─── Constantes de cores para gráficos ──────────────────────────────────────
 const CORES_RELATORIO = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
 
@@ -3218,7 +3632,7 @@ function DashboardNutricionistaPage() {
               <p className="font-medium">Nenhuma turma encontrada</p>
             </div>
           ) : (
-            <AbaTurmasNutricional turmas={turmas} dietas={dietas} healthPorTurma={healthPorTurma} />
+            <AbaTurmasNutricional turmas={turmas} dietas={dietas} healthPorTurma={healthPorTurma} unitId={unitId ?? ''} />
           )}
         </div>
       )}
