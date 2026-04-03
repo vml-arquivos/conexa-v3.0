@@ -1220,13 +1220,19 @@ export function DashboardNutricionistaPage() {
           ) : dietasFiltradas.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
               <Apple className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="font-medium">Nenhuma restrição encontrada</p>
+              <p className="font-medium">Nenhuma restrição alimentar cadastrada</p>
+              <p className="text-sm mt-1 text-gray-400 max-w-xs mx-auto">
+                Cadastre restrições pelo perfil de cada criança para visualizá-las aqui.
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
               {dietasFiltradas.map((d) => {
                 const sev = SEVERITY_CONFIG[d.severity ?? ''] ?? { label: d.severity ?? '—', color: 'text-gray-600', bg: 'bg-gray-100', icon: '•' };
-                const turmasCrianca = d.child?.enrollments?.map((e) => e.classroom?.name).filter(Boolean).join(', ') ?? '—';
+                const turmasNomes = d.child?.enrollments
+                  ?.map((e) => e.classroom?.name)
+                  .filter(Boolean) ?? [];
+                const turmasCrianca = turmasNomes.length > 0 ? turmasNomes.join(', ') : 'Turma não atribuída';
                 const isExp = expandido === d.id;
                 return (
                   <div key={d.id} className="bg-white rounded-xl border overflow-hidden">

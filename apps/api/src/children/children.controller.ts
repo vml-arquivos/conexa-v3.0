@@ -110,8 +110,10 @@ export class ChildrenController {
 
   /**
    * Listar todas as restrições alimentares ativas da unidade (para nutricionista)
+   * RBAC: apenas UNIDADE (inclui UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
    */
   @Get('dietary-restrictions/unidade')
+  @RequireRoles(RoleLevel.UNIDADE)
   async getAllDietaryRestrictionsByUnit(
     @Request() req,
     @Query('unitId') unitId?: string,
