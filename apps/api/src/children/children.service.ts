@@ -426,23 +426,25 @@ export class ChildrenService {
     const enrollmentFilter: any = { status: 'ATIVA' };
     if (classroomId) enrollmentFilter.classroomId = classroomId;
 
-    // 1 query com todos os joins necessários — sem N+1
+    // FIX: retornar TODAS as crianças matriculadas (não só as com restrição)
+    // Isso garante que o painel da nutricionista mostre total correto de alunos
     const children = await this.prisma.child.findMany({
       where: {
         mantenedoraId: user.mantenedoraId,
         unitId: targetUnitId,
         isActive: true,
-        // Apenas crianças com alguma informação de saúde relevante
-        OR: [
-          { allergies: { not: null } },
-          { medicalConditions: { not: null } },
-          { medicationNeeds: { not: null } },
-          { dietaryRestrictions: { some: { isActive: true } } },
-        ],
-        // Filtro de turma via enrollment
+        // Filtro de turma via enrollment (obrigatório quando classroomId fornecido)
         ...(classroomId ? {
           enrollments: { some: { classroomId, status: 'ATIVA' } },
-        } : {}),
+        } : {
+          // Sem turma: retornar apenas crianças com informação de saúde (visão geral)
+          OR: [
+            { allergies: { not: null } },
+            { medicalConditions: { not: null } },
+            { medicationNeeds: { not: null } },
+            { dietaryRestrictions: { some: { isActive: true } } },
+          ],
+        }),
       },
       select: {
         id: true,
@@ -481,8 +483,13 @@ export class ChildrenService {
     });
 
     // Calcular estatísticas
+    const comRestricao = children.filter(c =>
+      c.dietaryRestrictions.length > 0 || !!c.allergies || !!c.medicalConditions
+    ).length;
     const stats = {
       total: children.length,
+      totalMatriculados: children.length,
+      comRestricao,
       comAlergia: children.filter(c => c.allergies || c.dietaryRestrictions.some(r => r.type === 'ALERGIA')).length,
       comDieta: children.filter(c => c.dietaryRestrictions.some(r => r.type !== 'ALERGIA')).length,
       comCondicaoMedica: children.filter(c => !!c.medicalConditions).length,
