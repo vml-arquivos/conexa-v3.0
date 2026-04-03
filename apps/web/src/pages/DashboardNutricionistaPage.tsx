@@ -19,6 +19,7 @@ import {
   CheckCircle, Clock, XCircle, Printer, BookOpen,
   BarChart2, ChevronLeft, ChevronRight, Save, Trash2,
   Settings, GripVertical, History, Eye, FileEdit, X, FileText, Download,
+  Activity, Heart, TrendingDown, TrendingUp, UserCheck, CalendarClock, Clipboard,
 } from 'lucide-react';
 import {
   listCardapios, createCardapio, updateCardapio, upsertRefeicao, deleteCardapio, calcularNutricao,
@@ -1850,6 +1851,704 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
   );
 }
 
+// ─── AbaAcompanhamentoIndividual ─────────────────────────────────────────────────────────────────────────
+
+type StatusCasoNutricional = 'MONITORAMENTO' | 'ATENCAO_MODERADA' | 'ATENCAO_ALTA' | 'CRITICO';
+
+interface AcompanhamentoNutricional {
+  id: string;
+  childId: string;
+  statusCaso: StatusCasoNutricional;
+  ativo: boolean;
+  motivoAcompanhamento: string;
+  objetivos?: string;
+  condutaAtual?: string;
+  restricoesOperacionais?: string;
+  substituicoesSeguras?: string;
+  orientacoesProfCozinha?: string;
+  frequenciaRevisao?: string;
+  proximaReavaliacao?: string;
+  criadoEm: string;
+  atualizadoEm: string;
+  child?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth?: string;
+    photoUrl?: string;
+    allergies?: string;
+    medicalConditions?: string;
+    enrollments?: { classroom?: { id: string; name: string } }[];
+    dietaryRestrictions?: { id: string; type: string; name: string; severity?: string; forbiddenFoods?: string; allowedFoods?: string }[];
+  };
+}
+
+const STATUS_CASO_CONFIG: Record<StatusCasoNutricional, { label: string; color: string; bg: string; border: string; icon: string }> = {
+  MONITORAMENTO:    { label: 'Monitoramento',    color: 'text-blue-700',   bg: 'bg-blue-50',   border: 'border-blue-200',   icon: '🔵' },
+  ATENCAO_MODERADA: { label: 'Atenção Moderada', color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-200', icon: '🟡' },
+  ATENCAO_ALTA:     { label: 'Atenção Alta',     color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: '🟠' },
+  CRITICO:          { label: 'Crítico',           color: 'text-red-700',   bg: 'bg-red-50',   border: 'border-red-200',   icon: '🔴' },
+};
+
+function calcularIdade(dateOfBirth?: string): string {
+  if (!dateOfBirth) return '';
+  const nasc = new Date(dateOfBirth);
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - nasc.getFullYear();
+  const meses = hoje.getMonth() - nasc.getMonth();
+  if (meses < 0 || (meses === 0 && hoje.getDate() < nasc.getDate())) anos--;
+  const mesesRestantes = ((hoje.getMonth() - nasc.getMonth()) + 12) % 12;
+  if (anos === 0) return `${mesesRestantes}m`;
+  if (mesesRestantes === 0) return `${anos}a`;
+  return `${anos}a ${mesesRestantes}m`;
+}
+
+function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userId: string }) {
+  const [lista, setLista] = useState<AcompanhamentoNutricional[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selecionado, setSelecionado] = useState<AcompanhamentoNutricional | null>(null);
+  const [criancas, setCriancas] = useState<{ id: string; firstName: string; lastName: string; enrollments?: { classroom?: { id: string; name: string } }[] }[]>([]);
+  const [busca, setBusca] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<StatusCasoNutricional | ''>('');
+  const [modoForm, setModoForm] = useState<'novo' | 'editar' | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
+  const [resumo, setResumo] = useState<{ total: number; criticos: number; atencaoAlta: number; atencaoModerada: number; monitoramento: number; vencidosReavaliacao: number } | null>(null);
+
+  // Histórico nutricional da criança selecionada
+  const [historico, setHistorico] = useState<{ id: string; date: string; dietaryNotes?: string; recommendations?: string; healthNotes?: string }[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
+
+  // Medições de peso/altura da criança selecionada
+  const [medicoes, setMedicoes] = useState<{ childId: string; peso?: number; altura?: number; data?: string; obs?: string }[]>([]);
+
+  const [form, setForm] = useState({
+    childId: '',
+    motivoAcompanhamento: '',
+    statusCaso: 'MONITORAMENTO' as StatusCasoNutricional,
+    objetivos: '',
+    condutaAtual: '',
+    restricoesOperacionais: '',
+    substituicoesSeguras: '',
+    orientacoesProfCozinha: '',
+    frequenciaRevisao: '',
+    proximaReavaliacao: '',
+  });
+
+  // Carregar resumo
+  const carregarResumo = useCallback(async () => {
+    try {
+      const { data } = await http.get('/acompanhamento-nutricional/resumo', { params: { unitId } });
+      setResumo(data);
+    } catch { setResumo(null); }
+  }, [unitId]);
+
+  // Carregar lista de acompanhamentos
+  const carregarLista = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = { unitId };
+      if (filtroStatus) params.statusCaso = filtroStatus;
+      const { data } = await http.get('/acompanhamento-nutricional', { params });
+      setLista(Array.isArray(data) ? data : data?.data ?? []);
+    } catch { setLista([]); }
+    finally { setLoading(false); }
+  }, [unitId, filtroStatus]);
+
+  // Carregar crianças para o formulário
+  useEffect(() => {
+    http.get('/children', { params: { unitId, limit: '500', include: 'enrollments' } })
+      .then((r) => setCriancas(r.data?.data ?? r.data ?? []))
+      .catch(() => setCriancas([]));
+  }, [unitId]);
+
+  useEffect(() => { carregarLista(); carregarResumo(); }, [carregarLista, carregarResumo]);
+
+  // Carregar histórico da criança selecionada
+  const carregarHistorico = useCallback(async (childId: string) => {
+    setLoadingHistorico(true);
+    try {
+      const [obsRes, pesoRes] = await Promise.allSettled([
+        http.get('/development-observations', { params: { childId, category: 'NUTRICAO', limit: '20' } }),
+        http.get('/diary-events', { params: { childId, type: 'SAUDE', limit: '30' } }),
+      ]);
+      setHistorico(obsRes.status === 'fulfilled' ? (obsRes.value.data?.data ?? obsRes.value.data ?? []) : []);
+      if (pesoRes.status === 'fulfilled') {
+        const eventos = pesoRes.value.data?.data ?? pesoRes.value.data ?? [];
+        const meds = eventos
+          .filter((e: any) => e.medicaoAlimentar && (e.medicaoAlimentar.peso || e.medicaoAlimentar.altura))
+          .map((e: any) => ({
+            childId: e.childId,
+            peso: e.medicaoAlimentar?.peso,
+            altura: e.medicaoAlimentar?.altura,
+            data: e.occurredAt ?? e.eventDate,
+            obs: e.description,
+          }))
+          .slice(0, 10);
+        setMedicoes(meds);
+      }
+    } catch { setHistorico([]); setMedicoes([]); }
+    finally { setLoadingHistorico(false); }
+  }, []);
+
+  const abrirDetalhe = async (item: AcompanhamentoNutricional) => {
+    setSelecionado(item);
+    setModoForm(null);
+    setErro(''); setSucesso('');
+    if (item.childId) carregarHistorico(item.childId);
+  };
+
+  const abrirFormNovo = () => {
+    setSelecionado(null);
+    setModoForm('novo');
+    setForm({ childId: '', motivoAcompanhamento: '', statusCaso: 'MONITORAMENTO', objetivos: '', condutaAtual: '', restricoesOperacionais: '', substituicoesSeguras: '', orientacoesProfCozinha: '', frequenciaRevisao: '', proximaReavaliacao: '' });
+    setErro(''); setSucesso('');
+  };
+
+  const abrirFormEditar = (item: AcompanhamentoNutricional) => {
+    setSelecionado(item);
+    setModoForm('editar');
+    setForm({
+      childId: item.childId,
+      motivoAcompanhamento: item.motivoAcompanhamento ?? '',
+      statusCaso: item.statusCaso,
+      objetivos: item.objetivos ?? '',
+      condutaAtual: item.condutaAtual ?? '',
+      restricoesOperacionais: item.restricoesOperacionais ?? '',
+      substituicoesSeguras: item.substituicoesSeguras ?? '',
+      orientacoesProfCozinha: item.orientacoesProfCozinha ?? '',
+      frequenciaRevisao: item.frequenciaRevisao ?? '',
+      proximaReavaliacao: item.proximaReavaliacao ? item.proximaReavaliacao.slice(0, 10) : '',
+    });
+    setErro(''); setSucesso('');
+  };
+
+  const salvar = async () => {
+    if (!form.childId || !form.motivoAcompanhamento.trim()) {
+      setErro('Selecione uma criança e informe o motivo do acompanhamento.'); return;
+    }
+    setSalvando(true); setErro(''); setSucesso('');
+    try {
+      const payload: any = {
+        childId: form.childId,
+        motivoAcompanhamento: form.motivoAcompanhamento,
+        statusCaso: form.statusCaso,
+        objetivos: form.objetivos || undefined,
+        condutaAtual: form.condutaAtual || undefined,
+        restricoesOperacionais: form.restricoesOperacionais || undefined,
+        substituicoesSeguras: form.substituicoesSeguras || undefined,
+        orientacoesProfCozinha: form.orientacoesProfCozinha || undefined,
+        frequenciaRevisao: form.frequenciaRevisao || undefined,
+        proximaReavaliacao: form.proximaReavaliacao || undefined,
+      };
+      const { data } = await http.post('/acompanhamento-nutricional', payload);
+      setSucesso('Acompanhamento salvo com sucesso.');
+      setModoForm(null);
+      setSelecionado(data);
+      carregarLista();
+      carregarResumo();
+      if (data.childId) carregarHistorico(data.childId);
+    } catch (e: any) {
+      setErro(e?.response?.data?.message ?? 'Erro ao salvar. Tente novamente.');
+    } finally { setSalvando(false); }
+  };
+
+  const encerrar = async (childId: string) => {
+    if (!confirm('Deseja encerrar este acompanhamento?')) return;
+    try {
+      await http.delete(`/acompanhamento-nutricional/crianca/${childId}`);
+      setSelecionado(null);
+      carregarLista();
+      carregarResumo();
+    } catch { setErro('Erro ao encerrar acompanhamento.'); }
+  };
+
+  const listafiltrada = lista.filter((item) => {
+    if (!busca) return true;
+    const q = busca.toLowerCase();
+    const nome = `${item.child?.firstName ?? ''} ${item.child?.lastName ?? ''}`.toLowerCase();
+    return nome.includes(q) || item.motivoAcompanhamento?.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* ── Resumo de casos ── */}
+      {resumo && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {[
+            { label: 'Total Ativos', value: resumo.total, color: 'text-gray-800', bg: 'bg-white' },
+            { label: 'Críticos', value: resumo.criticos, color: 'text-red-700', bg: 'bg-red-50' },
+            { label: 'Atenção Alta', value: resumo.atencaoAlta, color: 'text-orange-700', bg: 'bg-orange-50' },
+            { label: 'Atenção Moderada', value: resumo.atencaoModerada, color: 'text-yellow-700', bg: 'bg-yellow-50' },
+            { label: 'Reavaliação Vencida', value: resumo.vencidosReavaliacao, color: 'text-purple-700', bg: 'bg-purple-50' },
+          ].map((s) => (
+            <div key={s.label} className={`${s.bg} rounded-xl border p-3 text-center`}>
+              <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Controles ── */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar criança ou motivo..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <select
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value as StatusCasoNutricional | '')}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          >
+            <option value="">Todos os status</option>
+            {(Object.keys(STATUS_CASO_CONFIG) as StatusCasoNutricional[]).map((s) => (
+              <option key={s} value={s}>{STATUS_CASO_CONFIG[s].label}</option>
+            ))}
+          </select>
+          <button onClick={() => { carregarLista(); carregarResumo(); }} disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+          </button>
+        </div>
+        <button
+          onClick={abrirFormNovo}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600"
+        >
+          <Plus className="w-4 h-4" /> Novo Acompanhamento
+        </button>
+      </div>
+
+      {/* ── Layout: lista + detalhe ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Lista de casos */}
+        <div className="space-y-3 lg:col-span-1">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">Carregando...</div>
+          ) : listafiltrada.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
+              <Activity className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium">Nenhum caso encontrado</p>
+              <p className="text-sm mt-1">Clique em "Novo Acompanhamento" para iniciar um caso.</p>
+            </div>
+          ) : (
+            listafiltrada.map((item) => {
+              const cfg = STATUS_CASO_CONFIG[item.statusCaso];
+              const turma = item.child?.enrollments?.[0]?.classroom?.name;
+              const vencido = item.proximaReavaliacao && new Date(item.proximaReavaliacao) < new Date();
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => abrirDetalhe(item)}
+                  className={`w-full text-left p-4 rounded-xl border transition-all ${
+                    selecionado?.id === item.id
+                      ? `${cfg.bg} ${cfg.border} shadow-sm`
+                      : 'bg-white hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-base">{cfg.icon}</span>
+                    <span className="font-semibold text-gray-800 text-sm">
+                      {item.child?.firstName} {item.child?.lastName}
+                    </span>
+                  </div>
+                  {turma && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{turma}</span>}
+                  <p className="text-xs text-gray-600 mt-1.5 line-clamp-2">{item.motivoAcompanhamento}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                    {vencido && <span className="text-xs text-purple-600 font-medium">⏰ Reavaliação vencida</span>}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Detalhe / Formulário */}
+        <div className="lg:col-span-2">
+          {/* ── Formulário de criação/edição ── */}
+          {modoForm && (
+            <div className="bg-white rounded-xl border p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <Clipboard className="w-4 h-4 text-orange-500" />
+                  {modoForm === 'novo' ? 'Novo Acompanhamento Nutricional' : 'Editar Acompanhamento'}
+                </h3>
+                <button onClick={() => setModoForm(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Criança *</label>
+                  <select
+                    value={form.childId}
+                    onChange={(e) => setForm((f) => ({ ...f, childId: e.target.value }))}
+                    disabled={modoForm === 'editar'}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 disabled:bg-gray-50"
+                  >
+                    <option value="">Selecione uma criança...</option>
+                    {criancas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.firstName} {c.lastName}{c.enrollments?.[0]?.classroom?.name ? ` (${c.enrollments[0].classroom.name})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Motivo do Acompanhamento *</label>
+                  <textarea
+                    rows={2}
+                    value={form.motivoAcompanhamento}
+                    onChange={(e) => setForm((f) => ({ ...f, motivoAcompanhamento: e.target.value }))}
+                    placeholder="Ex: Alergia severa a proteína do leite, obesidade, seletividade alimentar..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Status do Caso</label>
+                  <select
+                    value={form.statusCaso}
+                    onChange={(e) => setForm((f) => ({ ...f, statusCaso: e.target.value as StatusCasoNutricional }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  >
+                    {(Object.keys(STATUS_CASO_CONFIG) as StatusCasoNutricional[]).map((s) => (
+                      <option key={s} value={s}>{STATUS_CASO_CONFIG[s].icon} {STATUS_CASO_CONFIG[s].label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Próxima Reavaliação</label>
+                  <input
+                    type="date"
+                    value={form.proximaReavaliacao}
+                    onChange={(e) => setForm((f) => ({ ...f, proximaReavaliacao: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Objetivos do Acompanhamento</label>
+                  <textarea
+                    rows={2}
+                    value={form.objetivos}
+                    onChange={(e) => setForm((f) => ({ ...f, objetivos: e.target.value }))}
+                    placeholder="Ex: Reduzir peso gradualmente, introduzir novos alimentos, controlar reações alérgicas..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Conduta Atual</label>
+                  <textarea
+                    rows={2}
+                    value={form.condutaAtual}
+                    onChange={(e) => setForm((f) => ({ ...f, condutaAtual: e.target.value }))}
+                    placeholder="Descrição da conduta nutricional atual..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Restrições Operacionais</label>
+                  <textarea
+                    rows={2}
+                    value={form.restricoesOperacionais}
+                    onChange={(e) => setForm((f) => ({ ...f, restricoesOperacionais: e.target.value }))}
+                    placeholder="O que não pode ser servido a esta criança..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Substituições Seguras</label>
+                  <textarea
+                    rows={2}
+                    value={form.substituicoesSeguras}
+                    onChange={(e) => setForm((f) => ({ ...f, substituicoesSeguras: e.target.value }))}
+                    placeholder="Alternativas seguras para os alimentos restritos..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Orientações para Professor / Cozinha</label>
+                  <textarea
+                    rows={2}
+                    value={form.orientacoesProfCozinha}
+                    onChange={(e) => setForm((f) => ({ ...f, orientacoesProfCozinha: e.target.value }))}
+                    placeholder="Instruções práticas para o professor e a cozinha no dia a dia..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Frequência de Revisão</label>
+                  <input
+                    type="text"
+                    value={form.frequenciaRevisao}
+                    onChange={(e) => setForm((f) => ({ ...f, frequenciaRevisao: e.target.value }))}
+                    placeholder="Ex: Mensal, Quinzenal, Semanal..."
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+              </div>
+
+              {erro && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{erro}</p>}
+              {sucesso && <p className="text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg">{sucesso}</p>}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={salvar}
+                  disabled={salvando}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {salvando ? 'Salvando...' : 'Salvar Acompanhamento'}
+                </button>
+                <button
+                  onClick={() => setModoForm(null)}
+                  className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Detalhe do caso selecionado ── */}
+          {!modoForm && selecionado && (() => {
+            const cfg = STATUS_CASO_CONFIG[selecionado.statusCaso];
+            const child = selecionado.child;
+            const turma = child?.enrollments?.[0]?.classroom?.name;
+            const idade = calcularIdade(child?.dateOfBirth);
+            const vencido = selecionado.proximaReavaliacao && new Date(selecionado.proximaReavaliacao) < new Date();
+            const ultimaMedicao = medicoes[0];
+            const imc = ultimaMedicao?.peso && ultimaMedicao?.altura
+              ? (ultimaMedicao.peso / ((ultimaMedicao.altura / 100) ** 2)).toFixed(1)
+              : null;
+
+            return (
+              <div className="space-y-4">
+                {/* Cabeçalho da criança */}
+                <div className={`bg-white rounded-xl border ${cfg.border} p-5`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {child?.photoUrl ? (
+                        <img src={child.photoUrl} alt="" className="w-12 h-12 rounded-full object-cover border" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 font-bold text-lg">
+                          {child?.firstName?.[0]}{child?.lastName?.[0]}
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-bold text-gray-800 text-lg">{child?.firstName} {child?.lastName}</h3>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {turma && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{turma}</span>}
+                          {idade && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{idade}</span>}
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.icon} {cfg.label}</span>
+                          {vencido && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">⏰ Reavaliação vencida</span>}
+                        </div>
+                        {/* Badges de atenção */}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {child?.dietaryRestrictions?.filter((r) => r.severity === 'severa').map((r) => (
+                            <span key={r.id} className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">🚨 {r.name}</span>
+                          ))}
+                          {child?.allergies && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">⚠️ Alergia</span>}
+                          {child?.medicalConditions && <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">🏥 Condição médica</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => abrirFormEditar(selecionado)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                      >
+                        <FileEdit className="w-3.5 h-3.5" /> Editar
+                      </button>
+                      <button
+                        onClick={() => encerrar(selecionado.childId)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 rounded-lg text-xs text-red-600 hover:bg-red-50"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Encerrar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumo atual */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Medições */}
+                  <div className="bg-white rounded-xl border p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-orange-500" /> Última Medição
+                    </h4>
+                    {ultimaMedicao ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Peso</span>
+                          <span className="font-semibold">{ultimaMedicao.peso ? `${ultimaMedicao.peso} kg` : '—'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Altura</span>
+                          <span className="font-semibold">{ultimaMedicao.altura ? `${ultimaMedicao.altura} cm` : '—'}</span>
+                        </div>
+                        {imc && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">IMC</span>
+                            <span className={`font-semibold ${
+                              Number(imc) > 25 ? 'text-orange-600' : Number(imc) < 18.5 ? 'text-blue-600' : 'text-green-600'
+                            }`}>{imc}</span>
+                          </div>
+                        )}
+                        {ultimaMedicao.data && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(ultimaMedicao.data).toLocaleDateString('pt-BR')}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-400">Nenhuma medição registrada.</p>
+                    )}
+                  </div>
+
+                  {/* Status do caso */}
+                  <div className={`${cfg.bg} rounded-xl border ${cfg.border} p-4`}>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-orange-500" /> Status do Caso
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Status</span>
+                        <span className={`font-semibold ${cfg.color}`}>{cfg.icon} {cfg.label}</span>
+                      </div>
+                      {selecionado.frequenciaRevisao && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Revisão</span>
+                          <span className="font-medium">{selecionado.frequenciaRevisao}</span>
+                        </div>
+                      )}
+                      {selecionado.proximaReavaliacao && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Próx. Reavaliação</span>
+                          <span className={`font-medium ${vencido ? 'text-red-600' : 'text-gray-700'}`}>
+                            {new Date(selecionado.proximaReavaliacao).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Atualizado em</span>
+                        <span className="text-gray-600 text-xs">
+                          {new Date(selecionado.atualizadoEm).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Plano de cuidado */}
+                <div className="bg-white rounded-xl border p-5 space-y-4">
+                  <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Clipboard className="w-4 h-4 text-orange-500" /> Plano de Cuidado Nutricional
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { label: 'Motivo do Acompanhamento', value: selecionado.motivoAcompanhamento, full: true },
+                      { label: 'Objetivos', value: selecionado.objetivos, full: true },
+                      { label: 'Conduta Atual', value: selecionado.condutaAtual, full: true },
+                      { label: 'Restrições Operacionais', value: selecionado.restricoesOperacionais },
+                      { label: 'Substituições Seguras', value: selecionado.substituicoesSeguras },
+                      { label: 'Orientações para Professor / Cozinha', value: selecionado.orientacoesProfCozinha, full: true },
+                    ].filter((f) => f.value).map((f) => (
+                      <div key={f.label} className={f.full ? 'md:col-span-2' : ''}>
+                        <p className="text-xs font-medium text-gray-500 mb-1">{f.label}</p>
+                        <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">{f.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Linha do tempo nutricional */}
+                <div className="bg-white rounded-xl border p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                      <History className="w-4 h-4 text-orange-500" /> Linha do Tempo Nutricional
+                    </h4>
+                    <button onClick={() => carregarHistorico(selecionado.childId)}
+                      className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3" /> Atualizar
+                    </button>
+                  </div>
+                  {loadingHistorico ? (
+                    <p className="text-center text-sm text-gray-400 py-4">Carregando histórico...</p>
+                  ) : historico.length === 0 && medicoes.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">Nenhum registro nutricional encontrado.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Medições */}
+                      {medicoes.map((m, idx) => (
+                        <div key={idx} className="flex gap-3 items-start">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-sm">⚖️</div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-blue-700">Medição Antropométrica</span>
+                              {m.data && <span className="text-xs text-gray-400">{new Date(m.data).toLocaleDateString('pt-BR')}</span>}
+                            </div>
+                            <p className="text-sm text-gray-700 mt-0.5">
+                              {m.peso && `Peso: ${m.peso}kg`}{m.peso && m.altura && ' · '}{m.altura && `Altura: ${m.altura}cm`}
+                              {m.peso && m.altura && ` · IMC: ${(m.peso / ((m.altura / 100) ** 2)).toFixed(1)}`}
+                            </p>
+                            {m.obs && <p className="text-xs text-gray-500 mt-0.5">{m.obs}</p>}
+                          </div>
+                        </div>
+                      ))}
+                      {/* Anotações nutricionais */}
+                      {historico.map((obs) => (
+                        <div key={obs.id} className="flex gap-3 items-start">
+                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center text-sm">📋</div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-orange-700">Anotação Nutricional</span>
+                              <span className="text-xs text-gray-400">{new Date(obs.date).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                            {obs.dietaryNotes && <p className="text-sm text-gray-700 mt-0.5">{obs.dietaryNotes}</p>}
+                            {obs.recommendations && <p className="text-xs text-gray-500 mt-0.5"><strong>Rec:</strong> {obs.recommendations}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Estado vazio ── */}
+          {!modoForm && !selecionado && (
+            <div className="text-center py-16 text-gray-400 bg-white rounded-xl border">
+              <Activity className="w-16 h-16 mx-auto mb-4 text-gray-200" />
+              <p className="font-medium text-gray-500">Selecione um caso ou crie um novo</p>
+              <p className="text-sm mt-1">Clique em uma criança na lista ou em "Novo Acompanhamento".</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── AbaTurmasNutricional ─────────────────────────────────────────────────────────────────────────────────
 // ─── Tipos internos para TurmaCard ──────────────────────────────────────────
 interface CriancaTurma {
@@ -3287,6 +3986,7 @@ type SecaoNutri =
   | 'turmas'
   | 'observacoes-prof'
   | 'anotacoes-nutri'
+  | 'acompanhamento-individual'
   | 'relatorio'
   | 'configuracoes'
   | 'dietas'
@@ -3294,7 +3994,7 @@ type SecaoNutri =
 
 const SECOES_VALIDAS: SecaoNutri[] = [
   'visao-geral', 'cardapios', 'cardapios-nutricao', 'turmas',
-  'observacoes-prof', 'anotacoes-nutri', 'relatorio', 'configuracoes',
+  'observacoes-prof', 'anotacoes-nutri', 'acompanhamento-individual', 'relatorio', 'configuracoes',
   'dietas', 'pedidos',
 ];
 
@@ -3306,6 +4006,7 @@ const SECAO_LABELS: Record<SecaoNutri, string> = {
   'dietas': 'Dietas e Restrições',
   'observacoes-prof': 'Obs. dos Professores',
   'anotacoes-nutri': 'Anotações Nutricionais',
+  'acompanhamento-individual': 'Acompanhamento Individual',
   'relatorio': 'Relatórios',
   'pedidos': 'Pedidos de Alimentação',
   'configuracoes': 'Configurações',
@@ -3924,6 +4625,13 @@ function DashboardNutricionistaPage() {
       {secao === 'anotacoes-nutri' && (
         unitId
           ? <AbaAnotacoesNutricionais unitId={unitId} userId={(user as any)?.id ?? ''} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
+      )}
+
+      {/* ── Seção: Acompanhamento Individual Nutricional ── */}
+      {secao === 'acompanhamento-individual' && (
+        unitId
+          ? <AbaAcompanhamentoIndividual unitId={unitId} userId={(user as any)?.id ?? ''} />
           : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
