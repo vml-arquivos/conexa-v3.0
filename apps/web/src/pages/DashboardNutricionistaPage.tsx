@@ -664,12 +664,38 @@ function AbaCardapio({ unitId }: { unitId: string }) {
 }
 
 // ─── Sub-componente: Aba Nutrição ─────────────────────────────────────────────
+// ─── Metas etárias PNAE/FNDE (por dia, 5 dias úteis) ────────────────────────
+// Fonte: Resolução FNDE nº 06/2020 — Programa Nacional de Alimentação Escolar
+// Valores representam a ingestão diária recomendada por faixa etária.
+const METAS_ETARIAS: Record<string, {
+  label: string;
+  calorias: number; proteinas: number; carboidratos: number;
+  gorduras: number; fibras: number; sodio: number;
+}> = {
+  '0-3': {
+    label: '0 a 3 anos (creche)',
+    calorias: 1000, proteinas: 13, carboidratos: 130,
+    gorduras: 30, fibras: 19, sodio: 1000,
+  },
+  '4-6': {
+    label: '4 a 6 anos (pré-escola)',
+    calorias: 1400, proteinas: 20, carboidratos: 195,
+    gorduras: 39, fibras: 20, sodio: 1200,
+  },
+  '7-10': {
+    label: '7 a 10 anos (fundamental I)',
+    calorias: 1700, proteinas: 28, carboidratos: 237,
+    gorduras: 47, fibras: 25, sodio: 1500,
+  },
+};
+
 function AbaNutricao({ unitId }: { unitId: string }) {
   const [semana, setSemana] = useState(getSemanaAtual);
   const [cardapioId, setCardapioId] = useState<string | null>(null);
   const [nutricao, setNutricao] = useState<NutricaoResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
+  const [faixaEtaria, setFaixaEtaria] = useState<string>('4-6');
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -710,8 +736,11 @@ function AbaNutricao({ unitId }: { unitId: string }) {
           {nutricao && (
             <button
               onClick={() => {
+                const metaCSV = METAS_ETARIAS[faixaEtaria];
                 const linhas = [
                   ['Semana', semana],
+                  ['Faixa Etária de Referência', metaCSV.label],
+                  ['Fonte', 'Resolução FNDE nº 06/2020 — PNAE'],
                   [''],
                   ['Dia', 'Refeição', 'Kcal', 'Proteínas (g)', 'Carboidratos (g)', 'Gorduras (g)', 'Fibras (g)', 'Sódio (mg)'],
                   ...nutricao.resumoDiario.flatMap((d) =>
@@ -738,6 +767,12 @@ function AbaNutricao({ unitId }: { unitId: string }) {
                     nutricao.mediadiaria.gorduras,
                     nutricao.mediadiaria.fibras,
                     nutricao.mediadiaria.sodio,
+                  ],
+                  [''],
+                  [`META PNAE (${metaCSV.label})`, '',
+                    metaCSV.calorias, metaCSV.proteinas,
+                    metaCSV.carboidratos, metaCSV.gorduras,
+                    metaCSV.fibras, metaCSV.sodio,
                   ],
                 ];
                 const csv = linhas.map((l) => l.join(';')).join('\n');
@@ -768,8 +803,28 @@ function AbaNutricao({ unitId }: { unitId: string }) {
         </div>
       </div>
 
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{erro}</div>}
+       {/* Seletor de faixa etária */}
+      <div className="bg-white rounded-xl border p-4 flex items-center gap-3 flex-wrap">
+        <span className="text-sm font-semibold text-gray-700">Faixa etária de referência (PNAE):</span>
+        <div className="flex gap-2 flex-wrap">
+          {Object.entries(METAS_ETARIAS).map(([key, meta]) => (
+            <button
+              key={key}
+              onClick={() => setFaixaEtaria(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                faixaEtaria === key
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:bg-orange-50'
+              }`}
+            >
+              {meta.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-gray-400 ml-auto">Fonte: Resolução FNDE nº 06/2020</span>
+      </div>
 
+      {erro && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{erro}</div>}
       {loading ? (
         <div className="text-center py-12 text-gray-500">Calculando valores nutricionais...</div>
       ) : !nutricao ? (
@@ -798,25 +853,59 @@ function AbaNutricao({ unitId }: { unitId: string }) {
             ))}
           </div>
 
-          {/* Média diária */}
-          <div className="bg-white rounded-xl border p-4">
-            <p className="font-semibold text-gray-700 mb-3 text-sm">Média Diária</p>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
-              {[
-                { label: 'Kcal', value: nutricao.mediadiaria.calorias },
-                { label: 'Prot (g)', value: nutricao.mediadiaria.proteinas },
-                { label: 'Carb (g)', value: nutricao.mediadiaria.carboidratos },
-                { label: 'Gord (g)', value: nutricao.mediadiaria.gorduras },
-                { label: 'Fibras (g)', value: nutricao.mediadiaria.fibras },
-                { label: 'Sódio (mg)', value: nutricao.mediadiaria.sodio },
-              ].map((m) => (
-                <div key={m.label} className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500">{m.label}</p>
-                  <p className="text-lg font-bold text-gray-800">{m.value}</p>
+          {/* Média diária + Comparativo com metas etárias PNAE */}
+          {(() => {
+            const meta = METAS_ETARIAS[faixaEtaria];
+            const nutrientes: { key: keyof typeof meta; label: string; unit: string }[] = [
+              { key: 'calorias', label: 'Calorias', unit: 'kcal' },
+              { key: 'proteinas', label: 'Proteínas', unit: 'g' },
+              { key: 'carboidratos', label: 'Carboidratos', unit: 'g' },
+              { key: 'gorduras', label: 'Gorduras', unit: 'g' },
+              { key: 'fibras', label: 'Fibras', unit: 'g' },
+              { key: 'sodio', label: 'Sódio', unit: 'mg' },
+            ];
+            return (
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="px-5 py-3 bg-orange-50 border-b flex items-center justify-between">
+                  <p className="font-semibold text-gray-700 text-sm">Média Diária vs. Meta PNAE</p>
+                  <span className="text-xs text-orange-600 font-medium">{meta.label}</span>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-1 gap-3">
+                    {nutrientes.map(({ key, label, unit }) => {
+                      const valor = Number(nutricao.mediadiaria[key as keyof typeof nutricao.mediadiaria] ?? 0);
+                      const alvo = meta[key] as number;
+                      const pct = alvo > 0 ? Math.min((valor / alvo) * 100, 150) : 0;
+                      const status = valor < alvo * 0.85 ? 'abaixo' : valor > alvo * 1.15 ? 'acima' : 'dentro';
+                      const statusConfig = {
+                        abaixo: { label: 'Abaixo do recomendado', bar: 'bg-yellow-400', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-700' },
+                        dentro: { label: 'Dentro do recomendado', bar: 'bg-green-400', text: 'text-green-700', badge: 'bg-green-100 text-green-700' },
+                        acima:  { label: 'Acima do recomendado',  bar: 'bg-red-400',    text: 'text-red-700',    badge: 'bg-red-100 text-red-700'    },
+                      }[status];
+                      return (
+                        <div key={key} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium text-gray-700">{label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-500">{valor.toFixed(key === 'calorias' || key === 'sodio' ? 0 : 1)}{unit} / {alvo}{unit}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${statusConfig.badge}`}>{statusConfig.label}</span>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${statusConfig.bar}`}
+                              style={{ width: `${Math.min(pct, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">Valores de referência: Resolução FNDE nº 06/2020 — PNAE. Comparativo baseado na média diária calculada do cardápio da semana.</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Detalhamento por dia */}
           <div className="space-y-3">
