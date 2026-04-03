@@ -3,7 +3,12 @@
  * Acesso: UNIDADE_NUTRICIONISTA
  * Abas: Dietas/Restrições | Pedidos de Alimentação | Resumo por Turma | Cardápio | Nutrição
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import { listConfiguracoesRefeicao } from '../api/configuracao-refeicao';
 import { PageShell } from '@/components/ui/PageShell';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
@@ -1849,9 +1854,13 @@ function AbaTurmasNutricional({
   );
 }
 
+// ─── Constantes de cores para gráficos ──────────────────────────────────────
+const CORES_RELATORIO = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
+
 // ─── AbaRelatorioConsolidado ─────────────────────────────────────────────────────────────────────────────────
 function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
   const hoje = new Date();
+  const printRef = useRef<HTMLDivElement>(null);
   const [dataInicio, setDataInicio] = useState(
     new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
   );
@@ -1860,6 +1869,18 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
   const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
   const [loading, setLoading] = useState(false);
   const [gerado, setGerado] = useState(false);
+  // Filtros adicionais
+  const [filtroTurmaRel, setFiltroTurmaRel] = useState('');
+  const [filtroTipoRel, setFiltroTipoRel] = useState('');
+  const [turmasRel, setTurmasRel] = useState<{ id: string; name: string }[]>([]);
+
+  // Carregar turmas para filtro
+  useEffect(() => {
+    if (!unitId) return;
+    http.get('/lookup/classrooms/accessible', { params: { unitId } })
+      .then((r) => setTurmasRel(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
+      .catch(() => setTurmasRel([]));
+  }, [unitId]);
 
   const gerar = async () => {
     setLoading(true); setGerado(false);
@@ -1875,6 +1896,46 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
     finally { setLoading(false); }
   };
 
+  // Dietas filtradas pelos filtros de turma e tipo
+  const dietasFiltradas = dietas.filter((d) => {
+    const turmaOk = !filtroTurmaRel || d.child?.enrollments?.some((e: any) => e.classroom?.id === filtroTurmaRel);
+    const tipoOk = !filtroTipoRel || d.type === filtroTipoRel;
+    return turmaOk && tipoOk;
+  });
+
+  // Dados para gráfico de pizza: restrições por tipo
+  const restricoesPorTipo = dietasFiltradas.reduce<Record<string, number>>((acc, d) => {
+    acc[d.type] = (acc[d.type] ?? 0) + 1;
+    return acc;
+  }, {});
+  const dadosPizza = Object.entries(restricoesPorTipo).map(([tipo, qtd]) => ({
+    name: TYPE_LABEL[tipo] ?? tipo,
+    value: qtd,
+  }));
+
+  // Dados para gráfico de barras: cardápios por semana (publicados vs rascunhos)
+  const dadosCardapiosPorSemana = cardapios
+    .slice(0, 12)
+    .map((c) => ({
+      semana: c.semana?.slice(5) ?? c.semana, // MM-DD
+      publicado: c.publicado ? 1 : 0,
+      rascunho: c.publicado ? 0 : 1,
+    }))
+    .reverse();
+
+  // Dados para gráfico de linha: tendência de itens por semana
+  const dadosTendencia = cardapios
+    .slice(0, 8)
+    .map((c) => ({
+      semana: c.semana?.slice(5) ?? c.semana,
+      itens: c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0,
+    }))
+    .reverse();
+
+  // Totais
+  const totalPublicados = cardapios.filter((c) => c.publicado).length;
+  const totalRascunhos = cardapios.filter((c) => !c.publicado).length;
+
   const exportarCSV = () => {
     const linhas: string[] = [
       `Relatório Nutricional Consolidado`,
@@ -1882,14 +1943,15 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
       `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
       '',
       '=== CARDÁPIOS PUBLICADOS ===',
-      'Semana,Status,Publicado Em',
-      ...cardapios.map((c) =>
-        `${c.semana},${c.publicado ? 'Publicado' : 'Rascunho'},${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '-'}`
-      ),
+      'Semana,Status,Publicado Em,Total Itens',
+      ...cardapios.map((c) => {
+        const totalItens = c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0;
+        return `${c.semana},${c.publicado ? 'Publicado' : 'Rascunho'},${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '-'},${totalItens}`;
+      }),
       '',
       '=== RESTRIÇÕES ALIMENTARES ATIVAS ===',
       'Criança,Tipo,Descrição,Turma',
-      ...dietas.map((d) => {
+      ...dietasFiltradas.map((d) => {
         const nome = `${d.child?.firstName ?? ''} ${d.child?.lastName ?? ''}`.trim();
         const turma = d.child?.enrollments?.map((e: any) => e.classroom?.name).filter(Boolean).join('; ') || 'Não atribuída';
         return `${nome},${d.type},"${d.description ?? ''}",${turma}`;
@@ -1904,16 +1966,65 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
     URL.revokeObjectURL(url);
   };
 
-  // Totais
-  const totalPublicados = cardapios.filter((c) => c.publicado).length;
-  const totalRascunhos = cardapios.filter((c) => !c.publicado).length;
-  const restricoesPorTipo = dietas.reduce<Record<string, number>>((acc, d) => {
-    acc[d.type] = (acc[d.type] ?? 0) + 1;
-    return acc;
-  }, {});
+  const exportarPDF = () => {
+    const conteudo = printRef.current;
+    if (!conteudo) return;
+    const win = window.open('', '_blank', 'width=1000,height=800,scrollbars=yes');
+    if (!win) { alert('Permita pop-ups para gerar o PDF.'); return; }
+    win.document.write(`
+      <!DOCTYPE html><html lang="pt-BR"><head>
+      <meta charset="UTF-8"><title>Relatório Nutricional</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; color: #111; margin: 24px; }
+        h1 { font-size: 18px; color: #f97316; margin-bottom: 4px; }
+        h2 { font-size: 14px; color: #374151; margin: 16px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        th { background: #f3f4f6; text-align: left; padding: 6px 8px; font-size: 11px; color: #6b7280; }
+        td { padding: 5px 8px; border-bottom: 1px solid #f3f4f6; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
+        .pub { background: #d1fae5; color: #065f46; }
+        .ras { background: #fef3c7; color: #92400e; }
+        .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; min-width: 120px; }
+        .card p { margin: 0; font-size: 10px; color: #6b7280; }
+        .card strong { font-size: 22px; color: #111827; }
+        @media print { body { margin: 0; } }
+      </style></head><body>
+      <h1>Relatório Nutricional Consolidado</h1>
+      <p>Período: ${dataInicio} a ${dataFim} &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+      <div class="cards">
+        <div class="card"><p>Cardápios Publicados</p><strong>${totalPublicados}</strong></div>
+        <div class="card"><p>Rascunhos</p><strong>${totalRascunhos}</strong></div>
+        <div class="card"><p>Restrições Ativas</p><strong>${dietasFiltradas.length}</strong></div>
+        <div class="card"><p>Tipos de Restrição</p><strong>${dadosPizza.length}</strong></div>
+      </div>
+      <h2>Distribuição de Restrições por Tipo</h2>
+      <table><thead><tr><th>Tipo</th><th>Quantidade</th></tr></thead><tbody>
+        ${dadosPizza.map((r) => `<tr><td>${r.name}</td><td>${r.value}</td></tr>`).join('')}
+      </tbody></table>
+      <h2>Cardápios no Período (${cardapios.length})</h2>
+      <table><thead><tr><th>Semana</th><th>Status</th><th>Publicado Em</th><th>Itens</th></tr></thead><tbody>
+        ${cardapios.map((c) => {
+          const itens = c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0;
+          return `<tr><td>${c.semana}</td><td><span class="badge ${c.publicado ? 'pub' : 'ras'}">${c.publicado ? 'Publicado' : 'Rascunho'}</span></td><td>${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}</td><td>${itens}</td></tr>`;
+        }).join('')}
+      </tbody></table>
+      <h2>Restrições Alimentares Ativas (${dietasFiltradas.length})</h2>
+      <table><thead><tr><th>Criança</th><th>Tipo</th><th>Descrição</th><th>Turma</th></tr></thead><tbody>
+        ${dietasFiltradas.map((d) => {
+          const nome = `${d.child?.firstName ?? ''} ${d.child?.lastName ?? ''}`.trim();
+          const turma = d.child?.enrollments?.map((e: any) => e.classroom?.name).filter(Boolean).join(', ') || 'Não atribuída';
+          return `<tr><td>${nome || '—'}</td><td>${TYPE_LABEL[d.type] ?? d.type}</td><td>${d.description ?? '—'}</td><td>${turma}</td></tr>`;
+        }).join('')}
+      </tbody></table>
+      </body></html>
+    `);
+    win.document.close();
+    win.onload = () => { setTimeout(() => { win.focus(); win.print(); }, 300); };
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={printRef}>
       {/* Filtros */}
       <div className="bg-white rounded-xl border p-5">
         <h3 className="font-semibold text-gray-800 mb-4">Parâmetros do Relatório</h3>
@@ -1936,6 +2047,34 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
               className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
           </div>
+          {turmasRel.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Turma</label>
+              <select
+                value={filtroTurmaRel}
+                onChange={(e) => setFiltroTurmaRel(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              >
+                <option value="">Todas as turmas</option>
+                {turmasRel.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de Restrição</label>
+            <select
+              value={filtroTipoRel}
+              onChange={(e) => setFiltroTipoRel(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            >
+              <option value="">Todos os tipos</option>
+              {Object.entries(TYPE_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={gerar}
             disabled={loading}
@@ -1954,14 +2093,22 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
           )}
           {gerado && (
             <button
-              onClick={() => window.print()}
+              onClick={exportarPDF}
               className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-medium hover:bg-gray-700"
             >
-              <Printer className="w-4 h-4" /> Imprimir
+              <Printer className="w-4 h-4" /> Exportar PDF
             </button>
           )}
         </div>
       </div>
+
+      {!gerado && (
+        <div className="bg-white rounded-xl border p-10 text-center">
+          <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p className="text-gray-500 font-medium">Selecione o período e clique em Gerar Relatório</p>
+          <p className="text-xs text-gray-400 mt-1">Os gráficos e dados serão exibidos aqui</p>
+        </div>
+      )}
 
       {gerado && (
         <>
@@ -1970,8 +2117,8 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
             {[
               { label: 'Cardápios Publicados', value: totalPublicados, color: 'green' },
               { label: 'Rascunhos', value: totalRascunhos, color: 'yellow' },
-              { label: 'Restrições Ativas', value: dietas.length, color: 'red' },
-              { label: 'Tipos de Restrição', value: Object.keys(restricoesPorTipo).length, color: 'blue' },
+              { label: 'Restrições Ativas', value: dietasFiltradas.length, color: 'red' },
+              { label: 'Tipos de Restrição', value: dadosPizza.length, color: 'blue' },
             ].map(({ label, value, color }) => (
               <div key={label} className={`bg-white rounded-xl border p-4 border-l-4 border-l-${color}-400`}>
                 <p className="text-xs text-gray-500">{label}</p>
@@ -1980,7 +2127,100 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
             ))}
           </div>
 
-          {/* Cardápios */}
+          {/* Gráficos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Gráfico de pizza: distribuição de restrições por tipo */}
+            <div className="bg-white rounded-xl border p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                Distribuição de Restrições por Tipo
+              </h3>
+              {dadosPizza.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                  <AlertTriangle className="w-8 h-8 mb-2 opacity-30" />
+                  <p className="text-sm">Nenhuma restrição encontrada</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <ResponsiveContainer width="55%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={dadosPizza}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={75}
+                        label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                      >
+                        {dadosPizza.map((_, i) => (
+                          <Cell key={i} fill={CORES_RELATORIO[i % CORES_RELATORIO.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v, n) => [v, n]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-2">
+                    {dadosPizza.map((item, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: CORES_RELATORIO[i % CORES_RELATORIO.length] }} />
+                        <span className="text-gray-600 flex-1 text-xs">{item.name}</span>
+                        <span className="font-semibold text-gray-800">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Gráfico de barras: cardápios por semana */}
+            <div className="bg-white rounded-xl border p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-orange-500" />
+                Cardápios por Semana
+              </h3>
+              {dadosCardapiosPorSemana.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+                  <BookOpen className="w-8 h-8 mb-2 opacity-30" />
+                  <p className="text-sm">Nenhum cardápio no período</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={dadosCardapiosPorSemana} barGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                    <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="publicado" name="Publicado" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="rascunho" name="Rascunho" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+
+          {/* Gráfico de linha: tendência de itens por semana */}
+          {dadosTendencia.length > 1 && (
+            <div className="bg-white rounded-xl border p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-orange-500" />
+                Tendência de Itens Planejados por Semana
+              </h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={dadosTendencia}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                  <XAxis dataKey="semana" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line type="monotone" dataKey="itens" name="Itens Planejados" stroke="#f97316" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Tabela: Cardápios */}
           <div className="bg-white rounded-xl border p-5">
             <h3 className="font-semibold text-gray-800 mb-3">Cardápios no Período ({cardapios.length})</h3>
             {cardapios.length === 0 ? (
@@ -1993,35 +2233,43 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
                       <th className="pb-2">Semana</th>
                       <th className="pb-2">Status</th>
                       <th className="pb-2">Publicado Em</th>
+                      <th className="pb-2">Itens</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {cardapios.map((c) => (
-                      <tr key={c.id}>
-                        <td className="py-2 font-medium">{c.semana}</td>
-                        <td className="py-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            c.publicado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {c.publicado ? 'Publicado' : 'Rascunho'}
-                          </span>
-                        </td>
-                        <td className="py-2 text-gray-500">
-                          {c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}
-                        </td>
-                      </tr>
-                    ))}
+                    {cardapios.map((c) => {
+                      const totalItens = c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0;
+                      return (
+                        <tr key={c.id}>
+                          <td className="py-2 font-medium">{c.semana}</td>
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              c.publicado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {c.publicado ? 'Publicado' : 'Rascunho'}
+                            </span>
+                          </td>
+                          <td className="py-2 text-gray-500">
+                            {c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}
+                          </td>
+                          <td className="py-2 text-gray-600">{totalItens}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
 
-          {/* Restrições */}
+          {/* Tabela: Restrições */}
           <div className="bg-white rounded-xl border p-5">
-            <h3 className="font-semibold text-gray-800 mb-3">Restrições Alimentares Ativas ({dietas.length})</h3>
-            {dietas.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">Nenhuma restrição cadastrada.</p>
+            <h3 className="font-semibold text-gray-800 mb-3">Restrições Alimentares ({dietasFiltradas.length})</h3>
+            {dietasFiltradas.length === 0 ? (
+              <div className="text-center py-6">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm text-gray-400">Nenhuma restrição encontrada com os filtros selecionados.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -2034,14 +2282,14 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {dietas.map((d) => {
+                    {dietasFiltradas.map((d) => {
                       const nome = `${d.child?.firstName ?? ''} ${d.child?.lastName ?? ''}`.trim();
                       const turma = d.child?.enrollments?.map((e: any) => e.classroom?.name).filter(Boolean).join(', ') || 'Não atribuída';
                       return (
                         <tr key={d.id}>
                           <td className="py-2 font-medium">{nome || '—'}</td>
                           <td className="py-2">
-                            <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">{d.type}</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">{TYPE_LABEL[d.type] ?? d.type}</span>
                           </td>
                           <td className="py-2 text-gray-600 max-w-xs truncate">{d.description ?? '—'}</td>
                           <td className="py-2 text-gray-500">{turma}</td>
