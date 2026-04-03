@@ -4,6 +4,7 @@
  * Abas: Dietas/Restrições | Pedidos de Alimentação | Resumo por Turma | Cardápio | Nutrição
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -14,7 +15,7 @@ import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
 import {
   Apple, AlertTriangle, ShoppingCart, Users, Search,
-  RefreshCw, Plus, ChevronDown, ChevronUp, Filter,
+  RefreshCw, Plus, ChevronDown, ChevronUp,
   CheckCircle, Clock, XCircle, Printer, BookOpen,
   BarChart2, ChevronLeft, ChevronRight, Save, Trash2,
   Settings, GripVertical, History, Eye, FileEdit, X, FileText, Download,
@@ -2588,7 +2589,7 @@ function ModuloCardapios({ unitId }: { unitId: string }) {
   );
 }
 
-// ─── Tipos de seção da sidebar ──────────────────────────────────────────────
+// ─── Tipos de seção ──────────────────────────────────────────────────────────
 type SecaoNutri =
   | 'visao-geral'
   | 'cardapios'
@@ -2601,37 +2602,35 @@ type SecaoNutri =
   | 'dietas'
   | 'pedidos';
 
-interface NavItem {
-  id: SecaoNutri;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  group?: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'visao-geral',      label: 'Visão Geral',            icon: BarChart2,     group: 'Principal' },
-  { id: 'cardapios',        label: 'Cardápios',              icon: BookOpen,      group: 'Cardápios' },
-  { id: 'cardapios-nutricao', label: 'Cálculo Nutricional',  icon: Apple,         group: 'Cardápios' },
-  { id: 'turmas',           label: 'Turmas e Crianças',      icon: Users,         group: 'Acompanhamento' },
-  { id: 'dietas',           label: 'Dietas e Restrições',    icon: AlertTriangle, group: 'Acompanhamento' },
-  { id: 'observacoes-prof', label: 'Obs. dos Professores',   icon: Eye,           group: 'Observações' },
-  { id: 'anotacoes-nutri',  label: 'Anotações Nutricionais', icon: FileEdit,      group: 'Observações' },
-  { id: 'relatorio',        label: 'Relatórios',             icon: FileText,      group: 'Relatórios' },
-  { id: 'pedidos',          label: 'Pedidos de Alimentação', icon: ShoppingCart,  group: 'Relatórios' },
-  { id: 'configuracoes',    label: 'Configurações',          icon: Settings,      group: 'Configurações' },
+const SECOES_VALIDAS: SecaoNutri[] = [
+  'visao-geral', 'cardapios', 'cardapios-nutricao', 'turmas',
+  'observacoes-prof', 'anotacoes-nutri', 'relatorio', 'configuracoes',
+  'dietas', 'pedidos',
 ];
 
-const NAV_GROUPS = ['Principal', 'Cardápios', 'Acompanhamento', 'Observações', 'Relatórios', 'Configurações'];
+const SECAO_LABELS: Record<SecaoNutri, string> = {
+  'visao-geral': 'Visão Geral',
+  'cardapios': 'Cardápios',
+  'cardapios-nutricao': 'Cálculo Nutricional',
+  'turmas': 'Turmas e Crianças',
+  'dietas': 'Dietas e Restrições',
+  'observacoes-prof': 'Obs. dos Professores',
+  'anotacoes-nutri': 'Anotações Nutricionais',
+  'relatorio': 'Relatórios',
+  'pedidos': 'Pedidos de Alimentação',
+  'configuracoes': 'Configurações',
+};
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 function DashboardNutricionistaPage() {
   const { user } = useAuth();
   const unitId = (user as any)?.unitId ?? '';
-  const [secao, setSecao] = useState<SecaoNutri>('visao-geral');
-  const [sidebarAberta, setSidebarAberta] = useState(false);
-
-  // manter compat com código legado que usa 'aba'
-  const aba = secao;
+  // Navegação via query param ?s=<secao> — sincronizada com a sidebar global escura
+  const [searchParams] = useSearchParams();
+  const rawSecao = searchParams.get('s') ?? 'visao-geral';
+  const secao: SecaoNutri = (SECOES_VALIDAS as string[]).includes(rawSecao)
+    ? (rawSecao as SecaoNutri)
+    : 'visao-geral';
 
   // ── Estado: Dietas ──
   const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
@@ -2660,8 +2659,7 @@ function DashboardNutricionistaPage() {
   // Dados ricos do health dashboard por turma (classroomId -> children)
   const [healthPorTurma, setHealthPorTurma] = useState<Record<string, { children: any[]; stats: any }>>({});
 
-  // Alias para compatibilidade com blocos legados que usam 'aba'
-  const _ = aba; void _;
+
 
   // ── Carregar Dietas ──
   const carregarDietas = useCallback(async () => {
@@ -2834,147 +2832,58 @@ function DashboardNutricionistaPage() {
   const nomeUsuario = ((user?.nome as string) || '').split(' ')[0] || 'Nutricionista';
 
   // ── Título da seção atual ──
-  const tituloSecao = NAV_ITEMS.find((n) => n.id === secao)?.label ?? 'Painel da Nutricionista';
+  const tituloSecao = SECAO_LABELS[secao] ?? 'Painel da Nutricionista';
 
   return (
     <PageShell
-      title="Painel da Nutricionista"
+      title={tituloSecao}
       subtitle={`Olá, ${nomeUsuario}! Gestão de cardápios, restrições e nutrição.`}
     >
-      {/* Layout principal: sidebar + conteúdo */}
-      <div className="flex gap-0 -mx-4 md:-mx-6 lg:-mx-8 min-h-[calc(100vh-180px)]">
-
-        {/* ── Overlay mobile ── */}
-        {sidebarAberta && (
-          <div
-            className="fixed inset-0 bg-black/40 z-20 lg:hidden"
-            onClick={() => setSidebarAberta(false)}
-          />
-        )}
-
-        {/* ── Sidebar lateral ── */}
-        <aside
-          className={`
-            fixed lg:static inset-y-0 left-0 z-30 lg:z-auto
-            w-64 bg-white border-r flex-shrink-0
-            flex flex-col
-            transform transition-transform duration-200
-            ${sidebarAberta ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          `}
-        >
-          {/* Header da sidebar */}
-          <div className="px-4 py-4 border-b bg-gradient-to-r from-orange-500 to-orange-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white font-semibold text-sm">Módulo Nutrição</p>
-                <p className="text-orange-100 text-xs mt-0.5">{nomeUsuario}</p>
-              </div>
-              <button
-                onClick={() => setSidebarAberta(false)}
-                className="lg:hidden text-white/80 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* KPIs rápidos sempre visíveis */}
+      {secao === 'visao-geral' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+          <div className="bg-white rounded-xl border p-3 flex flex-col gap-0.5">
+            <span className="text-xs text-gray-500">C/ Restrição</span>
+            <span className="text-2xl font-bold text-gray-800">{totalCriancasComRestricao}</span>
           </div>
-
-          {/* KPIs compactos */}
-          <div className="px-3 py-3 border-b bg-orange-50 grid grid-cols-2 gap-2">
-            <div className="bg-white rounded-lg p-2 text-center">
-              <p className="text-lg font-bold text-gray-800">{totalCriancasComRestricao}</p>
-              <p className="text-[10px] text-gray-500 leading-tight">c/ restrição</p>
-            </div>
-            <div className="bg-red-50 rounded-lg p-2 text-center">
-              <p className="text-lg font-bold text-red-700">{totalAlergias}</p>
-              <p className="text-[10px] text-red-500 leading-tight">alergias</p>
-            </div>
+          <div className="bg-red-50 rounded-xl border border-red-200 p-3 flex flex-col gap-0.5">
+            <span className="text-xs text-red-600">Alergias</span>
+            <span className="text-2xl font-bold text-red-700">{totalAlergias}</span>
           </div>
-
-          {/* Navegação */}
-          <nav className="flex-1 overflow-y-auto py-2">
-            {NAV_GROUPS.map((grupo) => {
-              const itens = NAV_ITEMS.filter((n) => n.group === grupo);
-              if (!itens.length) return null;
-              return (
-                <div key={grupo} className="mb-1">
-                  <p className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                    {grupo}
-                  </p>
-                  {itens.map(({ id, label, icon: Icon }) => (
-                    <button
-                      key={id}
-                      onClick={() => { setSecao(id); setSidebarAberta(false); }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                        secao === id
-                          ? 'bg-orange-50 text-orange-700 font-semibold border-r-2 border-orange-500'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      <span className="truncate">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-          </nav>
-        </aside>
-
-        {/* ── Área de conteúdo ── */}
-        <main className="flex-1 min-w-0 overflow-auto">
-          {/* Topbar do conteúdo */}
-          <div className="sticky top-0 z-10 bg-white border-b px-4 md:px-6 py-3 flex items-center gap-3">
-            <button
-              onClick={() => setSidebarAberta(true)}
-              className="lg:hidden p-1.5 rounded-lg border text-gray-500 hover:bg-gray-50"
-            >
-              <Filter className="w-4 h-4" />
-            </button>
-            <h2 className="font-semibold text-gray-800 text-sm">{tituloSecao}</h2>
+          <div className="bg-orange-50 rounded-xl border border-orange-200 p-3 flex flex-col gap-0.5">
+            <span className="text-xs text-orange-600">Severidade Alta</span>
+            <span className="text-2xl font-bold text-orange-700">{totalSeveras}</span>
           </div>
-
-          {/* Conteúdo da seção */}
-          <div className="p-4 md:p-6">
+          <div className="bg-white rounded-xl border p-3 flex flex-col gap-0.5">
+            <span className="text-xs text-gray-500">Total Restrições</span>
+            <span className="text-2xl font-bold text-gray-800">{dietas.filter((d) => d.isActive).length}</span>
+          </div>
+        </div>
+      )}
+      {/* Conteúdo da seção */}
+      <div>
 
       {/* ── Seção: Visão Geral ── */}
       {secao === 'visao-geral' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
-              <span className="text-xs text-gray-500 font-medium">Crianças c/ Restrição</span>
-              <span className="text-2xl font-bold text-gray-800">{totalCriancasComRestricao}</span>
-            </div>
-            <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
-              <span className="text-xs text-gray-500 font-medium">Total de Restrições</span>
-              <span className="text-2xl font-bold text-gray-800">{dietas.filter((d) => d.isActive).length}</span>
-            </div>
-            <div className="bg-red-50 rounded-xl border border-red-200 p-4 flex flex-col gap-1">
-              <span className="text-xs text-red-600 font-medium">Alergias</span>
-              <span className="text-2xl font-bold text-red-700">{totalAlergias}</span>
-            </div>
-            <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 flex flex-col gap-1">
-              <span className="text-xs text-orange-600 font-medium">Severidade Alta</span>
-              <span className="text-2xl font-bold text-orange-700">{totalSeveras}</span>
-            </div>
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border p-5">
               <h3 className="font-semibold text-gray-800 mb-3">Acesso Rápido</h3>
               <div className="space-y-2">
                 {([
-                  { id: 'cardapios' as SecaoNutri, label: 'Planejar cardápio da semana', icon: BookOpen },
-                  { id: 'dietas' as SecaoNutri, label: 'Ver restrições alimentares', icon: AlertTriangle },
-                  { id: 'turmas' as SecaoNutri, label: 'Resumo por turma', icon: Users },
-                  { id: 'configuracoes' as SecaoNutri, label: 'Configurar refeições', icon: Settings },
-                ] as { id: SecaoNutri; label: string; icon: React.ComponentType<{className?: string}> }[]).map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => setSecao(id)}
+                  { href: '/app/nutricionista?s=cardapios',   label: 'Planejar cardápio da semana', icon: BookOpen },
+                  { href: '/app/nutricionista?s=dietas',      label: 'Ver restrições alimentares', icon: AlertTriangle },
+                  { href: '/app/nutricionista?s=turmas',      label: 'Resumo por turma', icon: Users },
+                  { href: '/app/nutricionista?s=configuracoes', label: 'Configurar refeições', icon: Settings },
+                ] as { href: string; label: string; icon: React.ComponentType<{className?: string}> }[]).map(({ href, label, icon: Icon }) => (
+                  <a
+                    key={href}
+                    href={href}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border hover:bg-orange-50 hover:border-orange-200 transition-colors text-sm text-gray-700"
                   >
                     <Icon className="w-4 h-4 text-orange-500" />
                     {label}
-                  </button>
+                  </a>
                 ))}
               </div>
             </div>
@@ -3356,9 +3265,7 @@ function DashboardNutricionistaPage() {
           : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-          </div>{/* fim p-4 md:p-6 */}
-        </main>{/* fim main */}
-      </div>{/* fim flex */}
+      </div>{/* fim conteudo */}
     </PageShell>
   );
 }

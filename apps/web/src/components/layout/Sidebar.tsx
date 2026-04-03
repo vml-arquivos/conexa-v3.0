@@ -4,7 +4,7 @@ import {
   ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
-  Apple, Utensils, Shield, X,
+  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -67,9 +67,19 @@ const DIRETOR_ITEMS: MenuItem[] = [
 ];
 
 // UNIDADE — Nutricionista ──────────────────────────────────────────────────────
+// Navegação completa do módulo via query param ?s=<secao>
+// A sidebar global escura é o único menu do módulo (sem sidebar interna)
 const NUTRI_ITEMS: MenuItem[] = [
-  { path: '/app/nutricionista',   label: 'Painel da Nutricionista', icon: <Utensils className="h-4 w-4" /> },
-  { path: '/app/painel-alergias', label: 'Alergias e Dietas',       icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
+  { path: '/app/nutricionista',                      label: 'Painel da Nutricionista', icon: <Utensils className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=cardapios',          label: 'Cardápios',               icon: <BookOpen className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=cardapios-nutricao', label: 'Cálculo Nutricional',     icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=turmas',             label: 'Turmas e Crianças',       icon: <Users className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=dietas',             label: 'Dietas e Restrições',     icon: <AlertTriangle className="h-4 w-4" />, badge: 'Importante' },
+  { path: '/app/nutricionista?s=observacoes-prof',   label: 'Obs. dos Professores',    icon: <Eye className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=anotacoes-nutri',    label: 'Anotações Nutricionais',  icon: <FileEdit className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=relatorio',          label: 'Relatórios',              icon: <FileText className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=pedidos',            label: 'Pedidos de Alimentação',  icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/nutricionista?s=configuracoes',      label: 'Configurações',           icon: <Settings className="h-4 w-4" /> },
 ];
 
 // UNIDADE — Administrativo ─────────────────────────────────────────────────────
@@ -141,6 +151,29 @@ const DEV_EXTRA: MenuItem[] = [
 ];
 
 // ─── Componentes de navegação ─────────────────────────────────────────────────
+
+// isActiveForItem: compara pathname + search para itens com query params
+function isActiveForItem(location: ReturnType<typeof useLocation>, itemPath: string): boolean {
+  const [itemPathname, itemSearch] = itemPath.split('?');
+  if (itemSearch) {
+    // Item com query param: pathname deve bater E o param ?s= deve bater
+    if (location.pathname !== itemPathname) return false;
+    const itemParams = new URLSearchParams(itemSearch);
+    const locParams = new URLSearchParams(location.search);
+    for (const [key, val] of itemParams.entries()) {
+      if (locParams.get(key) !== val) return false;
+    }
+    return true;
+  }
+  // Item sem query param: ativo apenas se pathname bate E não há ?s= na URL
+  // (para não marcar "Painel da Nutricionista" quando uma sub-seção está ativa)
+  if (location.pathname === itemPathname) {
+    const locParams = new URLSearchParams(location.search);
+    return !locParams.has('s');
+  }
+  return false;
+}
+
 function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; onClick?: () => void }) {
   return (
     <Link
@@ -157,7 +190,7 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
         {item.label}
       </span>
       <span className="flex items-center gap-1">
-        {item.badge && !active && (
+        {item.badge && (
           <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
             {item.badge}
           </span>
@@ -169,8 +202,8 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
 }
 
 function NavSection({
-  titulo, items, isActive, onItemClick,
-}: { titulo: string; items: MenuItem[]; isActive: (path: string) => boolean; onItemClick?: () => void }) {
+  titulo, items, location, onItemClick,
+}: { titulo: string; items: MenuItem[]; location: ReturnType<typeof useLocation>; onItemClick?: () => void }) {
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
@@ -178,7 +211,7 @@ function NavSection({
       </p>
       <div className="space-y-1">
         {items.map((item) => (
-          <NavItem key={item.path} item={item} active={isActive(item.path)} onClick={onItemClick} />
+          <NavItem key={item.path} item={item} active={isActiveForItem(location, item.path)} onClick={onItemClick} />
         ))}
       </div>
     </div>
@@ -213,9 +246,6 @@ export function Sidebar({ onClose }: SidebarProps) {
   const isPsicologa = userTypes.includes('STAFF_CENTRAL_PSICOLOGIA');
   // Se UNIDADE mas sem tipo específico, tratar como coordenadora genérica
   const isUnidadeGenerica = isUnidade && !isDiretor && !isNutricionista && !isCoordPedagogico && !isAdministrativo;
-
-  const isActive = (path: string) =>
-    location.pathname === path || location.pathname.startsWith(path + '/');
 
   // Label de perfil para exibição
   const perfilLabel = isDeveloper        ? 'Desenvolvedor'
@@ -288,72 +318,72 @@ export function Sidebar({ onClose }: SidebarProps) {
         {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
           <>
-            <NavSection titulo="Professor"    items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Nutricionista" items={NUTRI_ITEMS}                                        isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Diretor"       items={DIRETOR_ITEMS}                                      isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Unidade"       items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Central"       items={CENTRAL_ITEMS}                                      isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Mantenedora"   items={MANTENEDORA_ITEMS}                                  isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Dev — Extras"  items={DEV_EXTRA}                                          isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Professor"    items={[...PROFESSOR_PRINCIPAL, ...PROFESSOR_FERRAMENTAS]} location={location} onItemClick={onClose} />
+            <NavSection titulo="Nutricionista" items={NUTRI_ITEMS}                                        location={location} onItemClick={onClose} />
+            <NavSection titulo="Diretor"       items={DIRETOR_ITEMS}                                      location={location} onItemClick={onClose} />
+            <NavSection titulo="Unidade"       items={[...UNIDADE_GESTAO, ...UNIDADE_PEDAGOGICO]}         location={location} onItemClick={onClose} />
+            <NavSection titulo="Central"       items={CENTRAL_ITEMS}                                      location={location} onItemClick={onClose} />
+            <NavSection titulo="Mantenedora"   items={MANTENEDORA_ITEMS}                                  location={location} onItemClick={onClose} />
+            <NavSection titulo="Dev — Extras"  items={DEV_EXTRA}                                          location={location} onItemClick={onClose} />
           </>
         )}
 
         {/* MANTENEDORA */}
         {!isDeveloper && isMantenedora && (
-          <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Mantenedora" items={MANTENEDORA_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* STAFF_CENTRAL — Psicóloga Central (menu dedicado) */}
         {!isDeveloper && isCentral && isPsicologa && (
-          <NavSection titulo="Psicologia" items={PSICOLOGA_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Psicologia" items={PSICOLOGA_ITEMS} location={location} onItemClick={onClose} />
         )}
         {/* STAFF_CENTRAL — Coordenação Geral e demais */}
         {!isDeveloper && isCentral && !isPsicologa && (
-          <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Análises Centrais" items={CENTRAL_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Diretor */}
         {!isDeveloper && isDiretor && (
-          <NavSection titulo="Diretor" items={DIRETOR_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Diretor" items={DIRETOR_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Nutricionista */}
         {!isDeveloper && isNutricionista && (
-          <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Coordenadora Pedagógica */}
         {!isDeveloper && isCoordPedagogico && (
           <>
-            <NavSection titulo="Gestão"      items={COORD_GESTAO}      isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Gestão"      items={COORD_GESTAO}      location={location} onItemClick={onClose} />
+            <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  location={location} onItemClick={onClose} />
           </>
         )}
 
         {/* UNIDADE — Administrativo */}
         {!isDeveloper && isAdministrativo && (
-          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Genérico (sem roleType específico) */}
         {!isDeveloper && isUnidadeGenerica && (
           <>
-            <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      location={location} onItemClick={onClose} />
+            <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  location={location} onItemClick={onClose} />
           </>
         )}
 
         {/* PROFESSOR / PROFESSOR_AUXILIAR */}
         {!isDeveloper && !isUnidade && isProfessor && (
           <>
-            <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   isActive={isActive} onItemClick={onClose} />
-            <NavSection titulo="Ferramentas" items={PROFESSOR_FERRAMENTAS} isActive={isActive} onItemClick={onClose} />
+            <NavSection titulo="Pedagógico"  items={PROFESSOR_PRINCIPAL}   location={location} onItemClick={onClose} />
+            <NavSection titulo="Ferramentas" items={PROFESSOR_FERRAMENTAS} location={location} onItemClick={onClose} />
           </>
         )}
 
         {/* Fallback */}
         {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
-          <NavSection titulo="Menu" items={UNIDADE_GESTAO} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 
       </nav>
@@ -361,11 +391,11 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Rodapé */}
       <div className="p-3 border-t border-gray-800 space-y-1">
         {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
-          <NavSection titulo="Administração" items={adminItems} isActive={isActive} onItemClick={onClose} />
+          <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
         )}
         <div className="pt-1 space-y-1">
-          <NavItem item={perfilItem} active={isActive('/app/meu-perfil')} onClick={onClose} />
-          <NavItem item={configItem} active={isActive('/app/configuracoes')} onClick={onClose} />
+          <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
+          <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
         </div>
         <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
       </div>
