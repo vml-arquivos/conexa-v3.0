@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
+import { isProfessor as checkIsProfessor } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -283,6 +284,9 @@ export default function RdicCriancaPage() {
   const { user } = useAuth() as any;
   const [searchParams] = useSearchParams();
   const preselectedChildId = searchParams.get('childId');
+  const preselectedClassroomId = searchParams.get('classroomId');
+  // Perfil: PROFESSOR usa /teachers/dashboard; UNIDADE/outros usam lookup
+  const isProf = checkIsProfessor(user);
   const [loading, setLoading] = useState(true);
   const [turma, setTurma] = useState<Turma | null>(null);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
@@ -314,12 +318,56 @@ export default function RdicCriancaPage() {
   async function carregarTurma() {
     try {
       setLoading(true);
-      const res = await http.get('/teachers/dashboard');
-      if (res.data?.hasClassroom) {
-        setTurma(res.data.classroom);
-        const lista: Aluno[] = res.data.alunos ?? [];
+      if (isProf) {
+        // ── Fluxo PROFESSOR: usa /teachers/dashboard ──
+        const res = await http.get('/teachers/dashboard');
+        if (res.data?.hasClassroom) {
+          setTurma(res.data.classroom);
+          const lista: Aluno[] = res.data.alunos ?? [];
+          setAlunos(lista);
+          if (preselectedChildId) {
+            const aluno = lista.find(a => a.id === preselectedChildId);
+            if (aluno) {
+              setAlunoSelecionado(aluno);
+              setEtapa('formulario');
+              const rdicsRes = await http.get('/rdic', { params: { childId: aluno.id } }).catch(() => ({ data: [] }));
+              setRdicsDoAluno(Array.isArray(rdicsRes.data) ? rdicsRes.data : rdicsRes.data?.data ?? []);
+            }
+          }
+        }
+      } else {
+        // ── Fluxo UNIDADE/STAFF_CENTRAL/outros: usa lookup ──
+        const unitId = (user as any)?.unitId;
+        const classRes = await http.get('/lookup/classrooms/accessible', {
+          params: unitId ? { unitId } : {},
+        });
+        const turmasList: { id: string; name: string; code?: string; unitId?: string }[] = Array.isArray(classRes.data)
+          ? classRes.data
+          : classRes.data?.data ?? [];
+        if (turmasList.length === 0) return;
+        // Usar classroomId da URL se disponível, senão a primeira turma
+        const targetId = preselectedClassroomId ?? turmasList[0].id;
+        const turmaInfo = turmasList.find(t => t.id === targetId) ?? turmasList[0];
+        const resolvedUnitId = turmaInfo.unitId ?? unitId;
+        const unitRes = await http.get(`/units/${resolvedUnitId}`).catch(() => ({ data: { name: '' } }));
+        const turmaObj: Turma = {
+          id: turmaInfo.id,
+          name: turmaInfo.name,
+          code: turmaInfo.code ?? '',
+          unit: { name: unitRes.data?.name ?? '' },
+        };
+        setTurma(turmaObj);
+        const childrenRes = await http.get(`/lookup/classrooms/${turmaInfo.id}/children`);
+        const lista: Aluno[] = (Array.isArray(childrenRes.data) ? childrenRes.data : childrenRes.data?.data ?? []).map((c: any) => ({
+          id: c.id,
+          nome: `${c.firstName} ${c.lastName}`,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          idade: 0,
+          gender: c.gender ?? '',
+          photoUrl: c.photoUrl ?? undefined,
+        }));
         setAlunos(lista);
-        // Pré-selecionar criança se childId veio na URL
         if (preselectedChildId) {
           const aluno = lista.find(a => a.id === preselectedChildId);
           if (aluno) {
@@ -455,8 +503,10 @@ export default function RdicCriancaPage() {
       <PageShell title="RDIC por Criança" subtitle="Registro de Desenvolvimento Individual">
         <EmptyState
           icon={<Users className="h-12 w-12 text-gray-400" />}
-          title="Você ainda não tem turma"
-          description="Aguarde a coordenação vincular você a uma turma para acessar os RDICs."
+          title={isProf ? 'Você ainda não tem turma' : 'Nenhuma turma encontrada'}
+          description={isProf
+            ? 'Aguarde a coordenação vincular você a uma turma para acessar os RDICs.'
+            : 'Não foi possível carregar as turmas desta unidade. Verifique se há turmas ativas cadastradas.'}
         />
       </PageShell>
     );
