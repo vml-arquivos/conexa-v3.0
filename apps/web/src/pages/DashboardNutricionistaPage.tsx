@@ -3,7 +3,7 @@
  * Acesso: UNIDADE_NUTRICIONISTA
  * Abas: Dietas/Restrições | Pedidos de Alimentação | Resumo por Turma | Cardápio | Nutrição
  */
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '@/components/ui/PageShell';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
@@ -2149,11 +2149,50 @@ function AbaHistorico({ unitId }: { unitId: string }) {
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────────────────────────────────
-function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que estava faltando após o nome da função
+// ─── Tipos de seção da sidebar ──────────────────────────────────────────────
+type SecaoNutri =
+  | 'visao-geral'
+  | 'cardapios'
+  | 'cardapios-nutricao'
+  | 'turmas'
+  | 'observacoes-prof'
+  | 'anotacoes-nutri'
+  | 'relatorio'
+  | 'configuracoes'
+  | 'dietas'
+  | 'pedidos';
+
+interface NavItem {
+  id: SecaoNutri;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  group?: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'visao-geral',      label: 'Visão Geral',            icon: BarChart2,     group: 'Principal' },
+  { id: 'cardapios',        label: 'Cardápios',              icon: BookOpen,      group: 'Cardápios' },
+  { id: 'cardapios-nutricao', label: 'Cálculo Nutricional',  icon: Apple,         group: 'Cardápios' },
+  { id: 'turmas',           label: 'Turmas e Crianças',      icon: Users,         group: 'Acompanhamento' },
+  { id: 'dietas',           label: 'Dietas e Restrições',    icon: AlertTriangle, group: 'Acompanhamento' },
+  { id: 'observacoes-prof', label: 'Obs. dos Professores',   icon: Eye,           group: 'Observações' },
+  { id: 'anotacoes-nutri',  label: 'Anotações Nutricionais', icon: FileEdit,      group: 'Observações' },
+  { id: 'relatorio',        label: 'Relatórios',             icon: FileText,      group: 'Relatórios' },
+  { id: 'pedidos',          label: 'Pedidos de Alimentação', icon: ShoppingCart,  group: 'Relatórios' },
+  { id: 'configuracoes',    label: 'Configurações',          icon: Settings,      group: 'Configurações' },
+];
+
+const NAV_GROUPS = ['Principal', 'Cardápios', 'Acompanhamento', 'Observações', 'Relatórios', 'Configurações'];
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
+function DashboardNutricionistaPage() {
   const { user } = useAuth();
   const unitId = (user as any)?.unitId ?? '';
-  const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao' | 'configuracoes' | 'historico' | 'observacoes' | 'anotacoes' | 'relatorio'>('dietas');
+  const [secao, setSecao] = useState<SecaoNutri>('visao-geral');
+  const [sidebarAberta, setSidebarAberta] = useState(false);
+
+  // manter compat com código legado que usa 'aba'
+  const aba = secao;
 
   // ── Estado: Dietas ──
   const [dietas, setDietas] = useState<DietaryRestriction[]>([]);
@@ -2179,6 +2218,9 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
   // ── Estado: Turmas ──
   const [turmas, setTurmas] = useState<{ id: string; name: string; totalCriancas: number; comRestricao: number }[]>([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
+
+  // Alias para compatibilidade com blocos legados que usam 'aba'
+  const _ = aba; void _;
 
   // ── Carregar Dietas ──
   const carregarDietas = useCallback(async () => {
@@ -2241,8 +2283,8 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
   }, [dietas]);
 
   useEffect(() => { carregarDietas(); }, [carregarDietas]);
-  useEffect(() => { if (aba === 'pedidos') carregarPedidos(); }, [aba, carregarPedidos]);
-  useEffect(() => { if (aba === 'turmas') carregarTurmas(); }, [aba, carregarTurmas]);
+  useEffect(() => { if (secao === 'pedidos') carregarPedidos(); }, [secao, carregarPedidos]);
+  useEffect(() => { if (secao === 'turmas') carregarTurmas(); }, [secao, carregarTurmas]);
 
   // ── Adicionar Item de Alimentação ao Pedido ──
   const adicionarItemAlimentacao = async () => {
@@ -2305,64 +2347,175 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
   const totalAlergias = dietas.filter((d) => d.type === 'ALERGIA' && d.isActive).length;
   const totalSeveras = dietas.filter((d) => d.severity === 'severa' && d.isActive).length;
   const totalCriancasComRestricao = new Set(dietas.filter((d) => d.isActive).map((d) => d.child.id)).size;
-  const ABAS = [
-    { id: 'dietas', label: 'Dietas e Restrições', icon: Apple },
-    { id: 'pedidos', label: 'Pedidos de Alimentação', icon: ShoppingCart },
-    { id: 'turmas', label: 'Resumo por Turma', icon: Users },
-    { id: 'observacoes', label: 'Obs. dos Professores', icon: Eye },
-    { id: 'anotacoes', label: 'Anotações Nutricionais', icon: FileEdit },
-    { id: 'cardapio', label: 'Cardápio Semanal', icon: BookOpen },
-    { id: 'historico', label: 'Histórico de Cardápios', icon: History },
-    { id: 'nutricao', label: 'Cálculo Nutricional', icon: BarChart2 },
-    { id: 'relatorio', label: 'Relatório Consolidado', icon: FileText },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
-  ];
+  const nomeUsuario = ((user?.nome as string) || '').split(' ')[0] || 'Nutricionista';
+
+  // ── Título da seção atual ──
+  const tituloSecao = NAV_ITEMS.find((n) => n.id === secao)?.label ?? 'Painel da Nutricionista';
 
   return (
     <PageShell
       title="Painel da Nutricionista"
-      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Nutricionista'}! Dietas, restrições, cardápio e nutrição.`}
+      subtitle={`Olá, ${nomeUsuario}! Gestão de cardápios, restrições e nutrição.`}
     >
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
-          <span className="text-xs text-gray-500 font-medium">Crianças com Restrição</span>
-          <span className="text-2xl font-bold text-gray-800">{totalCriancasComRestricao}</span>
-        </div>
-        <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
-          <span className="text-xs text-gray-500 font-medium">Total de Restrições</span>
-          <span className="text-2xl font-bold text-gray-800">{dietas.filter((d) => d.isActive).length}</span>
-        </div>
-        <div className="bg-red-50 rounded-xl border border-red-200 p-4 flex flex-col gap-1">
-          <span className="text-xs text-red-600 font-medium">Alergias</span>
-          <span className="text-2xl font-bold text-red-700">{totalAlergias}</span>
-        </div>
-        <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 flex flex-col gap-1">
-          <span className="text-xs text-orange-600 font-medium">Severidade Alta</span>
-          <span className="text-2xl font-bold text-orange-700">{totalSeveras}</span>
-        </div>
-      </div>
+      {/* Layout principal: sidebar + conteúdo */}
+      <div className="flex gap-0 -mx-4 md:-mx-6 lg:-mx-8 min-h-[calc(100vh-180px)]">
 
-      {/* Abas */}
-      <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 overflow-x-auto">
-        {ABAS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setAba(id as any)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-              aba === id
-                ? 'bg-white text-orange-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+        {/* ── Overlay mobile ── */}
+        {sidebarAberta && (
+          <div
+            className="fixed inset-0 bg-black/40 z-20 lg:hidden"
+            onClick={() => setSidebarAberta(false)}
+          />
+        )}
 
-      {/* ── Aba: Dietas e Restrições ── */}
-      {aba === 'dietas' && (
+        {/* ── Sidebar lateral ── */}
+        <aside
+          className={`
+            fixed lg:static inset-y-0 left-0 z-30 lg:z-auto
+            w-64 bg-white border-r flex-shrink-0
+            flex flex-col
+            transform transition-transform duration-200
+            ${sidebarAberta ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}
+        >
+          {/* Header da sidebar */}
+          <div className="px-4 py-4 border-b bg-gradient-to-r from-orange-500 to-orange-400">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-semibold text-sm">Módulo Nutrição</p>
+                <p className="text-orange-100 text-xs mt-0.5">{nomeUsuario}</p>
+              </div>
+              <button
+                onClick={() => setSidebarAberta(false)}
+                className="lg:hidden text-white/80 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* KPIs compactos */}
+          <div className="px-3 py-3 border-b bg-orange-50 grid grid-cols-2 gap-2">
+            <div className="bg-white rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-gray-800">{totalCriancasComRestricao}</p>
+              <p className="text-[10px] text-gray-500 leading-tight">c/ restrição</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-red-700">{totalAlergias}</p>
+              <p className="text-[10px] text-red-500 leading-tight">alergias</p>
+            </div>
+          </div>
+
+          {/* Navegação */}
+          <nav className="flex-1 overflow-y-auto py-2">
+            {NAV_GROUPS.map((grupo) => {
+              const itens = NAV_ITEMS.filter((n) => n.group === grupo);
+              if (!itens.length) return null;
+              return (
+                <div key={grupo} className="mb-1">
+                  <p className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {grupo}
+                  </p>
+                  {itens.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setSecao(id); setSidebarAberta(false); }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        secao === id
+                          ? 'bg-orange-50 text-orange-700 font-semibold border-r-2 border-orange-500'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* ── Área de conteúdo ── */}
+        <main className="flex-1 min-w-0 overflow-auto">
+          {/* Topbar do conteúdo */}
+          <div className="sticky top-0 z-10 bg-white border-b px-4 md:px-6 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setSidebarAberta(true)}
+              className="lg:hidden p-1.5 rounded-lg border text-gray-500 hover:bg-gray-50"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+            <h2 className="font-semibold text-gray-800 text-sm">{tituloSecao}</h2>
+          </div>
+
+          {/* Conteúdo da seção */}
+          <div className="p-4 md:p-6">
+
+      {/* ── Seção: Visão Geral ── */}
+      {secao === 'visao-geral' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Crianças c/ Restrição</span>
+              <span className="text-2xl font-bold text-gray-800">{totalCriancasComRestricao}</span>
+            </div>
+            <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
+              <span className="text-xs text-gray-500 font-medium">Total de Restrições</span>
+              <span className="text-2xl font-bold text-gray-800">{dietas.filter((d) => d.isActive).length}</span>
+            </div>
+            <div className="bg-red-50 rounded-xl border border-red-200 p-4 flex flex-col gap-1">
+              <span className="text-xs text-red-600 font-medium">Alergias</span>
+              <span className="text-2xl font-bold text-red-700">{totalAlergias}</span>
+            </div>
+            <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 flex flex-col gap-1">
+              <span className="text-xs text-orange-600 font-medium">Severidade Alta</span>
+              <span className="text-2xl font-bold text-orange-700">{totalSeveras}</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-xl border p-5">
+              <h3 className="font-semibold text-gray-800 mb-3">Acesso Rápido</h3>
+              <div className="space-y-2">
+                {([
+                  { id: 'cardapios' as SecaoNutri, label: 'Planejar cardápio da semana', icon: BookOpen },
+                  { id: 'dietas' as SecaoNutri, label: 'Ver restrições alimentares', icon: AlertTriangle },
+                  { id: 'turmas' as SecaoNutri, label: 'Resumo por turma', icon: Users },
+                  { id: 'configuracoes' as SecaoNutri, label: 'Configurar refeições', icon: Settings },
+                ] as { id: SecaoNutri; label: string; icon: React.ComponentType<{className?: string}> }[]).map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setSecao(id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border hover:bg-orange-50 hover:border-orange-200 transition-colors text-sm text-gray-700"
+                  >
+                    <Icon className="w-4 h-4 text-orange-500" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border p-5">
+              <h3 className="font-semibold text-gray-800 mb-3">Alertas</h3>
+              {totalSeveras > 0 ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-red-700">
+                    <strong>{totalSeveras}</strong> criança{totalSeveras !== 1 ? 's' : ''} com restrição de severidade alta.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-green-700">Nenhum alerta crítico no momento.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Seção: Dietas e Restrições ── */}
+      {secao === 'dietas' && (
         <div className="space-y-4">
           {/* Filtros */}
           <div className="flex flex-wrap gap-3 items-center">
@@ -2495,8 +2648,8 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
         </div>
       )}
 
-      {/* ── Aba: Pedidos de Alimentação ── */}
-      {aba === 'pedidos' && (
+      {/* ── Seção: Pedidos de Alimentação ── */}
+      {secao === 'pedidos' && (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-3 items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2651,8 +2804,8 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
         </div>
       )}
 
-      {/* ── Aba: Resumo por Turma ── */}
-      {aba === 'turmas' && (
+      {/* ── Seção: Turmas e Crianças ── */}
+      {secao === 'turmas' && (
         <div className="space-y-4">
           <div className="flex justify-end">
             <button
@@ -2677,58 +2830,51 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
         </div>
       )}
 
-      {/* ── Aba: Observações dos Professores ── */}
-      {aba === 'observacoes' && unitId && <AbaObservacoesProfessores unitId={unitId} />}
-      {aba === 'observacoes' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Observações dos Professores ── */}
+      {secao === 'observacoes-prof' && (
+        unitId
+          ? <AbaObservacoesProfessores unitId={unitId} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {/* ── Aba: Anotações Nutricionais ── */}
-      {aba === 'anotacoes' && unitId && <AbaAnotacoesNutricionais unitId={unitId} userId={(user as any)?.id ?? ''} />}
-      {aba === 'anotacoes' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Anotações Nutricionais ── */}
+      {secao === 'anotacoes-nutri' && (
+        unitId
+          ? <AbaAnotacoesNutricionais unitId={unitId} userId={(user as any)?.id ?? ''} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {aba === 'cardapio' && unitId && <AbaCardapio unitId={unitId} />}
-      {aba === 'cardapio' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Cardápios (planejador semanal + histórico) ── */}
+      {secao === 'cardapios' && (
+        unitId
+          ? <AbaCardapio unitId={unitId} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {/* ── Aba: Cálculo Nutricional ── */}
-      {aba === 'nutricao' && unitId && <AbaNutricao unitId={unitId} />}
-      {aba === 'nutricao' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
-      )}
-      {/* ── Aba: Histórico de Cardápios ── */}
-      {aba === 'historico' && unitId && <AbaHistorico unitId={unitId} />}
-      {aba === 'historico' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Cálculo Nutricional ── */}
+      {secao === 'cardapios-nutricao' && (
+        unitId
+          ? <AbaNutricao unitId={unitId} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {/* ── Aba: Relatório Consolidado ── */}
-      {aba === 'relatorio' && unitId && <AbaRelatorioConsolidado unitId={unitId} />}
-      {aba === 'relatorio' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Relatórios ── */}
+      {secao === 'relatorio' && (
+        unitId
+          ? <AbaRelatorioConsolidado unitId={unitId} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
 
-      {/* ── Aba: Configurações de Refeição ── */}
-            {aba === 'configuracoes' && !unitId && (
-        <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
-          <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
-        </div>
+      {/* ── Seção: Configurações de Refeição ── */}
+      {secao === 'configuracoes' && (
+        unitId
+          ? <AbaConfiguracoes unitId={unitId} />
+          : <div className="text-center py-12 text-gray-400 bg-white rounded-xl border"><p className="font-medium">Unidade não identificada.</p></div>
       )}
+
+          </div>{/* fim p-4 md:p-6 */}
+        </main>{/* fim main */}
+      </div>{/* fim flex */}
     </PageShell>
   );
 }
