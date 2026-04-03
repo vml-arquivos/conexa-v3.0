@@ -114,6 +114,8 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [nonSchoolDays, setNonSchoolDays] = useState<string[]>([]);
+  // Configurações de refeição da unidade (FASE 7)
+  const [configsRefeicao, setConfigsRefeicao] = useState<ConfiguracaoRefeicao[]>([]);
   // Estado do formulário de refeição
   const [editando, setEditando] = useState<{ dia: DiaSemana; tipo: TipoRefeicao } | null>(null);
   const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([]);
@@ -169,6 +171,14 @@ function AbaCardapio({ unitId }: { unitId: string }) {
     http.get(`/units/${unitId}`)
       .then((res) => setNonSchoolDays(res.data?.nonSchoolDays ?? []))
       .catch(() => setNonSchoolDays([]));
+  }, [unitId]);
+
+  // Carrega configurações de refeição ativas da unidade (FASE 7)
+  useEffect(() => {
+    if (!unitId) return;
+    listConfiguracoesRefeicao(unitId)
+      .then((data) => setConfigsRefeicao(data))
+      .catch(() => setConfigsRefeicao([]));
   }, [unitId]);
 
   const criarCardapio = async () => {
@@ -299,6 +309,27 @@ function AbaCardapio({ unitId }: { unitId: string }) {
       </div>
 
       {erro && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{erro}</div>}
+
+      {/* Painel de refeições configuradas da unidade (FASE 7) */}
+      {configsRefeicao.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Settings className="w-4 h-4 text-orange-600" />
+            <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Refeições Configuradas da Unidade</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {configsRefeicao.map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5 px-3 py-1 bg-white border border-orange-200 rounded-full text-xs text-gray-700">
+                <span className="font-medium">{c.nome}</span>
+                {c.horario && <span className="text-gray-400">&nbsp;{c.horario}</span>}
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-orange-600 mt-2">
+            Use as refeições padrão do planejador abaixo. Gerencie horários e nomes em <strong>Configurações</strong>.
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-gray-500">Carregando cardápio...</div>
