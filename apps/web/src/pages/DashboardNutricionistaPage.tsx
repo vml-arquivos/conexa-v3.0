@@ -371,31 +371,49 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                     <td className="p-3 font-medium text-gray-700 bg-gray-50 text-xs">
                       {TIPO_REFEICAO_LABELS[tipo]}
                     </td>
-                    {DIAS_SEMANA.map((dia) => {
+                    {DIAS_SEMANA.map((dia, diaIdx) => {
                       const ref = cardapio.refeicoes?.find((r) => r.diaSemana === dia && r.tipoRefeicao === tipo);
+                      // Calcular data do dia para verificar se é letivo
+                      const dataStr = (() => {
+                        const d = new Date(semana + 'T12:00:00');
+                        d.setDate(d.getDate() + diaIdx);
+                        return d.toISOString().slice(0, 10);
+                      })();
+                      const isNonSchoolCell = nonSchoolDays.includes(dataStr);
                       return (
-                        <td key={dia} className="p-2 align-top border-l">
-                          <button
-                            onClick={() => abrirEdicaoComReset(dia, tipo)}
-                            className="w-full min-h-[60px] text-left rounded-lg p-2 hover:bg-orange-50 border border-dashed border-gray-200 hover:border-orange-300 transition-colors"
-                          >
-                            {ref?.itens?.length ? (
-                              <ul className="space-y-0.5">
-                                {ref.itens.map((item, idx) => (
-                                  <li key={idx} className="text-xs text-gray-700 truncate">• {item.nome}</li>
-                                ))}
-                                {ref.totaisNutricionais?.calorias ? (
-                                  <li className="text-xs text-orange-600 font-medium mt-1">
-                                    {ref.totaisNutricionais.calorias.toFixed(0)} kcal
-                                  </li>
-                                ) : null}
-                              </ul>
-                            ) : (
-                              <span className="text-xs text-gray-300 flex items-center gap-1">
-                                <Plus className="w-3 h-3" /> Adicionar
+                        <td key={dia} className={`p-2 align-top border-l ${
+                          isNonSchoolCell ? 'bg-gray-50' : ''
+                        }`}>
+                          {isNonSchoolCell ? (
+                            <div className="w-full min-h-[60px] flex items-center justify-center rounded-lg bg-gray-100 border border-dashed border-gray-200">
+                              <span className="text-xs text-gray-400 text-center">
+                                <span className="block text-base">&#128683;</span>
+                                Não letivo
                               </span>
-                            )}
-                          </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => abrirEdicaoComReset(dia, tipo)}
+                              className="w-full min-h-[60px] text-left rounded-lg p-2 hover:bg-orange-50 border border-dashed border-gray-200 hover:border-orange-300 transition-colors"
+                            >
+                              {ref?.itens?.length ? (
+                                <ul className="space-y-0.5">
+                                  {ref.itens.map((item, idx) => (
+                                    <li key={idx} className="text-xs text-gray-700 truncate">• {item.nome}</li>
+                                  ))}
+                                  {ref.totaisNutricionais?.calorias ? (
+                                    <li className="text-xs text-orange-600 font-medium mt-1">
+                                      {ref.totaisNutricionais.calorias.toFixed(0)} kcal
+                                    </li>
+                                  ) : null}
+                                </ul>
+                              ) : (
+                                <span className="text-xs text-gray-300 flex items-center gap-1">
+                                  <Plus className="w-3 h-3" /> Adicionar
+                                </span>
+                              )}
+                            </button>
+                          )}
                         </td>
                       );
                     })}
