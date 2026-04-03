@@ -313,13 +313,22 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                 {cardapio.refeicoes?.length ?? 0} refeições cadastradas
               </p>
             </div>
-            <button
-              onClick={excluirCardapio}
-              disabled={salvando}
-              className="flex items-center gap-1 px-3 py-2 border border-red-200 rounded-lg text-sm text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="w-4 h-4" /> Excluir
-            </button>
+            <div className="flex items-center gap-2 no-print">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                title="Imprimir ou salvar como PDF"
+              >
+                <Printer className="w-4 h-4" /> Imprimir / PDF
+              </button>
+              <button
+                onClick={excluirCardapio}
+                disabled={salvando}
+                className="flex items-center gap-1 px-3 py-2 border border-red-200 rounded-lg text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="w-4 h-4" /> Excluir
+              </button>
+            </div>
           </div>
 
           {/* Grade semanal */}
