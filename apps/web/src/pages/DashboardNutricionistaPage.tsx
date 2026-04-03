@@ -1250,7 +1250,9 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
           </div>
         </div>
       )}
-}
+    </div>  // ← CORREÇÃO 1: fechamento do return de AbaConfiguracoes (estava faltando)
+  );
+}  // ← CORREÇÃO 1: fechamento da função AbaConfiguracoes (estava faltando)
 
 // ─── AbaObservacoesProfessores ─────────────────────────────────────────────────────────────────────────────────
 interface DiaryEventItem {
@@ -2148,7 +2150,8 @@ function AbaHistorico({ unitId }: { unitId: string }) {
 }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────────────────────────────────
-function DashboardNutricionistaPage()  const { user } = useAuth();
+function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que estava faltando após o nome da função
+  const { user } = useAuth();
   const unitId = (user as any)?.unitId ?? '';
   const [aba, setAba] = useState<'dietas' | 'pedidos' | 'turmas' | 'cardapio' | 'nutricao' | 'configuracoes' | 'historico' | 'observacoes' | 'anotacoes' | 'relatorio'>('dietas');
 
@@ -2345,7 +2348,7 @@ function DashboardNutricionistaPage()  const { user } = useAuth();
         {ABAS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setAba(id)}
+            onClick={() => setAba(id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
               aba === id
                 ? 'bg-white text-orange-600 shadow-sm'
@@ -2730,3 +2733,5 @@ function DashboardNutricionistaPage()  const { user } = useAuth();
     </PageShell>
   );
 }
+
+export default DashboardNutricionistaPage;
