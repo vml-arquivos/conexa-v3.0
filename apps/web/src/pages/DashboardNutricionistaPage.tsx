@@ -2724,8 +2724,7 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
       )}
 
       {/* ── Aba: Configurações de Refeição ── */}
-      {aba === 'configuracoes' && unitId && <AbaConfiguracoes unitId={unitId} />}
-      {aba === 'configuracoes' && !unitId && (
+            {aba === 'configuracoes' && !unitId && (
         <div className="text-center py-12 text-gray-400 bg-white rounded-xl border">
           <p className="font-medium">Unidade não identificada. Faça login novamente.</p>
         </div>
@@ -2734,4 +2733,5 @@ function DashboardNutricionistaPage() {  // ← CORREÇÃO 2: adicionado "{" que
   );
 }
 
+export { DashboardNutricionistaPage };
 export default DashboardNutricionistaPage;
