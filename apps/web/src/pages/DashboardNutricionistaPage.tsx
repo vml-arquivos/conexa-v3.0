@@ -1300,16 +1300,26 @@ function AbaObservacoesProfessores({ unitId }: { unitId: string }) {
   const [loading, setLoading] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState<'REFEICAO' | 'ALIMENTACAO' | ''>('REFEICAO');
   const [busca, setBusca] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
+  const [turmas, setTurmas] = useState<{ id: string; name: string }[]>([]);
   const [dataInicio, setDataInicio] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10);
   });
   const [dataFim, setDataFim] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Carregar turmas para o filtro
+  useEffect(() => {
+    http.get('/lookup/classrooms/accessible', { params: { unitId } })
+      .then((r) => setTurmas(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
+      .catch(() => setTurmas([]));
+  }, [unitId]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { unitId, limit: '200', startDate: dataInicio, endDate: dataFim };
       if (filtroTipo) params.type = filtroTipo;
+      if (filtroTurma) params.classroomId = filtroTurma;
       const res = await http.get('/diary-events', { params });
       setEventos(res.data?.data ?? res.data ?? []);
     } catch {
@@ -1317,7 +1327,7 @@ function AbaObservacoesProfessores({ unitId }: { unitId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [unitId, filtroTipo, dataInicio, dataFim]);
+  }, [unitId, filtroTipo, filtroTurma, dataInicio, dataFim]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -1347,6 +1357,16 @@ function AbaObservacoesProfessores({ unitId }: { unitId: string }) {
             className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
           />
         </div>
+        <select
+          value={filtroTurma}
+          onChange={(e) => setFiltroTurma(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+        >
+          <option value="">Todas as turmas</option>
+          {turmas.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
         <select
           value={filtroTipo}
           onChange={(e) => setFiltroTipo(e.target.value as 'REFEICAO' | 'ALIMENTACAO' | '')}
@@ -1425,20 +1445,29 @@ interface DevObservation {
 }
 
 function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: string }) {
-  const [criancas, setCriancas] = useState<{ id: string; firstName: string; lastName: string; enrollments?: { classroom?: { name: string } }[] }[]>([]);
+  const [criancas, setCriancas] = useState<{ id: string; firstName: string; lastName: string; enrollments?: { classroom?: { id: string; name: string } }[] }[]>([]);
   const [criancaSelecionada, setCriancaSelecionada] = useState<string>('');
   const [observacoes, setObservacoes] = useState<DevObservation[]>([]);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [busca, setBusca] = useState('');
+  const [filtroTurmaAnot, setFiltroTurmaAnot] = useState('');
+  const [turmasAnot, setTurmasAnot] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState({ dietaryNotes: '', recommendations: '', healthNotes: '' });
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
 
-  // Carregar crianças da unidade
+  // Carregar turmas para filtro
   useEffect(() => {
-    http.get('/children', { params: { unitId, limit: '500' } })
+    http.get('/lookup/classrooms/accessible', { params: { unitId } })
+      .then((r) => setTurmasAnot(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
+      .catch(() => setTurmasAnot([]));
+  }, [unitId]);
+
+  // Carregar crianças da unidade (com enrollments para filtrar por turma)
+  useEffect(() => {
+    http.get('/children', { params: { unitId, limit: '500', include: 'enrollments' } })
       .then((r) => setCriancas(r.data?.data ?? r.data ?? []))
       .catch(() => setCriancas([]));
   }, [unitId]);
@@ -1508,7 +1537,9 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
 
   const criancasFiltradas = criancas.filter((c) => {
     const q = busca.toLowerCase();
-    return !q || `${c.firstName} ${c.lastName}`.toLowerCase().includes(q);
+    const nomeOk = !q || `${c.firstName} ${c.lastName}`.toLowerCase().includes(q);
+    const turmaOk = !filtroTurmaAnot || c.enrollments?.some((e) => e.classroom?.id === filtroTurmaAnot);
+    return nomeOk && turmaOk;
   });
 
   const criancaAtual = criancas.find((c) => c.id === criancaSelecionada);
@@ -1518,6 +1549,18 @@ function AbaAnotacoesNutricionais({ unitId, userId }: { unitId: string; userId: 
       {/* Coluna esquerda: seletor de criança */}
       <div className="bg-white rounded-xl border p-4 space-y-3 lg:col-span-1">
         <h3 className="font-semibold text-gray-800 text-sm">Selecionar Criança</h3>
+        {turmasAnot.length > 0 && (
+          <select
+            value={filtroTurmaAnot}
+            onChange={(e) => { setFiltroTurmaAnot(e.target.value); setCriancaSelecionada(''); }}
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+          >
+            <option value="">Todas as turmas</option>
+            {turmasAnot.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
