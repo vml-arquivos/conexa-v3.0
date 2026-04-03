@@ -43,7 +43,12 @@ function assertAccess(user: JwtPayload, unitId: string) {
       throw new ForbiddenException('Sem acesso a esta unidade');
     return;
   }
-  // PROFESSOR e demais: sem acesso ao módulo de cardápio
+  // PARTE 6: PROFESSOR pode ver cardápios publicados da sua unidade (somente leitura)
+  if (level === RoleLevel.PROFESSOR) {
+    if (user.unitId !== unitId)
+      throw new ForbiddenException('Sem acesso a esta unidade');
+    return; // acesso de leitura permitido; o controller filtra publicado=true
+  }
   throw new ForbiddenException('Sem acesso ao módulo de cardápio');
 }
 

@@ -404,11 +404,13 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Admin: Gestão de Usuários ────────────────────────────────────────
+            // ─── Admin: Gestão de Usuários ────────────────────
+      // RBAC: UNIDADE_NUTRICIONISTA NÃO acessa gestão de usuários.
+      // Apenas perfis UNIDADE genéricos (diretor, coord, admin) e superiores.
       {
         path: 'admin/usuarios',
         element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_ADMINISTRATIVO', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <AdminUsuariosPage />
           </RoleProtectedRoute>
         ),
