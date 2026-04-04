@@ -118,6 +118,8 @@ function AbaCardapio({ unitId }: { unitId: string }) {
   const [nonSchoolDays, setNonSchoolDays] = useState<string[]>([]);
   // Configurações de refeição da unidade (FASE 7)
   const [configsRefeicao, setConfigsRefeicao] = useState<ConfiguracaoRefeicao[]>([]);
+  // BLOCO D: restrições alimentares da unidade para alertas no cardápio
+  const [restricoesCardapio, setRestricoesCardapio] = useState<DietaryRestriction[]>([]);
   // Estado do formulário de refeição
   const [editando, setEditando] = useState<{ dia: DiaSemana; tipo: TipoRefeicao } | null>(null);
   const [itensForm, setItensForm] = useState<Partial<CardapioItem>[]>([]);
@@ -181,6 +183,13 @@ function AbaCardapio({ unitId }: { unitId: string }) {
     listConfiguracoesRefeicao(unitId)
       .then((data) => setConfigsRefeicao(data))
       .catch(() => setConfigsRefeicao([]));
+  }, [unitId]);
+  // BLOCO D: carrega restrições alimentares da unidade para alertas no cardápio
+  useEffect(() => {
+    if (!unitId) return;
+    http.get('/children/dietary-restrictions/unidade', { params: { unitId, limit: '500' } })
+      .then((r) => setRestricoesCardapio(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
+      .catch(() => setRestricoesCardapio([]));
   }, [unitId]);
 
   const criarCardapio = async () => {
@@ -572,6 +581,40 @@ function AbaCardapio({ unitId }: { unitId: string }) {
                   </div>
                 </div>
 
+                {/* BLOCO D: Alerta de restrição alimentar ao selecionar alimento */}
+                {alimentoAtual && restricoesCardapio.length > 0 && (() => {
+                  const nomeAlimento = alimentoAtual.nome.toLowerCase();
+                  const afetadas = restricoesCardapio.filter((r) => {
+                    if (!r.forbiddenFoods) return false;
+                    return r.forbiddenFoods.toLowerCase().split(/[,;\n]/).some((f) => {
+                      const ft = f.trim();
+                      return ft.length > 2 && nomeAlimento.includes(ft);
+                    });
+                  });
+                  if (afetadas.length === 0) return null;
+                  return (
+                    <div className="bg-red-50 border border-red-300 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                        <p className="text-xs font-semibold text-red-700">
+                          Atenção: {afetadas.length} criança{afetadas.length !== 1 ? 's' : ''} com restrição para "{alimentoAtual.nome}"
+                        </p>
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {afetadas.map((r) => {
+                          const turma = r.child?.enrollments?.[0]?.classroom?.name ?? 'Sem turma';
+                          return (
+                            <div key={r.id} className="flex items-center gap-2 text-xs text-red-800">
+                              <span className="font-medium">{r.child?.firstName} {r.child?.lastName}</span>
+                              <span className="text-red-500">({turma})</span>
+                              <span className="text-red-600">— {TYPE_LABEL[r.type] ?? r.type}: {r.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {/* Preview nutricional do alimento selecionado (por 100g) */}
                 {alimentoAtual && (
                   <div className="bg-white border border-orange-100 rounded-lg p-3">
@@ -833,9 +876,10 @@ function AbaNutricao({ unitId }: { unitId: string }) {
   }, [unitId, semana]);
   useEffect(() => { carregar(); }, [carregar]);
   // Carrega restrições/alergias para alertas de dietas especiais
+  // BLOCO D: URL corrigida — endpoint real é /children/dietary-restrictions/unidade?unitId=...
   useEffect(() => {
     if (!unitId) return;
-    http.get(`/dietary-restrictions/unidade/${unitId}?limit=200`)
+    http.get('/children/dietary-restrictions/unidade', { params: { unitId, limit: '200' } })
       .then((r) => setRestricoes(Array.isArray(r.data) ? r.data : r.data?.data ?? []))
       .catch(() => setRestricoes([]));
   }, [unitId]);
@@ -1212,6 +1256,8 @@ function AbaConfiguracoes({ unitId }: { unitId: string }) {
   };
 
   const handleToggleAtivo = async (config: ConfiguracaoRefeicao) => {
+    // BLOCO C: confirmação antes de desativar
+    if (config.ativo && !confirm(`Desativar a refeição "${config.nome}"? Ela ficará inativa mas pode ser reativada depois.`)) return;
     try {
       if (config.ativo) {
         await removeConfiguracaoRefeicao(config.id);
@@ -1933,6 +1979,9 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
   const [loading, setLoading] = useState(false);
   const [selecionado, setSelecionado] = useState<AcompanhamentoNutricional | null>(null);
   const [criancas, setCriancas] = useState<{ id: string; firstName: string; lastName: string; enrollments?: { classroom?: { id: string; name: string } }[] }[]>([]);
+  // BLOCO B: lista de turmas e filtro turma→criança no formulário
+  const [turmasForm, setTurmasForm] = useState<{ id: string; name: string }[]>([]);
+  const [filtroTurmaForm, setFiltroTurmaForm] = useState('');
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<StatusCasoNutricional | ''>('');
   const [modoForm, setModoForm] = useState<'novo' | 'editar' | null>(null);
@@ -2008,7 +2057,18 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
             });
           }
         });
-        setCriancas(Array.from(mapa.values()).sort((a, b) => a.firstName.localeCompare(b.firstName)));
+        const listaOrdenada = Array.from(mapa.values()).sort((a, b) => a.firstName.localeCompare(b.firstName));
+        setCriancas(listaOrdenada);
+        // BLOCO B: extrair turmas únicas para o filtro do formulário
+        const turmasUnicas = new Map<string, { id: string; name: string }>();
+        listaOrdenada.forEach((c) => {
+          c.enrollments?.forEach((e) => {
+            if (e.classroom?.id && !turmasUnicas.has(e.classroom.id)) {
+              turmasUnicas.set(e.classroom.id, { id: e.classroom.id, name: e.classroom.name });
+            }
+          });
+        });
+        setTurmasForm(Array.from(turmasUnicas.values()).sort((a, b) => a.name.localeCompare(b.name)));
       })
       .catch(() => setCriancas([]));
   }, [unitId]);
@@ -2237,9 +2297,25 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
                 </button>
               </div>
 
+              {/* BLOCO B: filtro turma→criança */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {modoForm === 'novo' && turmasForm.length > 0 && (
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">1. Turma</label>
+                    <select
+                      value={filtroTurmaForm}
+                      onChange={(e) => { setFiltroTurmaForm(e.target.value); setForm((f) => ({ ...f, childId: '' })); }}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    >
+                      <option value="">Todas as turmas</option>
+                      {turmasForm.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Criança *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{modoForm === 'novo' && turmasForm.length > 0 ? '2. Criança *' : 'Criança *'}</label>
                   <select
                     value={form.childId}
                     onChange={(e) => setForm((f) => ({ ...f, childId: e.target.value }))}
@@ -2247,11 +2323,13 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
                     className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 disabled:bg-gray-50"
                   >
                     <option value="">Selecione uma criança...</option>
-                    {criancas.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.firstName} {c.lastName}{c.enrollments?.[0]?.classroom?.name ? ` (${c.enrollments[0].classroom.name})` : ''}
-                      </option>
-                    ))}
+                    {criancas
+                      .filter((c) => !filtroTurmaForm || c.enrollments?.some((e) => e.classroom?.id === filtroTurmaForm))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.firstName} {c.lastName}{c.enrollments?.[0]?.classroom?.name ? ` (${c.enrollments[0].classroom.name})` : ''}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -3062,6 +3140,18 @@ function TurmaCard({
                       onChange={(e) => setFormPeso({ ...formPeso, obs: e.target.value })}
                       className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
                     />
+                    {/* BLOCO A: Preview de IMC em tempo real */}
+                    {formPeso.peso && formPeso.altura && Number(formPeso.peso) > 0 && Number(formPeso.altura) > 0 && (() => {
+                      const imcVal = Number(formPeso.peso) / ((Number(formPeso.altura) / 100) ** 2);
+                      const imcStr = imcVal.toFixed(1);
+                      const imcColor = imcVal > 25 ? 'text-orange-600' : imcVal < 18.5 ? 'text-blue-600' : 'text-green-600';
+                      return (
+                        <div className="bg-white border border-orange-200 rounded px-3 py-1.5 text-xs flex items-center gap-2">
+                          <span className="text-gray-500">IMC calculado:</span>
+                          <span className={`font-bold ${imcColor}`}>{imcStr}</span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex gap-2">
                       <button
                         onClick={salvarPeso}
@@ -3237,7 +3327,7 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
       'Semana,Status,Publicado Em,Total Itens',
       ...cardapios.map((c) => {
         const totalItens = c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0;
-        return `${c.semana},${c.publicado ? 'Publicado' : 'Rascunho'},${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '-'},${totalItens}`;
+        return `${c.semana},${c.publicado ? 'Publicado' : 'Rascunho'},${c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('pt-BR') : '-'},${totalItens}`;
       }),
       '',
       '=== RESTRIÇÕES ALIMENTARES ATIVAS ===',
@@ -3297,8 +3387,7 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
       <table><thead><tr><th>Semana</th><th>Status</th><th>Publicado Em</th><th>Itens</th></tr></thead><tbody>
         ${cardapios.map((c) => {
           const itens = c.refeicoes?.reduce((acc, r) => acc + (r.itens?.length ?? 0), 0) ?? 0;
-          return `<tr><td>${c.semana}</td><td><span class="badge ${c.publicado ? 'pub' : 'ras'}">${c.publicado ? 'Publicado' : 'Rascunho'}</span></td><td>${c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}</td><td>${itens}</td></tr>`;
-        }).join('')}
+       return `<tr><td>${c.semana}</td><td><span class="badge ${c.publicado ? 'pub' : 'ras'}">${c.publicado ? 'Publicado' : 'Rascunho'}</span></td><td>${c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('pt-BR') : '\u2014'}</td><td>${itens}</td></tr>`;       }).join('')}
       </tbody></table>
       <h2>Restrições Alimentares Ativas (${dietasFiltradas.length})</h2>
       <table><thead><tr><th>Criança</th><th>Tipo</th><th>Descrição</th><th>Turma</th></tr></thead><tbody>
@@ -3541,8 +3630,7 @@ function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {
                             </span>
                           </td>
                           <td className="py-2 text-gray-500">
-                            {c.publicadoEm ? new Date(c.publicadoEm).toLocaleDateString('pt-BR') : '—'}
-                          </td>
+                            {c.updatedAt ? new Date(c.updatedAt).toLocaleDateString('pt-BR') : '\u2014'}                      </td>
                           <td className="py-2 text-gray-600">{totalItens}</td>
                         </tr>
                       );
