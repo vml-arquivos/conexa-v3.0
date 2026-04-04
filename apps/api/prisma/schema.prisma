@@ -343,8 +343,8 @@ model Unit {
 
   dailyMetrics          DailyMetric[]
   cardapios             Cardapio[]
-  configuracoesRefeicao ConfiguracaoRefeicao[]
-
+   configuracoesRefeicao ConfiguracaoRefeicao[]
+  developmentReports    DevelopmentReport[]
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
@@ -391,8 +391,8 @@ model User {
   planningsCreated        Planning[]         @relation("CreatedBy")
   attendancesRecorded     Attendance[]       @relation("RecordedBy")
   materialRequestsCreated MaterialRequest[]  @relation("CreatedBy")
-  auditLogs               AuditLog[]         @relation("User")
-
+   auditLogs               AuditLog[]         @relation("User")
+  developmentReports      DevelopmentReport[]
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([email])
@@ -565,6 +565,7 @@ model Child {
   rdixInstancias      RDIXInstancia[]
   studentPostPerfs    StudentPostPerformance[]
   developmentObs              DevelopmentObservation[]
+  developmentReports          DevelopmentReport[]
   acompanhamentosNutricionais AcompanhamentoNutricional[]
 
   @@index([mantenedoraId])
@@ -639,8 +640,8 @@ model Classroom {
   attendances      Attendance[]
   materialRequests MaterialRequest[]
   reportBases      ReportBase[]
-  classroomPosts   ClassroomPost[]
-
+   classroomPosts       ClassroomPost[]
+  developmentReports   DevelopmentReport[]
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -2211,4 +2212,31 @@ model AcompanhamentoNutricional {
   @@index([ativo])
   @@index([proximaReavaliacao])
   @@map("acompanhamento_nutricional")
+}
+
+// ============================================================
+// MÓDULO DE DESENVOLVIMENTO — Relatório Individual
+// ============================================================
+
+model DevelopmentReport {
+  id          String    @id @default(cuid())
+  childId     String
+  authorId    String
+  classroomId String
+  unitId      String
+  period      String
+  content     String
+  status      String    @default("DRAFT")
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  child     Child     @relation(fields: [childId], references: [id])
+  author    User      @relation(fields: [authorId], references: [id])
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+  unit      Unit      @relation(fields: [unitId], references: [id])
+
+  @@index([childId, createdAt(sort: Desc)])
+  @@index([classroomId, period])
+  @@map("DevelopmentReport")
 }
