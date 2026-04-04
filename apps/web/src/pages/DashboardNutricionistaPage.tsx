@@ -2465,7 +2465,8 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
             const vencido = selecionado.proximaReavaliacao && new Date(selecionado.proximaReavaliacao) < new Date();
             const ultimaMedicao = medicoes[0];
             const imc = ultimaMedicao?.peso && ultimaMedicao?.altura
-              ? (ultimaMedicao.peso / ((ultimaMedicao.altura / 100) ** 2)).toFixed(1)
+              // FIX-IMC: altura salva em metros; sem /100
+              ? (ultimaMedicao.peso / (ultimaMedicao.altura ** 2)).toFixed(1)
               : null;
 
             return (
@@ -2531,7 +2532,7 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-500">Altura</span>
-                          <span className="font-semibold">{ultimaMedicao.altura ? `${ultimaMedicao.altura} cm` : '—'}</span>
+                          <span className="font-semibold">{ultimaMedicao.altura ? `${ultimaMedicao.altura} m` : '—'}</span>
                         </div>
                         {imc && (
                           <div className="flex justify-between text-sm">
@@ -2635,8 +2636,9 @@ function AbaAcompanhamentoIndividual({ unitId, userId }: { unitId: string; userI
                               {m.data && <span className="text-xs text-gray-400">{new Date(m.data).toLocaleDateString('pt-BR')}</span>}
                             </div>
                             <p className="text-sm text-gray-700 mt-0.5">
-                              {m.peso && `Peso: ${m.peso}kg`}{m.peso && m.altura && ' · '}{m.altura && `Altura: ${m.altura}cm`}
-                              {m.peso && m.altura && ` · IMC: ${(m.peso / ((m.altura / 100) ** 2)).toFixed(1)}`}
+                              {m.peso && `Peso: ${m.peso}kg`}{m.peso && m.altura && ' · '}{m.altura && `Altura: ${m.altura}m`}
+                              {/* FIX-IMC: altura em metros; sem /100 */}
+                              {m.peso && m.altura && ` · IMC: ${(m.peso / (m.altura ** 2)).toFixed(1)}`}
                             </p>
                             {m.obs && <p className="text-xs text-gray-500 mt-0.5">{m.obs}</p>}
                           </div>
@@ -2857,12 +2859,13 @@ function TurmaCard({
         childId: formPeso.childId,
         type: 'SAUDE',
         title: 'Diagnóstico Nutricional',
-        description: formPeso.obs || `Peso: ${formPeso.peso}kg | Altura: ${formPeso.altura}cm`,
+        description: formPeso.obs || `Peso: ${formPeso.peso}kg | Altura: ${formPeso.altura}m`,
         eventDate: hoje,
         status: 'PUBLICADO',
         medicaoAlimentar: {
           ...(formPeso.peso ? { peso: Number(formPeso.peso) } : {}),
-          ...(formPeso.altura ? { altura: Number(formPeso.altura) } : {}),
+          // FIX-IMC: normalizar vírgula decimal (0,98 → 0.98) e salvar em metros
+          ...(formPeso.altura ? { altura: Number(String(formPeso.altura).replace(',', '.')) } : {}),
         },
       });
       setFormPeso({ childId: '', peso: '', altura: '', obs: '' });
@@ -3084,7 +3087,7 @@ function TurmaCard({
                           {o.medicaoAlimentar && (
                             <div className="flex gap-3 text-[10px] text-gray-500">
                               {o.medicaoAlimentar.peso && <span>Peso: {o.medicaoAlimentar.peso}kg</span>}
-                              {o.medicaoAlimentar.altura && <span>Altura: {o.medicaoAlimentar.altura}cm</span>}
+                              {o.medicaoAlimentar.altura && <span>Altura: {o.medicaoAlimentar.altura}m</span>}
                             </div>
                           )}
                         </div>
@@ -3126,8 +3129,9 @@ function TurmaCard({
                         className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
                       />
                       <input
-                        type="number"
-                        placeholder="Altura (cm)"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Altura (m) ex: 0,98"
                         value={formPeso.altura}
                         onChange={(e) => setFormPeso({ ...formPeso, altura: e.target.value })}
                         className="border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
@@ -3141,8 +3145,10 @@ function TurmaCard({
                       className="w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-orange-300"
                     />
                     {/* BLOCO A: Preview de IMC em tempo real */}
-                    {formPeso.peso && formPeso.altura && Number(formPeso.peso) > 0 && Number(formPeso.altura) > 0 && (() => {
-                      const imcVal = Number(formPeso.peso) / ((Number(formPeso.altura) / 100) ** 2);
+                    {formPeso.peso && formPeso.altura && Number(formPeso.peso) > 0 && Number(String(formPeso.altura).replace(',', '.')) > 0 && (() => {
+                      // FIX-IMC: normalizar vírgula e calcular sem /100 (altura em metros)
+                      const alturaM = Number(String(formPeso.altura).replace(',', '.'));
+                      const imcVal = Number(formPeso.peso) / (alturaM ** 2);
                       const imcStr = imcVal.toFixed(1);
                       const imcColor = imcVal > 25 ? 'text-orange-600' : imcVal < 18.5 ? 'text-blue-600' : 'text-green-600';
                       return (
@@ -3177,7 +3183,8 @@ function TurmaCard({
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {diagnosticos.map((d, i) => {
                       const crianca = allCriancas.find((c) => c.id === d.childId);
-                      const imc = d.peso && d.altura ? (d.peso / ((d.altura / 100) ** 2)).toFixed(1) : null;
+                      // FIX-IMC: altura em metros; sem /100
+                      const imc = d.peso && d.altura ? (d.peso / (d.altura ** 2)).toFixed(1) : null;
                       return (
                         <div key={i} className="bg-gray-50 rounded-lg p-2.5">
                           <div className="flex items-center justify-between">
@@ -3192,7 +3199,7 @@ function TurmaCard({
                           </div>
                           <div className="flex gap-4 mt-1 text-xs text-gray-600">
                             {d.peso && <span>Peso: <strong>{d.peso}kg</strong></span>}
-                            {d.altura && <span>Altura: <strong>{d.altura}cm</strong></span>}
+                            {d.altura && <span>Altura: <strong>{d.altura}m</strong></span>}
                             {imc && <span>IMC: <strong className={Number(imc) > 25 ? 'text-orange-600' : Number(imc) < 18.5 ? 'text-blue-600' : 'text-green-600'}>{imc}</strong></span>}
                           </div>
                           {d.obs && <p className="text-xs text-gray-500 mt-0.5">{d.obs}</p>}
