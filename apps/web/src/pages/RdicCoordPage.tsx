@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import {
   Brain, RefreshCw, CheckCircle, AlertCircle,
-  RotateCcw, Globe, Filter, User, Users,
+  RotateCcw, Globe, Filter, User, Users, TrendingUp,
 } from 'lucide-react';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
@@ -442,6 +442,14 @@ export default function RdicCoordPage() {
                   />
                 </div>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/app/turma/${turmaId}/painel`)}
+                className="flex items-center gap-1 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+              >
+                <TrendingUp className="h-3.5 w-3.5" /> Painel
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

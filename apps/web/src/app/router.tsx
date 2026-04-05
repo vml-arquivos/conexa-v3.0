@@ -520,36 +520,9 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Fase 1 — Central RDIC da Criança (/app/crianca/:childId/rdic-central) ───────────
-      {
-        path: 'crianca/:childId/rdic-central',
-        element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <CentralRdicCriancaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      // ─── Fase 2 — Painel Analítico da Criança (/app/crianca/:childId/painel-analitico) ───
-      {
-        path: 'crianca/:childId/painel-analitico',
-        element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <PainelAnaliticoCriancaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      // ─── Fase 3 — Painel da Turma (/app/turma/:classroomId/painel) ──────────────────
-      {
-        path: 'turma/:classroomId/painel',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <PainelTurmaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
+      { path:'turma/:classroomId/painel', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelTurmaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
+      { path:'crianca/:childId/rdic-central', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><CentralRdicCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
+      { path:'crianca/:childId/painel-analitico', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelAnaliticoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
     ],
   },
 ]);
