@@ -343,7 +343,17 @@ export default function RdicCriancaPage() {
   const [loadingRdics, setLoadingRdics] = useState(false);
 
   // Formulário RDIC
-  const [bimestre, setBimestre] = useState(1);
+  // Calcula o bimestre atual com base no mês corrente (ano letivo: Fev–Dez)
+  // 1º Bim: Fev–Abr (2-4), 2º Bim: Mai–Jul (5-7), 3º Bim: Ago–Out (8-10), 4º Bim: Nov–Dez (11-12)
+  const calcularBimestreAtual = (): number => {
+    const mes = new Date().getMonth() + 1; // 1-12
+    if (mes >= 2 && mes <= 4) return 1;
+    if (mes >= 5 && mes <= 7) return 2;
+    if (mes >= 8 && mes <= 10) return 3;
+    if (mes >= 11 && mes <= 12) return 4;
+    return 1; // Janeiro: pré-ano letivo, usa 1º bimestre como padrão
+  };
+  const [bimestre, setBimestre] = useState(calcularBimestreAtual);
   const [dimensoes, setDimensoes] = useState<DimensaoAvaliacao[]>(criarDimensoesVazias());
   const [observacaoGeral, setObservacaoGeral] = useState('');
   const [proximosPassos, setProximosPassos] = useState('');
