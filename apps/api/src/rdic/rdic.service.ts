@@ -427,6 +427,91 @@ export class RdicService {
     return instancia;
   }
 
+  // ─── Central da Criança ─────────────────────────────────────────────────
+  async centralDaCrianca(childId: string, user: JwtPayload) {
+    const level = user.roles[0]?.level;
+
+    // 1. Buscar dados da criança (sem acompanhamentosNutricionais no select)
+    const child = await this.prisma.child.findFirst({
+      where: { id: childId, mantenedoraId: user.mantenedoraId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        gender: true,
+        allergies: true,
+        medicalConditions: true,
+        photoUrl: true,
+        enrollments: {
+          where: { status: 'ATIVA' },
+          select: {
+            classroom: {
+              select: { id: true, name: true, code: true },
+            },
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (!child) throw new NotFoundException('Criança não encontrada');
+
+    // 2b. Acompanhamento nutricional — query separada e defensiva
+    // Isola o risco: se a tabela não existir no cliente Prisma, nunca quebra
+    let acompanhamentoNutricional: any = null;
+    try {
+      acompanhamentoNutricional = await (this.prisma as any)
+        .acompanhamentoNutricional.findUnique({
+          where: { childId },
+          select: {
+            statusCaso: true,
+            orientacoesProfCozinha: true,
+            restricoesOperacionais: true,
+            substituicoesSeguras: true,
+            proximaReavaliacao: true,
+          },
+        });
+    } catch {
+      // Silencioso — acompanhamento é opcional, não deve quebrar o endpoint central
+    }
+
+    // 3. Todos os RDICs da criança
+    const rdics = await this.prisma.rDIXInstancia.findMany({
+      where: { childId, mantenedoraId: user.mantenedoraId },
+      orderBy: [{ anoLetivo: 'desc' }, { criadoEm: 'desc' }],
+      select: {
+        id: true,
+        periodo: true,
+        periodoEnum: true,
+        anoLetivo: true,
+        status: true,
+        criadoEm: true,
+        atualizadoEm: true,
+        reviewComment: true,
+        conteudoFinal: true,
+      },
+    });
+
+    const turmaAtual = child.enrollments[0]?.classroom ?? null;
+
+    return {
+      child: {
+        id: child.id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        dateOfBirth: child.dateOfBirth ? (child.dateOfBirth as Date).toISOString() : null,
+        gender: child.gender ? String(child.gender) : null,
+        allergies: child.allergies ?? null,
+        medicalConditions: child.medicalConditions ?? null,
+        photoUrl: child.photoUrl ?? null,
+        turmaAtual,
+      },
+      acompanhamentoNutricional,
+      rdics,
+    };
+  }
+
   // ─── Helper interno ───────────────────────────────────────────────────────
   private async _buscarEValidar(id: string, user: JwtPayload) {
     const instancia = await this.prisma.rDIXInstancia.findUnique({

@@ -166,7 +166,7 @@ function KanbanCard({
   crianca: CriancaStatus;
   onDevolver: (id: string) => void;
   onAprovar: (id: string) => void;
-  onVerDetalhe: (id: string) => void;
+  onVerDetalhe: (rdicId: string, childId: string) => void;
   salvandoId: string | null;
 }) {
   const rdicId = crianca?.rdic?.id ?? null;
@@ -203,7 +203,7 @@ function KanbanCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onVerDetalhe(rdicId)}
+              onClick={() => onVerDetalhe(rdicId, crianca.childId)}
               className="text-xs h-7 px-2"
             >
               {podeAprovar ? 'Revisar' : 'Ver'}
@@ -324,8 +324,10 @@ export default function RdicCoordPage() {
   };
 
   // ─── Navegar para detalhe — usa React Router (não window.location) ────────
-  const handleVerDetalhe = useCallback((id: string) => {
-    navigate(`/rdic/${id}`);
+  const handleVerDetalhe = useCallback((rdicId: string, childId: string) => {
+    if (childId) {
+      navigate(`/app/crianca/${childId}/rdic-central`);
+    }
   }, [navigate]);
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
