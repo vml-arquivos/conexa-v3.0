@@ -1,17 +1,15 @@
 /**
- * RdicCoordPage.tsx
- * Tela da Coordenadora Pedagógica da Unidade para revisão, correção e aprovação de RDICs.
+ * RdicCoordPage.tsx — SEDF 2026 (Trimestral + Kanban)
  *
- * Fluxo de acesso:
- *  - UNIDADE: acesso completo (ver, editar, devolver, finalizar, publicar)
- *  - Outros roles: bloqueado (RoleProtectedRoute no router)
- *
- * Fluxo de status:
- *  RASCUNHO → (professor envia) → EM_REVISAO → (coord. aprova) → FINALIZADO → (coord. publica) → PUBLICADO
- *                                             → (coord. devolve com comentário) → DEVOLVIDO
- *  DEVOLVIDO → (professor corrige e reenvia) → EM_REVISAO
+ * Alterações vs versão anterior:
+ *  - Filtro de Turma OBRIGATÓRIO antes de qualquer chamada à API
+ *  - Filtro de Trimestre (1º, 2º, 3º) — SEDF 2026
+ *  - Visualização Kanban: Pendentes | Em Rascunho/Devolvidos | Prontos p/ Revisão
+ *  - BUG FIX: devolver usava http.patch — corrigido para http.post (alinhado com @Post controller)
+ *  - Código defensivo: optional chaining + nullish coalescing + try/catch em toda chamada
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -22,58 +20,102 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { toast } from 'sonner';
 import http from '../api/http';
 import {
-  Brain, RefreshCw, CheckCircle, AlertCircle, Clock,
-  Eye, Edit3, Send, RotateCcw, BookOpen, Filter,
-  ChevronDown, ChevronUp, User, FileText, Globe, XCircle,
+  Brain, RefreshCw, CheckCircle, AlertCircle,
+  RotateCcw, Globe, Filter, User, Users,
 } from 'lucide-react';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface RdicItem {
+// ─── Tipos ─────────────────────────────────────────────────────────────────────
+interface Turma {
   id: string;
-  childId: string;
-  classroomId: string;
-  periodo: string;
-  anoLetivo: number;
-  status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'APROVADO' | 'FINALIZADO' | 'PUBLICADO';
-  rascunhoJson: any;
-  conteudoFinal: any;
-  criadoPorId: string;
-  revisadoPorId?: string;
-  reviewComment?: string;
-  finalizadoEm?: string;
-  publicadoEm?: string;
-  criadoEm: string;
-  child?: { firstName: string; lastName: string; dateOfBirth?: string };
+  name: string;
+  code: string;
 }
 
-// ─── Badge de status ──────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: RdicItem['status'] }) {
-  const map: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
-    RASCUNHO:   { label: 'Rascunho',      cls: 'bg-gray-100 text-gray-600',        icon: <Edit3 className="h-3 w-3" /> },
-    EM_REVISAO: { label: 'Em Revisão',    cls: 'bg-yellow-100 text-yellow-700',    icon: <Clock className="h-3 w-3" /> },
-    DEVOLVIDO:  { label: 'Devolvido',     cls: 'bg-orange-100 text-orange-700',    icon: <RotateCcw className="h-3 w-3" /> },
-    APROVADO:   { label: '✓ Aprovado',    cls: 'bg-emerald-100 text-emerald-700',  icon: <CheckCircle className="h-3 w-3" /> },
-    FINALIZADO: { label: 'Finalizado',    cls: 'bg-blue-100 text-blue-700',        icon: <CheckCircle className="h-3 w-3" /> },
-    PUBLICADO:  { label: 'Publicado',     cls: 'bg-green-100 text-green-700',      icon: <Globe className="h-3 w-3" /> },
+interface RdicDaCrianca {
+  id: string;
+  status: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewComment?: string;
+}
+
+interface CriancaStatus {
+  childId: string;
+  nome: string;
+  rdic: RdicDaCrianca | null;
+  status: 'PENDENTE' | 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'APROVADO' | 'FINALIZADO' | 'PUBLICADO';
+}
+
+interface TurmaStatusResponse {
+  classroomId: string;
+  classroomName: string;
+  periodo: string;
+  anoLetivo: number;
+  completude: number;
+  contagem: Record<string, number>;
+  criancas: CriancaStatus[];
+}
+
+// ─── Constantes ────────────────────────────────────────────────────────────────
+const TRIMESTRES = [
+  { id: 1, label: '1º Trimestre', periodo: 'Fev–Mai 2026', valor: 'PRIMEIRO_TRIMESTRE'  },
+  { id: 2, label: '2º Trimestre', periodo: 'Jun–Set 2026', valor: 'SEGUNDO_TRIMESTRE'   },
+  { id: 3, label: '3º Trimestre', periodo: 'Out–Dez 2026', valor: 'TERCEIRO_TRIMESTRE'  },
+] as const;
+
+const ANO_LETIVO = 2026;
+
+const KANBAN_COLUNAS = [
+  {
+    id: 'pendente',
+    titulo: '📋 Pendentes',
+    cor: 'border-t-slate-400 bg-slate-50',
+    header: 'bg-slate-100 text-slate-700',
+    statusList: ['PENDENTE'],
+  },
+  {
+    id: 'rascunho',
+    titulo: '✏️ Em Rascunho',
+    cor: 'border-t-amber-400 bg-amber-50/40',
+    header: 'bg-amber-100 text-amber-800',
+    statusList: ['RASCUNHO', 'DEVOLVIDO'],
+  },
+  {
+    id: 'revisao',
+    titulo: '🔍 Prontos para Revisão',
+    cor: 'border-t-emerald-400 bg-emerald-50/40',
+    header: 'bg-emerald-100 text-emerald-800',
+    statusList: ['EM_REVISAO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'],
+  },
+] as const;
+
+// ─── StatusPill ────────────────────────────────────────────────────────────────
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    PENDENTE:   'bg-slate-100 text-slate-600',
+    RASCUNHO:   'bg-gray-100 text-gray-600',
+    DEVOLVIDO:  'bg-orange-100 text-orange-700',
+    EM_REVISAO: 'bg-yellow-100 text-yellow-700',
+    APROVADO:   'bg-emerald-100 text-emerald-700',
+    FINALIZADO: 'bg-blue-100 text-blue-700',
+    PUBLICADO:  'bg-green-100 text-green-700',
   };
-  const s = map[status] ?? map.RASCUNHO;
+  const labels: Record<string, string> = {
+    PENDENTE: 'Pendente', RASCUNHO: 'Rascunho', DEVOLVIDO: 'Devolvido',
+    EM_REVISAO: 'Em Revisão', APROVADO: 'Aprovado',
+    FINALIZADO: 'Finalizado', PUBLICADO: 'Publicado',
+  };
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${s.cls}`}>
-      {s.icon} {s.label}
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${map[status] ?? 'bg-gray-100 text-gray-500'}`}>
+      {labels[status] ?? status}
     </span>
   );
 }
 
-// ─── Modal de Devolução ───────────────────────────────────────────────────────
+// ─── Modal de Devolução ────────────────────────────────────────────────────────
 function ModalDevolucao({
-  onConfirmar,
-  onCancelar,
-  salvando,
-}: {
-  onConfirmar: (comment: string) => void;
-  onCancelar: () => void;
-  salvando: boolean;
-}) {
+  onConfirmar, onCancelar, salvando,
+}: { onConfirmar: (c: string) => void; onCancelar: () => void; salvando: boolean }) {
   const [comentario, setComentario] = useState('');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -87,466 +129,375 @@ function ModalDevolucao({
             <p className="text-sm text-gray-500">Informe o motivo da devolução</p>
           </div>
         </div>
-        <div className="space-y-3">
-          <Label htmlFor="comentario-devolucao" className="text-sm font-medium text-gray-700">
-            Comentário para o professor <span className="text-red-500">*</span>
-          </Label>
-          <Textarea
-            id="comentario-devolucao"
-            placeholder="Ex: Faltou descrever o desenvolvimento motor no campo 'Corpo, Gestos e Movimentos'. Por favor, complemente com observações da semana de 10/02."
-            value={comentario}
-            onChange={e => setComentario(e.target.value)}
-            className="min-h-[100px] text-sm"
-          />
-          <p className="text-xs text-gray-400">{comentario.length}/500 caracteres</p>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <Button variant="outline" onClick={onCancelar} disabled={salvando} className="text-sm">
+        <Textarea
+          placeholder="Ex: Faltou descrever o desenvolvimento motor. Por favor, complemente."
+          value={comentario}
+          onChange={e => setComentario(e.target.value)}
+          className="min-h-[100px] text-sm"
+        />
+        <p className="text-xs text-gray-400 mt-1">{comentario.length}/500</p>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={onCancelar} disabled={salvando}>
             Cancelar
           </Button>
           <Button
             onClick={() => onConfirmar(comentario)}
             disabled={salvando || comentario.trim().length < 10}
-            className="bg-orange-600 hover:bg-orange-700 text-white text-sm flex items-center gap-2"
+            className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
           >
-            {salvando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-            Confirmar Devolução
+            {salvando
+              ? <RefreshCw className="h-4 w-4 animate-spin" />
+              : <RotateCcw className="h-4 w-4" />}
+            Confirmar
           </Button>
         </div>
-        {comentario.trim().length < 10 && comentario.length > 0 && (
-          <p className="text-xs text-red-500 mt-2">O comentário deve ter pelo menos 10 caracteres.</p>
+        {comentario.length > 0 && comentario.trim().length < 10 && (
+          <p className="text-xs text-red-500 mt-1">Mínimo de 10 caracteres.</p>
         )}
       </div>
     </div>
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
-export default function RdicCoordPage() {
-  const [loading, setLoading] = useState(true);
-  const [rdics, setRdics] = useState<RdicItem[]>([]);
-  const [filtroStatus, setFiltroStatus] = useState<string>('todos');
-  const [selecionado, setSelecionado] = useState<RdicItem | null>(null);
-  const [modoEdicao, setModoEdicao] = useState(false);
-  const [conteudoEditado, setConteudoEditado] = useState<any>(null);
-  const [salvando, setSalvando] = useState(false);
-  const [expandido, setExpandido] = useState<string | null>(null);
-  const [modalDevolucao, setModalDevolucao] = useState<string | null>(null); // id do RDIC a devolver
+// ─── Card Kanban por criança ───────────────────────────────────────────────────
+function KanbanCard({
+  crianca, onDevolver, onAprovar, onVerDetalhe, salvandoId,
+}: {
+  crianca: CriancaStatus;
+  onDevolver: (id: string) => void;
+  onAprovar: (id: string) => void;
+  onVerDetalhe: (id: string) => void;
+  salvandoId: string | null;
+}) {
+  const rdicId = crianca?.rdic?.id ?? null;
+  const isSalvando = salvandoId === rdicId;
+  const podeAprovar = crianca.status === 'EM_REVISAO' || crianca.status === 'RASCUNHO';
+  const podeDevolver = crianca.status === 'EM_REVISAO';
 
-  // ─── Carregar RDICs da unidade ─────────────────────────────────────────────
-  const carregar = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await http.get('/rdic');
-      setRdics(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
-    } catch {
-      toast.error('Erro ao carregar RDICs');
-    } finally {
-      setLoading(false);
-    }
+  return (
+    <Card className="hover:shadow-md transition-shadow border border-gray-100">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <User className="h-4 w-4 text-indigo-600" />
+            </div>
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {crianca?.nome ?? 'Criança'}
+            </p>
+          </div>
+          <StatusPill status={crianca?.status ?? 'PENDENTE'} />
+        </div>
+
+        {crianca.status === 'DEVOLVIDO' && crianca?.rdic?.reviewComment && (
+          <div className="bg-orange-50 border border-orange-100 rounded-lg p-2 flex gap-2">
+            <AlertCircle className="h-3.5 w-3.5 text-orange-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-orange-700 line-clamp-2">
+              {crianca.rdic.reviewComment}
+            </p>
+          </div>
+        )}
+
+        {rdicId && (
+          <div className="flex flex-wrap gap-1 pt-1 border-t border-gray-100">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onVerDetalhe(rdicId)}
+              className="text-xs h-7 px-2"
+            >
+              {podeAprovar ? 'Revisar' : 'Ver'}
+            </Button>
+            {podeDevolver && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onDevolver(rdicId)}
+                disabled={isSalvando}
+                className="text-xs h-7 px-2 text-orange-600 border-orange-200"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" /> Devolver
+              </Button>
+            )}
+            {podeAprovar && (
+              <Button
+                size="sm"
+                onClick={() => onAprovar(rdicId)}
+                disabled={isSalvando}
+                className="text-xs h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isSalvando
+                  ? <RefreshCw className="h-3 w-3 animate-spin" />
+                  : <CheckCircle className="h-3 w-3 mr-1" />}
+                Aprovar
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────────
+export default function RdicCoordPage() {
+  const navigate = useNavigate();
+
+  const [turmaId, setTurmaId]               = useState<string>('');
+  const [trimestreId, setTrimestreId]       = useState<number>(1);
+  const [turmas, setTurmas]                 = useState<Turma[]>([]);
+  const [loadingTurmas, setLoadingTurmas]   = useState(true);
+  const [turmaStatus, setTurmaStatus]       = useState<TurmaStatusResponse | null>(null);
+  const [loadingStatus, setLoadingStatus]   = useState(false);
+  const [salvandoId, setSalvandoId]         = useState<string | null>(null);
+  const [modalDevolucaoId, setModalDevolucaoId] = useState<string | null>(null);
+
+  // ─── Carregar turmas via endpoint padronizado do projecto ──────────────────
+  useEffect(() => {
+    const fetchTurmas = async () => {
+      setLoadingTurmas(true);
+      try {
+        const res = await http.get('/lookup/classrooms/accessible');
+        const raw = Array.isArray(res?.data) ? res.data : res?.data?.data ?? [];
+        setTurmas(raw.map((t: any) => ({ id: t.id, name: t.name, code: t.code ?? '' })));
+      } catch {
+        toast.error('Não foi possível carregar as turmas.');
+      } finally {
+        setLoadingTurmas(false);
+      }
+    };
+    fetchTurmas();
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
-
-  // ─── Filtrar por status ────────────────────────────────────────────────────
-  const rdicsFiltrados = rdics.filter(r =>
-    filtroStatus === 'todos' ? true : r.status === filtroStatus
-  );
-
-  // ─── Abrir RDIC para revisão ───────────────────────────────────────────────
-  function abrirRevisao(rdic: RdicItem) {
-    setSelecionado(rdic);
-    setConteudoEditado(rdic.rascunhoJson ?? {});
-    setModoEdicao(false);
-  }
-
-  // ─── Devolver ao professor (com comentário obrigatório) ───────────────────
-  async function confirmarDevolucao(id: string, comment: string) {
-    setSalvando(true);
+  // ─── Carregar status Kanban (GATE: só executa com turmaId preenchido) ──────
+  const carregarStatus = useCallback(async () => {
+    if (!turmaId) return;
+    setLoadingStatus(true);
     try {
-      await http.patch(`/rdic/${id}/devolver`, { comment });
-      toast.success('RDIC devolvido ao professor com comentário.');
-      setModalDevolucao(null);
-      setSelecionado(null);
-      await carregar();
+      const trimestre = TRIMESTRES.find(t => t.id === trimestreId);
+      const res = await http.get('/rdic/turma/status', {
+        params: {
+          classroomId: turmaId,
+          periodo:     trimestre?.label ?? '1º Trimestre',
+          anoLetivo:   ANO_LETIVO,
+        },
+      });
+      setTurmaStatus(res?.data ?? null);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao devolver RDIC');
+      toast.error(err?.response?.data?.message ?? 'Erro ao carregar status da turma.');
+      setTurmaStatus(null);
     } finally {
-      setSalvando(false);
+      setLoadingStatus(false);
     }
-  }
+  }, [turmaId, trimestreId]);
 
-  // ─── Salvar correções ──────────────────────────────────────────────────────
-  async function salvarCorrecoes(id: string) {
-    setSalvando(true);
-    try {
-      await http.patch(`/rdic/${id}`, { rascunhoJson: conteudoEditado });
-      toast.success('Correções salvas com sucesso.');
-      setModoEdicao(false);
-      await carregar();
-      const atualizado = rdics.find(r => r.id === id);
-      if (atualizado) setSelecionado({ ...atualizado, rascunhoJson: conteudoEditado });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar correções');
-    } finally {
-      setSalvando(false);
-    }
-  }
+  useEffect(() => { carregarStatus(); }, [carregarStatus]);
 
-   // ─── Aprovar RDIC (novo endpoint POST /aprovar) ──────────────────────────────
-  async function aprovar(id: string) {
+  // ─── Aprovar RDIC ──────────────────────────────────────────────────────────
+  const handleAprovar = async (id: string) => {
     if (!confirm('Aprovar este RDIC? O professor não poderá mais editá-lo.')) return;
-    setSalvando(true);
+    setSalvandoId(id);
     try {
       await http.post(`/rdic/${id}/aprovar`);
       toast.success('✓ RDIC aprovado com sucesso!');
-      setSelecionado(null);
-      await carregar();
+      await carregarStatus();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao aprovar RDIC');
+      toast.error(err?.response?.data?.message ?? 'Erro ao aprovar RDIC.');
     } finally {
-      setSalvando(false);
+      setSalvandoId(null);
     }
-  }
-
-  // ─── Finalizar (legado) ─────────────────────────────────────────────
-  async function finalizar(id: string) {
-    if (!confirm('Finalizar e aprovar este RDIC? O professor não poderá mais editá-lo.')) return;
-    setSalvando(true);
-    try {
-      await http.patch(`/rdic/${id}/finalizar`, { conteudoFinal: conteudoEditado });
-      toast.success('RDIC finalizado e aprovado!');
-      setSelecionado(null);
-      await carregar();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao finalizar RDIC');
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  // ─── Publicar (libera para coord. geral) ──────────────────────────────────
-  async function publicar(id: string) {
-    if (!confirm('Publicar este RDIC? Ele ficará disponível para a Coordenação Geral.')) return;
-    setSalvando(true);
-    try {
-      await http.patch(`/rdic/${id}/publicar`);
-      toast.success('RDIC publicado! Agora visível para a Coordenação Geral.');
-      setSelecionado(null);
-      await carregar();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao publicar RDIC');
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-  if (loading) return <LoadingState message="Carregando RDICs da unidade..." />;
-
-  // ─── Painel de revisão de um RDIC selecionado ─────────────────────────────
-  if (selecionado) {
-    const dados = conteudoEditado ?? selecionado.rascunhoJson ?? {};
-    const nome = `${selecionado.child?.firstName ?? ''} ${selecionado.child?.lastName ?? ''}`.trim();
-    const podeEditar = selecionado.status === 'EM_REVISAO' || selecionado.status === 'RASCUNHO';
-
-    return (
-      <PageShell
-        title={`Revisão RDIC — ${nome}`}
-        subtitle={`${selecionado.periodo} / ${selecionado.anoLetivo}`}
-      >
-        {/* Modal de devolução */}
-        {modalDevolucao && (
-          <ModalDevolucao
-            salvando={salvando}
-            onCancelar={() => setModalDevolucao(null)}
-            onConfirmar={(comment) => confirmarDevolucao(modalDevolucao, comment)}
-          />
-        )}
-
-        <div className="space-y-6">
-          {/* Alerta de comentário de devolução anterior */}
-          {selecionado.status === 'DEVOLVIDO' && selecionado.reviewComment && (
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex gap-3">
-              <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-orange-700">Devolvido pela coordenação</p>
-                <p className="text-sm text-orange-600 mt-1">{selecionado.reviewComment}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Cabeçalho com status e ações */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white border rounded-xl p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                <User className="h-5 w-5 text-indigo-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-gray-800">{nome}</p>
-                <p className="text-sm text-gray-500">{selecionado.periodo} · {selecionado.anoLetivo}</p>
-              </div>
-              <StatusBadge status={selecionado.status} />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setSelecionado(null)} className="text-sm">
-                ← Voltar à lista
-              </Button>
-              {podeEditar && !modoEdicao && (
-                <Button
-                  variant="outline"
-                  onClick={() => setModoEdicao(true)}
-                  className="flex items-center gap-2 text-sm border-blue-300 text-blue-600"
-                >
-                  <Edit3 className="h-4 w-4" /> Editar / Corrigir
-                </Button>
-              )}
-              {modoEdicao && (
-                <Button
-                  onClick={() => salvarCorrecoes(selecionado.id)}
-                  disabled={salvando}
-                  className="flex items-center gap-2 text-sm bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  {salvando ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                  Salvar Correções
-                </Button>
-              )}
-              {podeEditar && (
-                <Button
-                  variant="outline"
-                  onClick={() => setModalDevolucao(selecionado.id)}
-                  className="flex items-center gap-2 text-sm border-orange-300 text-orange-600"
-                >
-                  <RotateCcw className="h-4 w-4" /> Devolver ao Professor
-                </Button>
-              )}
-              {podeEditar && (
-                <Button
-                  onClick={() => aprovar(selecionado.id)}
-                  disabled={salvando}
-                  className="flex items-center gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <CheckCircle className="h-4 w-4" /> Aprovar RDIC
-                </Button>
-              )}
-              {selecionado.status === 'FINALIZADO' && (
-                <Button
-                  onClick={() => publicar(selecionado.id)}
-                  disabled={salvando}
-                  className="flex items-center gap-2 text-sm bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Globe className="h-4 w-4" /> Publicar para Coord. Geral
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Conteúdo do RDIC */}
-          <div className="grid grid-cols-1 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-indigo-500" /> Observação Geral
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {modoEdicao ? (
-                  <Textarea
-                    value={dados.observacaoGeral ?? ''}
-                    onChange={e => setConteudoEditado({ ...dados, observacaoGeral: e.target.value })}
-                    className="min-h-[120px] text-sm"
-                    placeholder="Observação geral sobre o desenvolvimento da criança..."
-                  />
-                ) : (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {dados.observacaoGeral || <span className="text-gray-400 italic">Sem observação geral registrada.</span>}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {selecionado.status === 'PUBLICADO' && (
-              <Card className="border-green-200 bg-green-50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2 text-green-700">
-                    <Globe className="h-4 w-4" /> Conteúdo Publicado
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-green-600">
-                    Publicado em {selecionado.publicadoEm ? new Date(selecionado.publicadoEm).toLocaleDateString('pt-BR') : '—'}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </PageShell>
-    );
-  }
-
-  // ─── Lista de RDICs ────────────────────────────────────────────────────────
-  const contadores: Record<string, number> = {
-    todos: rdics.length,
-    RASCUNHO: rdics.filter(r => r.status === 'RASCUNHO').length,
-    EM_REVISAO: rdics.filter(r => r.status === 'EM_REVISAO').length,
-    DEVOLVIDO: rdics.filter(r => r.status === 'DEVOLVIDO').length,
-    APROVADO: rdics.filter(r => r.status === 'APROVADO').length,
-    FINALIZADO: rdics.filter(r => r.status === 'FINALIZADO').length,
-    PUBLICADO: rdics.filter(r => r.status === 'PUBLICADO').length,
   };
+
+  // ─── Devolver com comentário — usa POST conforme @Post(':id/devolver') ─────
+  const handleDevolver = async (id: string, comment: string) => {
+    setSalvandoId(id);
+    try {
+      await http.post(`/rdic/${id}/devolver`, { comment });
+      toast.success('RDIC devolvido ao professor.');
+      setModalDevolucaoId(null);
+      await carregarStatus();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? 'Erro ao devolver RDIC.');
+    } finally {
+      setSalvandoId(null);
+    }
+  };
+
+  // ─── Navegar para detalhe — usa React Router (não window.location) ────────
+  const handleVerDetalhe = useCallback((id: string) => {
+    navigate(`/rdic/${id}`);
+  }, [navigate]);
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  const trimestre = TRIMESTRES.find(t => t.id === trimestreId) ?? TRIMESTRES[0];
+
+  const criancasPorColuna = (statusList: readonly string[]) =>
+    (turmaStatus?.criancas ?? []).filter(c => statusList.includes(c?.status ?? 'PENDENTE'));
+
+  if (loadingTurmas) return <LoadingState message="Carregando turmas..." />;
 
   return (
     <PageShell
       title="Revisão de RDICs"
       subtitle="Coordenação Pedagógica — Relatórios de Desenvolvimento Individual"
     >
-      {/* Modal de devolução (na lista) */}
-      {modalDevolucao && (
+      {modalDevolucaoId && (
         <ModalDevolucao
-          salvando={salvando}
-          onCancelar={() => setModalDevolucao(null)}
-          onConfirmar={(comment) => confirmarDevolucao(modalDevolucao, comment)}
+          salvando={salvandoId === modalDevolucaoId}
+          onCancelar={() => setModalDevolucaoId(null)}
+          onConfirmar={(c) => handleDevolver(modalDevolucaoId, c)}
         />
       )}
 
       <div className="space-y-6">
-        {/* Resumo por status */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            { key: 'EM_REVISAO', label: 'Aguardando Revisão', icon: <Clock className="h-5 w-5" />, cor: 'text-yellow-600 bg-yellow-50 border-yellow-200' },
-            { key: 'DEVOLVIDO',  label: 'Devolvidos',          icon: <RotateCcw className="h-5 w-5" />, cor: 'text-orange-600 bg-orange-50 border-orange-200' },
-            { key: 'APROVADO',   label: 'Aprovados',           icon: <CheckCircle className="h-5 w-5" />, cor: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-            { key: 'FINALIZADO', label: 'Finalizados',          icon: <CheckCircle className="h-5 w-5" />, cor: 'text-blue-600 bg-blue-50 border-blue-200' },
-            { key: 'PUBLICADO',  label: 'Publicados',           icon: <Globe className="h-5 w-5" />, cor: 'text-green-600 bg-green-50 border-green-200' },
-          ].map(item => (
-            <button
-              key={item.key}
-              onClick={() => setFiltroStatus(filtroStatus === item.key ? 'todos' : item.key)}
-              className={`border rounded-xl p-4 text-left transition-all hover:shadow-sm ${item.cor} ${filtroStatus === item.key ? 'ring-2 ring-offset-1 ring-current' : ''}`}
-            >
-              <div className="flex items-center gap-2 mb-1">{item.icon}<span className="font-bold text-xl">{contadores[item.key] ?? 0}</span></div>
-              <p className="text-xs font-medium">{item.label}</p>
-            </button>
-          ))}
-        </div>
+        {/* ── Filtros obrigatórios ── */}
+        <Card className="border-indigo-100 bg-indigo-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-indigo-700 flex items-center gap-2">
+              <Filter className="h-4 w-4" /> Selecione a Turma e o Trimestre
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">
+                  Turma <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  value={turmaId}
+                  onChange={e => setTurmaId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                >
+                  <option value="">— Selecione uma turma —</option>
+                  {turmas.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t?.name ?? '—'}{t?.code ? ` (${t.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {turmas.length === 0 && (
+                  <p className="text-xs text-gray-400">Nenhuma turma encontrada para esta unidade.</p>
+                )}
+              </div>
 
-        {/* Filtro de status */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="h-4 w-4 text-gray-400" />
-          {(['todos', 'EM_REVISAO', 'DEVOLVIDO', 'RASCUNHO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setFiltroStatus(s)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                filtroStatus === s
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
-              }`}
-            >
-              {s === 'todos' ? 'Todos' : s === 'EM_REVISAO' ? 'Em Revisão' : s === 'DEVOLVIDO' ? 'Devolvidos' : s === 'RASCUNHO' ? 'Rascunho' : s === 'APROVADO' ? 'Aprovados' : s === 'FINALIZADO' ? 'Finalizado' : 'Publicado'}
-              {s !== 'todos' && ` (${contadores[s] ?? 0})`}
-            </button>
-          ))}
-        </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Trimestre (SEDF 2026)</Label>
+                <div className="flex gap-2">
+                  {TRIMESTRES.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setTrimestreId(t.id)}
+                      className={`flex-1 py-2 px-2 rounded-lg border text-xs font-medium transition-all ${
+                        trimestreId === t.id
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      <span className="block font-semibold">{t.label}</span>
+                      <span className="block text-[10px] opacity-70">{t.periodo}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Lista */}
-        {rdicsFiltrados.length === 0 ? (
+        {/* ── Sem turma seleccionada ── */}
+        {!turmaId && (
           <EmptyState
-            icon={<Brain className="h-12 w-12 text-gray-400" />}
-            title="Nenhum RDIC encontrado"
-            description={filtroStatus === 'EM_REVISAO' ? 'Nenhum RDIC aguardando revisão no momento.' : 'Nenhum RDIC neste status.'}
+            icon={<Users className="h-12 w-12 text-gray-300" />}
+            title="Selecione uma turma para começar"
+            description="Escolha a turma acima para visualizar o painel Kanban de RDICs."
           />
-        ) : (
-          <div className="space-y-3">
-            {rdicsFiltrados.map(rdic => {
-              const nome = `${rdic.child?.firstName ?? ''} ${rdic.child?.lastName ?? ''}`.trim() || 'Criança';
-              const isExpanded = expandido === rdic.id;
-              const podeEditar = rdic.status === 'EM_REVISAO' || rdic.status === 'RASCUNHO';
-              return (
-                <Card key={rdic.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                          <User className="h-4 w-4 text-indigo-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-gray-800 truncate">{nome}</p>
-                          <p className="text-xs text-gray-500">{rdic.periodo} · {rdic.anoLetivo}</p>
-                        </div>
-                        <StatusBadge status={rdic.status} />
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {rdic.status === 'EM_REVISAO' && (
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium animate-pulse">
-                            Aguarda revisão
-                          </span>
-                        )}
-                        {rdic.status === 'DEVOLVIDO' && (
-                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
-                            Devolvido
-                          </span>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => abrirRevisao(rdic)}
-                          className="flex items-center gap-1 text-xs"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          {rdic.status === 'EM_REVISAO' ? 'Revisar' : 'Ver'}
-                        </Button>
-                        <button
-                          onClick={() => setExpandido(isExpanded ? null : rdic.id)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </button>
-                      </div>
+        )}
+
+        {/* ── Loading ── */}
+        {turmaId && loadingStatus && (
+          <LoadingState message="Carregando status da turma..." />
+        )}
+
+        {/* ── Kanban ── */}
+        {turmaId && !loadingStatus && turmaStatus && (
+          <>
+            {/* Barra de completude */}
+            <div className="bg-white border rounded-xl p-4 shadow-sm flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="font-semibold text-gray-800">{turmaStatus?.classroomName ?? '—'}</p>
+                <p className="text-sm text-gray-500">
+                  {trimestre?.label} · {turmaStatus?.anoLetivo ?? ANO_LETIVO} · {turmaStatus?.contagem?.total ?? 0} crianças
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-emerald-600">{turmaStatus?.completude ?? 0}%</p>
+                <p className="text-xs text-gray-500">completude</p>
+              </div>
+              <div className="flex-1 max-w-xs hidden sm:block">
+                <div className="w-full bg-gray-100 rounded-full h-2.5">
+                  <div
+                    className="bg-emerald-500 h-2.5 rounded-full transition-all"
+                    style={{ width: `${turmaStatus?.completude ?? 0}%` }}
+                  />
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={carregarStatus}
+                className="flex items-center gap-1 text-xs"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+              </Button>
+            </div>
+
+            {/* Colunas Kanban */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {KANBAN_COLUNAS.map(coluna => {
+                const criancas = criancasPorColuna(coluna.statusList);
+                return (
+                  <div
+                    key={coluna.id}
+                    className={`rounded-xl border-t-4 ${coluna.cor} border border-gray-200 min-h-[300px]`}
+                  >
+                    <div className={`px-4 py-3 rounded-t-lg ${coluna.header} flex items-center justify-between`}>
+                      <span className="font-semibold text-sm">{coluna.titulo}</span>
+                      <span className="bg-white/60 text-current font-bold text-xs px-2 py-0.5 rounded-full">
+                        {criancas.length}
+                      </span>
                     </div>
+                    <div className="p-3 space-y-2">
+                      {criancas.length === 0 ? (
+                        <div className="text-center py-8 text-gray-400">
+                          <Brain className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                          <p className="text-xs">Nenhuma criança aqui</p>
+                        </div>
+                      ) : (
+                        criancas.map(crianca => (
+                          <KanbanCard
+                            key={crianca?.childId}
+                            crianca={crianca}
+                            salvandoId={salvandoId}
+                            onAprovar={handleAprovar}
+                            onDevolver={(id) => setModalDevolucaoId(id)}
+                            onVerDetalhe={handleVerDetalhe}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
-                    {/* Comentário de devolução */}
-                    {rdic.status === 'DEVOLVIDO' && rdic.reviewComment && (
-                      <div className="mt-2 bg-orange-50 border border-orange-100 rounded-lg p-2 flex gap-2">
-                        <AlertCircle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-xs text-orange-700">{rdic.reviewComment}</p>
-                      </div>
-                    )}
-
-                    {/* Ações rápidas inline */}
-                    {isExpanded && (
-                      <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
-                        {podeEditar && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => setModalDevolucao(rdic.id)} className="text-xs text-orange-600 border-orange-200">
-                              <RotateCcw className="h-3.5 w-3.5 mr-1" /> Devolver
-                            </Button>
-                            <Button size="sm" onClick={() => { abrirRevisao(rdic); setModoEdicao(true); }} className="text-xs bg-blue-600 text-white">
-                              <Edit3 className="h-3.5 w-3.5 mr-1" /> Editar e Aprovar
-                            </Button>
-                            <Button size="sm" onClick={() => aprovar(rdic.id)} className="text-xs bg-emerald-600 text-white">
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar
-                            </Button>
-                          </>
-                        )}
-                        {rdic.status === 'FINALIZADO' && (
-                          <Button size="sm" onClick={() => publicar(rdic.id)} className="text-xs bg-green-600 text-white">
-                            <Globe className="h-3.5 w-3.5 mr-1" /> Publicar
-                          </Button>
-                        )}
-                        <p className="text-xs text-gray-400 self-center">
-                          Criado em {new Date(rdic.criadoEm).toLocaleDateString('pt-BR')}
-                          {rdic.finalizadoEm && ` · Aprovado em ${new Date(rdic.finalizadoEm).toLocaleDateString('pt-BR')}`}
-                          {rdic.publicadoEm && ` · Publicado em ${new Date(rdic.publicadoEm).toLocaleDateString('pt-BR')}`}
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+        {/* ── Turma seleccionada mas sem dados ── */}
+        {turmaId && !loadingStatus && !turmaStatus && (
+          <EmptyState
+            icon={<Brain className="h-10 w-10 text-gray-300" />}
+            title="Nenhum dado encontrado"
+            description="Não foi possível carregar os dados desta turma. Verifique a conexão e tente novamente."
+          />
         )}
       </div>
     </PageShell>
