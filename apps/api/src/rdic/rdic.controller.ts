@@ -103,6 +103,26 @@ export class RdicController {
     return this.svc.listar(queryGeral, user);
   }
 
+  /**
+   * GET /rdic/child/:childId/central
+   * Central do RDIC da Criança — agrega child + RDICs + saúde + diário.
+   * DEVE vir antes de :id para não ser capturado como param genérico.
+   */
+  @Get('child/:childId/central')
+  @RequireRoles(
+    RoleLevel.PROFESSOR,
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  centralDaCrianca(
+    @Param('childId') childId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.centralDaCrianca(childId, user);
+  }
+
   /** Detalhe de um RDIC */
   @Get(':id')
   @RequireRoles(
