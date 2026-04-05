@@ -9,7 +9,7 @@
  * 4. Pode gerar um rascunho automático via Motor de IA LGPD (dados anonimizados)
  * 5. Salva o RDIC no banco
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor as checkIsProfessor } from '../api/auth';
@@ -171,6 +171,54 @@ const BIMESTRES = [
   { id: 4, label: '4º Bimestre', periodo: 'Nov–Dez 2026' },
 ];
 
+// ─── Kanban: status e agrupamento ───────────────────────────────────────────
+const RDIC_STATUS = {
+  PENDING:     'PENDING',
+  EM_ANDAMENTO: 'EM_ANDAMENTO',
+  CONCLUIDO:   'CONCLUIDO',
+} as const
+
+const KANBAN_TABS = [
+  {
+    key:         RDIC_STATUS.PENDING,
+    label:       'Pendentes',
+    description: 'Sem RDIC iniciado neste bimestre',
+    color:       'text-red-600 border-red-400',
+    badge:       'bg-red-100 text-red-700',
+  },
+  {
+    key:         RDIC_STATUS.EM_ANDAMENTO,
+    label:       'Em Andamento',
+    description: 'RDIC em rascunho ou devolvido para correção',
+    color:       'text-yellow-600 border-yellow-400',
+    badge:       'bg-yellow-100 text-yellow-700',
+  },
+  {
+    key:         RDIC_STATUS.CONCLUIDO,
+    label:       'Concluídos',
+    description: 'RDIC enviado para revisão, aprovado ou publicado',
+    color:       'text-green-600 border-green-400',
+    badge:       'bg-green-100 text-green-700',
+  },
+]
+
+function resolveRdicStatus(rdics: RdicSalvo[], bimestreAtual: number): string {
+  try {
+    const ano = new Date().getFullYear()
+    const bimestreLabel = `${bimestreAtual}º Bimestre`
+    const rdic = rdics?.find(
+      r => r?.anoLetivo === ano && (r?.periodo ?? '').includes(bimestreLabel)
+    ) ?? null
+    if (!rdic) return RDIC_STATUS.PENDING
+    const s = rdic?.status ?? ''
+    if (s === 'RASCUNHO' || s === 'DEVOLVIDO') return RDIC_STATUS.EM_ANDAMENTO
+    if (['EM_REVISAO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'].includes(s)) return RDIC_STATUS.CONCLUIDO
+    return RDIC_STATUS.PENDING
+  } catch {
+    return RDIC_STATUS.PENDING
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function criarDimensoesVazias(): DimensaoAvaliacao[] {
   return DIMENSOES_BNCC.map(d => ({
@@ -309,6 +357,9 @@ export default function RdicCriancaPage() {
   // Navegação
   const [etapa, setEtapa] = useState<'selecionar' | 'formulario' | 'historico'>('selecionar');
   const [dimensaoAberta, setDimensaoAberta] = useState<string | null>('eu-outro-nos');
+  // Kanban
+  const [kanbanTab, setKanbanTab] = useState<string>(RDIC_STATUS.PENDING);
+  const [rdicsMap, setRdicsMap] = useState<Record<string, RdicSalvo[]>>({});
 
   // ─── Carregar turma e alunos ──────────────────────────────────────────────
   useEffect(() => {
@@ -325,6 +376,7 @@ export default function RdicCriancaPage() {
           setTurma(res.data.classroom);
           const lista: Aluno[] = res.data.alunos ?? [];
           setAlunos(lista);
+          carregarRdicsMapParaTurma(lista);
           if (preselectedChildId) {
             const aluno = lista.find(a => a.id === preselectedChildId);
             if (aluno) {
@@ -368,6 +420,7 @@ export default function RdicCriancaPage() {
           photoUrl: c.photoUrl ?? undefined,
         }));
         setAlunos(lista);
+        carregarRdicsMapParaTurma(lista);
         if (preselectedChildId) {
           const aluno = lista.find(a => a.id === preselectedChildId);
           if (aluno) {
@@ -378,13 +431,32 @@ export default function RdicCriancaPage() {
           }
         }
       }
-    } catch {
+     } catch {
       toast.error('Não foi possível carregar a turma.');
     } finally {
       setLoading(false);
     }
   }
-
+  // Carrega RDICs de todos os alunos em paralelo para o Kanban
+  async function carregarRdicsMapParaTurma(lista: Aluno[]) {
+    if (!lista || lista.length === 0) return;
+    try {
+      const resultados = await Promise.allSettled(
+        lista.map(a =>
+          http.get('/rdic', { params: { childId: a.id } }).catch(() => ({ data: [] }))
+        )
+      );
+      const mapa: Record<string, RdicSalvo[]> = {};
+      lista.forEach((a, i) => {
+        const r = resultados[i];
+        const raw = r.status === 'fulfilled' ? r.value?.data : [];
+        mapa[a.id] = Array.isArray(raw) ? raw : raw?.data ?? [];
+      });
+      setRdicsMap(mapa);
+    } catch {
+      // silencioso — Kanban fica com todos pendentes
+    }
+  }
   async function selecionarAluno(aluno: Aluno) {
     setAlunoSelecionado(aluno);
     setDimensoes(criarDimensoesVazias());
@@ -512,6 +584,21 @@ export default function RdicCriancaPage() {
     );
   }
 
+  // Grupos Kanban calculados a partir do rdicsMap
+  const kanbanGrupos = useMemo(() => {
+    const grupos: Record<string, Aluno[]> = {
+      [RDIC_STATUS.PENDING]:      [],
+      [RDIC_STATUS.EM_ANDAMENTO]: [],
+      [RDIC_STATUS.CONCLUIDO]:    [],
+    };
+    alunos.forEach(a => {
+      const rdics = rdicsMap[a.id] ?? [];
+      const status = resolveRdicStatus(rdics, bimestre);
+      grupos[status]?.push(a);
+    });
+    return grupos;
+  }, [alunos, rdicsMap, bimestre]);
+
   return (
     <PageShell
       title="RDIC por Criança"
@@ -531,14 +618,33 @@ export default function RdicCriancaPage() {
         </div>
       </div>
 
-      {/* ─── ETAPA 1: Seleção de criança ─── */}
+      {/* ─── ETAPA 1: Kanban de crianças por status de RDIC ─── */}
       {etapa === 'selecionar' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">
-              Selecione a criança
-            </h2>
-            <span className="text-sm text-gray-500">{alunos.length} alunos na turma</span>
+        <div className="space-y-5">
+          {/* Cabeçalho + seletor de bimestre */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Selecione a criança</h2>
+              <p className="text-sm text-gray-500">{alunos.length} alunos na turma</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 font-medium">Bimestre:</span>
+              <div className="flex gap-1">
+                {BIMESTRES.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => setBimestre(b.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      bimestre === b.id
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    {b.id}º
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {alunos.length === 0 ? (
@@ -548,17 +654,60 @@ export default function RdicCriancaPage() {
               description="A turma ainda não tem alunos matriculados."
             />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {alunos.map(aluno => (
-                <CardCrianca
-                  key={aluno.id}
-                  aluno={aluno}
-                  selecionado={alunoSelecionado?.id === aluno.id}
-                  onClick={() => selecionarAluno(aluno)}
-                  rdicsCount={rdicsDoAluno.filter(r => r.childId === aluno.id).length}
-                />
-              ))}
-            </div>
+            <>
+              {/* Abas Kanban */}
+              <div className="flex gap-2 border-b border-gray-200">
+                {KANBAN_TABS.map(tab => {
+                  const count = kanbanGrupos[tab.key]?.length ?? 0;
+                  const ativo = kanbanTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setKanbanTab(tab.key)}
+                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
+                        ativo
+                          ? `${tab.color} border-current`
+                          : 'text-gray-500 border-transparent hover:text-gray-700'
+                      }`}
+                    >
+                      {tab.label}
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                        ativo ? tab.badge : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Descrição da aba ativa */}
+              {(() => {
+                const tabAtiva = KANBAN_TABS.find(t => t.key === kanbanTab);
+                return tabAtiva ? (
+                  <p className="text-xs text-gray-500 -mt-2">{tabAtiva.description}</p>
+                ) : null;
+              })()}
+
+              {/* Cards da aba ativa */}
+              {(kanbanGrupos[kanbanTab] ?? []).length === 0 ? (
+                <div className="text-center py-10 text-gray-400 text-sm">
+                  Nenhuma criança nesta categoria para o {bimestre}º bimestre.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(kanbanGrupos[kanbanTab] ?? []).map(aluno => (
+                    <CardCrianca
+                      key={aluno.id}
+                      aluno={aluno}
+                      selecionado={alunoSelecionado?.id === aluno.id}
+                      onClick={() => selecionarAluno(aluno)}
+                      rdicsCount={(rdicsMap[aluno.id] ?? []).length}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
