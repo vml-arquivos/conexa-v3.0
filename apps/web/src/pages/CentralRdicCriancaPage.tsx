@@ -17,7 +17,7 @@ import {
   AlertTriangle, BookOpen, Clock, CheckCircle,
   RotateCcw, Globe,
 } from 'lucide-react';
-import { useHttp } from '../hooks/useHttp';
+import http from '../api/http';
 import { PageShell } from '../components/PageShell';
 import { LoadingState } from '../components/LoadingState';
 import { Badge } from '../components/ui/badge';
@@ -112,7 +112,6 @@ function formatarGenero(gender: string | null): string {
 export default function CentralRdicCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
-  const http = useHttp();
 
   const [dados, setDados] = useState<CentralResponse | null>(null);
   const [loading, setLoading] = useState(true);

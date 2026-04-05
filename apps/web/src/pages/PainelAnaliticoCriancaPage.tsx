@@ -16,8 +16,7 @@ import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
   ResponsiveContainer, Tooltip, Legend,
 } from 'recharts';
-import { useAuth } from '../hooks/useAuth';
-import { useHttp } from '../hooks/useHttp';
+import http from '../api/http';
 import { PageShell } from '../components/PageShell';
 import { LoadingState } from '../components/LoadingState';
 import { Badge } from '../components/ui/badge';
@@ -99,8 +98,6 @@ function calcularIdade(dateOfBirth: string | null): string {
 export default function PainelAnaliticoCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const http = useHttp();
 
   const [dados, setDados] = useState<CentralDaCriancaResponse | null>(null);
   const [loading, setLoading] = useState(true);

@@ -17,7 +17,7 @@ import {
   RotateCcw, Globe, ArrowLeft, RefreshCw, Activity,
   Apple, Heart, Stethoscope, TrendingUp, BookOpen, User,
 } from 'lucide-react';
-import { useHttp } from '../hooks/useHttp';
+import http from '../api/http';
 import { PageShell } from '../components/PageShell';
 import { LoadingState } from '../components/LoadingState';
 import { Badge } from '../components/ui/badge';
@@ -106,7 +106,6 @@ function KpiCard({
 export default function PainelTurmaPage() {
   const { classroomId } = useParams<{ classroomId: string }>();
   const navigate = useNavigate();
-  const http = useHttp();
 
   const [dados, setDados] = useState<TurmaStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
