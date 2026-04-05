@@ -1591,6 +1591,17 @@ enum StatusRDIX {
   PUBLICADO
 }
 
+/// Período letivo do RDIC (SEDF 2026: Trimestral | legado: Bimestral)
+enum RdicPeriodo {
+  PRIMEIRO_BIMESTRE
+  SEGUNDO_BIMESTRE
+  TERCEIRO_BIMESTRE
+  QUARTO_BIMESTRE
+  PRIMEIRO_TRIMESTRE
+  SEGUNDO_TRIMESTRE
+  TERCEIRO_TRIMESTRE
+}
+
 model RDIXTemplate {
   id            String          @id @default(cuid())
   mantenedoraId String
@@ -1615,7 +1626,8 @@ model RDIXInstancia {
   templateId    String
   childId       String
   classroomId   String
-  periodo       String       @db.VarChar(50)
+  periodo        String      @db.VarChar(50)
+  periodoEnum    RdicPeriodo?
   anoLetivo     Int
   status        StatusRDIX   @default(RASCUNHO)
   rascunhoJson  Json?
@@ -1638,6 +1650,7 @@ model RDIXInstancia {
   @@index([unitId])
   @@index([classroomId])
   @@index([status])
+  @@index([periodoEnum])
 }
 
 // ============================================================================
