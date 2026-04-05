@@ -17,8 +17,8 @@ import {
   ResponsiveContainer, Tooltip, Legend,
 } from 'recharts';
 import http from '../api/http';
-import { PageShell } from '../components/PageShell';
-import { LoadingState } from '../components/LoadingState';
+import { PageShell } from '../components/ui/PageShell';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
