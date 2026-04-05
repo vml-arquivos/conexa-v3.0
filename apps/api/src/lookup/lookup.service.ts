@@ -427,7 +427,9 @@ export class LookupService {
             id: true,
             firstName: true,
             lastName: true,
-            allergies: true,         // para AlergiaAlert
+            dateOfBirth: true,        // FIX: idade real no RDIC por Criança
+            gender: true,             // FIX: gênero real no RDIC por Criança
+            allergies: true,          // para AlergiaAlert
             medicalConditions: true,  // para AlergiaAlert
             photoUrl: true,           // FIX C1: foto da criança
           },
@@ -446,9 +448,11 @@ export class LookupService {
       lastName: e.child.lastName,
       name: `${e.child.firstName} ${e.child.lastName}`.trim(),
       classroomId: resolvedClassroomId,
-      allergies: e.child.allergies ?? null,         // para AlergiaAlert
+      dateOfBirth: e.child.dateOfBirth ? (e.child.dateOfBirth as Date).toISOString() : null, // FIX: idade real
+      gender: e.child.gender ? String(e.child.gender) : null,                                // FIX: gênero real
+      allergies: e.child.allergies ?? null,          // para AlergiaAlert
       medicalConditions: e.child.medicalConditions ?? null, // para AlergiaAlert
-      photoUrl: e.child.photoUrl ?? null,           // FIX C1: foto da criança
+      photoUrl: e.child.photoUrl ?? null,            // FIX C1: foto da criança
     }));
   }
 

@@ -36,6 +36,10 @@ import RdicCriancaPage from '../pages/RdicCriancaPage';
 import SalaDeAulaVirtualPage from '../pages/SalaDeAulaVirtualPage';
 import RdicCoordPage from '../pages/RdicCoordPage';
 import RdicGeralPage from '../pages/RdicGeralPage';
+// ─── Fases 1, 2 e 3 — Central RDIC, Painel Analítico e Painel da Turma ────────────────────
+import CentralRdicCriancaPage from '../pages/CentralRdicCriancaPage';
+import PainelAnaliticoCriancaPage from '../pages/PainelAnaliticoCriancaPage';
+import PainelTurmaPage from '../pages/PainelTurmaPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
@@ -506,12 +510,42 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Sala de Aula Virtual (Professor + Coordenação) ─────────────────────
+      // ─── Sala de Aula Virtual (Professor + Coordenação) ─────────────────────────
       {
         path: 'sala-de-aula-virtual',
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <SalaDeAulaVirtualPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Fase 1 — Central RDIC da Criança (/app/crianca/:childId/rdic-central) ───────────
+      {
+        path: 'crianca/:childId/rdic-central',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <CentralRdicCriancaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Fase 2 — Painel Analítico da Criança (/app/crianca/:childId/painel-analitico) ───
+      {
+        path: 'crianca/:childId/painel-analitico',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PainelAnaliticoCriancaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Fase 3 — Painel da Turma (/app/turma/:classroomId/painel) ──────────────────
+      {
+        path: 'turma/:classroomId/painel',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <PainelTurmaPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

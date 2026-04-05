@@ -28,16 +28,28 @@ import {
   BookOpen, Heart, Music, Palette, Calculator, MessageSquare,
   ArrowLeft, FileText, Eye, EyeOff, Send, Plus, Printer,
 } from 'lucide-react';
-
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// ─── Tipos ────────────────────────────────────────────────────────────────────────────────
 interface Aluno {
   id: string;
   nome: string;
   firstName: string;
   lastName: string;
   idade: number;
+  dateOfBirth?: string | null;
   gender: string;
   photoUrl?: string;
+}
+
+// FIX: calcular idade real a partir de dateOfBirth
+function calcularIdade(dateOfBirth?: string | null): number {
+  if (!dateOfBirth) return 0;
+  const nasc = new Date(dateOfBirth);
+  if (isNaN(nasc.getTime())) return 0;
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) anos--;
+  return Math.max(0, anos);
 }
 
 interface Turma {
@@ -423,7 +435,8 @@ export default function RdicCriancaPage() {
           nome: `${c.firstName} ${c.lastName}`,
           firstName: c.firstName,
           lastName: c.lastName,
-          idade: 0,
+          dateOfBirth: c.dateOfBirth ?? null,
+          idade: calcularIdade(c.dateOfBirth),
           gender: c.gender ?? '',
           photoUrl: c.photoUrl ?? undefined,
         }));
