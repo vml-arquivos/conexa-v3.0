@@ -164,12 +164,13 @@ const NIVEIS: Array<{ id: IndicadorAvaliacao['nivel']; label: string; short: str
   { id: 'AMPLIADO', label: 'Ampliado', short: 'A', cor: 'text-blue-600', corBg: 'bg-blue-100 border-blue-300 text-blue-700' },
 ];
 
-const BIMESTRES = [
-  { id: 1, label: '1º Bimestre', periodo: 'Fev–Abr 2026' },
-  { id: 2, label: '2º Bimestre', periodo: 'Mai–Jul 2026' },
-  { id: 3, label: '3º Bimestre', periodo: 'Ago–Out 2026' },
-  { id: 4, label: '4º Bimestre', periodo: 'Nov–Dez 2026' },
-];
+/** SEDF 2026 — Calendário Trimestral */
+const TRIMESTRES = [
+  { id: 1, label: '1º Trimestre', periodo: 'Fev–Mai 2026', valor: 'PRIMEIRO_TRIMESTRE'  },
+  { id: 2, label: '2º Trimestre', periodo: 'Jun–Set 2026', valor: 'SEGUNDO_TRIMESTRE'   },
+  { id: 3, label: '3º Trimestre', periodo: 'Out–Dez 2026', valor: 'TERCEIRO_TRIMESTRE'  },
+] as const;
+type TrimestreId = (typeof TRIMESTRES)[number]['id'];
 
 // ─── Kanban: status e agrupamento ───────────────────────────────────────────
 const RDIC_STATUS = {
@@ -182,7 +183,7 @@ const KANBAN_TABS = [
   {
     key:         RDIC_STATUS.PENDING,
     label:       'Pendentes',
-    description: 'Sem RDIC iniciado neste bimestre',
+    description: 'Sem RDIC iniciado neste trimestre',
     color:       'text-red-600 border-red-400',
     badge:       'bg-red-100 text-red-700',
   },
@@ -202,20 +203,20 @@ const KANBAN_TABS = [
   },
 ]
 
-function resolveRdicStatus(rdics: RdicSalvo[], bimestreAtual: number): string {
+function resolveRdicStatus(rdics: RdicSalvo[], trimestreAtual: number): string {
   try {
-    const ano = new Date().getFullYear()
-    const bimestreLabel = `${bimestreAtual}º Bimestre`
+    const ano = new Date().getFullYear();
+    const trimestreLabel = `${trimestreAtual}º Trimestre`;
     const rdic = rdics?.find(
-      r => r?.anoLetivo === ano && (r?.periodo ?? '').includes(bimestreLabel)
-    ) ?? null
-    if (!rdic) return RDIC_STATUS.PENDING
-    const s = rdic?.status ?? ''
-    if (s === 'RASCUNHO' || s === 'DEVOLVIDO') return RDIC_STATUS.EM_ANDAMENTO
-    if (['EM_REVISAO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'].includes(s)) return RDIC_STATUS.CONCLUIDO
-    return RDIC_STATUS.PENDING
+      r => r?.anoLetivo === ano && (r?.periodo ?? '').includes(trimestreLabel)
+    ) ?? null;
+    if (!rdic) return RDIC_STATUS.PENDING;
+    const s = rdic?.status ?? '';
+    if (s === 'RASCUNHO' || s === 'DEVOLVIDO') return RDIC_STATUS.EM_ANDAMENTO;
+    if (['EM_REVISAO', 'APROVADO', 'FINALIZADO', 'PUBLICADO'].includes(s)) return RDIC_STATUS.CONCLUIDO;
+    return RDIC_STATUS.PENDING;
   } catch {
-    return RDIC_STATUS.PENDING
+    return RDIC_STATUS.PENDING;
   }
 }
 
@@ -343,17 +344,14 @@ export default function RdicCriancaPage() {
   const [loadingRdics, setLoadingRdics] = useState(false);
 
   // Formulário RDIC
-  // Calcula o bimestre atual com base no mês corrente (ano letivo: Fev–Dez)
-  // 1º Bim: Fev–Abr (2-4), 2º Bim: Mai–Jul (5-7), 3º Bim: Ago–Out (8-10), 4º Bim: Nov–Dez (11-12)
-  const calcularBimestreAtual = (): number => {
-    const mes = new Date().getMonth() + 1; // 1-12
-    if (mes >= 2 && mes <= 4) return 1;
-    if (mes >= 5 && mes <= 7) return 2;
-    if (mes >= 8 && mes <= 10) return 3;
-    if (mes >= 11 && mes <= 12) return 4;
-    return 1; // Janeiro: pré-ano letivo, usa 1º bimestre como padrão
+  /** SEDF 2026: 1ºT Fev–Mai(2-5), 2ºT Jun–Set(6-9), 3ºT Out–Dez(10-12) */
+  const calcularTrimestreAtual = (): TrimestreId => {
+    const mes = new Date().getMonth() + 1;
+    if (mes >= 2 && mes <= 5) return 1;
+    if (mes >= 6 && mes <= 9) return 2;
+    return 3;
   };
-  const [bimestre, setBimestre] = useState(calcularBimestreAtual);
+  const [trimestre, setTrimestre] = useState<TrimestreId>(calcularTrimestreAtual);
   const [dimensoes, setDimensoes] = useState<DimensaoAvaliacao[]>(criarDimensoesVazias());
   const [observacaoGeral, setObservacaoGeral] = useState('');
   const [proximosPassos, setProximosPassos] = useState('');
@@ -386,7 +384,7 @@ export default function RdicCriancaPage() {
           setTurma(res.data.classroom);
           const lista: Aluno[] = res.data.alunos ?? [];
           setAlunos(lista);
-          carregarRdicsMapParaTurma(lista);
+          carregarRdicsMapParaTurma(lista, res.data?.classroom?.id);
           if (preselectedChildId) {
             const aluno = lista.find(a => a.id === preselectedChildId);
             if (aluno) {
@@ -430,7 +428,7 @@ export default function RdicCriancaPage() {
           photoUrl: c.photoUrl ?? undefined,
         }));
         setAlunos(lista);
-        carregarRdicsMapParaTurma(lista);
+        carregarRdicsMapParaTurma(lista, turmaInfo.id);
         if (preselectedChildId) {
           const aluno = lista.find(a => a.id === preselectedChildId);
           if (aluno) {
@@ -448,12 +446,19 @@ export default function RdicCriancaPage() {
     }
   }
   // Carrega RDICs de todos os alunos em paralelo para o Kanban
-  async function carregarRdicsMapParaTurma(lista: Aluno[]) {
+  async function carregarRdicsMapParaTurma(lista: Aluno[], classroomId?: string) {
     if (!lista || lista.length === 0) return;
     try {
       const resultados = await Promise.allSettled(
         lista.map(a =>
-          http.get('/rdic', { params: { childId: a.id } }).catch(() => ({ data: [] }))
+          http
+            .get('/rdic', {
+              params: {
+                childId: a.id,
+                ...(classroomId ? { classroomId } : {}),
+              },
+            })
+            .catch(() => ({ data: [] }))
         )
       );
       const mapa: Record<string, RdicSalvo[]> = {};
@@ -513,10 +518,10 @@ export default function RdicCriancaPage() {
     setRelatorioIA(null);
     try {
       const ano = new Date().getFullYear();
-      const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
+      const trimestreAtual = TRIMESTRES.find(t => t.id === trimestre);
       const res = await http.post('/ia/relatorio-consolidado-lgpd', {
         childId: alunoSelecionado.id,
-        periodo: `${bimestreAtual?.label ?? `${bimestre}º Bimestre`} ${ano}`,
+        periodo: `${trimestreAtual?.label ?? `${trimestre}º Trimestre`} ${ano}`,
       });
       setRelatorioIA(res.data);
       setMostrarRelatorioIA(true);
@@ -545,18 +550,20 @@ export default function RdicCriancaPage() {
     }
     setSaving(true);
     try {
-      const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
+      const trimestreAtual = TRIMESTRES.find(t => t.id === trimestre);
       const ano = new Date().getFullYear();
+      const periodoLabel = trimestreAtual?.label ?? `${trimestre}º Trimestre`;
       const payload = {
-        childId: alunoSelecionado.id,
-        classroomId: turma?.id,
-        periodo: `${bimestreAtual?.label ?? `${bimestre}º Bimestre`}`,
-        anoLetivo: ano,
-        rascunhoJson: { bimestre, dimensoes, observacaoGeral, proximosPassos },
+        childId:      alunoSelecionado.id,
+        classroomId:  turma?.id,
+        periodo:      periodoLabel,
+        periodoEnum:  trimestreAtual?.valor ?? null,
+        anoLetivo:    ano,
+        rascunhoJson: { trimestre, dimensoes, observacaoGeral, proximosPassos },
       };
-      // Verificar se já existe RDIC para este período (tenta atualizar, se não cria)
       const existente = rdicsDoAluno.find(
-        r => r.periodo === payload.periodo && r.anoLetivo === ano && r.status === 'RASCUNHO'
+        r => r.periodo === payload.periodo && r.anoLetivo === ano &&
+             (r.status === 'RASCUNHO' || r.status === 'DEVOLVIDO')
       );
       if (existente) {
         await http.patch(`/rdic/${existente.id}`, { rascunhoJson: payload.rascunhoJson });
@@ -585,11 +592,11 @@ export default function RdicCriancaPage() {
     };
     alunos.forEach(a => {
       const rdics = rdicsMap[a.id] ?? [];
-      const status = resolveRdicStatus(rdics, bimestre);
+      const status = resolveRdicStatus(rdics, trimestre);
       grupos[status]?.push(a);
     });
     return grupos;
-  }, [alunos, rdicsMap, bimestre]);
+  }, [alunos, rdicsMap, trimestre]);
 
   // ─── Render: Loading ──────────────────────────────────────────────────────
   if (loading) return <LoadingState message="Carregando turma..." />;
@@ -631,26 +638,26 @@ export default function RdicCriancaPage() {
       {/* ─── ETAPA 1: Kanban de crianças por status de RDIC ─── */}
       {etapa === 'selecionar' && (
         <div className="space-y-5">
-          {/* Cabeçalho + seletor de bimestre */}
+          {/* Cabeçalho + seletor de trimestre */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Selecione a criança</h2>
               <p className="text-sm text-gray-500">{alunos.length} alunos na turma</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 font-medium">Bimestre:</span>
+              <span className="text-sm text-gray-600 font-medium">Trimestre:</span>
               <div className="flex gap-1">
-                {BIMESTRES.map(b => (
+                {TRIMESTRES.map(t => (
                   <button
-                    key={b.id}
-                    onClick={() => setBimestre(b.id)}
+                    key={t.id}
+                    onClick={() => setTrimestre(t.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      bimestre === b.id
+                      trimestre === t.id
                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                         : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    {b.id}º
+                    {t.id}º T
                   </button>
                 ))}
               </div>
@@ -702,7 +709,7 @@ export default function RdicCriancaPage() {
               {/* Cards da aba ativa */}
               {(kanbanGrupos[kanbanTab] ?? []).length === 0 ? (
                 <div className="text-center py-10 text-gray-400 text-sm">
-                  Nenhuma criança nesta categoria para o {bimestre}º bimestre.
+                  Nenhuma criança nesta categoria para o {trimestre}º trimestre.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -759,25 +766,25 @@ export default function RdicCriancaPage() {
             )}
           </div>
 
-          {/* Seleção de bimestre */}
+          {/* Seleção de trimestre */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Período de Avaliação</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {BIMESTRES.map(b => (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {TRIMESTRES.map(t => (
                   <button
-                    key={b.id}
-                    onClick={() => setBimestre(b.id)}
+                    key={t.id}
+                    onClick={() => setTrimestre(t.id)}
                     className={`p-3 rounded-xl border-2 text-center transition-all ${
-                      bimestre === b.id
+                      trimestre === t.id
                         ? 'border-blue-500 bg-blue-50 text-blue-800'
                         : 'border-gray-200 hover:border-blue-300 text-gray-700'
                     }`}
                   >
-                    <p className="font-semibold text-sm">{b.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{b.periodo}</p>
+                    <p className="font-semibold text-sm">{t.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{t.periodo}</p>
                   </button>
                 ))}
               </div>
@@ -983,7 +990,7 @@ export default function RdicCriancaPage() {
                 <Textarea
                   value={observacaoGeral}
                   onChange={e => setObservacaoGeral(e.target.value)}
-                  placeholder={`Descreva o desenvolvimento geral de ${alunoSelecionado.firstName} neste bimestre, considerando avanços, dificuldades e aspectos relevantes observados durante as atividades...`}
+                  placeholder={`Descreva o desenvolvimento geral de ${alunoSelecionado.firstName} neste trimestre (${TRIMESTRES.find(t => t.id === trimestre)?.periodo ?? ''}), considerando avanços, dificuldades e aspectos relevantes...`}
                   rows={6}
                   className="resize-none"
                 />
@@ -1042,9 +1049,9 @@ export default function RdicCriancaPage() {
                   try {
                     const lista = await http.get('/rdic', { params: { childId: alunoSelecionado.id } });
                     const rdics = Array.isArray(lista.data) ? lista.data : lista.data?.data ?? [];
-                    const bimestreAtual = BIMESTRES.find(b => b.id === bimestre);
+                    const trimestreAtual = TRIMESTRES.find(t => t.id === trimestre);
                     const ano = new Date().getFullYear();
-                    const periodo = `${bimestreAtual?.label ?? `${bimestre}º Bimestre`}`;
+                    const periodo = trimestreAtual?.label ?? `${trimestre}º Trimestre`;
                     const rdic = rdics.find((r: any) => r.periodo === periodo && r.anoLetivo === ano && (r.status === 'RASCUNHO' || r.status === 'DEVOLVIDO'));
                     if (rdic) {
                       await http.patch(`/rdic/${rdic.id}/enviar-revisao`);

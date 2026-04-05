@@ -68,18 +68,32 @@ export class RdicService {
       );
     }
 
+    const periodoEnumMap: Record<string, string> = {
+      'PRIMEIRO_TRIMESTRE': 'PRIMEIRO_TRIMESTRE',
+      'SEGUNDO_TRIMESTRE':  'SEGUNDO_TRIMESTRE',
+      'TERCEIRO_TRIMESTRE': 'TERCEIRO_TRIMESTRE',
+      'PRIMEIRO_BIMESTRE':  'PRIMEIRO_BIMESTRE',
+      'SEGUNDO_BIMESTRE':   'SEGUNDO_BIMESTRE',
+      'TERCEIRO_BIMESTRE':  'TERCEIRO_BIMESTRE',
+      'QUARTO_BIMESTRE':    'QUARTO_BIMESTRE',
+    };
+    const periodoEnumResolvido = dto.periodoEnum
+      ? (periodoEnumMap[dto.periodoEnum] ?? null)
+      : null;
+
     return this.prisma.rDIXInstancia.create({
       data: {
         mantenedoraId: user.mantenedoraId,
-        unitId: user.unitId,
-        templateId: template.id,
+        unitId:        user.unitId,
+        templateId:    template.id,
         childId,
         classroomId,
         periodo,
-        anoLetivo: Number(anoLetivo),
-        status: 'RASCUNHO',
-        rascunhoJson: rascunhoJson ?? {},
-        criadoPorId: user.sub,
+        periodoEnum:   periodoEnumResolvido as any ?? undefined,
+        anoLetivo:     Number(anoLetivo),
+        status:        'RASCUNHO',
+        rascunhoJson:  rascunhoJson ?? {},
+        criadoPorId:   user.sub,
       },
       include: { child: { select: { firstName: true, lastName: true } } },
     });
@@ -365,6 +379,12 @@ export class RdicService {
     // UNIDADE (coord. pedagógica): vê todos da sua unidade
     else if (level === 'UNIDADE') {
       where.unitId = user.unitId;
+      // Exige pelo menos um filtro granular para evitar carga de toda a unidade
+      if (!query.classroomId && !query.childId) {
+        throw new BadRequestException(
+          'Para a coordenação de unidade, é obrigatório filtrar por classroomId ou childId.',
+        );
+      }
     }
     // STAFF_CENTRAL: somente APROVADO/PUBLICADO/FINALIZADO
     else if (level === 'STAFF_CENTRAL') {
