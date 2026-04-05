@@ -2218,6 +2218,16 @@ model AcompanhamentoNutricional {
 // MÓDULO DE DESENVOLVIMENTO — Relatório Individual
 // ============================================================
 
+/// Status do Relatório de Desenvolvimento Individual da Criança (RDIC)
+enum RdicStatus {
+  RASCUNHO
+  EM_REVISAO
+  DEVOLVIDO
+  APROVADO
+  FINALIZADO
+  PUBLICADO
+}
+
 model DevelopmentReport {
   id          String    @id @default(cuid())
   childId     String
@@ -2226,7 +2236,7 @@ model DevelopmentReport {
   unitId      String
   period      String
   content     String
-  status      String    @default("DRAFT")
+  status      RdicStatus @default(RASCUNHO)
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
