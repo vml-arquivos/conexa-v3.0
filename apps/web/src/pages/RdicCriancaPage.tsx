@@ -576,6 +576,21 @@ export default function RdicCriancaPage() {
   // ─── Progresso ────────────────────────────────────────────────────────────
   const progresso = calcularProgresso(dimensoes);
 
+  // Grupos Kanban — useMemo DEVE ficar ANTES de qualquer early return (React #310)
+  const kanbanGrupos = useMemo(() => {
+    const grupos: Record<string, Aluno[]> = {
+      [RDIC_STATUS.PENDING]:      [],
+      [RDIC_STATUS.EM_ANDAMENTO]: [],
+      [RDIC_STATUS.CONCLUIDO]:    [],
+    };
+    alunos.forEach(a => {
+      const rdics = rdicsMap[a.id] ?? [];
+      const status = resolveRdicStatus(rdics, bimestre);
+      grupos[status]?.push(a);
+    });
+    return grupos;
+  }, [alunos, rdicsMap, bimestre]);
+
   // ─── Render: Loading ──────────────────────────────────────────────────────
   if (loading) return <LoadingState message="Carregando turma..." />;
 
@@ -593,21 +608,6 @@ export default function RdicCriancaPage() {
       </PageShell>
     );
   }
-
-  // Grupos Kanban calculados a partir do rdicsMap
-  const kanbanGrupos = useMemo(() => {
-    const grupos: Record<string, Aluno[]> = {
-      [RDIC_STATUS.PENDING]:      [],
-      [RDIC_STATUS.EM_ANDAMENTO]: [],
-      [RDIC_STATUS.CONCLUIDO]:    [],
-    };
-    alunos.forEach(a => {
-      const rdics = rdicsMap[a.id] ?? [];
-      const status = resolveRdicStatus(rdics, bimestre);
-      grupos[status]?.push(a);
-    });
-    return grupos;
-  }, [alunos, rdicsMap, bimestre]);
 
   return (
     <PageShell
