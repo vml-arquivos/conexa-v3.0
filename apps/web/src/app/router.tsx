@@ -40,6 +40,7 @@ import RdicGeralPage from '../pages/RdicGeralPage';
 import CentralRdicCriancaPage from '../pages/CentralRdicCriancaPage';
 import PainelAnaliticoCriancaPage from '../pages/PainelAnaliticoCriancaPage';
 import PainelTurmaPage from '../pages/PainelTurmaPage';
+import PainelInteligenciaPage from '../pages/PainelInteligenciaPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
@@ -523,6 +524,7 @@ export const router = createBrowserRouter([
       { path:'turma/:classroomId/painel', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelTurmaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/rdic-central', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><CentralRdicCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/painel-analitico', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelAnaliticoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
+      { path:'inteligencia', element:(<RoleProtectedRoute allowedRoles={['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelInteligenciaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
     ],
   },
 ]);

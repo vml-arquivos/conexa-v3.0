@@ -7,6 +7,8 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { toast } from 'sonner';
 import http from '../api/http';
+import { useAuth } from '../app/AuthProvider';
+import { hasRole } from '../api/auth';
 import {
   Brain, Heart, AlertTriangle, CheckCircle, Clock,
   RotateCcw, Globe, FileText, BookOpen, ArrowLeft,
@@ -98,6 +100,8 @@ export default function CentralRdicCriancaPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<CentralData | null>(null);
+  const { user } = useAuth();
+  const podeCriar = hasRole(user, 'PROFESSOR') || hasRole(user, 'PROFESSOR_AUXILIAR');
 
   const carregar = useCallback(async () => {
     if (!childId) return;
@@ -150,13 +154,15 @@ export default function CentralRdicCriancaPage() {
             >
               <Activity className="h-4 w-4" /> Painel Analítico
             </Button>
-            <Button
-              onClick={() => navigate(`/app/rdic-crianca?childId=${childId}&classroomId=${child?.turma?.id ?? ''}`)}
-              className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              <Brain className="h-4 w-4" />
-              {rdicAtual ? 'Editar RDIC' : 'Criar RDIC'}
-            </Button>
+            {podeCriar && (
+              <Button
+                onClick={() => navigate(`/app/rdic-crianca?childId=${childId}&classroomId=${child?.turma?.id ?? ''}`)}
+                className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                <Brain className="h-4 w-4" />
+                {rdicAtual ? 'Editar RDIC' : 'Criar RDIC'}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -243,9 +249,11 @@ export default function CentralRdicCriancaPage() {
                 <div className="text-center py-6">
                   <Brain className="h-8 w-8 mx-auto mb-2 text-gray-300" />
                   <p className="text-sm text-gray-500">Nenhum RDIC criado ainda.</p>
-                  <Button size="sm" onClick={() => navigate(`/app/rdic-crianca?childId=${childId}`)} className="mt-3 bg-indigo-600 text-white text-xs">
-                    Criar Primeiro RDIC
-                  </Button>
+                  {podeCriar && (
+                    <Button size="sm" onClick={() => navigate(`/app/rdic-crianca?childId=${childId}`)} className="mt-3 bg-indigo-600 text-white text-xs">
+                      Criar Primeiro RDIC
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -330,8 +338,9 @@ export default function CentralRdicCriancaPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge status={rdic.status} />
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/app/rdic-crianca?childId=${childId}&classroomId=${child?.turma?.id ?? ''}`)} className="text-xs h-7 px-2">
-                        {rdic.status === 'RASCUNHO' || rdic.status === 'DEVOLVIDO' ? 'Editar' : 'Ver'}
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/app/rdic-crianca?childId=${childId}&classroomId=${child?.turma?.id ?? ''}`)}
+                        className="text-xs h-7 px-2">
+                        {podeCriar && (rdic.status === 'RASCUNHO' || rdic.status === 'DEVOLVIDO') ? 'Editar' : 'Ver'}
                       </Button>
                     </div>
                   </div>
