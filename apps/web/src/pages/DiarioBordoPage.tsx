@@ -241,6 +241,7 @@ export default function DiarioBordoPage() {
     reacaoCriancas: '',
     adaptacoesRealizadas: '',
     ocorrencias: '',
+    statusExecucaoPlano: '' as 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '',
   });
 
   // Formulário de microgesto
@@ -838,6 +839,14 @@ export default function DiarioBordoPage() {
       toast.error('Existe um planejamento aprovado para hoje. Preencha o campo "O que foi executado?" antes de salvar o diário.');
       return;
     }
+    if (planejamentoHoje && !form.statusExecucaoPlano) {
+      toast.error('Seleccione o status de execução do plano do dia: CUMPRIDO, PARCIAL ou NÃO REALIZADO.');
+      return;
+    }
+    if (!form.reflexaoPedagogica.trim()) {
+      toast.error('Preencha a Avaliação do Plano do Dia antes de salvar.');
+      return;
+    }
     // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)
     const dataDiario = new Date(form.date + 'T12:00:00');
     const diaSemana = dataDiario.getDay(); // 0=Dom, 6=Sáb
@@ -910,6 +919,7 @@ export default function DiarioBordoPage() {
             reacaoCriancas: form.reacaoCriancas,
             adaptacoesRealizadas: form.adaptacoesRealizadas,
             ocorrencias: form.ocorrencias,
+            statusExecucaoPlano: form.statusExecucaoPlano || null,
           },
         });
       }
@@ -929,6 +939,7 @@ export default function DiarioBordoPage() {
         criancasPresentes: [],
         execucaoPlanejamento: '',
         reacaoCriancas: '',
+        statusExecucaoPlano: '' as 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '',
         adaptacoesRealizadas: '',
         ocorrencias: '',
       });
@@ -950,7 +961,7 @@ export default function DiarioBordoPage() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
           { id: 'lista', label: 'Meus Diários', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Novo Registro', icon: <Plus className="h-4 w-4" /> },
+          { id: 'novo', label: 'Diário do Dia', icon: <Plus className="h-4 w-4" /> },
           { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
@@ -1008,6 +1019,23 @@ export default function DiarioBordoPage() {
                               {diario.microgestos.length} microgestos
                             </span>
                           )}
+                          {/* Badge status de execução do plano */}
+                          {(() => {
+                            const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext : {};
+                            const s = ctx.statusExecucaoPlano;
+                            if (!s) return null;
+                            const cfg: Record<string, { label: string; cor: string }> = {
+                              FEITO: { label: '✅ Cumprido', cor: 'bg-emerald-100 text-emerald-700' },
+                              PARCIAL: { label: '⚠️ Parcial', cor: 'bg-amber-100 text-amber-700' },
+                              NAO_REALIZADO: { label: '❌ Não Realizado', cor: 'bg-red-100 text-red-700' },
+                            };
+                            const c = cfg[s];
+                            return c ? (
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.cor}`}>
+                                {c.label}
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                         {diario.momentoDestaque && (
                           <p className="text-sm text-gray-700 line-clamp-2 mt-1">
@@ -1094,6 +1122,27 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-6 max-w-3xl">
+
+          {/* Gate de Chamada — aviso forte quando chamada não foi feita */}
+          {!chamadaCarregada && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-amber-800">Chamada do Dia ainda não realizada</p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  Realize a Chamada Diária antes de registar o Diário do Dia.
+                  As presenças serão importadas automaticamente após a chamada.
+                </p>
+                <button
+                  onClick={() => { if (classroomId) window.location.href = '/app/chamada'; }}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors font-medium"
+                >
+                  <Users className="h-3.5 w-3.5" /> Ir para Chamada Diária
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* BUG C FIX: Card de Planejamento do Dia com campos de execução integrados */}
           {planejamentoHoje ? (
             <Card className="border-2 border-indigo-200 bg-indigo-50">
@@ -1147,6 +1196,40 @@ export default function DiarioBordoPage() {
               <CardContent className="space-y-3 pt-0">
                 <div className="border-t border-indigo-200 pt-3">
                   <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide mb-3">Registro de Execução do Planejamento</p>
+
+                  {/* Selector de status de execução */}
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold text-indigo-800 mb-2">
+                      Como foi a execução do plano? <span className="text-red-500">*</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        { id: 'FEITO', label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700', corOff: 'border-emerald-200 text-emerald-700 hover:bg-emerald-50' },
+                        { id: 'PARCIAL', label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600', corOff: 'border-amber-200 text-amber-700 hover:bg-amber-50' },
+                        { id: 'NAO_REALIZADO', label: 'Não Realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600', corOff: 'border-red-200 text-red-600 hover:bg-red-50' },
+                      ] as const).map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            form.statusExecucaoPlano === s.id
+                              ? `${s.cor} text-white border-transparent shadow-sm`
+                              : `bg-white ${s.corOff}`
+                          }`}
+                        >
+                          <span>{s.emoji}</span> {s.label}
+                        </button>
+                      ))}
+                    </div>
+                    {form.statusExecucaoPlano && (
+                      <p className="text-xs text-indigo-600 mt-1.5">
+                        {form.statusExecucaoPlano === 'FEITO' && '✓ O plano do dia foi cumprido conforme planeado.'}
+                        {form.statusExecucaoPlano === 'PARCIAL' && '⚠ O plano foi parcialmente executado — descreva as adaptações abaixo.'}
+                        {form.statusExecucaoPlano === 'NAO_REALIZADO' && '⚠ O plano não foi realizado — registe o motivo no campo de reflexão.'}
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-3">
                     <div>
                       <Label className="text-indigo-800">O que foi executado?</Label>
@@ -1430,9 +1513,16 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* Reflexão */}
+          {/* Avaliação do Plano do Dia */}
           <Card className="border-2 border-indigo-100">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-indigo-700"><Lightbulb className="h-5 w-5" /> Reflexão Pedagógica</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-indigo-700">
+                <Lightbulb className="h-5 w-5" /> Avaliação do Plano do Dia
+              </CardTitle>
+              <p className="text-xs text-indigo-500 mt-0.5">
+                Obrigatório — este registo alimenta os relatórios da coordenação pedagógica.
+              </p>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label>Momento de Destaque do Dia</Label>
@@ -1444,9 +1534,11 @@ export default function DiarioBordoPage() {
                 />
               </div>
               <div>
-                <Label>Reflexão Pedagógica</Label>
+                <Label>
+                  Avaliação da Execução <span className="text-red-500">*</span>
+                </Label>
                 <Textarea
-                  placeholder="Reflita sobre sua prática: O que funcionou bem? O que você faria diferente? Quais aprendizagens emergiram? Como as crianças surpreenderam?"
+                  placeholder="Como foi a execução do plano? O que funcionou? O que não funcionou? O objetivo foi atingido? O que precisa ser retomado amanhã?"
                   rows={3}
                   value={form.reflexaoPedagogica}
                   onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
@@ -1467,7 +1559,7 @@ export default function DiarioBordoPage() {
           <div className="flex gap-3">
             <Button onClick={salvarDiario} disabled={saving} className="flex-1">
               {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Salvar Diário de Bordo
+              Guardar Diário do Dia
             </Button>
             <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
           </div>
