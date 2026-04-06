@@ -429,9 +429,10 @@ export class RdicService {
 
   // ─── Central da Criança ─────────────────────────────────────────────────
   async centralDaCrianca(childId: string, user: JwtPayload) {
-    const level = user.roles[0]?.level;
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const level = user.roles?.[0]?.level;
 
-    // 1. Buscar dados da criança (sem acompanhamentosNutricionais no select)
+    // 1. Dados da criança com restrições alimentares
     const child = await this.prisma.child.findFirst({
       where: { id: childId, mantenedoraId: user.mantenedoraId },
       select: {
@@ -440,25 +441,55 @@ export class RdicService {
         lastName: true,
         dateOfBirth: true,
         gender: true,
+        photoUrl: true,
         allergies: true,
         medicalConditions: true,
-        photoUrl: true,
+        medicationNeeds: true,
         enrollments: {
           where: { status: 'ATIVA' },
           select: {
-            classroom: {
-              select: { id: true, name: true, code: true },
-            },
+            classroom: { select: { id: true, name: true } },
           },
           take: 1,
+        },
+        dietaryRestrictions: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            type: true,
+            name: true,
+            severity: true,
+            forbiddenFoods: true,
+          },
         },
       },
     });
 
-    if (!child) throw new NotFoundException('Criança não encontrada');
+    if (!child) {
+      throw new NotFoundException('Criança não encontrada ou fora do escopo');
+    }
 
-    // 2b. Acompanhamento nutricional — query separada e defensiva
-    // Isola o risco: se a tabela não existir no cliente Prisma, nunca quebra
+    // 2. PROFESSOR: verificar vínculo com a turma da criança
+    if (level === 'PROFESSOR') {
+      const enrollment = child.enrollments?.[0];
+      if (!enrollment) {
+        throw new ForbiddenException('Criança sem turma activa');
+      }
+      const ct = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          teacherId: user.sub,
+          classroomId: enrollment.classroom.id,
+          isActive: true,
+        },
+      });
+      if (!ct) {
+        throw new ForbiddenException(
+          'Você não está vinculado à turma desta criança.',
+        );
+      }
+    }
+
+    // 3. Acompanhamento nutricional — query separada e defensiva
     let acompanhamentoNutricional: any = null;
     try {
       acompanhamentoNutricional = await (this.prisma as any)
@@ -473,42 +504,65 @@ export class RdicService {
           },
         });
     } catch {
-      // Silencioso — acompanhamento é opcional, não deve quebrar o endpoint central
+      // Silencioso — acompanhamento é opcional, nunca deve quebrar o endpoint
     }
 
-    // 3. Todos os RDICs da criança
+    // 4. Todos os RDICs da criança (mais recente primeiro)
     const rdics = await this.prisma.rDIXInstancia.findMany({
       where: { childId, mantenedoraId: user.mantenedoraId },
-      orderBy: [{ anoLetivo: 'desc' }, { criadoEm: 'desc' }],
       select: {
         id: true,
         periodo: true,
         periodoEnum: true,
         anoLetivo: true,
         status: true,
+        rascunhoJson: true,
+        reviewComment: true,
+        submittedAt: true,
+        reviewedAt: true,
+        finalizadoEm: true,
+        publicadoEm: true,
         criadoEm: true,
         atualizadoEm: true,
-        reviewComment: true,
-        conteudoFinal: true,
       },
+      orderBy: { criadoEm: 'desc' },
     });
 
-    const turmaAtual = child.enrollments[0]?.classroom ?? null;
+    // 5. Contar eventos do diário nos últimos 90 dias
+    let totalDiario90dias = 0;
+    try {
+      const noventa = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      totalDiario90dias = await this.prisma.diaryEvent.count({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          createdAt: { gte: noventa },
+        },
+      });
+    } catch {
+      // Silencioso — contagem é informativa, não deve quebrar o endpoint
+    }
 
     return {
       child: {
         id: child.id,
         firstName: child.firstName,
         lastName: child.lastName,
-        dateOfBirth: child.dateOfBirth ? (child.dateOfBirth as Date).toISOString() : null,
+        dateOfBirth: child.dateOfBirth
+          ? (child.dateOfBirth as Date).toISOString()
+          : null,
         gender: child.gender ? String(child.gender) : null,
+        photoUrl: child.photoUrl ?? null,
         allergies: child.allergies ?? null,
         medicalConditions: child.medicalConditions ?? null,
-        photoUrl: child.photoUrl ?? null,
-        turmaAtual,
+        medicationNeeds: child.medicationNeeds ?? null,
+        turma: child.enrollments?.[0]?.classroom ?? null,
+        restricoesAlimentares: child.dietaryRestrictions ?? [],
+        acompanhamentoNutricional,
       },
-      acompanhamentoNutricional,
       rdics,
+      rdicAtual: rdics[0] ?? null,
+      totalDiario90dias,
     };
   }
 
