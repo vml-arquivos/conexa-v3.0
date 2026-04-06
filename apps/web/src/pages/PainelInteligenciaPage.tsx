@@ -10,7 +10,7 @@
  * Acesso: UNIDADE | STAFF_CENTRAL | MANTENEDORA | DEVELOPER
  * Rota: /app/inteligencia
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -230,37 +230,111 @@ function PainelSaudeNutricao({ criancaId, criancaNome, turmaId }: { criancaId: s
 
 function PainelAuditoriaDocente({ turmaId, turmaNome }: { turmaId: string; turmaNome: string }) {
   const navigate = useNavigate();
+  const [conferencias, setConferencias] = useState<any[]>([]);
+  const [plannings, setPlannings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const carregar = useCallback(async () => {
+    if (!turmaId) return;
+    setLoading(true);
+    try {
+      const dataInicio = new Date(Date.now()-90*24*60*60*1000).toISOString().slice(0,10);
+      const [rC, rP] = await Promise.allSettled([
+        http.get('/planning-conferencia', { params: { classroomId: turmaId, dataInicio } }),
+        http.get('/plannings', { params: { classroomId: turmaId } }),
+      ]);
+      if (rC.status === 'fulfilled') {
+        const d = rC.value?.data;
+        setConferencias(Array.isArray(d) ? d : []);
+      }
+      if (rP.status === 'fulfilled') {
+        const d = rP.value?.data;
+        setPlannings(Array.isArray(d) ? d : (d?.data ?? []));
+      }
+    } catch { /* silencioso */ }
+    finally { setLoading(false); }
+  }, [turmaId]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const resumo = useMemo(() => {
+    const total = conferencias.length;
+    if (total === 0) return null;
+    const feito = conferencias.filter((c: any) => c.status === 'FEITO').length;
+    const parcial = conferencias.filter((c: any) => c.status === 'PARCIAL').length;
+    const naoRealizado = conferencias.filter((c: any) => c.status === 'NAO_REALIZADO').length;
+    return {
+      total, feito, parcial, naoRealizado,
+      pctFeito: Math.round((feito/total)*100),
+      pctParcial: Math.round((parcial/total)*100),
+      pctNaoRealizado: Math.round((naoRealizado/total)*100),
+    };
+  }, [conferencias]);
+
+  const planningsAprovados = plannings.filter((p:any) =>
+    ['APROVADO','EM_EXECUCAO','CONCLUIDO'].includes(p.status)
+  ).length;
+  const planningsSemConferencia = planningsAprovados - [...new Set(conferencias.map((c:any)=>c.planningId))].length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
           <Shield className="h-4 w-4 text-amber-500" /> Auditoria Docente — {turmaNome}
         </h3>
-        <Button size="sm" onClick={() => navigate(`/app/turma/${turmaId}/painel`)} className="text-xs bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1">
-          <BarChart2 className="h-3.5 w-3.5" /> Ver Painel
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={carregar} className="text-xs flex items-center gap-1">
+            <RefreshCw className="h-3.5 w-3.5" /> Actualizar
+          </Button>
+          <Button size="sm" onClick={() => navigate(`/app/turma/${turmaId}/painel`)} className="text-xs bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1">
+            <BarChart2 className="h-3.5 w-3.5" /> Ver Painel
+          </Button>
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          { label: 'Cobertura de Observações', desc: '% crianças com diário nos últimos 30 dias', icon: <BookOpen className="h-5 w-5 text-indigo-400" /> },
-          { label: 'Taxa de Devolução de RDICs', desc: 'RDICs devolvidos vs enviados para revisão', icon: <AlertCircle className="h-5 w-5 text-amber-400" /> },
-          { label: 'Completude por Trimestre', desc: 'Evolução mensal da execução docente', icon: <TrendingUp className="h-5 w-5 text-emerald-400" /> },
-        ].map((c, i) => (
-          <Card key={i} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/app/turma/${turmaId}/painel`)}>
-            <CardContent className="p-4">
-              {c.icon}
-              <p className="text-sm font-semibold text-gray-800 mt-2">{c.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{c.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex items-start gap-3">
-        <Shield className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-700">
-          A auditoria completa com gráficos semanais está disponível no <strong>Painel da Turma</strong>.
-        </p>
-      </div>
+
+      {loading ? (
+        <div className="text-center py-6 text-sm text-gray-400">Carregando dados...</div>
+      ) : resumo === null ? (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-5 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-700">Sem conferências registadas</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              O professor ainda não conferiu nenhum planejamento desta turma nos últimos 90 dias.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              {label:'Feito',val:resumo.feito,pct:resumo.pctFeito,bg:'bg-emerald-50',txt:'text-emerald-700',cor:'bg-emerald-400'},
+              {label:'Parcial',val:resumo.parcial,pct:resumo.pctParcial,bg:'bg-amber-50',txt:'text-amber-700',cor:'bg-amber-400'},
+              {label:'Não Realizado',val:resumo.naoRealizado,pct:resumo.pctNaoRealizado,bg:'bg-red-50',txt:'text-red-700',cor:'bg-red-400'},
+            ].map((item,i)=>(
+              <div key={i} className={`${item.bg} rounded-xl p-4 text-center`}>
+                <p className={`text-3xl font-bold ${item.txt}`}>{item.pct}%</p>
+                <p className={`text-xs font-semibold ${item.txt} mt-0.5`}>{item.label}</p>
+                <p className="text-xs text-gray-400">{item.val} de {resumo.total}</p>
+              </div>
+            ))}
+          </div>
+          <div className="w-full h-3 rounded-full overflow-hidden flex bg-gray-100">
+            <div className="h-full bg-emerald-400" style={{width:`${resumo.pctFeito}%`}}/>
+            <div className="h-full bg-amber-400" style={{width:`${resumo.pctParcial}%`}}/>
+            <div className="h-full bg-red-400" style={{width:`${resumo.pctNaoRealizado}%`}}/>
+          </div>
+          {planningsSemConferencia > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0" />
+              <p className="text-xs text-amber-700">
+                <strong>{planningsSemConferencia} planejamento(s)</strong> aprovados sem conferência registada.
+              </p>
+            </div>
+          )}
+          <p className="text-xs text-gray-400 text-right">{resumo.total} conferências nos últimos 90 dias</p>
+        </>
+      )}
     </div>
   );
 }
