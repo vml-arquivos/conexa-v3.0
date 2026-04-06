@@ -21,7 +21,7 @@ import { getAccessibleClassrooms } from '../api/lookup';
 import {
   Brain, Users, BarChart2, Heart, Shield,
   ChevronRight, TrendingUp, BookOpen, Activity,
-  Sparkles, AlertCircle,
+  Sparkles, AlertCircle, RefreshCw,
 } from 'lucide-react';
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────────
