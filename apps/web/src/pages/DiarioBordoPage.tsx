@@ -827,6 +827,10 @@ export default function DiarioBordoPage() {
   }
 
   async function salvarDiario() {
+    if (!chamadaCarregada) {
+      toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
+      return;
+    }
     if (!form.momentoDestaque.trim() && !form.reflexaoPedagogica.trim()) {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Reflexão Pedagógica');
       return;
@@ -1143,6 +1147,8 @@ export default function DiarioBordoPage() {
             </div>
           )}
 
+          {chamadaCarregada && (
+            <>
           {/* BUG C FIX: Card de Planejamento do Dia com campos de execução integrados */}
           {planejamentoHoje ? (
             <Card className="border-2 border-indigo-200 bg-indigo-50">
@@ -1563,6 +1569,8 @@ export default function DiarioBordoPage() {
             </Button>
             <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
           </div>
+            </>
+          )}
         </div>
       )}
 

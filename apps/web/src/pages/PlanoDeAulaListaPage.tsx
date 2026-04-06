@@ -48,6 +48,16 @@ const MESES = [
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+function toPedagogicalDateKey(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 // ─── Configuração de status ───────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, {
@@ -136,19 +146,17 @@ function getStatusVirtual(p: Planning, today: Date): string {
   if (status === 'RASCUNHO' || status === 'EM_REVISAO' || status === 'DEVOLVIDO' || status === 'CANCELADO') {
     return status;
   }
-  const start = p.startDate ? new Date(p.startDate) : null;
-  const end = p.endDate ? new Date(p.endDate) : start;
-  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (end) {
-    const endMid = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-    if (endMid < todayMid && (status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'PUBLICADO')) {
+  const startKey = p.startDate ? toPedagogicalDateKey(p.startDate) : null;
+  const endKey = p.endDate ? toPedagogicalDateKey(p.endDate) : startKey;
+  const todayKey = toPedagogicalDateKey(today);
+  if (endKey) {
+    if (endKey < todayKey && (status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'PUBLICADO')) {
       return 'CONCLUIDO';
     }
   }
-  if (start && (status === 'APROVADO' || status === 'PUBLICADO')) {
-    const startMid = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const endMid = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate()) : startMid;
-    if (startMid <= todayMid && todayMid <= endMid) {
+  if (startKey && (status === 'APROVADO' || status === 'PUBLICADO')) {
+    const finalKey = endKey ?? startKey;
+    if (startKey <= todayKey && todayKey <= finalKey) {
       return 'EM_EXECUCAO';
     }
   }
@@ -237,11 +245,8 @@ export default function PlanoDeAulaListaPage() {
 
   // Mapeia planejamentos por dia (usa startDate)
   function getPlanningsForDay(day: number): Planning[] {
-    return plannings.filter(p => {
-      const d = p.startDate ? new Date(p.startDate) : null;
-      if (!d) return false;
-      return d.getFullYear() === currentYear && d.getMonth() === currentMonth && d.getDate() === day;
-    });
+    const dayKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return plannings.filter(p => p.startDate ? toPedagogicalDateKey(p.startDate) === dayKey : false);
   }
 
   // G2 FIX: Retorna status visual (com CONCLUIDO virtual para planejamentos passados)
@@ -815,11 +820,8 @@ export default function PlanoDeAulaListaPage() {
 
               {/* APROVADO hoje: link para Diário de Bordo */}
               {selectedPlanning.status === 'APROVADO' && (() => {
-                const startDate = selectedPlanning.startDate ? new Date(selectedPlanning.startDate) : null;
-                const isApprovedToday = startDate &&
-                  startDate.getFullYear() === today.getFullYear() &&
-                  startDate.getMonth() === today.getMonth() &&
-                  startDate.getDate() === today.getDate();
+                const startDateKey = selectedPlanning.startDate ? toPedagogicalDateKey(selectedPlanning.startDate) : null;
+                const isApprovedToday = startDateKey === toPedagogicalDateKey(today);
                 if (!isApprovedToday) return null;
                 return (
                   <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-3">

@@ -15,7 +15,33 @@ import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { getScopedWhereForPlanning } from './planning-scope.helper';
 import { maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
-import { assertSchoolDay } from '../common/utils/date.utils';
+import { assertSchoolDay, formatPedagogicalDate } from '../common/utils/date.utils';
+
+function parsePedagogicalDateInput(value: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  }
+  return new Date(value);
+}
+
+function toPedagogicalDateKey(value: Date | string): string {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function getPedagogicalUtcRange(date: string): { start: Date; end: Date } {
+  const [year, month, day] = date.split('-').map(Number);
+  return {
+    start: new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)),
+    end: new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)),
+  };
+}
 
 @Injectable()
 export class PlanningService {
@@ -80,7 +106,7 @@ export class PlanningService {
     // 4. Buscar entrada da matriz para a data
     // FIX C3.1: usar intervalo UTC do dia para cobrir tanto T00:00Z (new Date('YYYY-MM-DD'))
     // quanto T03:00Z (parser com offset -03:00). Date.UTC garante independência de timezone do servidor.
-    const targetDate = new Date(dto.date);
+    const targetDate = parsePedagogicalDateInput(dto.date);
     const dateParts = dto.date.split('-').map(Number);
     const dayStart = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
     const dayEnd   = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 23, 59, 59, 999));
@@ -92,12 +118,12 @@ export class PlanningService {
     });
 
     // 5. Montar dados do planejamento
-    let title = `${template.name} - ${classroom.name} - ${targetDate.toLocaleDateString('pt-BR')}`;
+    let title = `${template.name} - ${classroom.name} - ${formatPedagogicalDate(targetDate)}`;
     let description = template.description || '';
     let content: any = {};
 
     if (matrixEntry) {
-      title = `${matrixEntry.campoDeExperiencia} - ${classroom.name} - ${targetDate.toLocaleDateString('pt-BR')}`;
+      title = `${matrixEntry.campoDeExperiencia} - ${classroom.name} - ${formatPedagogicalDate(targetDate)}`;
       description = matrixEntry.intencionalidade || '';
       content = {
         campoDeExperiencia: matrixEntry.campoDeExperiencia,
@@ -230,8 +256,8 @@ export class PlanningService {
     }
 
     // Validar datas
-    const startDate = new Date(createDto.startDate);
-    const endDate = new Date(createDto.endDate);
+    const startDate = parsePedagogicalDateInput(createDto.startDate);
+    const endDate = parsePedagogicalDateInput(createDto.endDate);
 
     if (startDate > endDate) {
       throw new BadRequestException(
@@ -424,14 +450,18 @@ export class PlanningService {
     if (query.startDate || query.endDate) {
       let periodConditions: object[] = [];
       if (query.startDate && query.endDate) {
+        const startRange = getPedagogicalUtcRange(query.startDate);
+        const endRange = getPedagogicalUtcRange(query.endDate);
         periodConditions = [
-          { startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } },
-          { endDate: { gte: new Date(query.startDate) } },
+          { startDate: { lte: endRange.end } },
+          { endDate: { gte: startRange.start } },
         ];
       } else if (query.startDate) {
-        periodConditions = [{ endDate: { gte: new Date(query.startDate) } }];
+        const startRange = getPedagogicalUtcRange(query.startDate);
+        periodConditions = [{ endDate: { gte: startRange.start } }];
       } else if (query.endDate) {
-        periodConditions = [{ startDate: { lte: new Date(query.endDate + 'T23:59:59.999Z') } }];
+        const endRange = getPedagogicalUtcRange(query.endDate);
+        periodConditions = [{ startDate: { lte: endRange.end } }];
       }
       // Preservar o OR existente (professor: createdBy OR classroomId) e adicionar OR de período
       if (periodConditions.length > 0) {
@@ -603,10 +633,10 @@ export class PlanningService {
     // Validar datas se fornecidas
     if (updateDto.startDate || updateDto.endDate) {
       const startDate = updateDto.startDate
-        ? new Date(updateDto.startDate)
+        ? parsePedagogicalDateInput(updateDto.startDate)
         : planning.startDate;
       const endDate = updateDto.endDate
-        ? new Date(updateDto.endDate)
+        ? parsePedagogicalDateInput(updateDto.endDate)
         : planning.endDate;
 
       if (startDate > endDate) {
@@ -626,8 +656,8 @@ export class PlanningService {
         ...(updateDto.classroomId !== undefined && { classroomId: updateDto.classroomId }),
         ...(updateDto.pedagogicalContent !== undefined && { pedagogicalContent: updateDto.pedagogicalContent }),
         // Campos legados
-        ...(updateDto.startDate && { startDate: new Date(updateDto.startDate) }),
-        ...(updateDto.endDate && { endDate: new Date(updateDto.endDate) }),
+        ...(updateDto.startDate && { startDate: parsePedagogicalDateInput(updateDto.startDate) }),
+        ...(updateDto.endDate && { endDate: parsePedagogicalDateInput(updateDto.endDate) }),
         ...(updateDto.objectives && {
           objectives: typeof updateDto.objectives === 'string'
             ? updateDto.objectives
@@ -1202,9 +1232,9 @@ export class PlanningService {
       const dd = String(dt.getDate()).padStart(2, '0');
       dates.push(`${yy}-${mm}-${dd}`);
     }
-    const rangeStart = new Date(y, m - 1, d, 0, 0, 0);
+    const rangeStart = getPedagogicalUtcRange(startDate).start;
     const lastDate = dates[dates.length - 1].split('-').map(Number);
-    const rangeEnd = new Date(lastDate[0], lastDate[1] - 1, lastDate[2], 23, 59, 59);
+    const rangeEnd = getPedagogicalUtcRange(dates[dates.length - 1]).end;
     // Busca planejamentos existentes que se sobrepõem ao range
     const existing = await this.prisma.planning.findMany({
       where: {
@@ -1220,10 +1250,8 @@ export class PlanningService {
     // Determina quais datas do range estão ocupadas
     const occupied: string[] = [];
     for (const dateStr of dates) {
-      const [dy, dm, dd2] = dateStr.split('-').map(Number);
-      const dt = new Date(dy, dm - 1, dd2);
       const isOccupied = existing.some(
-        (p) => new Date(p.startDate) <= dt && new Date(p.endDate) >= dt,
+        (p) => toPedagogicalDateKey(p.startDate) <= dateStr && toPedagogicalDateKey(p.endDate) >= dateStr,
       );
       if (isOccupied) occupied.push(dateStr);
     }
@@ -1238,9 +1266,8 @@ export class PlanningService {
         const cm = String(candidate.getMonth() + 1).padStart(2, '0');
         const cd = String(candidate.getDate()).padStart(2, '0');
         const candidateStr = `${cy}-${cm}-${cd}`;
-        const candidateEnd = new Date(cy, candidate.getMonth(), candidate.getDate(), 23, 59, 59);
         const isOccupied = existing.some(
-          (p) => new Date(p.startDate) <= candidate && new Date(p.endDate) >= candidateEnd,
+          (p) => toPedagogicalDateKey(p.startDate) <= candidateStr && toPedagogicalDateKey(p.endDate) >= candidateStr,
         );
         if (!isOccupied) {
           nextFreeDate = candidateStr;
