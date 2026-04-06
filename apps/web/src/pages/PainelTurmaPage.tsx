@@ -34,23 +34,27 @@ export default function PainelTurmaPage() {
   const navigate = useNavigate();
   const [s1,setS1]=useState<any>(null); const [s2,setS2]=useState<any>(null); const [s3,setS3]=useState<any>(null);
   const [health,setHealth]=useState<any>(null); const [eventos,setEventos]=useState<any[]>([]); const [loading,setLoading]=useState(true);
+  const [conferencias,setConferencias]=useState<any[]>([]);
 
   const carregar = useCallback(async () => {
     if (!classroomId) return;
     setLoading(true);
     try {
-      const [r1,r2,r3,rH,rD] = await Promise.allSettled([
+      const dataInicio = new Date(Date.now()-90*24*60*60*1000).toISOString().slice(0,10);
+      const [r1,r2,r3,rH,rD,rC] = await Promise.allSettled([
         http.get('/rdic/turma/status',{params:{classroomId,periodo:'1º Trimestre',anoLetivo:ANO}}),
         http.get('/rdic/turma/status',{params:{classroomId,periodo:'2º Trimestre',anoLetivo:ANO}}),
         http.get('/rdic/turma/status',{params:{classroomId,periodo:'3º Trimestre',anoLetivo:ANO}}),
         http.get('/children/health/dashboard',{params:{classroomId}}),
         http.get('/diary-events',{params:{classroomId,startDate:new Date(Date.now()-56*24*60*60*1000).toISOString().slice(0,10),limit:'500'}}),
+        http.get('/planning-conferencia',{params:{classroomId,dataInicio}}),
       ]);
       if(r1.status==='fulfilled')setS1(r1.value?.data??null);
       if(r2.status==='fulfilled')setS2(r2.value?.data??null);
       if(r3.status==='fulfilled')setS3(r3.value?.data??null);
       if(rH.status==='fulfilled')setHealth(rH.value?.data??null);
       if(rD.status==='fulfilled'){const r=rD.value?.data;setEventos(Array.isArray(r)?r:(r?.data??[]));}
+      if(rC.status==='fulfilled'){const r=rC.value?.data;setConferencias(Array.isArray(r)?r:[]);}
     } catch { toast.error('Erro ao carregar painel da turma.'); }
     finally { setLoading(false); }
   }, [classroomId]);
@@ -76,6 +80,23 @@ export default function PainelTurmaPage() {
     });
     return{completude,statusData,diarioSemanal,criancas,turmaName};
   },[s1,s2,s3,eventos]);
+
+  const resumoConferencias = useMemo(()=>{
+    const total = conferencias.length;
+    if(total===0) return null;
+    const feito = conferencias.filter((c:any)=>c.status==='FEITO').length;
+    const parcial = conferencias.filter((c:any)=>c.status==='PARCIAL').length;
+    const naoRealizado = conferencias.filter((c:any)=>c.status==='NAO_REALIZADO').length;
+    return {
+      total,
+      feito,
+      parcial,
+      naoRealizado,
+      pctFeito: Math.round((feito/total)*100),
+      pctParcial: Math.round((parcial/total)*100),
+      pctNaoRealizado: Math.round((naoRealizado/total)*100),
+    };
+  },[conferencias]);
 
   if(loading) return <LoadingState message="Carregando painel da turma..."/>;
   const total=s1?.contagem?.total??s2?.contagem?.total??s3?.contagem?.total??0;
@@ -137,6 +158,39 @@ export default function PainelTurmaPage() {
             </CardContent>
           </Card>
         </div>
+
+        {resumoConferencias && (
+          <Card className="border-purple-100 bg-purple-50/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-purple-500"/>
+                Execução do Planejamento
+                <span className="text-xs font-normal text-gray-400 ml-1">(últimos 90 dias)</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                {[
+                  {label:'Feito',val:resumoConferencias.feito,pct:resumoConferencias.pctFeito,cor:'#22c55e',bg:'bg-emerald-50',txt:'text-emerald-700'},
+                  {label:'Parcial',val:resumoConferencias.parcial,pct:resumoConferencias.pctParcial,cor:'#f59e0b',bg:'bg-amber-50',txt:'text-amber-700'},
+                  {label:'Não Realizado',val:resumoConferencias.naoRealizado,pct:resumoConferencias.pctNaoRealizado,cor:'#ef4444',bg:'bg-red-50',txt:'text-red-700'},
+                ].map((item,i)=>(
+                  <div key={i} className={`${item.bg} rounded-lg p-3 text-center`}>
+                    <p className={`text-2xl font-bold ${item.txt}`}>{item.pct}%</p>
+                    <p className={`text-xs font-medium ${item.txt}`}>{item.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{item.val} dias</p>
+                  </div>
+                ))}
+              </div>
+              <div className="w-full h-2.5 rounded-full overflow-hidden flex bg-gray-100">
+                <div className="h-full bg-emerald-400 transition-all" style={{width:`${resumoConferencias.pctFeito}%`}}/>
+                <div className="h-full bg-amber-400 transition-all" style={{width:`${resumoConferencias.pctParcial}%`}}/>
+                <div className="h-full bg-red-400 transition-all" style={{width:`${resumoConferencias.pctNaoRealizado}%`}}/>
+              </div>
+              <p className="text-xs text-gray-400 mt-2 text-right">{resumoConferencias.total} conferências registadas</p>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>

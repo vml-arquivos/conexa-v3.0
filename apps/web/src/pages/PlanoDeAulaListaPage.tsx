@@ -22,6 +22,7 @@ import {
   ThumbsDown,
   Printer,
   Download,
+  ClipboardCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import http from '../api/http';
@@ -869,6 +870,16 @@ export default function PlanoDeAulaListaPage() {
                 </Button>
               )}
 
+              {/* APROVADO: botão Conferir */}
+              {selectedPlanning.status === 'APROVADO' && (
+                <Button
+                  onClick={() => { setSelectedPlanning(null); navigate(`/app/planejamento/${selectedPlanning.id}/conferir`); }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" /> Conferir Execução
+                </Button>
+              )}
+
               {/* RASCUNHO: botão Editar */}
               {selectedPlanning.status === 'RASCUNHO' && (
                 <Button
@@ -885,21 +896,32 @@ export default function PlanoDeAulaListaPage() {
                   Aguardando aprovação da coordenação
                 </div>
               )}
-              {/* EM_EXECUCAO: link para Diário de Bordo */}
+              {/* EM_EXECUCAO: link para Diário de Bordo + botão Conferir */}
               {selectedPlanning.status === 'EM_EXECUCAO' && (
-                <Button
-                  variant="outline"
-                  onClick={() => navigate('/app/diario-de-bordo')}
-                  className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                >
-                  <BookOpen className="h-4 w-4 mr-2" /> Abrir Diário de Bordo
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/app/diario-de-bordo')}
+                    className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" /> Abrir Diário de Bordo
+                  </Button>
+                  <Button
+                    onClick={() => { setSelectedPlanning(null); navigate(`/app/planejamento/${selectedPlanning.id}/conferir`); }}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <ClipboardCheck className="h-4 w-4 mr-2" /> Conferir Execução
+                  </Button>
+                </>
               )}
-              {/* CONCLUIDO: apenas informação */}
+              {/* CONCLUIDO: botão Conferir + informação */}
               {selectedPlanning.status === 'CONCLUIDO' && (
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-teal-800 text-sm text-center">
-                  Planejamento concluído
-                </div>
+                <Button
+                  onClick={() => { setSelectedPlanning(null); navigate(`/app/planejamento/${selectedPlanning.id}/conferir`); }}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <ClipboardCheck className="h-4 w-4 mr-2" /> Conferir Execução
+                </Button>
               )}
 
               <Button

@@ -444,8 +444,8 @@ export default function PlanejamentosPage() {
                             <Send className="h-3 w-3" /> Corrigir e Reenviar
                           </button>
                         )}
-                        {/* Botão Conferir — professor em APROVADO ou EM_EXECUCAO */}
-                        {ehProfessor && (p.status === 'APROVADO' || p.status === 'EM_EXECUCAO') && (
+                        {/* Botão Conferir — professor em APROVADO, EM_EXECUCAO ou CONCLUIDO */}
+                        {ehProfessor && (p.status === 'APROVADO' || p.status === 'EM_EXECUCAO' || p.status === 'CONCLUIDO') && (
                           <button
                             onClick={() => navigate(`/app/planejamento/${p.id}/conferir`)}
                             title="Conferir execução do planejamento"
