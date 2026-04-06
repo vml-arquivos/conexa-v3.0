@@ -121,6 +121,13 @@ enum PlanningType {
   ANUAL
 }
 
+/// Status da Conferência do Planejamento — marcação de execução pelo professor
+enum PlanningConferenciaStatus {
+  FEITO
+  PARCIAL
+  NAO_REALIZADO
+}
+
 /// Status de planejamento
 enum PlanningStatus {
   RASCUNHO
@@ -830,6 +837,37 @@ model Planning {
   @@index([status])
   @@index([startDate])
   @@index([endDate])
+  conferencias PlanningConferencia[]
+}
+
+// ============================================================================
+// CONFERÊNCIA DO PLANEJAMENTO
+// Registo diário de execução do professor — FEITO / PARCIAL / NAO_REALIZADO
+// Tabela aditiva — não altera nenhum modelo existente estruturalmente
+// ============================================================================
+
+/// Conferência diária do planejamento — marcada pelo professor após a execução
+model PlanningConferencia {
+  id              String                     @id @default(cuid())
+  planningId      String
+  mantenedoraId   String
+  unitId          String
+  classroomId     String
+  professorId     String                     @db.VarChar(255)
+  dataConferencia DateTime                   // Dia conferido (meio-dia UTC)
+  status          PlanningConferenciaStatus
+  observacao      String?                    @db.Text
+  justificativa   String?                    @db.Text
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  planning Planning @relation(fields: [planningId], references: [id], onDelete: Cascade)
+
+  @@unique([planningId, dataConferencia])
+  @@index([classroomId])
+  @@index([professorId])
+  @@index([mantenedoraId])
+  @@index([dataConferencia])
 }
 
 // ============================================================================

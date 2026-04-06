@@ -45,6 +45,7 @@ import { CardapioModule } from './cardapio/cardapio.module';
 import { AlimentosModule } from './alimentos/alimentos.module';
 import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
 import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/acompanhamento-nutricional.module';
+import { PlanningConferenciaModule } from './planning-conferencia/planning-conferencia.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/ac
     AlimentosModule,
     ConfiguracaoRefeicaoModule,
     AcompanhamentoNutricionalModule,
+    PlanningConferenciaModule,
   ],
   controllers: [AppController],
   providers: [

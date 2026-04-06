@@ -41,6 +41,7 @@ import CentralRdicCriancaPage from '../pages/CentralRdicCriancaPage';
 import PainelAnaliticoCriancaPage from '../pages/PainelAnaliticoCriancaPage';
 import PainelTurmaPage from '../pages/PainelTurmaPage';
 import PainelInteligenciaPage from '../pages/PainelInteligenciaPage';
+import ConferenciaPlanejamentoPage from '../pages/ConferenciaPlanejamentoPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
@@ -497,6 +498,15 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PlanoDeAulaNovoPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'planejamento/:planningId/conferir',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'DEVELOPER']}>
+            <ConferenciaPlanejamentoPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

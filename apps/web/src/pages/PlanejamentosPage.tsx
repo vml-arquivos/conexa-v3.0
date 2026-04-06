@@ -19,7 +19,7 @@ import {
   CheckCircle, AlertCircle, Sparkles, FileText,
   Users, Target, Lightbulb, RefreshCw, Eye, Edit3,
   Search, Star, BookMarked, Layers, Send, ThumbsUp, ThumbsDown,
-  MessageSquare, Clock,
+  MessageSquare, Clock, ClipboardCheck,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -442,6 +442,16 @@ export default function PlanejamentosPage() {
                             className="flex items-center gap-1 text-xs bg-orange-600 text-white px-2 py-1 rounded-lg hover:bg-orange-700 transition-colors"
                           >
                             <Send className="h-3 w-3" /> Corrigir e Reenviar
+                          </button>
+                        )}
+                        {/* Botão Conferir — professor em APROVADO ou EM_EXECUCAO */}
+                        {ehProfessor && (p.status === 'APROVADO' || p.status === 'EM_EXECUCAO') && (
+                          <button
+                            onClick={() => navigate(`/app/planejamento/${p.id}/conferir`)}
+                            title="Conferir execução do planejamento"
+                            className="flex items-center gap-1 text-xs bg-purple-600 text-white px-2 py-1 rounded-lg hover:bg-purple-700 transition-colors"
+                          >
+                            <ClipboardCheck className="h-3 w-3" /> Conferir
                           </button>
                         )}
                         {/* Botões de Coordenação — apenas para UNIDADE em EM_REVISAO */}
