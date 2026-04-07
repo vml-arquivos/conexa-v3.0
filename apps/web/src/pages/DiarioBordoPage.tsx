@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -47,6 +48,7 @@ interface DiaryEntry {
   ausencias: number;
   status: string;
   createdAt: string;
+  aiContext?: Record<string, any> | null;
 }
 
 interface Microgesto {
@@ -213,6 +215,7 @@ function SeletorCrianca({
 // ─── Componente Principal ─────────────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const roles = normalizeRoles(user);
   const isDeveloper = roles.includes('DEVELOPER');
   const currentUserId = (user as any)?.id ?? (user as any)?.sub ?? '';
@@ -223,10 +226,13 @@ export default function DiarioBordoPage() {
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
+  const childIdFromQuery = searchParams.get('childId') ?? undefined;
+  const dateFromQuery = searchParams.get('date') ?? undefined;
 
   // Formulário do Diário
   const [form, setForm] = useState({
-    date: getPedagogicalToday(),
+    date: dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : getPedagogicalToday(),
     climaEmocional: 'BOM',
     momentoDestaque: '',
     reflexaoPedagogica: '',
@@ -328,6 +334,12 @@ export default function DiarioBordoPage() {
     loadDiarios();
     loadTurmaECriancas();
   }, []);
+
+  useEffect(() => {
+    if (dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery)) {
+      setForm(f => (f.date === dateFromQuery ? f : { ...f, date: dateFromQuery }));
+    }
+  }, [dateFromQuery]);
 
   // BUG D FIX: Carregar observações quando o usuário navega para a aba de observações.
   // O problema anterior: loadObservacoes era chamado apenas no click de uma criança,
@@ -571,7 +583,10 @@ export default function DiarioBordoPage() {
         setLoadingTurma(false);
         return;
       }
-      const cid = turmas[0].id;
+      const turmaInicial = classroomIdFromQuery
+        ? turmas.find(t => t.id === classroomIdFromQuery) ?? turmas[0]
+        : turmas[0];
+      const cid = turmaInicial.id;
       setClassroomId(cid);
 
       // Buscar crianças matriculadas na turma
@@ -580,7 +595,12 @@ export default function DiarioBordoPage() {
         const criancasRes = await http.get('/lookup/children/accessible', { params: { classroomId: cid } });
         lista = Array.isArray(criancasRes.data) ? criancasRes.data : [];
         setCriancas(lista);
-        if (lista.length > 0) setChildId(lista[0].id);
+        if (lista.length > 0) {
+          const childInicial = childIdFromQuery
+            ? (lista.find(c => c.id === childIdFromQuery)?.id ?? lista[0].id)
+            : lista[0].id;
+          setChildId(childInicial);
+        }
       } catch {
         setCriancas([]);
       }
@@ -588,8 +608,9 @@ export default function DiarioBordoPage() {
       // Pré-carregar chamada do dia para preencher presenças automaticamente
       // Usa data local para evitar bug de timezone servidor UTC vs cliente GMT-3
       try {
-        const dateISO = /^\d{4}-\d{2}-\d{2}$/.test(form.date)
-          ? form.date
+        const dateBase = dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : form.date;
+        const dateISO = /^\d{4}-\d{2}-\d{2}$/.test(dateBase)
+          ? dateBase
           : (() => {
               const d = new Date();
               const y = d.getFullYear();
@@ -643,9 +664,9 @@ export default function DiarioBordoPage() {
       // Buscar planejamento ativo do dia via endpoint dedicado (timezone-safe)
       // Usa getPedagogicalToday() para garantir data correta em America/Sao_Paulo
       try {
-        const hoje = getPedagogicalToday();
+        const planDate = dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : form.date;
         const activePlanRes = await http.get('/plannings/active-today', {
-          params: { classroomId: cid, date: hoje },
+          params: { classroomId: cid, date: planDate },
         });
         const activePlan = activePlanRes.data;
         if (activePlan?.hasActivePlanning && activePlan.planningId) {
@@ -866,7 +887,7 @@ export default function DiarioBordoPage() {
       return;
     }
     if (!form.reflexaoPedagogica.trim()) {
-      toast.error('Preencha a Avaliação do Plano do Dia antes de salvar.');
+      toast.error('Preencha a Avaliação do Plano de Aula antes de salvar.');
       return;
     }
     // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)
@@ -953,7 +974,7 @@ export default function DiarioBordoPage() {
       setAba('lista');
       loadDiarios();
       setForm({
-        date: getPedagogicalToday(),
+        date: dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : getPedagogicalToday(),
         climaEmocional: 'BOM',
         momentoDestaque: '',
         reflexaoPedagogica: '',
@@ -1182,7 +1203,7 @@ export default function DiarioBordoPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2 text-indigo-800 text-base">
-                      <Target className="h-5 w-5 text-indigo-500" /> Planejamento do Dia
+                      <Target className="h-5 w-5 text-indigo-500" /> Plano de Aula do Dia
                     </CardTitle>
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-200 text-indigo-800">
                       {planejamentoHoje.status === 'EM_EXECUCAO' ? '▶ Em Execução' : '✓ Aprovado'}
@@ -1190,13 +1211,12 @@ export default function DiarioBordoPage() {
                   </div>
                   <p className="text-sm font-semibold text-indigo-900 mt-1">{planejamentoHoje.title}</p>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0">
+                <CardContent className="space-y-4 pt-0">
 
-                  {/* Campos de Experiência */}
                   {(planejamentoHoje.camposExperiencia ?? []).length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Campos de Experiência</p>
-                      <div className="flex flex-wrap gap-1">
+                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">Campo de Experiência</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {planejamentoHoje.camposExperiencia!.map((c, i) => (
                           <span key={i} className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full">{c}</span>
                         ))}
@@ -1204,90 +1224,84 @@ export default function DiarioBordoPage() {
                     </div>
                   )}
 
-                  {/* Objetivos por indicador */}
                   {(planejamentoHoje.objetivosMatriz ?? []).length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {planejamentoHoje.objetivosMatriz!.map((obj, i) => (
-                        <div key={i} className="bg-indigo-100/60 rounded-lg p-2.5 space-y-0.5">
+                        <div key={i} className="rounded-xl border border-indigo-200 bg-white/70 p-3 space-y-2">
                           {(obj as any).campoExperiencia && (
-                            <p className="text-xs font-semibold text-indigo-700">
-                              {(obj as any).campoExperiencia}
-                            </p>
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
+                              <p className="text-sm font-medium text-indigo-900">{(obj as any).campoExperiencia}</p>
+                            </div>
                           )}
-                          {(obj as any).objetivoBNCC && (
-                            <p className="text-xs text-indigo-800">
-                              <span className="font-semibold">BNCC:</span> {(obj as any).objetivoBNCC}
-                            </p>
-                          )}
-                          {(obj as any).objetivo_bncc && !(obj as any).objetivoBNCC && (
-                            <p className="text-xs text-indigo-800">
-                              <span className="font-semibold">BNCC:</span> {(obj as any).objetivo_bncc}
-                            </p>
+                          {((obj as any).objetivoBNCC || (obj as any).objetivo_bncc) && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
+                              <p className="text-sm text-indigo-900">{(obj as any).objetivoBNCC || (obj as any).objetivo_bncc}</p>
+                            </div>
                           )}
                           {(obj as any).objetivoCurriculoDF && (
-                            <p className="text-xs text-indigo-700">
-                              <span className="font-semibold">Currículo DF:</span> {(obj as any).objetivoCurriculoDF}
-                            </p>
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                              <p className="text-sm text-indigo-900">{(obj as any).objetivoCurriculoDF}</p>
+                            </div>
                           )}
                           {((obj as any).intencionalidadePedagogica || (obj as any).intencionalidade) && (
-                            <p className="text-xs text-indigo-600 italic">
-                              🎯 {(obj as any).intencionalidadePedagogica || (obj as any).intencionalidade}
-                            </p>
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{(obj as any).intencionalidadePedagogica || (obj as any).intencionalidade}</p>
+                            </div>
                           )}
                         </div>
                       ))}
                     </div>
                   )}
 
-                  {/* Legado: objectives como texto */}
                   {!((planejamentoHoje.objetivosMatriz ?? []).length > 0) && planejamentoHoje.objectives && (
                     <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Objetivos</p>
-                      <p className="text-xs text-indigo-800">{planejamentoHoje.objectives}</p>
+                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.objectives}</p>
                     </div>
                   )}
 
-                  {/* Desenvolvimento da Atividade */}
                   {planejamentoHoje.activities && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
-                      <p className="text-xs text-indigo-800 whitespace-pre-line">{planejamentoHoje.activities}</p>
+                    <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                      <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
+                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
                     </div>
                   )}
 
-                  {/* Materiais Previstos */}
                   {planejamentoHoje.recursos && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
-                      <p className="text-xs text-indigo-800">{planejamentoHoje.recursos}</p>
+                    <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                      <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
+                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
                     </div>
                   )}
 
                 </CardContent>
               </Card>
 
-              {/* ── CARD B: Execução do Plano do Dia ── */}
+              {/* ── CARD B: Avaliação do Plano de Aula ── */}
               <Card className="border-2 border-emerald-200 bg-emerald-50/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-emerald-800">
-                    <ClipboardList className="h-5 w-5 text-emerald-500" /> Execução do Plano do Dia
+                    <ClipboardList className="h-5 w-5 text-emerald-500" /> Avaliação do Plano de Aula
                   </CardTitle>
                   <p className="text-xs text-emerald-600 mt-0.5">
-                    Registe o que realmente aconteceu em sala.
+                    Registe a execução pedagógica e a avaliação do que aconteceu em sala.
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-4">
 
-                  {/* Selector FEITO / PARCIAL / NÃO REALIZADO */}
                   <div>
                     <p className="text-sm font-semibold text-emerald-800 mb-2">
-                      Como foi a execução do plano? <span className="text-red-500">*</span>
+                      Cumprimento do plano <span className="text-red-500">*</span>
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {([
                         { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
                         { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                        { id: 'NAO_REALIZADO' as const, label: 'Não Realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
+                        { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
                       ]).map(s => (
                         <button
                           key={s.id}
@@ -1303,33 +1317,22 @@ export default function DiarioBordoPage() {
                         </button>
                       ))}
                     </div>
-                    {form.statusExecucaoPlano === 'FEITO' && (
-                      <p className="text-xs text-emerald-600 mt-1">✓ O plano foi cumprido conforme planeado.</p>
-                    )}
-                    {form.statusExecucaoPlano === 'PARCIAL' && (
-                      <p className="text-xs text-amber-600 mt-1">⚠ Plano parcialmente executado — descreva as adaptações abaixo.</p>
-                    )}
-                    {form.statusExecucaoPlano === 'NAO_REALIZADO' && (
-                      <p className="text-xs text-red-600 mt-1">⚠ Plano não realizado — registe o motivo na Avaliação abaixo.</p>
-                    )}
                   </div>
 
-                  {/* O que foi executado */}
                   <div>
                     <Label>O que foi executado?</Label>
                     <Textarea
-                      placeholder="Descreva como o planejamento foi executado: quais atividades foram realizadas, como foram conduzidas..."
+                      placeholder="Descreva como o plano foi desenvolvido na prática: propostas realizadas, mediações e encaminhamentos."
                       rows={3}
                       value={form.execucaoPlanejamento}
                       onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
                     />
                   </div>
 
-                  {/* Materiais utilizados */}
                   <div>
                     <Label>Materiais realmente utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
                     <Textarea
-                      placeholder="Quais materiais e recursos foram efectivamente usados? Houve algum imprevisto?"
+                      placeholder="Quais materiais e recursos foram efectivamente usados durante a atividade?"
                       rows={2}
                       value={form.materiaisUtilizados}
                       onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
@@ -1337,26 +1340,89 @@ export default function DiarioBordoPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* Adaptações realizadas */}
                     <div>
                       <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
                       <Textarea
-                        placeholder="Quais ajustes foram necessários em relação ao planeado?"
+                        placeholder="Que ajustes foram necessários em relação ao que estava previsto?"
                         rows={3}
                         value={form.adaptacoesRealizadas}
                         onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
                       />
                     </div>
-                    {/* Ocorrências relevantes da execução */}
                     <div>
                       <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
                       <Textarea
-                        placeholder="Alguma ocorrência importante durante a execução?"
+                        placeholder="Registre fatos importantes, imprevistos ou situações que impactaram a aula."
                         rows={3}
                         value={form.ocorrencias}
                         onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <Label>Reação das crianças</Label>
+                    <Textarea
+                      placeholder="Como as crianças responderam? Houve engajamento, resistência, surpresa, descobertas?"
+                      rows={2}
+                      value={form.reacaoCriancas}
+                      onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
+                    />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800 mb-2">Objetivo foi atingido?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {([
+                        { id: 'SIM' as const, label: 'Sim', emoji: '✅', cor: 'bg-emerald-600 text-white border-emerald-600', corOff: 'border-emerald-200 text-emerald-700' },
+                        { id: 'PARCIAL' as const, label: 'Parcialmente', emoji: '⚠️', cor: 'bg-amber-500 text-white border-amber-500', corOff: 'border-amber-200 text-amber-700' },
+                        { id: 'NAO' as const, label: 'Não', emoji: '❌', cor: 'bg-red-500 text-white border-red-500', corOff: 'border-red-200 text-red-600' },
+                      ]).map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, objetivoAtingido: s.id }))}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            form.objetivoAtingido === s.id
+                              ? s.cor + ' shadow-sm'
+                              : 'bg-white ' + s.corOff
+                          }`}
+                        >
+                          <span>{s.emoji}</span> {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>O que funcionou bem?</Label>
+                      <Textarea
+                        placeholder="Quais estratégias, materiais ou momentos tiveram maior impacto positivo?"
+                        rows={3}
+                        value={form.oQueFuncionou}
+                        onChange={e => setForm(f => ({ ...f, oQueFuncionou: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <Label>O que não funcionou?</Label>
+                      <Textarea
+                        placeholder="Quais dificuldades surgiram? O que precisaria ser diferente?"
+                        rows={3}
+                        value={form.oQueNaoFuncionou}
+                        onChange={e => setForm(f => ({ ...f, oQueNaoFuncionou: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>O que precisa ser retomado? <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      placeholder="O que deve ser continuado, aprofundado ou corrigido no próximo dia?"
+                      rows={3}
+                      value={form.reflexaoPedagogica}
+                      onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
+                    />
                   </div>
 
                 </CardContent>
@@ -1598,92 +1664,6 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* ── CARD C: Avaliação do Plano do Dia ── */}
-          {planejamentoHoje && (
-            <Card className="border-2 border-purple-200 bg-purple-50/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-purple-800">
-                  <Lightbulb className="h-5 w-5 text-purple-500" /> Avaliação do Plano do Dia
-                </CardTitle>
-                <p className="text-xs text-purple-600 mt-0.5">
-                  Obrigatório — alimenta os relatórios da coordenação pedagógica.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-
-                {/* Reação das crianças */}
-                <div>
-                  <Label>Reação das crianças</Label>
-                  <Textarea
-                    placeholder="Como as crianças responderam? Houve engajamento, resistência, surpresa, descobertas?"
-                    rows={2}
-                    value={form.reacaoCriancas}
-                    onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
-                  />
-                </div>
-
-                {/* Objetivo atingido */}
-                <div>
-                  <p className="text-sm font-semibold text-purple-800 mb-2">O objetivo foi atingido?</p>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { id: 'SIM' as const, label: 'Sim', emoji: '✅', cor: 'bg-emerald-600 text-white border-emerald-600', corOff: 'border-emerald-200 text-emerald-700' },
-                      { id: 'PARCIAL' as const, label: 'Parcialmente', emoji: '⚠️', cor: 'bg-amber-500 text-white border-amber-500', corOff: 'border-amber-200 text-amber-700' },
-                      { id: 'NAO' as const, label: 'Não', emoji: '❌', cor: 'bg-red-500 text-white border-red-500', corOff: 'border-red-200 text-red-600' },
-                    ]).map(s => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, objetivoAtingido: s.id }))}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                          form.objetivoAtingido === s.id
-                            ? s.cor + ' shadow-sm'
-                            : 'bg-white ' + s.corOff
-                        }`}
-                      >
-                        <span>{s.emoji}</span> {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* O que funcionou */}
-                  <div>
-                    <Label>O que funcionou bem?</Label>
-                    <Textarea
-                      placeholder="Quais estratégias, materiais ou momentos tiveram maior impacto positivo?"
-                      rows={3}
-                      value={form.oQueFuncionou}
-                      onChange={e => setForm(f => ({ ...f, oQueFuncionou: e.target.value }))}
-                    />
-                  </div>
-                  {/* O que não funcionou */}
-                  <div>
-                    <Label>O que não funcionou?</Label>
-                    <Textarea
-                      placeholder="Quais dificuldades surgiram? O que precisaria ser diferente?"
-                      rows={3}
-                      value={form.oQueNaoFuncionou}
-                      onChange={e => setForm(f => ({ ...f, oQueNaoFuncionou: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                {/* O que precisa ser retomado */}
-                <div>
-                  <Label>O que precisa ser retomado? <span className="text-red-500">*</span></Label>
-                  <Textarea
-                    placeholder="O que deve ser continuado, aprofundado ou corrigido no próximo dia?"
-                    rows={3}
-                    value={form.reflexaoPedagogica}
-                    onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
-                  />
-                </div>
-
-              </CardContent>
-            </Card>
-          )}
 
           {/* ── CARD D: Fechamento Geral do Dia ── */}
           <Card className="border-2 border-blue-100">

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -311,6 +312,7 @@ export default function ControleFaltasPage() {
 
 // ─── Visão do Professor (extraída para componente separado) ───────────────────
 function ControleFaltasProfessorView() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);
@@ -441,7 +443,7 @@ function ControleFaltasProfessorView() {
         registros: lista,
       });
       toast.success('Chamada salva com sucesso! ✅');
-      setEtapa('resumo');
+      navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`);
     } catch {
       toast.error('Erro ao salvar a chamada. Tente novamente.');
     } finally {
