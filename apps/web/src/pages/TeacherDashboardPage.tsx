@@ -226,7 +226,59 @@ export default function TeacherDashboardPage() {
     'escuta-fala': 'bg-blue-50 border-blue-200 text-blue-800',
     'espacos-tempos': 'bg-green-50 border-green-200 text-green-800',
   };
-
+  const totalAlunos = ind?.totalAlunos ?? alunos.length;
+  const presentesHoje = insightsHoje?.presenca?.presentes ?? 0;
+  const ausentesHoje = insightsHoje?.presenca?.ausentes ?? Math.max(totalAlunos - presentesHoje, 0);
+  const diariosSemana = ind?.diariosEstaSemana ?? 0;
+  const planejamentosSemana = ind?.planejamentosEstaSemana ?? 0;
+  const rdicsRegistrados = ind?.rdicsRegistrados ?? 0;
+  const registrosHoje = registradosHoje.size;
+  const presencaPct = totalAlunos > 0 ? Math.min(100, Math.round((presentesHoje / totalAlunos) * 100)) : 0;
+  const diariosPct = Math.min(100, Math.round((diariosSemana / 5) * 100));
+  const planejamentosPct = Math.min(100, Math.round((planejamentosSemana / 5) * 100));
+  const registrosHojePct = totalAlunos > 0 ? Math.min(100, Math.round((registrosHoje / totalAlunos) * 100)) : 0;
+  const cardsResumoTurma = [
+    {
+      label: 'Crianças na turma',
+      value: totalAlunos,
+      helper: turma?.capacity ? `${turma.capacity} vagas planejadas` : 'Turma ativa',
+      icon: <Users className="h-5 w-5" />,
+      accent: 'text-blue-700',
+      iconShell: 'bg-blue-600',
+      progress: turma?.capacity ? Math.min(100, Math.round((totalAlunos / turma.capacity) * 100)) : 100,
+      progressClass: 'bg-blue-500',
+    },
+    {
+      label: 'Presença do dia',
+      value: presentesHoje,
+      helper: totalAlunos > 0 ? `${ausentesHoje} ausência(s)` : 'Sem turma vinculada',
+      icon: <CheckCircle className="h-5 w-5" />,
+      accent: 'text-emerald-700',
+      iconShell: 'bg-emerald-600',
+      progress: presencaPct,
+      progressClass: 'bg-emerald-500',
+    },
+    {
+      label: 'Diários da semana',
+      value: diariosSemana,
+      helper: 'Meta visual de 5 registros',
+      icon: <BookOpen className="h-5 w-5" />,
+      accent: 'text-amber-700',
+      iconShell: 'bg-amber-500',
+      progress: diariosPct,
+      progressClass: 'bg-amber-500',
+    },
+    {
+      label: 'Planejamentos no período',
+      value: planejamentosSemana,
+      helper: 'Acompanhamento da semana',
+      icon: <Calendar className="h-5 w-5" />,
+      accent: 'text-violet-700',
+      iconShell: 'bg-violet-600',
+      progress: planejamentosPct,
+      progressClass: 'bg-violet-500',
+    },
+  ];
 
   return (
     <PageShell
@@ -246,111 +298,202 @@ export default function TeacherDashboardPage() {
 
       {data?.hasClassroom && (
         <div className="space-y-6">
-          {/* Widget: Hoje — dados reais da API com fallback para lookup local */}
-          {(insightsHoje || objetivosHoje.length > 0) && (
-            <div className="rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center">
-                    <Star className="h-4 w-4 text-white" />
+          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+            <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-5 text-white shadow-xl shadow-slate-200/70">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-4">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+                    <Star className="h-3.5 w-3.5 text-amber-300" />
+                    Cockpit da turma
                   </div>
                   <div>
-                    <p className="font-bold text-amber-800 text-sm">
-                      Hoje — {insightsHoje?.diaSemana ? insightsHoje.diaSemana.charAt(0).toUpperCase() + insightsHoje.diaSemana.slice(1) : ddmmHoje + '/2026'}
+                    <h2 className="text-2xl font-semibold tracking-tight">Sua visão rápida da turma de hoje</h2>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-200">
+                      {turma ? `${turma.name} · ${turma.unit?.name}` : 'Painel da professora'}
+                      {turma?.segmento ? ` · segmento ${turma.segmento}` : ''}
                     </p>
-                    {insightsHoje?.planejamentoAtivo && (
-                      <p className="text-xs text-amber-600">
-                        Planejamento: <span className="font-semibold">{insightsHoje.planejamentoAtivo.title}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs text-slate-100/90">
+                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{totalAlunos} criança(s)</span>
+                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{presentesHoje} presente(s)</span>
+                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{diariosSemana} diário(s) na semana</span>
+                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{planejamentosSemana} planejamento(s) no período</span>
+                  </div>
+                </div>
+
+                <div className="min-w-[240px] rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Resumo do dia</p>
+                      <p className="mt-1 text-3xl font-semibold">{presentesHoje}<span className="text-base font-medium text-slate-300">/{totalAlunos || '?'} presentes</span></p>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-400/15 p-3 text-emerald-200">
+                      <CheckCircle className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${presencaPct}%` }} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
+                    <div className="rounded-2xl bg-black/10 p-3">
+                      <p className="text-slate-300">Ausências</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{ausentesHoje}</p>
+                    </div>
+                    <div className="rounded-2xl bg-black/10 p-3">
+                      <p className="text-slate-300">Registros hoje</p>
+                      <p className="mt-1 text-lg font-semibold text-white">{registrosHoje}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {cardsResumoTurma.map((card) => (
+                <div key={card.label} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
+                      <p className={`mt-2 text-3xl font-semibold ${card.accent}`}>{card.value}</p>
+                      <p className="mt-1 text-xs text-slate-500">{card.helper}</p>
+                    </div>
+                    <div className={`rounded-2xl ${card.iconShell} p-3 text-white shadow-sm`}>
+                      {card.icon}
+                    </div>
+                  </div>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className={`h-full rounded-full ${card.progressClass} transition-all`} style={{ width: `${card.progress}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Widget: Hoje — dados reais da API com fallback para lookup local */}
+          {(insightsHoje || objetivosHoje.length > 0) && (
+            <div className="rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 p-5 shadow-sm shadow-amber-100/70">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-white shadow-sm shadow-amber-200">
+                    <Star className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Resumo pedagógico de hoje</p>
+                    <p className="mt-1 text-lg font-semibold text-amber-950">
+                      {insightsHoje?.diaSemana ? insightsHoje.diaSemana.charAt(0).toUpperCase() + insightsHoje.diaSemana.slice(1) : ddmmHoje + '/2026'}
+                    </p>
+                    {insightsHoje?.planejamentoAtivo ? (
+                      <p className="mt-1 text-sm text-amber-800">
+                        Planejamento ativo: <span className="font-semibold">{insightsHoje.planejamentoAtivo.title}</span>
                       </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-amber-800">Sem planejamento ativo identificado para hoje.</p>
                     )}
                   </div>
                 </div>
                 <button onClick={() => navigate('/app/planejamentos')}
-                  className="text-xs text-amber-700 font-medium hover:text-amber-900 flex items-center gap-1">
+                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white/80 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-white">
                   Ver planejamentos <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
 
-              {insightsHoje?.alertas?.planejamentosPendentes > 0 && (
-                <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-red-500 flex-shrink-0" />
-                  <p className="text-xs text-red-700 font-medium">
-                    {insightsHoje.alertas.planejamentosPendentes} planejamento(s) em rascunho há mais de 2 dias. <button onClick={() => navigate('/app/planejamentos')} className="underline">Enviar para revisão</button>
-                  </p>
-                </div>
-              )}
-
-              {insightsHoje?.presenca && (
-                <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  <p className="text-xs text-green-700">
-                    <span className="font-semibold">{insightsHoje.presenca.presentes}</span> presentes
-                    {insightsHoje.presenca.ausentes > 0 && (
-                      <span className="text-red-600 ml-2">· <span className="font-semibold">{insightsHoje.presenca.ausentes}</span> ausentes</span>
-                    )}
-                    {insightsHoje.presenca.turma && <span className="text-gray-500 ml-2">({insightsHoje.presenca.turma})</span>}
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {(insightsHoje?.planejamentoAtivo?.objetivosHoje?.length > 0
-                  ? insightsHoje.planejamentoAtivo.objetivosHoje
-                  : objetivosHoje.map((obj: any) => ({
-                      campoExperiencia: obj.campo_label,
-                      codigoBNCC: obj.codigo_bncc,
-                      objetivoBNCC: obj.objetivo_bncc,
-                      objetivoCurriculoDF: '',
-                      intencionalidadePedagogica: obj.intencionalidade,
-                    }))
-                ).map((obj: any, i: number) => (
-                  <div key={i} className="rounded-xl border bg-white/80 p-3">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {obj.codigoBNCC && (
-                        <span className="text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">{obj.codigoBNCC}</span>
-                      )}
-                      <span className="text-xs text-gray-500">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
-                    </div>
-                    <p className="text-sm font-medium leading-snug text-gray-800">{obj.objetivoBNCC}</p>
-                    {obj.intencionalidadePedagogica && (
-                      <p className="text-xs text-indigo-600 mt-1 flex items-start gap-1">
-                        <Lightbulb className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                        {obj.intencionalidadePedagogica}
+              <div className="mt-4 grid gap-3 lg:grid-cols-[0.95fr_1.05fr]">
+                <div className="space-y-3">
+                  {insightsHoje?.alertas?.planejamentosPendentes > 0 && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-3 flex items-start gap-2">
+                      <Bell className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+                      <p className="text-xs font-medium text-red-700">
+                        {insightsHoje.alertas.planejamentosPendentes} planejamento(s) em rascunho há mais de 2 dias. <button onClick={() => navigate('/app/planejamentos')} className="underline underline-offset-2">Enviar para revisão</button>
                       </p>
-                    )}
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  )}
 
-              {insightsHoje && !insightsHoje.planejamentoAtivo && objetivosHoje.length === 0 && (
-                <div className="text-center py-3">
-                  <p className="text-xs text-amber-700">Nenhum planejamento ativo para hoje.</p>
-                  <button onClick={() => navigate('/app/planejamento/novo')}
-                    className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
-                    Criar planejamento →
-                  </button>
+                  <div className="rounded-2xl border border-emerald-200 bg-white/80 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Presença recente</p>
+                        <p className="mt-1 text-2xl font-semibold text-emerald-900">{presentesHoje}<span className="text-sm font-medium text-emerald-700">/{totalAlunos || '?'} presentes</span></p>
+                      </div>
+                      <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700">
+                        <CheckCircle className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
+                      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${presencaPct}%` }} />
+                    </div>
+                    <p className="mt-2 text-xs text-emerald-700">{ausentesHoje} ausência(s) registradas no dia.</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Indicadores visuais da turma</p>
+                    <div className="mt-3 space-y-3">
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
+                          <span>Diários da semana</span>
+                          <span>{diariosSemana}/5</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-amber-500" style={{ width: `${diariosPct}%` }} /></div>
+                      </div>
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
+                          <span>Planejamentos do período</span>
+                          <span>{planejamentosSemana}/5</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-500" style={{ width: `${planejamentosPct}%` }} /></div>
+                      </div>
+                      <div>
+                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
+                          <span>Crianças com registro hoje</span>
+                          <span>{registrosHoje}/{totalAlunos || '?'}</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${registrosHojePct}%` }} /></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                <div className="space-y-2">
+                  {(insightsHoje?.planejamentoAtivo?.objetivosHoje?.length > 0
+                    ? insightsHoje.planejamentoAtivo.objetivosHoje
+                    : objetivosHoje.map((obj: any) => ({
+                        campoExperiencia: obj.campo_label,
+                        codigoBNCC: obj.codigo_bncc,
+                        objetivoBNCC: obj.objetivo_bncc,
+                        objetivoCurriculoDF: '',
+                        intencionalidadePedagogica: obj.intencionalidade,
+                      }))
+                  ).slice(0, 3).map((obj: any, i: number) => (
+                    <div key={i} className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {obj.codigoBNCC && (
+                          <span className="text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">{obj.codigoBNCC}</span>
+                        )}
+                        <span className="text-xs text-slate-500">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                      </div>
+                      <p className="text-sm font-medium leading-snug text-slate-800">{obj.objetivoBNCC}</p>
+                      {obj.intencionalidadePedagogica && (
+                        <p className="text-xs text-indigo-600 mt-2 flex items-start gap-1.5 rounded-xl bg-indigo-50 px-3 py-2">
+                          <Lightbulb className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                          {obj.intencionalidadePedagogica}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+
+                  {insightsHoje && !insightsHoje.planejamentoAtivo && objetivosHoje.length === 0 && (
+                    <div className="text-center rounded-2xl border border-dashed border-amber-300 bg-white/70 py-8 px-4">
+                      <p className="text-sm text-amber-700">Nenhum planejamento ativo para hoje.</p>
+                      <button onClick={() => navigate('/app/planejamento/novo')}
+                        className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
+                        Criar planejamento →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Cards de indicadores */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { icon: <Users className="h-6 w-6 text-blue-600" />, bg: 'bg-blue-100', val: ind?.totalAlunos ?? alunos.length, label: 'Crianças' },
-              { icon: <BookOpen className="h-6 w-6 text-green-600" />, bg: 'bg-green-100', val: ind?.diariosEstaSemana ?? 0, label: 'Diários esta semana' },
-              { icon: <Calendar className="h-6 w-6 text-purple-600" />, bg: 'bg-purple-100', val: ind?.planejamentosEstaSemana ?? 0, label: 'Planejamentos' },
-              { icon: <Brain className="h-6 w-6 text-indigo-600" />, bg: 'bg-indigo-100', val: ind?.rdicsRegistrados ?? 0, label: 'RDIC' },
-            ].map((c, i) => (
-              <Card key={i} className="rounded-2xl border-2 text-center hover:shadow-md transition-all">
-                <CardContent className="pt-4 pb-3">
-                  <div className={`w-10 h-10 ${c.bg} rounded-xl flex items-center justify-center mx-auto mb-2`}>{c.icon}</div>
-                  <p className="text-2xl font-bold text-gray-800">{c.val}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
           {/* Abas */}
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
             {[
