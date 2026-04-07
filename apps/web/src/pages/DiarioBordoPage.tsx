@@ -22,6 +22,7 @@ import {
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -408,13 +409,14 @@ function SeletorCrianca({
                 className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300'}`}
                 title={`${c.firstName} ${c.lastName}`}
               >
-                {c.photoUrl ? (
-                  <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow">
-                    <UserCircle className="w-6 h-6 text-blue-400" />
-                  </div>
-                )}
+                <ChildAvatar
+                  child={c}
+                  alt={c.firstName}
+                  sizeClassName="w-10 h-10"
+                  imageClassName="rounded-full object-cover border-2 border-white shadow"
+                  fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow"
+                  iconClassName="w-6 h-6 text-blue-400"
+                />
                 <span className={`text-xs font-medium leading-tight text-center max-w-[60px] truncate ${sel ? 'text-blue-700' : 'text-gray-600'}`}>
                   {c.firstName}
                 </span>
@@ -1501,13 +1503,14 @@ export default function DiarioBordoPage() {
                                 className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
                                 title={getCriancaNome(c)}
                               >
-                                {c.photoUrl ? (
-                                  <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                                    <UserCircle className="w-6 h-6 text-blue-400" />
-                                  </div>
-                                )}
+                                <ChildAvatar
+                                  child={c}
+                                  alt={c.firstName}
+                                  sizeClassName="w-10 h-10"
+                                  imageClassName="rounded-full object-cover"
+                                  fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center"
+                                  iconClassName="w-6 h-6 text-blue-400"
+                                />
                                 <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
                                 {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
                               </button>
@@ -2265,13 +2268,14 @@ export default function DiarioBordoPage() {
                     <div className="flex items-start gap-3">
                       {/* Avatar da criança */}
                       <div className="flex-shrink-0">
-                        {crianca?.photoUrl ? (
-                          <img src={crianca.photoUrl} alt={crianca.firstName} className="w-10 h-10 rounded-full object-cover border-2 border-orange-200" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center border-2 border-orange-200">
-                            <UserCircle className="w-6 h-6 text-orange-400" />
-                          </div>
-                        )}
+                        <ChildAvatar
+                          child={crianca}
+                          alt={crianca?.firstName}
+                          sizeClassName="w-10 h-10"
+                          imageClassName="rounded-full object-cover border-2 border-orange-200"
+                          fallbackClassName="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center border-2 border-orange-200"
+                          iconClassName="w-6 h-6 text-orange-400"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
