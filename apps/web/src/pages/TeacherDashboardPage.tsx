@@ -227,6 +227,7 @@ export default function TeacherDashboardPage() {
     'espacos-tempos': 'bg-green-50 border-green-200 text-green-800',
   };
 
+
   return (
     <PageShell
       title={`Olá, ${nomeProf}! 👋`}
@@ -270,7 +271,6 @@ export default function TeacherDashboardPage() {
                 </button>
               </div>
 
-              {/* Alertas */}
               {insightsHoje?.alertas?.planejamentosPendentes > 0 && (
                 <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-center gap-2">
                   <Bell className="h-4 w-4 text-red-500 flex-shrink-0" />
@@ -280,7 +280,6 @@ export default function TeacherDashboardPage() {
                 </div>
               )}
 
-              {/* Presença */}
               {insightsHoje?.presenca && (
                 <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2 flex items-center gap-3">
                   <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
@@ -294,7 +293,6 @@ export default function TeacherDashboardPage() {
                 </div>
               )}
 
-              {/* Objetivos do planejamento ativo ou lookup local como fallback */}
               <div className="space-y-2">
                 {(insightsHoje?.planejamentoAtivo?.objetivosHoje?.length > 0
                   ? insightsHoje.planejamentoAtivo.objetivosHoje
@@ -324,7 +322,6 @@ export default function TeacherDashboardPage() {
                 ))}
               </div>
 
-              {/* Sem planejamento ativo */}
               {insightsHoje && !insightsHoje.planejamentoAtivo && objetivosHoje.length === 0 && (
                 <div className="text-center py-3">
                   <p className="text-xs text-amber-700">Nenhum planejamento ativo para hoje.</p>
@@ -354,7 +351,6 @@ export default function TeacherDashboardPage() {
               </Card>
             ))}
           </div>
-
           {/* Abas */}
           <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
             {[
@@ -373,16 +369,22 @@ export default function TeacherDashboardPage() {
 
           {/* ─── MINHA TURMA ─── */}
           {abaAtiva === 'turma' && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h2 className="text-base font-bold text-gray-700">Minhas Crianças ({alunos.length})</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Toque na câmera para adicionar ou atualizar a foto</p>
+                  <h2 className="text-lg font-semibold text-slate-900">Minhas Crianças</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Cards mais enxutos, com foto real quando disponível, leitura rápida do status do dia e ações diretas.
+                  </p>
                 </div>
-                <button onClick={() => navigate('/app/chamada')}
-                  className="flex items-center gap-1 text-blue-500 text-sm font-medium hover:text-blue-700">
-                  Fazer chamada <ChevronRight className="h-4 w-4" />
-                </button>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-3 py-1">{alunos.length} crianças</span>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{registrosHoje} com registro hoje</span>
+                  <button onClick={() => navigate('/app/chamada')}
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 font-medium text-white transition hover:bg-blue-700">
+                    Fazer chamada <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
 
               {alunos.length === 0 ? (
@@ -391,59 +393,73 @@ export default function TeacherDashboardPage() {
                   <p className="text-gray-400">Nenhuma criança matriculada ainda</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {alunos.map(aluno => (
-                    <div key={aluno.id}
-                      className="flex flex-col items-center p-4 bg-white border-2 border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-sm transition-all">
-                      {/* Foto com botão de upload */}
-                      <div className="relative mb-3">
-                        {aluno.photoUrl ? (
-                          <button onClick={() => setFotoAmpliada({ url: aluno.photoUrl!, nome: `${aluno.firstName} ${aluno.lastName}` })}>
-                            <img src={aluno.photoUrl} alt={aluno.nome}
-                              className="w-16 h-16 rounded-full object-cover border-2 border-blue-100 hover:border-blue-400 transition-all cursor-zoom-in" />
-                          </button>
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-blue-100">
-                            <UserCircle className="w-10 h-10 text-blue-400" />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {alunos.map(aluno => {
+                    const temFoto = Boolean(aluno.photoUrl);
+                    const generoLabel = aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : 'Não informado';
+                    const registradoHoje = registradosHoje.has(aluno.id);
+
+                    return (
+                      <div key={aluno.id}
+                        className="group rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+                        <div className="flex items-start gap-4">
+                          <div className="relative shrink-0">
+                            {temFoto ? (
+                              <button onClick={() => setFotoAmpliada({ url: aluno.photoUrl!, nome: `${aluno.firstName} ${aluno.lastName}` })}>
+                                <img src={aluno.photoUrl} alt={aluno.nome}
+                                  className="h-16 w-16 rounded-2xl object-cover border border-blue-100 shadow-sm transition-all cursor-zoom-in group-hover:border-blue-300" />
+                              </button>
+                            ) : (
+                              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50">
+                                <UserCircle className="h-10 w-10 text-slate-400" />
+                              </div>
+                            )}
+                            <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
                           </div>
-                        )}
-                        <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-base font-semibold text-slate-900">{aluno.firstName} {aluno.lastName}</p>
+                                <p className="mt-1 text-xs text-slate-500">{aluno.idade} meses · {generoLabel}</p>
+                              </div>
+                              <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                {registradoHoje ? 'Registrado hoje' : 'Sem registro'}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Foto</p>
+                                <p className="mt-1 text-xs font-medium text-slate-700">{temFoto ? 'Foto atualizada' : 'Avatar padrão'}</p>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Principal info</p>
+                                <p className="mt-1 text-xs font-medium text-slate-700">{registradoHoje ? 'Registro do dia feito' : 'Pedir observação'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
+                            title="Registrar microgesto"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100">
+                            <Plus className="h-3.5 w-3.5" /> Registrar
+                          </button>
+                          <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100">
+                            <Brain className="h-3.5 w-3.5" /> RDIC
+                          </button>
+                          <button onClick={() => navigate('/app/rdx')} title="Fotos"
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-pink-50 px-3 py-2 text-xs font-medium text-pink-700 transition hover:bg-pink-100">
+                            <Camera className="h-3.5 w-3.5" /> Fotos
+                          </button>
+                        </div>
                       </div>
-
-                      <p className="font-semibold text-sm text-center text-gray-800 leading-tight">{aluno.firstName}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{aluno.idade} meses</p>
-                      <span className={`mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${aluno.gender === 'MASCULINO' ? 'bg-blue-100 text-blue-600' : aluno.gender === 'FEMININO' ? 'bg-pink-100 text-pink-600' : 'bg-gray-100 text-gray-500'}`}>
-                        {aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : '-'}
-                      </span>
-
-                      {/* Indicador de registro hoje */}
-                      <span className={`mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        registradosHoje.has(aluno.id)
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {registradosHoje.has(aluno.id) ? '✓ Registrado' : 'Sem registro'}
-                      </span>
-
-                      {/* Ações rápidas por criança */}
-                      <div className="flex gap-1 mt-2">
-                        <button
-                          onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
-                          title="Registrar microgesto"
-                          className="p-1.5 rounded-lg bg-blue-50 text-blue-500 hover:bg-blue-100 transition-all">
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
-                          className="p-1.5 rounded-lg bg-indigo-50 text-indigo-500 hover:bg-indigo-100 transition-all">
-                          <Brain className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => navigate('/app/rdx')} title="Fotos"
-                          className="p-1.5 rounded-lg bg-pink-50 text-pink-500 hover:bg-pink-100 transition-all">
-                          <Camera className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
