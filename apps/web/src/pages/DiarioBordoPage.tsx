@@ -1245,7 +1245,7 @@ export default function DiarioBordoPage() {
   });
 
   return (
-    <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
+    <PageShell title="Central da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
@@ -1708,17 +1708,19 @@ export default function DiarioBordoPage() {
                 </div>
               </div>
 
-              <div>
-                <Label>
-                  {getExecucaoLabel(form.statusExecucaoPlano)} {planejamentoHoje && <span className="text-red-500">*</span>} <span className="font-normal text-gray-400">{getExecucaoHint(form.statusExecucaoPlano)}</span>
-                </Label>
-                <Textarea
-                  placeholder={getExecucaoPlaceholder(form.statusExecucaoPlano)}
-                  rows={3}
-                  value={form.execucaoPlanejamento}
-                  onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
-                />
-              </div>
+              {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
+                <div>
+                  <Label>
+                    {getExecucaoLabel(form.statusExecucaoPlano)} {planejamentoHoje && <span className="text-red-500">*</span>} <span className="font-normal text-gray-400">{getExecucaoHint(form.statusExecucaoPlano)}</span>
+                  </Label>
+                  <Textarea
+                    placeholder={getExecucaoPlaceholder(form.statusExecucaoPlano)}
+                    rows={3}
+                    value={form.execucaoPlanejamento}
+                    onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
+                  />
+                </div>
+              )}
 
               <div>
                 <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
