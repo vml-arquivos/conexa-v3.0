@@ -283,24 +283,38 @@ export function MaterialRequestForm({ classroomId, classroomName, onSuccess, isP
 
                 {/* Select de Produto (ou input manual se catálogo vazio) */}
                 {!catalogLoading && produtosDaCategoria.length > 0 ? (
-                  <select
-                    value={item.materialId ?? ''}
-                    onChange={e => {
-                      if (e.target.value === '') {
-                        updateItemManual(idx, '');
-                      } else {
-                        updateProduto(idx, e.target.value);
-                      }
-                    }}
-                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  >
-                    <option value="">— Selecione o produto —</option>
-                    {produtosDaCategoria.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={item.materialId ?? (item.item && !item.materialId ? '__outro__' : '')}
+                      onChange={e => {
+                        if (e.target.value === '') {
+                          updateItemManual(idx, '');
+                        } else if (e.target.value === '__outro__') {
+                          updateItemManual(idx, '');
+                        } else {
+                          updateProduto(idx, e.target.value);
+                        }
+                      }}
+                      className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    >
+                      <option value="">— Selecione o produto —</option>
+                      {produtosDaCategoria.map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                      <option value="__outro__">✏️ Outro — digitar</option>
+                    </select>
+                    {!item.materialId && (item.item !== undefined) && (
+                      <input
+                        type="text"
+                        placeholder="Nome do item"
+                        value={item.item}
+                        onChange={e => updateItemManual(idx, e.target.value)}
+                        className="flex-1 min-w-0 border border-blue-300 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    )}
+                  </>
                 ) : (
-                  /* Fallback: input manual */
+                  /* Fallback: input manual quando catálogo vazio ou erro */
                   <input
                     type="text"
                     placeholder={catalogLoading ? 'Carregando...' : 'Nome do item'}
