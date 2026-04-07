@@ -13,9 +13,6 @@ if (!baseURL) {
 
 const http = axios.create({
   baseURL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Request interceptor: adiciona Bearer token
@@ -25,6 +22,16 @@ http.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+
+    if (isFormData) {
+      config.headers.delete?.('Content-Type');
+      delete (config.headers as Record<string, unknown>)['Content-Type'];
+    } else if (!config.headers['Content-Type']) {
+      config.headers['Content-Type'] = 'application/json';
+    }
+
     return config;
   },
   (error) => {
