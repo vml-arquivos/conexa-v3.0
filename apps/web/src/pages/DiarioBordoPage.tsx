@@ -362,7 +362,7 @@ function getFechamentoTitle() {
 }
 
 function getAcolhidaTitle() {
-  return 'Acolhida e Registro Inicial';
+  return 'Chamada + Acolhida';
 }
 
 function getChamadaTitle() {
@@ -374,7 +374,7 @@ function getExecucaoTitle() {
 }
 
 function getAvaliacaoTitle() {
-  return 'Avaliação do Dia';
+  return 'Avaliação do Plano de Aula';
 }
 
 // ─── Seletor de Criança por Foto ──────────────────────────────────────────────
@@ -1429,13 +1429,16 @@ export default function DiarioBordoPage() {
             </div>
           )}
 
-          <Card className="border-2 border-blue-100">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-blue-700">
-                <Calendar className="h-5 w-5" /> {getAcolhidaTitle()}
+          <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <Users className="h-5 w-5" /> {getAcolhidaTitle()}
               </CardTitle>
+              <p className="text-sm text-blue-700">
+                Registre a presença, o clima emocional da turma e um resumo curto do recebimento das crianças no início do dia.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Data</Label>
@@ -1463,111 +1466,108 @@ export default function DiarioBordoPage() {
                 )}
               </div>
 
-              <div>
-                <Label>Registro rápido da acolhida</Label>
-                <Textarea
-                  placeholder={getAcolhidaPlaceholder()}
-                  rows={3}
-                  value={form.acolhidaInicial}
-                  onChange={e => setForm(f => ({ ...f, acolhidaInicial: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label>Clima Emocional da Turma</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {CLIMAS.map(clima => (
-                    <button
-                      key={clima.id}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, climaEmocional: clima.id }))}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${form.climaEmocional === clima.id ? clima.cor + ' border-current shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                    >
-                      {clima.emoji} {clima.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-green-100">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-700">
-                <Users className="h-5 w-5" /> {getChamadaTitle()}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500">{getChamadaManualHelper(chamadaCarregada)}</p>
-              {criancas.length > 0 ? (() => {
-                const totalChamadaUI = chamadaCarregada && chamadaInfo?.total ? chamadaInfo.total : criancas.length;
-                const presentesUI = form.criancasPresentes.length;
-                const ausentesUI = Math.max(0, totalChamadaUI - presentesUI);
-
-                return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-                      <Label>Chamada — Crianças Presentes ({presentesUI}/{totalChamadaUI})</Label>
-                      {chamadaCarregada && chamadaInfo && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                          <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
-                        </span>
-                      )}
-                    </div>
-                    {!chamadaCarregada && (
-                      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                        Ajuste manualmente se necessário, mas a guarda do diário continuará bloqueada até a chamada oficial ser feita.
-                      </p>
+              <div className="space-y-4 rounded-2xl border border-blue-100 bg-white/80 p-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                    <Label>{getChamadaTitle()}</Label>
+                    {criancas.length > 0 && chamadaCarregada && chamadaInfo && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                        <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
+                      </span>
                     )}
-                    <p className="text-xs text-gray-400 mb-2">Toque na foto para ajustar a presença</p>
-                    <div className="flex flex-wrap gap-2">
-                      {criancas.map(c => {
-                        const presente = form.criancasPresentes.includes(c.id);
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => toggleCriancaPresente(c.id)}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
-                            title={getCriancaNome(c)}
-                          >
-                            {c.photoUrl ? (
-                              <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                                <UserCircle className="w-6 h-6 text-blue-400" />
-                              </div>
-                            )}
-                            <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
-                            {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
-                          </button>
-                        );
-                      })}
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">{getChamadaManualHelper(chamadaCarregada)}</p>
+                  {criancas.length > 0 ? (() => {
+                    const totalChamadaUI = chamadaCarregada && chamadaInfo?.total ? chamadaInfo.total : criancas.length;
+                    const presentesUI = form.criancasPresentes.length;
+                    const ausentesUI = Math.max(0, totalChamadaUI - presentesUI);
+
+                    return (
+                      <div>
+                        {!chamadaCarregada && (
+                          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                            Ajuste manualmente se necessário, mas a guarda do diário continuará bloqueada até a chamada oficial ser feita.
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400 mb-2">Toque na foto para ajustar a presença</p>
+                        <div className="flex flex-wrap gap-2">
+                          {criancas.map(c => {
+                            const presente = form.criancasPresentes.includes(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => toggleCriancaPresente(c.id)}
+                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
+                                title={getCriancaNome(c)}
+                              >
+                                {c.photoUrl ? (
+                                  <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                                    <UserCircle className="w-6 h-6 text-blue-400" />
+                                  </div>
+                                )}
+                                <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
+                                {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {chamadaCarregada
+                            ? `${presentesUI} presente(s) · ${ausentesUI} ausente(s)`
+                            : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
+                        </p>
+                      </div>
+                    );
+                  })() : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Presenças</Label>
+                        <Input type="number" min={0} value={form.presencas} onChange={e => setForm(f => ({ ...f, presencas: Number(e.target.value) }))} />
+                      </div>
+                      <div>
+                        <Label>Ausências</Label>
+                        <Input type="number" min={0} value={form.ausencias} onChange={e => setForm(f => ({ ...f, ausencias: Number(e.target.value) }))} />
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {chamadaCarregada
-                        ? `${presentesUI} presente(s) · ${ausentesUI} ausente(s)`
-                        : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
-                    </p>
-                  </div>
-                );
-              })() : (
-                <div className="grid grid-cols-2 gap-4">
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-4">
                   <div>
-                    <Label>Presenças</Label>
-                    <Input type="number" min={0} value={form.presencas} onChange={e => setForm(f => ({ ...f, presencas: Number(e.target.value) }))} />
+                    <Label>Registro rápido da acolhida</Label>
+                    <Textarea
+                      placeholder={getAcolhidaPlaceholder()}
+                      rows={3}
+                      value={form.acolhidaInicial}
+                      onChange={e => setForm(f => ({ ...f, acolhidaInicial: e.target.value }))}
+                    />
                   </div>
+
                   <div>
-                    <Label>Ausências</Label>
-                    <Input type="number" min={0} value={form.ausencias} onChange={e => setForm(f => ({ ...f, ausencias: Number(e.target.value) }))} />
+                    <Label>Clima Emocional da Turma</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {CLIMAS.map(clima => (
+                        <button
+                          key={clima.id}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, climaEmocional: clima.id }))}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${form.climaEmocional === clima.id ? clima.cor + ' border-current shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                        >
+                          {clima.emoji} {clima.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 
           {planejamentoHoje ? (
-            <Card className="border-2 border-indigo-200 bg-indigo-50/60">
+            <Card className="border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 shadow-md shadow-indigo-100/60">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-3">
                   <CardTitle className="flex items-center gap-2 text-indigo-800 text-base">
@@ -1675,200 +1675,6 @@ export default function DiarioBordoPage() {
               <p className="text-xs text-gray-500">{getPlanningEmptyText()}</p>
             </div>
           )}
-
-          <Card className="border-2 border-emerald-200 bg-emerald-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-emerald-800">
-                <ClipboardList className="h-5 w-5 text-emerald-500" /> {getExecucaoTitle()}
-              </CardTitle>
-              <p className="text-xs text-emerald-600 mt-0.5">
-                Registre o que foi executado no plano do dia e os ajustes pedagógicos feitos ao longo da rotina.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-emerald-800 mb-2">
-                  Cumprimento do plano {planejamentoHoje && <span className="text-red-500">*</span>}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {([
-                    { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                    { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                    { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
-                  ]).map(s => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form.statusExecucaoPlano === s.id ? s.cor + ' shadow-md' : 'bg-white ' + s.corOff}`}
-                    >
-                      <span>{s.emoji}</span> {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
-                <div>
-                  <Label>
-                    {getExecucaoLabel(form.statusExecucaoPlano)} {planejamentoHoje && <span className="text-red-500">*</span>} <span className="font-normal text-gray-400">{getExecucaoHint(form.statusExecucaoPlano)}</span>
-                  </Label>
-                  <Textarea
-                    placeholder={getExecucaoPlaceholder(form.statusExecucaoPlano)}
-                    rows={3}
-                    value={form.execucaoPlanejamento}
-                    onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
-                  />
-                </div>
-              )}
-
-              <div>
-                <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
-                <Textarea
-                  placeholder="Quais materiais e recursos foram realmente utilizados?"
-                  rows={2}
-                  value={form.materiaisUtilizados}
-                  onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
-                  <Textarea
-                    placeholder="Que ajustes foram necessários em relação ao previsto?"
-                    rows={2}
-                    value={form.adaptacoesRealizadas}
-                    onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
-                  <Textarea
-                    placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
-                    rows={2}
-                    value={form.ocorrencias}
-                    onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-sky-200 bg-sky-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sky-800">
-                <ClipboardList className="h-5 w-5 text-sky-500" /> {getAvaliacaoTitle()}
-              </CardTitle>
-              <p className="text-xs text-sky-600 mt-0.5">{getAvaliacaoIntro()}</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Reação das crianças <span className="font-normal text-gray-400">(opcional)</span></Label>
-                <Textarea
-                  placeholder="Como as crianças responderam às propostas e interações do dia?"
-                  rows={2}
-                  value={form.reacaoCriancas}
-                  onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
-                <Textarea
-                  placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
-                  rows={3}
-                  value={form.reflexaoPedagogica}
-                  onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
-                />
-              </div>
-
-              <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-sky-900">Observação individual por aluno</p>
-                  <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
-                </div>
-
-                <div>
-                  <Label>Criança(s) da turma</Label>
-                  {criancas.length === 0 ? (
-                    <p className="text-xs text-gray-400 mt-2 italic">Nenhuma criança disponível para seleção.</p>
-                  ) : (
-                    <div className="space-y-3 mt-2">
-                      <select
-                        multiple
-                        value={avaliacaoIndividualForm.childIds}
-                        onChange={e => {
-                          const selecionadas = Array.from(e.target.selectedOptions).map(option => option.value);
-                          setAvaliacaoIndividualForm(f => ({ ...f, childIds: selecionadas }));
-                        }}
-                        className="w-full min-h-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                      >
-                        {criancas
-                          .slice()
-                          .sort((a, b) => getCriancaNome(a).localeCompare(getCriancaNome(b), 'pt-BR'))
-                          .map(c => (
-                            <option key={c.id} value={c.id}>{getCriancaNome(c)}</option>
-                          ))}
-                      </select>
-                      <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança ou toque nas fotos abaixo para seleção rápida.</p>
-                      <div className="flex flex-wrap gap-2">
-                        {criancas.map(c => {
-                          const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
-                          return (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
-                              className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
-                              title={getCriancaNome(c)}
-                            >
-                              {c.photoUrl ? (
-                                <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center">
-                                  <UserCircle className="w-6 h-6 text-sky-400" />
-                                </div>
-                              )}
-                              <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
-                              {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <Label>Observação individual breve</Label>
-                  <Textarea
-                    placeholder={getAvaliacaoPlaceholder()}
-                    rows={3}
-                    value={avaliacaoIndividualForm.observacao}
-                    onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, observacao: e.target.value }))}
-                  />
-                </div>
-
-                {avaliacaoIndividualForm.childIds.length > 0 && (
-                  <p className="text-xs text-gray-500">
-                    Selecionadas: {criancas.filter(c => avaliacaoIndividualForm.childIds.includes(c.id)).map(c => c.firstName).join(', ')}
-                  </p>
-                )}
-
-                <Button
-                  type="button"
-                  onClick={salvarAvaliacaoIndividual}
-                  disabled={savingAvaliacaoIndividual}
-                  className="w-full bg-sky-600 hover:bg-sky-700"
-                >
-                  {savingAvaliacaoIndividual
-                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
-                    : <><Save className="h-4 w-4 mr-2" /> {getPlanningObservationTitle(avaliacaoIndividualForm.childIds.length)}</>}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
           <Card className="border-2 border-green-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-green-700"><Clock className="h-5 w-5" /> Rotina do Dia</CardTitle></CardHeader>
@@ -1987,6 +1793,206 @@ export default function DiarioBordoPage() {
               )}
             </CardContent>
           </Card>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-50 border border-sky-200 w-fit text-xs font-semibold uppercase tracking-wide text-sky-700">
+              <ClipboardList className="h-4 w-4" /> {getAvaliacaoTitle()}
+            </div>
+
+            <Card className="border-2 border-emerald-200 bg-emerald-50/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-emerald-800">
+                  <ClipboardList className="h-5 w-5 text-emerald-500" /> {getExecucaoTitle()}
+                </CardTitle>
+                <p className="text-xs text-emerald-600 mt-0.5">
+                  Registre o que foi executado no plano do dia e os ajustes pedagógicos feitos ao longo da rotina.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800 mb-2">
+                    Cumprimento do plano {planejamentoHoje && <span className="text-red-500">*</span>}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                      { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
+                      { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
+                    ]).map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form.statusExecucaoPlano === s.id ? s.cor + ' shadow-md' : 'bg-white ' + s.corOff}`}
+                      >
+                        <span>{s.emoji}</span> {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
+                  <div>
+                    <Label>
+                      {getExecucaoLabel(form.statusExecucaoPlano)} {planejamentoHoje && <span className="text-red-500">*</span>} <span className="font-normal text-gray-400">{getExecucaoHint(form.statusExecucaoPlano)}</span>
+                    </Label>
+                    <Textarea
+                      placeholder={getExecucaoPlaceholder(form.statusExecucaoPlano)}
+                      rows={3}
+                      value={form.execucaoPlanejamento}
+                      onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Quais materiais e recursos foram realmente utilizados?"
+                    rows={2}
+                    value={form.materiaisUtilizados}
+                    onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Textarea
+                      placeholder="Que ajustes foram necessários em relação ao previsto?"
+                      rows={2}
+                      value={form.adaptacoesRealizadas}
+                      onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Textarea
+                      placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
+                      rows={2}
+                      value={form.ocorrencias}
+                      onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-sky-200 bg-sky-50/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sky-800">
+                  <ClipboardList className="h-5 w-5 text-sky-500" /> Avaliação do Dia
+                </CardTitle>
+                <p className="text-xs text-sky-600 mt-0.5">{getAvaliacaoIntro()}</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Reação das crianças <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Como as crianças responderam às propostas e interações do dia?"
+                    rows={2}
+                    value={form.reacaoCriancas}
+                    onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
+                  <Textarea
+                    placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
+                    rows={3}
+                    value={form.reflexaoPedagogica}
+                    onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
+                  />
+                </div>
+
+                <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-sky-900">Observação individual por aluno</p>
+                    <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
+                  </div>
+
+                  <div>
+                    <Label>Criança(s) da turma</Label>
+                    {criancas.length === 0 ? (
+                      <p className="text-xs text-gray-400 mt-2 italic">Nenhuma criança disponível para seleção.</p>
+                    ) : (
+                      <div className="space-y-3 mt-2">
+                        <select
+                          multiple
+                          value={avaliacaoIndividualForm.childIds}
+                          onChange={e => {
+                            const selecionadas = Array.from(e.target.selectedOptions).map(option => option.value);
+                            setAvaliacaoIndividualForm(f => ({ ...f, childIds: selecionadas }));
+                          }}
+                          className="w-full min-h-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                        >
+                          {criancas
+                            .slice()
+                            .sort((a, b) => getCriancaNome(a).localeCompare(getCriancaNome(b), 'pt-BR'))
+                            .map(c => (
+                              <option key={c.id} value={c.id}>{getCriancaNome(c)}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança ou toque nas fotos abaixo para seleção rápida.</p>
+                        <div className="flex flex-wrap gap-2">
+                          {criancas.map(c => {
+                            const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
+                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
+                                title={getCriancaNome(c)}
+                              >
+                                {c.photoUrl ? (
+                                  <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center">
+                                    <UserCircle className="w-6 h-6 text-sky-400" />
+                                  </div>
+                                )}
+                                <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
+                                {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Observação individual breve</Label>
+                    <Textarea
+                      placeholder={getAvaliacaoPlaceholder()}
+                      rows={3}
+                      value={avaliacaoIndividualForm.observacao}
+                      onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, observacao: e.target.value }))}
+                    />
+                  </div>
+
+                  {avaliacaoIndividualForm.childIds.length > 0 && (
+                    <p className="text-xs text-gray-500">
+                      Selecionadas: {criancas.filter(c => avaliacaoIndividualForm.childIds.includes(c.id)).map(c => c.firstName).join(', ')}
+                    </p>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={salvarAvaliacaoIndividual}
+                    disabled={savingAvaliacaoIndividual}
+                    className="w-full bg-sky-600 hover:bg-sky-700"
+                  >
+                    {savingAvaliacaoIndividual
+                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+                      : <><Save className="h-4 w-4 mr-2" /> {getPlanningObservationTitle(avaliacaoIndividualForm.childIds.length)}</>}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card className="border-2 border-blue-100">
             <CardHeader className="pb-2">
