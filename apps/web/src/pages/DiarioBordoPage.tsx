@@ -1907,9 +1907,14 @@ export default function DiarioBordoPage() {
                 </div>
 
                 <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-sky-900">Observação individual por aluno</p>
-                    <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-sky-900">Observação individual por aluno</p>
+                      <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
+                    </div>
+                    <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                      Use este registro para comportamento, reação, necessidade de retomada ou observação relevante do aluno em relação ao plano/aula.
+                    </div>
                   </div>
 
                   <div>
