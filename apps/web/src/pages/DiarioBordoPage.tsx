@@ -1942,32 +1942,25 @@ export default function DiarioBordoPage() {
                               <option key={c.id} value={c.id}>{getCriancaNome(c)}</option>
                             ))}
                         </select>
-                        <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança ou toque nas fotos abaixo para seleção rápida.</p>
-                        <div className="flex flex-wrap gap-2">
-                          {criancas.map(c => {
-                            const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
-                            return (
-                              <button
-                                key={c.id}
-                                type="button"
-                                onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
-                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
-                                title={getCriancaNome(c)}
-                              >
-                                <ChildAvatar
-                                  child={c}
-                                  alt={c.firstName}
-                                  sizeClassName="w-10 h-10"
-                                  imageClassName="rounded-full object-cover"
-                                  fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center"
-                                  iconClassName="w-6 h-6 text-sky-400"
-                                />
-                                <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
-                                {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança. A seleção permanece registrada abaixo de forma compacta para manter a área mais limpa.</p>
+                        {avaliacaoIndividualForm.childIds.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {criancas
+                              .filter(c => avaliacaoIndividualForm.childIds.includes(c.id))
+                              .map(c => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
+                                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:border-sky-300 hover:bg-sky-100"
+                                  title={`Remover ${getCriancaNome(c)} da seleção`}
+                                >
+                                  <span className="truncate max-w-[140px]">{getCriancaNome(c)}</span>
+                                  <span className="text-sky-500">×</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2087,29 +2080,11 @@ export default function DiarioBordoPage() {
                           <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>
                         ))}
                     </select>
-                    {/* Avatares para seleção rápida */}
-                    <div className="flex flex-wrap gap-2">
-                      {criancas.map(c => {
-                        const sel = criancaSelecionadaOcorr === c.id;
-                        return (
-                          <button key={c.id} type="button"
-                            title={`${c.firstName} ${c.lastName}`}
-                            onClick={() => setCriancaSelecionadaOcorr(sel ? '' : c.id)}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-orange-500 bg-orange-50 shadow-sm' : 'border-gray-200 bg-white hover:border-orange-300'}`}>
-                            <ChildAvatar
-                              child={c}
-                              alt={c.firstName}
-                              sizeClassName="w-10 h-10"
-                              imageClassName="rounded-full object-cover"
-                              fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-orange-100 to-amber-100 flex items-center justify-center"
-                              iconClassName="w-6 h-6 text-orange-400"
-                            />
-                            <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-orange-700' : 'text-gray-600'}`}>{c.firstName}</span>
-                            {sel && <span className="text-orange-500 text-xs">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
+                    {criancaSelecionadaOcorr && (
+                      <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+                        Criança selecionada: <span className="font-semibold">{criancas.find(c => c.id === criancaSelecionadaOcorr)?.firstName} {criancas.find(c => c.id === criancaSelecionadaOcorr)?.lastName}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2408,33 +2383,11 @@ export default function DiarioBordoPage() {
                         ))}
                     </select>
                   </div>
-                  {/* Cards de avatar mantidos para acesso rápido visual */}
-                  <div className="flex flex-wrap gap-2">
-                    {criancas.map(c => {
-                      const sel = criancaSelecionadaObs === c.id;
-                      return (
-                        <button key={c.id} type="button"
-                          title={`${c.firstName} ${c.lastName}`}
-                          onClick={() => {
-                            const next = sel ? '' : c.id;
-                            setCriancaSelecionadaObs(next);
-                            if (next) loadObservacoes(next); else loadObservacoes(undefined);
-                          }}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-teal-500 bg-teal-50 shadow-sm' : 'border-gray-200 bg-white hover:border-teal-300'}`}>
-                          <ChildAvatar
-                            child={c}
-                            alt={c.firstName}
-                            sizeClassName="w-10 h-10"
-                            imageClassName="rounded-full object-cover"
-                            fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-teal-100 to-cyan-100 flex items-center justify-center"
-                            iconClassName="w-6 h-6 text-teal-400"
-                          />
-                          <span className={`text-xs font-medium text-center max-w-[60px] truncate ${sel ? 'text-teal-700' : 'text-gray-600'}`}>{c.firstName}</span>
-                          {sel && <span className="text-teal-500 text-xs">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {criancaSelecionadaObs && (
+                    <div className="rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-800">
+                      Criança selecionada: <span className="font-semibold">{criancas.find(c => c.id === criancaSelecionadaObs)?.firstName} {criancas.find(c => c.id === criancaSelecionadaObs)?.lastName}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
