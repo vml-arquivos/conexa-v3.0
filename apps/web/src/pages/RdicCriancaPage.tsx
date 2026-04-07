@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { toast } from 'sonner';
@@ -754,13 +755,15 @@ export default function RdicCriancaPage() {
               <ArrowLeft className="h-4 w-4" /> Trocar criança
             </button>
             <div className="flex items-center gap-3 flex-1">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                {alunoSelecionado.photoUrl ? (
-                  <img src={alunoSelecionado.photoUrl} alt={alunoSelecionado.firstName} className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  `${alunoSelecionado.firstName[0]}${alunoSelecionado.lastName[0]}`
-                )}
-              </div>
+              <ChildAvatar
+                child={alunoSelecionado}
+                alt={alunoSelecionado.firstName}
+                sizeClassName="w-12 h-12"
+                imageClassName="rounded-full object-cover"
+                fallbackClassName="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white"
+                initialsClassName="text-sm font-bold text-white"
+                showInitials
+              />
               <div>
                 <h2 className="text-lg font-bold text-gray-800">
                   {alunoSelecionado.firstName} {alunoSelecionado.lastName}

@@ -18,6 +18,7 @@ import http from '../api/http';
 import { createMicrogestureEvent, fetchRegisteredChildrenToday, type MicrogestureKind } from '../services/microgestures';
 import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
+import { ChildAvatar, hasChildPhoto, resolveChildPhotoUrl } from '../components/children/ChildAvatar';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -536,7 +537,7 @@ export default function TeacherDashboardPage() {
               ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {alunos.map(aluno => {
-                    const temFoto = Boolean(aluno.photoUrl);
+                    const temFoto = hasChildPhoto(aluno);
                     const generoLabel = aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : 'Não informado';
                     const registradoHoje = registradosHoje.has(aluno.id);
 
@@ -546,14 +547,25 @@ export default function TeacherDashboardPage() {
                         <div className="flex items-start gap-4">
                           <div className="relative shrink-0">
                             {temFoto ? (
-                              <button onClick={() => setFotoAmpliada({ url: aluno.photoUrl!, nome: `${aluno.firstName} ${aluno.lastName}` })}>
-                                <img src={aluno.photoUrl} alt={aluno.nome}
-                                  className="h-16 w-16 rounded-2xl object-cover border border-blue-100 shadow-sm transition-all cursor-zoom-in group-hover:border-blue-300" />
+                              <button onClick={() => setFotoAmpliada({ url: resolveChildPhotoUrl(aluno)!, nome: `${aluno.firstName} ${aluno.lastName}` })}>
+                                <ChildAvatar
+                                  child={aluno}
+                                  alt={aluno.nome}
+                                  sizeClassName="h-16 w-16"
+                                  imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all cursor-zoom-in group-hover:border-blue-300"
+                                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
+                                  iconClassName="h-10 w-10 text-slate-400"
+                                />
                               </button>
                             ) : (
-                              <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50">
-                                <UserCircle className="h-10 w-10 text-slate-400" />
-                              </div>
+                              <ChildAvatar
+                                child={aluno}
+                                alt={aluno.nome}
+                                sizeClassName="h-16 w-16"
+                                imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all"
+                                fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
+                                iconClassName="h-10 w-10 text-slate-400"
+                              />
                             )}
                             <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
                           </div>
@@ -686,10 +698,15 @@ export default function TeacherDashboardPage() {
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
                           temRdic ? 'bg-indigo-500' : 'bg-gray-300'
                         }`}>
-                          {aluno.photoUrl
-                            ? <img src={aluno.photoUrl} alt={aluno.firstName} className="w-10 h-10 rounded-full object-cover" />
-                            : `${aluno.firstName[0]}${aluno.lastName[0]}`
-                          }
+                          <ChildAvatar
+                            child={aluno}
+                            alt={aluno.firstName}
+                            sizeClassName="w-10 h-10"
+                            imageClassName="rounded-full object-cover"
+                            fallbackClassName={`w-10 h-10 rounded-full flex items-center justify-center ${temRdic ? 'bg-indigo-500 text-white' : 'bg-gray-300 text-white'}`}
+                            initialsClassName="text-sm font-bold"
+                            showInitials
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-800 truncate">{aluno.firstName} {aluno.lastName}</p>

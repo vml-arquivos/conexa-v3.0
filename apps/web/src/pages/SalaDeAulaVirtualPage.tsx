@@ -19,6 +19,7 @@ import {
   Upload, History, TrendingUp, Brain, Heart, Activity, X, Camera,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface ClassroomPost {
@@ -631,11 +632,13 @@ export default function SalaDeAulaVirtualPage() {
                               const d = getDesempenhoInfo(p.performance);
                               return (
                                 <div key={p.id} className={`flex items-center gap-2 p-2 rounded-lg border text-xs ${d.cor}`}>
-                                  {p.child?.photoUrl ? (
-                                    <img src={p.child.photoUrl} className="w-6 h-6 rounded-full object-cover" alt="" />
-                                  ) : (
-                                    <UserCircle className="w-6 h-6 opacity-50" />
-                                  )}
+                                  <ChildAvatar
+                                    child={p.child}
+                                    sizeClassName="w-6 h-6"
+                                    imageClassName="rounded-full object-cover"
+                                    fallbackClassName="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center"
+                                    iconClassName="w-6 h-6 opacity-50"
+                                  />
                                   <div className="min-w-0">
                                     <p className="font-medium truncate">{p.child?.firstName}</p>
                                     <p className="opacity-75">{d.emoji} {d.label}</p>
@@ -761,13 +764,13 @@ export default function SalaDeAulaVirtualPage() {
                     onClick={() => selecionarAluno(c)}
                     className="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-gray-100 bg-white hover:border-indigo-300 hover:shadow-md transition-all text-center"
                   >
-                    {c.photoUrl ? (
-                      <img src={c.photoUrl} className="w-14 h-14 rounded-full object-cover" alt="" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                        <UserCircle className="w-8 h-8 text-indigo-400" />
-                      </div>
-                    )}
+                    <ChildAvatar
+                      child={c}
+                      sizeClassName="w-14 h-14"
+                      imageClassName="rounded-full object-cover"
+                      fallbackClassName="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center"
+                      iconClassName="w-8 h-8 text-indigo-400"
+                    />
                     <p className="text-sm font-medium text-gray-800 leading-tight">{c.firstName} {c.lastName}</p>
                   </button>
                 ))}
@@ -779,13 +782,13 @@ export default function SalaDeAulaVirtualPage() {
               <div className="flex items-center gap-3 bg-white border-2 border-indigo-100 rounded-2xl p-4">
                 <button onClick={() => setAlunoSelecionado(null)} className="text-indigo-600 hover:underline text-sm font-medium">← Voltar</button>
                 <div className="relative">
-                  {alunoSelecionado.photoUrl ? (
-                    <img src={alunoSelecionado.photoUrl} className="w-12 h-12 rounded-full object-cover" alt="" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                      <UserCircle className="w-7 h-7 text-indigo-400" />
-                    </div>
-                  )}
+                  <ChildAvatar
+                    child={alunoSelecionado}
+                    sizeClassName="w-12 h-12"
+                    imageClassName="rounded-full object-cover"
+                    fallbackClassName="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center"
+                    iconClassName="w-7 h-7 text-indigo-400"
+                  />
                   <input ref={fotoInputRef} type="file" accept="image/*" className="hidden" onChange={handleUploadFoto} />
                   <button
                     onClick={() => fotoInputRef.current?.click()}
@@ -1371,13 +1374,13 @@ export default function SalaDeAulaVirtualPage() {
                 <Card key={crianca.id} className="border-2 hover:border-indigo-100 transition-all">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      {crianca.photoUrl ? (
-                        <img src={crianca.photoUrl} className="w-10 h-10 rounded-full object-cover" alt="" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-                          <UserCircle className="w-6 h-6 text-indigo-400" />
-                        </div>
-                      )}
+                      <ChildAvatar
+                        child={crianca}
+                        sizeClassName="w-10 h-10"
+                        imageClassName="rounded-full object-cover"
+                        fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center"
+                        iconClassName="w-6 h-6 text-indigo-400"
+                      />
                       <div>
                         <p className="font-medium text-gray-800">{crianca.firstName} {crianca.lastName}</p>
                       </div>
