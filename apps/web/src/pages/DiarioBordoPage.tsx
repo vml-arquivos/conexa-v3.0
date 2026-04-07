@@ -935,7 +935,7 @@ export default function DiarioBordoPage() {
           },
         });
       }
-      toast.success('Diário de Bordo salvo!');
+      toast.success('Diário da Turma salvo!');
       setAba('lista');
       loadDiarios();
       setForm({
@@ -972,7 +972,7 @@ export default function DiarioBordoPage() {
   });
 
   return (
-    <PageShell title="Diário de Bordo" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
+    <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, os microgestos e as reflexões da turma">
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
@@ -998,7 +998,7 @@ export default function DiarioBordoPage() {
               <Input placeholder="Buscar por data ou conteúdo..." className="pl-9" value={busca} onChange={e => setBusca(e.target.value)} />
             </div>
             <Button onClick={() => setAba('novo')} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" /> Novo Diário
+              <Plus className="h-4 w-4" /> Novo Diário do Dia
             </Button>
           </div>
 
@@ -1007,9 +1007,9 @@ export default function DiarioBordoPage() {
           {!loading && diariosFiltrados.length === 0 && (
             <EmptyState
               icon={<BookOpen className="h-12 w-12 text-gray-300" />}
-              title="Nenhum diário registrado"
-              description="Comece registrando o dia pedagógico de hoje"
-              action={<Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" />Criar Diário</Button>}
+              title="Nenhum diário da turma registrado"
+              description="Comece registrando o Diário do Dia de hoje"
+              action={<Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" />Criar Diário do Dia</Button>}
             />
           )}
 

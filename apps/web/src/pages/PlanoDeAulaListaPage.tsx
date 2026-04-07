@@ -278,8 +278,8 @@ export default function PlanoDeAulaListaPage() {
 
   return (
     <PageShell
-      title="Painel de Planejamentos"
-      subtitle="Visualize e gerencie seus planejamentos no calendário"
+      title="Planos de Aula"
+      subtitle="Visualize e gerencie seus planos no calendário"
     >
       <div className="space-y-6">
 
@@ -511,7 +511,7 @@ export default function PlanoDeAulaListaPage() {
         <button
           onClick={() => navigate('/app/planejamento/novo')}
           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 z-40"
-          title="Novo Planejamento"
+          title="Novo Plano"
         >
           <Plus className="h-6 w-6" />
         </button>
@@ -791,13 +791,13 @@ export default function PlanoDeAulaListaPage() {
                   </div>
                   <p className="text-xs text-teal-700 mb-3">
                     Este planejamento foi executado no período{selectedPlanning.startDate ? ` de ${formatPedagogicalDate(selectedPlanning.startDate)}` : ''}{selectedPlanning.endDate ? ` a ${formatPedagogicalDate(selectedPlanning.endDate)}` : ''}.
-                    Consulte o Diário de Bordo para ver os registros de execução diária.
+                    Consulte o Diário da Turma para ver os registros de execução diária.
                   </p>
                   <button
                     onClick={() => { setSelectedPlanning(null); navigate('/app/diario-de-bordo'); }}
                     className="text-xs text-teal-600 underline hover:text-teal-800 font-medium"
                   >
-                    Ver Diários de Bordo →
+                    Ver Diário da Turma →
                   </button>
                 </div>
               )}
@@ -812,13 +812,13 @@ export default function PlanoDeAulaListaPage() {
                       onClick={() => { setSelectedPlanning(null); navigate('/app/diario-de-bordo'); }}
                       className="text-xs text-indigo-600 underline hover:text-indigo-800 mt-0.5"
                     >
-                      Registrar execução no Diário de Bordo →
+                      Registrar execução no Diário do Dia →
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* APROVADO hoje: link para Diário de Bordo */}
+              {/* APROVADO hoje: link para Diário do Dia */}
               {selectedPlanning.status === 'APROVADO' && (() => {
                 const startDateKey = selectedPlanning.startDate ? toPedagogicalDateKey(selectedPlanning.startDate) : null;
                 const isApprovedToday = startDateKey === toPedagogicalDateKey(today);
@@ -832,7 +832,7 @@ export default function PlanoDeAulaListaPage() {
                         onClick={() => navigate('/app/diario-de-bordo')}
                         className="text-xs text-green-600 underline hover:text-green-800 mt-0.5"
                       >
-                        Usar como Diário de Bordo hoje →
+                        Usar como Diário do Dia hoje →
                       </button>
                     </div>
                   </div>
@@ -889,7 +889,7 @@ export default function PlanoDeAulaListaPage() {
                   onClick={() => navigate(`/app/planejamento/${selectedPlanning.id}/editar`)}
                   className="w-full"
                 >
-                  Editar Planejamento
+                  Editar Plano
                 </Button>
               )}
               {/* EM_REVISAO: informação de que está aguardando aprovação */}
@@ -898,7 +898,7 @@ export default function PlanoDeAulaListaPage() {
                   Aguardando aprovação da coordenação
                 </div>
               )}
-              {/* EM_EXECUCAO: link para Diário de Bordo + botão Conferir */}
+              {/* EM_EXECUCAO: link para Diário do Dia + botão Conferir */}
               {selectedPlanning.status === 'EM_EXECUCAO' && (
                 <>
                   <Button
@@ -906,7 +906,7 @@ export default function PlanoDeAulaListaPage() {
                     onClick={() => navigate('/app/diario-de-bordo')}
                     className="w-full border-indigo-300 text-indigo-700 hover:bg-indigo-50"
                   >
-                    <BookOpen className="h-4 w-4 mr-2" /> Abrir Diário de Bordo
+                    <BookOpen className="h-4 w-4 mr-2" /> Abrir Diário do Dia
                   </Button>
                   <Button
                     onClick={() => { setSelectedPlanning(null); navigate(`/app/planejamento/${selectedPlanning.id}/conferir`); }}

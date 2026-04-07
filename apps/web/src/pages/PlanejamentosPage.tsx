@@ -327,7 +327,7 @@ export default function PlanejamentosPage() {
   });
 
   return (
-    <PageShell title="Planejamentos Pedagógicos" subtitle="Organize seus planejamentos com base na Matriz Curricular COCRIS 2026">
+    <PageShell title="Planos de Aula" subtitle="Organize seus planos com base na Matriz Curricular COCRIS 2026">
       {/* Seletor de unidade — apenas para STAFF_CENTRAL/MANTENEDORA */}
       {ehCentral && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
@@ -337,8 +337,8 @@ export default function PlanejamentosPage() {
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
-          { id: 'meus', label: 'Meus Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Novo Planejamento', icon: <Plus className="h-4 w-4" /> },
+          { id: 'meus', label: 'Planos de Aula', icon: <BookOpen className="h-4 w-4" /> },
+          { id: 'novo', label: 'Novo Plano', icon: <Plus className="h-4 w-4" /> },
           { id: 'matriz', label: 'Matriz Curricular 2026', icon: <Layers className="h-4 w-4" /> },
           { id: 'templates', label: 'Templates', icon: <BookMarked className="h-4 w-4" /> },
         ].map(tab => (
@@ -355,7 +355,7 @@ export default function PlanejamentosPage() {
           <div className="flex flex-wrap gap-3 items-center">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Buscar planejamento..." className="pl-9" value={busca} onChange={e => setBusca(e.target.value)} />
+              <Input placeholder="Buscar plano..." className="pl-9" value={busca} onChange={e => setBusca(e.target.value)} />
             </div>
             <select className="px-3 py-2 border rounded-lg text-sm text-gray-700" value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
               <option value="">Todos os status</option>

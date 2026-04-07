@@ -750,7 +750,7 @@ export default function PlanoDeAulaNovoPage() {
 
   if (loading) {
     return (
-      <PageShell title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
+      <PageShell title={isEditing ? 'Editar Plano' : 'Novo Plano'}>
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
@@ -760,8 +760,8 @@ export default function PlanoDeAulaNovoPage() {
 
   return (
     <PageShell
-      title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
-      subtitle="Planejamento por data com Matriz Pedagógica 2026 automática"
+      title={isEditing ? 'Editar Plano' : 'Novo Plano'}
+      subtitle="Plano por data com Matriz Pedagógica 2026 automática"
     >
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ─── Cabeçalho com status ─── */}

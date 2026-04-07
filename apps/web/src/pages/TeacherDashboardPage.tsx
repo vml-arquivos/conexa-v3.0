@@ -41,8 +41,8 @@ interface DashboardData {
 // ─── Ações Rápidas ────────────────────────────────────────────────────────────
 const ACOES_RAPIDAS = [
   { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
-  { id: 'diario', label: 'Diário de Bordo', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
-  { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
+  { id: 'diario', label: 'Diário da Turma', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
+  { id: 'planejamento', label: 'Planos de Aula', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
   { id: 'sala', label: 'Sala de Aula Virtual', desc: 'Tarefas e desempenho', icon: <GraduationCap className="h-6 w-6" />, cor: 'bg-violet-500', rota: '/app/sala-de-aula-virtual' },
   { id: 'rdic', label: 'RDIC por Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-crianca' },
   { id: 'materiais', label: 'Materiais', desc: 'Solicitar recursos', icon: <ShoppingCart className="h-6 w-6" />, cor: 'bg-orange-500', rota: '/app/material-requests' },
@@ -686,7 +686,7 @@ export default function TeacherDashboardPage() {
                         <BookOpen className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">Diário de Bordo</p>
+                        <p className="font-semibold text-gray-800">Diário da Turma</p>
                         <p className="text-xs text-gray-500">Esta semana</p>
                       </div>
                     </div>

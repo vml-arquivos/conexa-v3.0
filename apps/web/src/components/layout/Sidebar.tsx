@@ -24,9 +24,9 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
-  { path: '/app/planejamentos',       label: 'Meus Planejamentos',     icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/planejamento/novo',   label: 'Novo Planejamento',      icon: <Calendar className="h-4 w-4" /> },
-  { path: '/app/diario-de-bordo',     label: 'Diário de Bordo',        icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/planejamentos',       label: 'Planos de Aula',         icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/planejamento/novo',   label: 'Novo Plano',             icon: <Calendar className="h-4 w-4" /> },
+  { path: '/app/diario-de-bordo',     label: 'Diário da Turma',        icon: <ClipboardList className="h-4 w-4" /> },
   { path: '/app/rdic-crianca',        label: 'RDIC por Criança',       icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada',             label: 'Chamada Diária',         icon: <UserCheck className="h-4 w-4" /> },
   { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },
