@@ -72,9 +72,7 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
       const url = res.data?.photoUrl || res.data?.url;
       if (url) { onUpload(crianca.id, url); toast.success(`Foto de ${crianca.firstName} atualizada!`); }
     } catch {
-      const url = URL.createObjectURL(file);
-      onUpload(crianca.id, url);
-      toast.success(`Foto de ${crianca.firstName} adicionada!`);
+      toast.error(`Não foi possível salvar a foto de ${crianca.firstName}.`);
     } finally { setUploading(false); }
   }
 
