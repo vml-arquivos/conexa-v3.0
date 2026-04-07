@@ -664,11 +664,25 @@ export default function DiarioBordoPage() {
             const desc = typeof planHoje.description === 'string' && planHoje.description.startsWith('{')
               ? (() => { try { return JSON.parse(planHoje.description); } catch { return null; } })()
               : null;
-            objectives = pc?.objetivos || planHoje.objectives || desc?.objectives_text || '';
-            activities = pc?.atividades || planHoje.activities || desc?.activities || '';
+            // FIX PARSING: dados do PlanningV2 estão em desc.days[0], não na raiz
+            const dayZero = desc?.days?.[0];
+            // objectives: tentar parsear planHoje.objectives se for array JSON
+            const objRaw = planHoje.objectives;
+            let parsedObjectives: Array<Record<string, unknown>> = [];
+            if (Array.isArray(objRaw)) {
+              parsedObjectives = objRaw;
+            } else if (typeof objRaw === 'string' && objRaw.startsWith('[')) {
+              try { parsedObjectives = JSON.parse(objRaw); } catch { /* silencioso */ }
+            }
+            objectives = pc?.objetivos || desc?.objectives_text || '';
+            activities = pc?.atividades || planHoje.activities
+              || dayZero?.teacher?.atividade || desc?.activities || '';
             camposExperiencia = desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
-            objetivosMatriz = desc?.objectives ?? pc?.objetivosMatriz ?? [];
-            recursos = desc?.resources || pc?.recursos || '';
+            objetivosMatriz = (dayZero?.objectives?.length ? dayZero.objectives : null)
+              ?? (parsedObjectives.length ? parsedObjectives : null)
+              ?? pc?.objetivosMatriz ?? [];
+            recursos = pc?.recursos || dayZero?.teacher?.recursos
+              || desc?.resources || planHoje.resources || '';
           } catch {
             // Detalhes não críticos — continua com dados básicos
           }
@@ -972,7 +986,7 @@ export default function DiarioBordoPage() {
   });
 
   return (
-    <PageShell title="Diário de Bordo" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
+    <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[

@@ -337,8 +337,8 @@ export default function PlanejamentosPage() {
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
-          { id: 'meus', label: 'Meus Planejamentos', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Novo Planejamento', icon: <Plus className="h-4 w-4" /> },
+          { id: 'meus', label: 'Planos de Aula', icon: <BookOpen className="h-4 w-4" /> },
+          { id: 'novo', label: 'Novo Plano de Aula', icon: <Plus className="h-4 w-4" /> },
           { id: 'matriz', label: 'Matriz Curricular 2026', icon: <Layers className="h-4 w-4" /> },
           { id: 'templates', label: 'Templates', icon: <BookMarked className="h-4 w-4" /> },
         ].map(tab => (
