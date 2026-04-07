@@ -1794,29 +1794,48 @@ export default function DiarioBordoPage() {
                   {criancas.length === 0 ? (
                     <p className="text-xs text-gray-400 mt-2 italic">Nenhuma criança disponível para seleção.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {criancas.map(c => {
-                        const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
-                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
-                            title={getCriancaNome(c)}
-                          >
-                            {c.photoUrl ? (
-                              <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center">
-                                <UserCircle className="w-6 h-6 text-sky-400" />
-                              </div>
-                            )}
-                            <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
-                            {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
-                          </button>
-                        );
-                      })}
+                    <div className="space-y-3 mt-2">
+                      <select
+                        multiple
+                        value={avaliacaoIndividualForm.childIds}
+                        onChange={e => {
+                          const selecionadas = Array.from(e.target.selectedOptions).map(option => option.value);
+                          setAvaliacaoIndividualForm(f => ({ ...f, childIds: selecionadas }));
+                        }}
+                        className="w-full min-h-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                      >
+                        {criancas
+                          .slice()
+                          .sort((a, b) => getCriancaNome(a).localeCompare(getCriancaNome(b), 'pt-BR'))
+                          .map(c => (
+                            <option key={c.id} value={c.id}>{getCriancaNome(c)}</option>
+                          ))}
+                      </select>
+                      <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança ou toque nas fotos abaixo para seleção rápida.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {criancas.map(c => {
+                          const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
+                              className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
+                              title={getCriancaNome(c)}
+                            >
+                              {c.photoUrl ? (
+                                <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center">
+                                  <UserCircle className="w-6 h-6 text-sky-400" />
+                                </div>
+                              )}
+                              <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
+                              {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
