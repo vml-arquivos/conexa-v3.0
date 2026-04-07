@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useAuth, getPrimaryRole } from '../../app/AuthProvider';
 import { normalizeRoles } from '../../app/RoleProtectedRoute';
 import { getPedagogicalToday } from '../../utils/pedagogicalDate';
+import http from '../../api/http';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Calendar, LogOut, User, Users, Menu } from 'lucide-react';
@@ -9,8 +11,14 @@ interface TopbarProps {
   onMenuToggle?: () => void;
 }
 
+type AccessibleClassroom = {
+  id: string;
+  name: string;
+};
+
 export function Topbar({ onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuth() as any;
+  const [resolvedClassroom, setResolvedClassroom] = useState<AccessibleClassroom | null>(null);
 
   // FIX p0.1: usar normalizeRoles + getPrimaryRole para seleção determinística do role exibido
   // Garante que STAFF_CENTRAL apareça mesmo quando o array de roles tem outra ordem
@@ -19,8 +27,45 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
   // Informações pedagógicas para a Topbar
   const today = getPedagogicalToday();
-  const classroomName = user?.user?.classrooms?.[0]?.name || "Turma não atribuída";
-  const hasClassroom = !!user?.user?.classrooms?.[0]?.id;
+  const directClassrooms = Array.isArray(user?.classrooms)
+    ? user.classrooms
+    : Array.isArray(user?.user?.classrooms)
+      ? user.user.classrooms
+      : [];
+  const directClassroom = directClassrooms[0] as AccessibleClassroom | undefined;
+  const classroomName = directClassroom?.name || resolvedClassroom?.name || 'Turma não atribuída';
+  const hasClassroom = Boolean(directClassroom?.id || resolvedClassroom?.id);
+
+  useEffect(() => {
+    let active = true;
+
+    if (directClassroom?.id) {
+      setResolvedClassroom(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    http.get('/lookup/classrooms/accessible')
+      .then((response) => {
+        if (!active) return;
+        const classrooms = Array.isArray(response.data) ? response.data : [];
+        const firstClassroom = classrooms[0];
+        setResolvedClassroom(
+          firstClassroom?.id && firstClassroom?.name
+            ? { id: firstClassroom.id, name: firstClassroom.name }
+            : null,
+        );
+      })
+      .catch(() => {
+        if (!active) return;
+        setResolvedClassroom(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [directClassroom?.id]);
 
   return (
     <header className="bg-background border-b border-border px-3 sm:px-6 py-3 sticky top-0 z-30">
