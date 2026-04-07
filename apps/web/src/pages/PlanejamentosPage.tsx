@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor, isUnidade, isCentral } from '../api/auth';
 import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
@@ -106,6 +107,7 @@ const MATRIZ_SAMPLE: MatrizEntry[] = [
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function PlanejamentosPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const ehProfessor = isProfessor(user);
   const ehCoordenador = isUnidade(user);

@@ -259,7 +259,7 @@ export default function PainelTurmaPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0"><User className="h-3.5 w-3.5 text-indigo-600"/></div>
                               <span className="font-medium text-gray-800 truncate max-w-[140px]">{c.nome}</span>
-                              {aprov===3&&<Globe className="h-3.5 w-3.5 text-green-500 flex-shrink-0" title="Todos aprovados"/>}
+                              {aprov===3&&<span title="Todos aprovados"><Globe className="h-3.5 w-3.5 text-green-500 flex-shrink-0" /></span>}
                             </div>
                           </td>
                           {[c.st1,c.st2,c.st3].map((st:string,i:number)=><td key={i} className="text-center px-2 py-2.5"><Dot status={st}/></td>)}
