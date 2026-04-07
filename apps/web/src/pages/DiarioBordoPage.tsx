@@ -152,6 +152,231 @@ const ROTINA_PADRAO = [
   { momento: 'Roda de Encerramento', descricao: 'Revisão do dia, combinados, despedida', concluido: false },
 ];
 
+function pickPlanningText(source: Record<string, any> | null | undefined, ...keys: string[]) {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
+function pickPlanningList(source: Record<string, any> | null | undefined, ...keys: string[]) {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    }
+  }
+  return [] as string[];
+}
+
+function summarizePlanningObservation(planningTitle: string | undefined, observation: string) {
+  const texto = observation.trim();
+  if (!texto) return '';
+  return planningTitle ? `${planningTitle}: ${texto}` : texto;
+}
+
+function resetObsFormState() {
+  return {
+    category: 'GERAL',
+    date: getPedagogicalToday(),
+    behaviorDescription: '',
+    socialInteraction: '',
+    emotionalState: '',
+    dietaryNotes: '',
+    sleepPattern: '',
+    learningProgress: '',
+    planningParticipation: '',
+    psychologicalNotes: '',
+    developmentAlerts: '',
+    recommendations: '',
+    observacaoPersonalizada: '',
+  };
+}
+
+const CATEGORIA_AVALIACAO_PLANO = 'AVALIACAO_PLANO';
+
+function getInitialDiaryForm(dateFromQuery?: string) {
+  return {
+    date: dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : getPedagogicalToday(),
+    climaEmocional: 'BOM',
+    acolhidaInicial: '',
+    momentoDestaque: '',
+    reflexaoPedagogica: '',
+    encaminhamentos: '',
+    presencas: 0,
+    ausencias: 0,
+    rotina: ROTINA_PADRAO.map(r => ({ ...r })),
+    microgestos: [] as Microgesto[],
+    criancasPresentes: [] as string[],
+    execucaoPlanejamento: '',
+    reacaoCriancas: '',
+    adaptacoesRealizadas: '',
+    ocorrencias: '',
+    statusExecucaoPlano: '' as 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '',
+    materiaisUtilizados: '',
+    objetivoAtingido: '' as 'SIM' | 'PARCIAL' | 'NAO' | '',
+    oQueFuncionou: '',
+    oQueNaoFuncionou: '',
+  };
+}
+
+function getInitialAvaliacaoIndividualForm() {
+  return {
+    childIds: [] as string[],
+    observacao: '',
+  };
+}
+
+function getInitialPlanningObservationForm(date: string) {
+  return {
+    category: CATEGORIA_AVALIACAO_PLANO,
+    date,
+    behaviorDescription: '',
+    socialInteraction: '',
+    emotionalState: '',
+    dietaryNotes: '',
+    sleepPattern: '',
+    learningProgress: '',
+    planningParticipation: '',
+    psychologicalNotes: '',
+    developmentAlerts: '',
+    recommendations: '',
+    observacaoPersonalizada: '',
+  };
+}
+
+function getPlanningObservationPreview(planningTitle: string | undefined, observation: string) {
+  const resumo = summarizePlanningObservation(planningTitle, observation);
+  return resumo.length > 180 ? `${resumo.slice(0, 177)}...` : resumo;
+}
+
+function getCriancaNome(crianca?: Crianca) {
+  if (!crianca) return 'Criança';
+  return `${crianca.firstName} ${crianca.lastName}`.trim();
+}
+
+function getPlanningStatusLabel(status?: string) {
+  return status === 'EM_EXECUCAO' ? '▶ Em Execução' : '✓ Aprovado';
+}
+
+function getPlanningSectionTitle() {
+  return 'Plano de Aula do Dia';
+}
+
+function getPlanningEmptyText() {
+  return 'Nenhum planejamento aprovado para hoje. Registre o diário livremente.';
+}
+
+function getObjectiveCardFields(obj: Record<string, any>) {
+  return {
+    camposExperiencia: pickPlanningList(obj, 'camposExperiencia'),
+    campoExperiencia: pickPlanningText(obj, 'campoExperiencia', 'campo_experiencia', 'campo'),
+    objetivoBNCC: pickPlanningText(obj, 'objetivoBNCC', 'objetivo_bncc'),
+    objetivoCurriculo: pickPlanningText(obj, 'objetivoCurriculoDF', 'objetivoCurriculo', 'objetivo_curriculo', 'objetivo_curriculo_movimento'),
+    intencionalidade: pickPlanningText(obj, 'intencionalidadePedagogica', 'intencionalidade', 'intencionalidade_pedagogica'),
+    desenvolvimento: pickPlanningText(obj, 'desenvolvimentoAtividade', 'desenvolvimento', 'activities', 'atividade', 'exemploAtividade', 'exemplo_atividade'),
+    recursos: pickPlanningText(obj, 'recursos', 'materiais', 'resources'),
+  };
+}
+
+function hasObjectiveCardContent(fields: ReturnType<typeof getObjectiveCardFields>) {
+  return Boolean(
+    fields.camposExperiencia.length
+    || fields.campoExperiencia
+    || fields.objetivoBNCC
+    || fields.objetivoCurriculo
+    || fields.intencionalidade
+    || fields.desenvolvimento
+    || fields.recursos,
+  );
+}
+
+function getPlanningObservationTitle(totalSelecionadas: number) {
+  return totalSelecionadas > 1 ? 'Salvar observações individuais' : 'Salvar observação individual';
+}
+
+function getPlanningObservationSuccess(totalSelecionadas: number) {
+  return totalSelecionadas > 1
+    ? 'Observações individuais salvas com sucesso!'
+    : 'Observação individual salva com sucesso!';
+}
+
+function getPlanningObservationError() {
+  return 'Erro ao salvar observação individual';
+}
+
+function getAcolhidaPlaceholder() {
+  return 'Registre rapidamente como a turma chegou, como foi o acolhimento inicial e qualquer ocorrência breve do começo do dia.';
+}
+
+function getAvaliacaoPlaceholder() {
+  return 'Ex.: participou com curiosidade, precisou de mediação para retomar a proposta, demonstrou dificuldade de concentração, reagiu com entusiasmo à atividade.';
+}
+
+function getExecucaoPlaceholder(statusExecucaoPlano: 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '') {
+  if (statusExecucaoPlano === 'NAO_REALIZADO') {
+    return 'Explique brevemente o que impediu a execução do plano.';
+  }
+  if (statusExecucaoPlano === 'PARCIAL') {
+    return 'Explique brevemente o que foi realizado e o que ficou pendente.';
+  }
+  return 'Descreva o que foi executado no plano, como aconteceu a proposta e quais encaminhamentos pedagógicos foram feitos.';
+}
+
+function getExecucaoLabel(statusExecucaoPlano: 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '') {
+  if (statusExecucaoPlano === 'NAO_REALIZADO') {
+    return 'Motivo da não realização';
+  }
+  if (statusExecucaoPlano === 'PARCIAL') {
+    return 'Justificativa da execução parcial';
+  }
+  return 'O que foi executado?';
+}
+
+function getExecucaoHint(statusExecucaoPlano: 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '') {
+  if (statusExecucaoPlano === 'PARCIAL' || statusExecucaoPlano === 'NAO_REALIZADO') {
+    return '(obrigatório nesta situação)';
+  }
+  return '(obrigatório quando houver plano do dia)';
+}
+
+function getAvaliacaoIntro() {
+  return 'Faça a leitura pedagógica do dia e registre observações individuais breves por criança, sem escrever diretamente em RDIC.';
+}
+
+function getAvaliacaoIndividualHelper() {
+  return 'Use este registro curto para comportamento, reação, necessidade de retomada ou qualquer observação relevante do aluno em relação ao plano/aula.';
+}
+
+function getChamadaManualHelper(chamadaCarregada: boolean) {
+  return chamadaCarregada
+    ? 'Chamada importada da lista de presença'
+    : 'A chamada oficial ainda não foi realizada. Pode ajustar manualmente, mas o ideal é registrar a chamada antes.';
+}
+
+function getFechamentoTitle() {
+  return 'Fechamento Geral do Dia';
+}
+
+function getAcolhidaTitle() {
+  return 'Acolhida e Registro Inicial';
+}
+
+function getChamadaTitle() {
+  return 'Chamada / Presença';
+}
+
+function getExecucaoTitle() {
+  return 'Execução do Plano';
+}
+
+function getAvaliacaoTitle() {
+  return 'Avaliação do Dia';
+}
+
 // ─── Seletor de Criança por Foto ──────────────────────────────────────────────
 function SeletorCrianca({
   criancas,
@@ -231,29 +456,7 @@ export default function DiarioBordoPage() {
   const dateFromQuery = searchParams.get('date') ?? undefined;
 
   // Formulário do Diário
-  const [form, setForm] = useState({
-    date: dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : getPedagogicalToday(),
-    climaEmocional: 'BOM',
-    momentoDestaque: '',
-    reflexaoPedagogica: '',
-    encaminhamentos: '',
-    presencas: 0,
-    ausencias: 0,
-    rotina: ROTINA_PADRAO.map(r => ({ ...r })),
-    microgestos: [] as Microgesto[],
-    criancasPresentes: [] as string[],
-    // BUG C FIX: Campos de execução do planejamento integrados ao diário
-    execucaoPlanejamento: '',
-    reacaoCriancas: '',
-    adaptacoesRealizadas: '',
-    ocorrencias: '',
-    statusExecucaoPlano: '' as 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '',
-    materiaisUtilizados: '',
-    objetivoAtingido: '' as 'SIM' | 'PARCIAL' | 'NAO' | '',
-    oQueFuncionou: '',
-    oQueNaoFuncionou: '',
-  });
-
+  const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
   // Formulário de microgesto
   const [microgestoForm, setMicrogestoForm] = useState({
     tipos: ['ESCUTA'] as string[],
@@ -283,6 +486,7 @@ export default function DiarioBordoPage() {
     // G3 FIX: campos da matriz pedagógica 2026
     camposExperiencia?: string[];
     objetivosMatriz?: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }>;
+    intencionalidadeGeral?: string;
     recursos?: string;
     // Vínculo com matriz curricular — necessário para registrar ocorrências
     curriculumMatrixId?: string;
@@ -313,22 +517,9 @@ export default function DiarioBordoPage() {
   const [loadingObs, setLoadingObs] = useState(false);
   const [savingObs, setSavingObs] = useState(false);
   const [criancaSelecionadaObs, setCriancaSelecionadaObs] = useState<string>('');
-  const [obsForm, setObsForm] = useState({
-    category: 'GERAL',
-    date: getPedagogicalToday(),
-    behaviorDescription: '',
-    socialInteraction: '',
-    emotionalState: '',
-    dietaryNotes: '',
-    sleepPattern: '',
-    learningProgress: '',
-    planningParticipation: '',
-    psychologicalNotes: '',
-    developmentAlerts: '',
-    recommendations: '',
-    // FIX 5: campo livre opcional
-    observacaoPersonalizada: '',
-  });
+  const [obsForm, setObsForm] = useState(() => resetObsFormState());
+  const [avaliacaoIndividualForm, setAvaliacaoIndividualForm] = useState(() => getInitialAvaliacaoIndividualForm());
+  const [savingAvaliacaoIndividual, setSavingAvaliacaoIndividual] = useState(false);
 
   useEffect(() => {
     loadDiarios();
@@ -554,19 +745,66 @@ export default function DiarioBordoPage() {
         ...(observacaoPersonalizada.trim() ? { interests: observacaoPersonalizada } : {}),
       });
       toast.success('Observação salva com sucesso!');
-      setObsForm({
-        category: 'GERAL', date: getPedagogicalToday(),
-        behaviorDescription: '', socialInteraction: '', emotionalState: '',
-        dietaryNotes: '', sleepPattern: '', learningProgress: '',
-        planningParticipation: '', psychologicalNotes: '', developmentAlerts: '', recommendations: '',
-        observacaoPersonalizada: '',
-      });
+      setObsForm(resetObsFormState());
       setCriancaSelecionadaObs('');
       loadObservacoes();
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar observação'));
     } finally {
       setSavingObs(false);
+    }
+  }
+
+  function toggleCriancaAvaliacaoIndividual(id: string) {
+    setAvaliacaoIndividualForm(f => ({
+      ...f,
+      childIds: f.childIds.includes(id)
+        ? f.childIds.filter(childIdSelecionado => childIdSelecionado !== id)
+        : [...f.childIds, id],
+    }));
+  }
+
+  async function salvarAvaliacaoIndividual() {
+    if (avaliacaoIndividualForm.childIds.length === 0) {
+      toast.error('Selecione pelo menos uma criança');
+      return;
+    }
+    if (!avaliacaoIndividualForm.observacao.trim()) {
+      toast.error('Escreva uma observação individual breve');
+      return;
+    }
+    if (!classroomId) {
+      toast.error('Turma não identificada. Recarregue a página e tente novamente.');
+      return;
+    }
+
+    setSavingAvaliacaoIndividual(true);
+    try {
+      const payloadBase = getInitialPlanningObservationForm(form.date);
+      const observacao = avaliacaoIndividualForm.observacao.trim();
+      const resumoPlano = summarizePlanningObservation(planejamentoHoje?.title, observacao);
+
+      await Promise.all(
+        avaliacaoIndividualForm.childIds.map(childIdSelecionado =>
+          http.post('/development-observations', {
+            ...payloadBase,
+            childId: childIdSelecionado,
+            classroomId,
+            date: `${form.date}T12:00:00.000Z`,
+            behaviorDescription: observacao,
+            planningParticipation: resumoPlano,
+            ...(form.reflexaoPedagogica.trim() ? { recommendations: form.reflexaoPedagogica.trim() } : {}),
+          })
+        )
+      );
+
+      toast.success(getPlanningObservationSuccess(avaliacaoIndividualForm.childIds.length));
+      setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
+      if (aba === 'observacoes') loadObservacoes();
+    } catch (err: any) {
+      toast.error(extractErrorMessage(err, getPlanningObservationError()));
+    } finally {
+      setSavingAvaliacaoIndividual(false);
     }
   }
 
@@ -675,6 +913,7 @@ export default function DiarioBordoPage() {
           let activities = '';
           let camposExperiencia: string[] = [];
           let objetivosMatriz: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }> = [];
+          let intencionalidadeGeral = '';
           let recursos = '';
           try {
             const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
@@ -702,6 +941,22 @@ export default function DiarioBordoPage() {
             objetivosMatriz = (dayZero?.objectives?.length ? dayZero.objectives : null)
               ?? (parsedObjectives.length ? parsedObjectives : null)
               ?? pc?.objetivosMatriz ?? [];
+            intencionalidadeGeral = pickPlanningText(
+              dayZero?.teacher,
+              'intencionalidadePedagogica',
+              'intencionalidade_pedagogica',
+              'intencionalidade',
+            ) || pickPlanningText(
+              desc,
+              'intencionalidadePedagogica',
+              'intencionalidade_pedagogica',
+              'intencionalidade',
+            ) || pickPlanningText(
+              pc,
+              'intencionalidadePedagogica',
+              'intencionalidade_pedagogica',
+              'intencionalidade',
+            );
             recursos = pc?.recursos || dayZero?.teacher?.recursos
               || desc?.resources || planHoje.resources || '';
           } catch {
@@ -715,6 +970,7 @@ export default function DiarioBordoPage() {
             status: activePlan.status ?? 'EM_EXECUCAO',
             camposExperiencia,
             objetivosMatriz,
+            intencionalidadeGeral,
             recursos,
             curriculumMatrixId: undefined,
             // curriculumEntryId vem do endpoint active-today (opcional — não bloqueia o botão)
@@ -951,6 +1207,7 @@ export default function DiarioBordoPage() {
             presencas: presencasReais,
             ausencias: ausenciasReais,
             climaEmocional: form.climaEmocional,
+            acolhidaInicial: form.acolhidaInicial,
             momentoDestaque: form.momentoDestaque,
             reflexaoPedagogica: form.reflexaoPedagogica,
             rotina: form.rotina,
@@ -973,27 +1230,8 @@ export default function DiarioBordoPage() {
       toast.success('Diário de Bordo salvo!');
       setAba('lista');
       loadDiarios();
-      setForm({
-        date: dateFromQuery && /^\d{4}-\d{2}-\d{2}$/.test(dateFromQuery) ? dateFromQuery : getPedagogicalToday(),
-        climaEmocional: 'BOM',
-        momentoDestaque: '',
-        reflexaoPedagogica: '',
-        encaminhamentos: '',
-        presencas: 0,
-        ausencias: 0,
-        rotina: ROTINA_PADRAO.map(r => ({ ...r })),
-        microgestos: [],
-        criancasPresentes: [],
-        execucaoPlanejamento: '',
-        reacaoCriancas: '',
-        statusExecucaoPlano: '' as 'FEITO' | 'PARCIAL' | 'NAO_REALIZADO' | '',
-        materiaisUtilizados: '',
-        objetivoAtingido: '' as 'SIM' | 'PARCIAL' | 'NAO' | '',
-        oQueFuncionou: '',
-        oQueNaoFuncionou: '',
-        adaptacoesRealizadas: '',
-        ocorrencias: '',
-      });
+      setForm(getInitialDiaryForm(dateFromQuery));
+      setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
@@ -1173,16 +1411,13 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-6 max-w-3xl">
-
-          {/* Gate de Chamada — aviso forte quando chamada não foi feita */}
           {!chamadaCarregada && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-bold text-amber-800">Chamada do Dia ainda não realizada</p>
                 <p className="text-sm text-amber-700 mt-0.5">
-                  Realize a Chamada Diária antes de registar o Diário do Dia.
-                  As presenças serão importadas automaticamente após a chamada.
+                  Realize a Chamada Diária antes de guardar o Diário do Dia. As presenças serão importadas automaticamente após a chamada.
                 </p>
                 <button
                   onClick={() => { if (classroomId) window.location.href = '/app/chamada'; }}
@@ -1194,238 +1429,17 @@ export default function DiarioBordoPage() {
             </div>
           )}
 
-          {chamadaCarregada && (
-            <>
-          {/* ── CARD A: Planejamento do Dia (somente leitura) ── */}
-          {planejamentoHoje ? (
-            <>
-              <Card className="border-2 border-indigo-200 bg-indigo-50/60">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-indigo-800 text-base">
-                      <Target className="h-5 w-5 text-indigo-500" /> Plano de Aula do Dia
-                    </CardTitle>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-200 text-indigo-800">
-                      {planejamentoHoje.status === 'EM_EXECUCAO' ? '▶ Em Execução' : '✓ Aprovado'}
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-indigo-900 mt-1">{planejamentoHoje.title}</p>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-0">
-
-                  {(planejamentoHoje.camposExperiencia ?? []).length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">Campo de Experiência</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {planejamentoHoje.camposExperiencia!.map((c, i) => (
-                          <span key={i} className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded-full">{c}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {(planejamentoHoje.objetivosMatriz ?? []).length > 0 && (
-                    <div className="space-y-3">
-                      {planejamentoHoje.objetivosMatriz!.map((obj, i) => (
-                        <div key={i} className="rounded-xl border border-indigo-200 bg-white/70 p-3 space-y-2">
-                          {(obj as any).campoExperiencia && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
-                              <p className="text-sm font-medium text-indigo-900">{(obj as any).campoExperiencia}</p>
-                            </div>
-                          )}
-                          {((obj as any).objetivoBNCC || (obj as any).objetivo_bncc) && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
-                              <p className="text-sm text-indigo-900">{(obj as any).objetivoBNCC || (obj as any).objetivo_bncc}</p>
-                            </div>
-                          )}
-                          {(obj as any).objetivoCurriculoDF && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
-                              <p className="text-sm text-indigo-900">{(obj as any).objetivoCurriculoDF}</p>
-                            </div>
-                          )}
-                          {((obj as any).intencionalidadePedagogica || (obj as any).intencionalidade) && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{(obj as any).intencionalidadePedagogica || (obj as any).intencionalidade}</p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!((planejamentoHoje.objetivosMatriz ?? []).length > 0) && planejamentoHoje.objectives && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
-                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.objectives}</p>
-                    </div>
-                  )}
-
-                  {planejamentoHoje.activities && (
-                    <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                      <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
-                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
-                    </div>
-                  )}
-
-                  {planejamentoHoje.recursos && (
-                    <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                      <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
-                      <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
-                    </div>
-                  )}
-
-                </CardContent>
-              </Card>
-
-              {/* ── CARD B: Avaliação do Plano de Aula ── */}
-              <Card className="border-2 border-emerald-200 bg-emerald-50/30">
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-emerald-800">
-                    <ClipboardList className="h-5 w-5 text-emerald-500" /> Avaliação do Plano de Aula
-                  </CardTitle>
-                  <p className="text-xs text-emerald-600 mt-0.5">
-                    Registe a execução pedagógica e a avaliação do que aconteceu em sala.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-4 shadow-sm">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-emerald-900">Execução do Plano</h3>
-                      <p className="text-xs text-emerald-700">
-                        Registre a execução do que foi planejado e os ajustes feitos ao longo do dia.
-                      </p>
-                    </div>
-
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-800 mb-2">
-                        Cumprimento do plano <span className="text-red-500">*</span>
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {([
-                          { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                          { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                          { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
-                        ]).map(s => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                              form.statusExecucaoPlano === s.id
-                                ? s.cor + ' shadow-md'
-                                : 'bg-white ' + s.corOff
-                            }`}
-                          >
-                            <span>{s.emoji}</span> {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
-                      <div>
-                        <Label>
-                          {form.statusExecucaoPlano === 'NAO_REALIZADO'
-                            ? 'Motivo da não realização'
-                            : 'Justificativa da execução parcial'} <span className="font-normal text-gray-400">(obrigatório nesta situação)</span>
-                        </Label>
-                        <Textarea
-                          placeholder={
-                            form.statusExecucaoPlano === 'NAO_REALIZADO'
-                              ? 'Explique brevemente o que impediu a execução do plano.'
-                              : 'Explique brevemente o que foi realizado e o que ficou pendente.'
-                          }
-                          rows={2}
-                          value={form.execucaoPlanejamento}
-                          onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Textarea
-                        placeholder="Quais materiais e recursos foram realmente utilizados?"
-                        rows={2}
-                        value={form.materiaisUtilizados}
-                        onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
-                        <Textarea
-                          placeholder="Que ajustes foram necessários em relação ao previsto?"
-                          rows={2}
-                          value={form.adaptacoesRealizadas}
-                          onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
-                        <Textarea
-                          placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
-                          rows={2}
-                          value={form.ocorrencias}
-                          onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 space-y-4 shadow-sm">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-sky-900">Avaliação do Dia</h3>
-                      <p className="text-xs text-sky-700">
-                        Faça a leitura pedagógica do dia de forma breve e objetiva.
-                      </p>
-                    </div>
-
-                    <div>
-                      <Label>Reação das crianças <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Textarea
-                        placeholder="Como as crianças responderam às propostas e interações do dia?"
-                        rows={2}
-                        value={form.reacaoCriancas}
-                        onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
-                      <Textarea
-                        placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
-                        rows={3}
-                        value={form.reflexaoPedagogica}
-                        onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <p className="text-xs text-gray-500">Nenhum planejamento aprovado para hoje. Registre o diário livremente.</p>
-            </div>
-          )}
-          {/* Cabeçalho */}
           <Card className="border-2 border-blue-100">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-blue-700"><Calendar className="h-5 w-5" /> Informações do Dia</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-700">
+                <Calendar className="h-5 w-5" /> {getAcolhidaTitle()}
+              </CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Data</Label>
                   <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-                  {/* BUG F FIX: Aviso visual de fim de semana */}
                   {(() => {
                     const d = new Date(form.date + 'T12:00:00').getDay();
                     return (d === 0 || d === 6) ? (
@@ -1449,66 +1463,26 @@ export default function DiarioBordoPage() {
                 )}
               </div>
 
-              {/* Chamada visual por fotos */}
-              {criancas.length > 0 && (() => {
-                const totalChamadaUI = chamadaCarregada && chamadaInfo?.total ? chamadaInfo.total : criancas.length;
-                const presentesUI = form.criancasPresentes.length;
-                const ausentesUI = Math.max(0, totalChamadaUI - presentesUI);
-
-                return (
-                  <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label>Chamada — Crianças Presentes ({presentesUI}/{totalChamadaUI})</Label>
-                    {chamadaCarregada && chamadaInfo && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                        <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
-                      </span>
-                    )}
-                  </div>
-                  {!chamadaCarregada && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
-                      ⚠️ Chamada do dia ainda não realizada. Marque as presenças manualmente ou acesse <strong>Chamada Diária</strong> primeiro.
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 mb-2">Toque na foto para ajustar a presença</p>
-                  <div className="flex flex-wrap gap-2">
-                    {criancas.map(c => {
-                      const presente = form.criancasPresentes.includes(c.id);
-                      return (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => toggleCriancaPresente(c.id)}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
-                        >
-                          {c.photoUrl ? (
-                            <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                              <UserCircle className="w-6 h-6 text-blue-400" />
-                            </div>
-                          )}
-                          <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
-                          {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {chamadaCarregada
-                      ? `${presentesUI} presente(s) · ${ausentesUI} ausente(s)`
-                      : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
-                  </p>
-                </div>
-                );
-              })()}
+              <div>
+                <Label>Registro rápido da acolhida</Label>
+                <Textarea
+                  placeholder={getAcolhidaPlaceholder()}
+                  rows={3}
+                  value={form.acolhidaInicial}
+                  onChange={e => setForm(f => ({ ...f, acolhidaInicial: e.target.value }))}
+                />
+              </div>
 
               <div>
                 <Label>Clima Emocional da Turma</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
                   {CLIMAS.map(clima => (
-                    <button key={clima.id} onClick={() => setForm(f => ({ ...f, climaEmocional: clima.id }))}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${form.climaEmocional === clima.id ? clima.cor + ' border-current shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                    <button
+                      key={clima.id}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, climaEmocional: clima.id }))}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 text-sm font-medium transition-all ${form.climaEmocional === clima.id ? clima.cor + ' border-current shadow-sm' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >
                       {clima.emoji} {clima.label}
                     </button>
                   ))}
@@ -1517,15 +1491,371 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* Rotina */}
+          <Card className="border-2 border-green-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-700">
+                <Users className="h-5 w-5" /> {getChamadaTitle()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-500">{getChamadaManualHelper(chamadaCarregada)}</p>
+              {criancas.length > 0 ? (() => {
+                const totalChamadaUI = chamadaCarregada && chamadaInfo?.total ? chamadaInfo.total : criancas.length;
+                const presentesUI = form.criancasPresentes.length;
+                const ausentesUI = Math.max(0, totalChamadaUI - presentesUI);
+
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                      <Label>Chamada — Crianças Presentes ({presentesUI}/{totalChamadaUI})</Label>
+                      {chamadaCarregada && chamadaInfo && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                          <CheckCircle className="h-3 w-3" /> Chamada importada da lista de presença
+                        </span>
+                      )}
+                    </div>
+                    {!chamadaCarregada && (
+                      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                        Ajuste manualmente se necessário, mas a guarda do diário continuará bloqueada até a chamada oficial ser feita.
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mb-2">Toque na foto para ajustar a presença</p>
+                    <div className="flex flex-wrap gap-2">
+                      {criancas.map(c => {
+                        const presente = form.criancasPresentes.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => toggleCriancaPresente(c.id)}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${presente ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white opacity-60 hover:opacity-100'}`}
+                            title={getCriancaNome(c)}
+                          >
+                            {c.photoUrl ? (
+                              <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                                <UserCircle className="w-6 h-6 text-blue-400" />
+                              </div>
+                            )}
+                            <span className="text-xs font-medium text-center max-w-[60px] truncate">{c.firstName}</span>
+                            {presente && <span className="text-green-500 text-xs font-bold">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {chamadaCarregada
+                        ? `${presentesUI} presente(s) · ${ausentesUI} ausente(s)`
+                        : `${form.criancasPresentes.length} marcado(s) manualmente — chamada oficial ainda não realizada`}
+                    </p>
+                  </div>
+                );
+              })() : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Presenças</Label>
+                    <Input type="number" min={0} value={form.presencas} onChange={e => setForm(f => ({ ...f, presencas: Number(e.target.value) }))} />
+                  </div>
+                  <div>
+                    <Label>Ausências</Label>
+                    <Input type="number" min={0} value={form.ausencias} onChange={e => setForm(f => ({ ...f, ausencias: Number(e.target.value) }))} />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {planejamentoHoje ? (
+            <Card className="border-2 border-indigo-200 bg-indigo-50/60">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-indigo-800 text-base">
+                    <Target className="h-5 w-5 text-indigo-500" /> {getPlanningSectionTitle()}
+                  </CardTitle>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-200 text-indigo-800">
+                    {getPlanningStatusLabel(planejamentoHoje.status)}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-indigo-900 mt-1">{planejamentoHoje.title}</p>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                {(planejamentoHoje.camposExperiencia ?? []).length > 0 && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {planejamentoHoje.camposExperiencia!.map((campo, i) => (
+                        <span key={i} className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{campo}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {planejamentoHoje.intencionalidadeGeral && (
+                  <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3">
+                    <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                    <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
+                  </div>
+                )}
+
+                {(planejamentoHoje.objetivosMatriz ?? []).length > 0 ? (
+                  <div className="space-y-3">
+                    {planejamentoHoje.objetivosMatriz!.map((obj, i) => {
+                      const fields = getObjectiveCardFields(obj as Record<string, any>);
+                      if (!hasObjectiveCardContent(fields)) return null;
+                      return (
+                        <div key={i} className="rounded-xl border border-indigo-200 bg-white/80 p-3 space-y-3">
+                          {fields.campoExperiencia && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
+                              <p className="text-sm font-medium text-indigo-900 whitespace-pre-line">{fields.campoExperiencia}</p>
+                            </div>
+                          )}
+                          {fields.objetivoBNCC && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.objetivoBNCC}</p>
+                            </div>
+                          )}
+                          {fields.objetivoCurriculo && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.objetivoCurriculo}</p>
+                            </div>
+                          )}
+                          {fields.intencionalidade && (
+                            <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
+                              <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                              <p className="text-sm text-fuchsia-950 whitespace-pre-line">{fields.intencionalidade}</p>
+                            </div>
+                          )}
+                          {fields.desenvolvimento && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.desenvolvimento}</p>
+                            </div>
+                          )}
+                          {fields.recursos && (
+                            <div>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.recursos}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    {planejamentoHoje.objectives && (
+                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.objectives}</p>
+                      </div>
+                    )}
+                    {planejamentoHoje.activities && (
+                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
+                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
+                      </div>
+                    )}
+                    {planejamentoHoje.recursos && (
+                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
+                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
+                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <p className="text-xs text-gray-500">{getPlanningEmptyText()}</p>
+            </div>
+          )}
+
+          <Card className="border-2 border-emerald-200 bg-emerald-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-emerald-800">
+                <ClipboardList className="h-5 w-5 text-emerald-500" /> {getExecucaoTitle()}
+              </CardTitle>
+              <p className="text-xs text-emerald-600 mt-0.5">
+                Registre o que foi executado no plano do dia e os ajustes pedagógicos feitos ao longo da rotina.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-emerald-800 mb-2">
+                  Cumprimento do plano {planejamentoHoje && <span className="text-red-500">*</span>}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                    { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
+                    { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
+                  ]).map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form.statusExecucaoPlano === s.id ? s.cor + ' shadow-md' : 'bg-white ' + s.corOff}`}
+                    >
+                      <span>{s.emoji}</span> {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>
+                  {getExecucaoLabel(form.statusExecucaoPlano)} {planejamentoHoje && <span className="text-red-500">*</span>} <span className="font-normal text-gray-400">{getExecucaoHint(form.statusExecucaoPlano)}</span>
+                </Label>
+                <Textarea
+                  placeholder={getExecucaoPlaceholder(form.statusExecucaoPlano)}
+                  rows={3}
+                  value={form.execucaoPlanejamento}
+                  onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
+                <Textarea
+                  placeholder="Quais materiais e recursos foram realmente utilizados?"
+                  rows={2}
+                  value={form.materiaisUtilizados}
+                  onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Que ajustes foram necessários em relação ao previsto?"
+                    rows={2}
+                    value={form.adaptacoesRealizadas}
+                    onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
+                    rows={2}
+                    value={form.ocorrencias}
+                    onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-sky-200 bg-sky-50/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sky-800">
+                <ClipboardList className="h-5 w-5 text-sky-500" /> {getAvaliacaoTitle()}
+              </CardTitle>
+              <p className="text-xs text-sky-600 mt-0.5">{getAvaliacaoIntro()}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Reação das crianças <span className="font-normal text-gray-400">(opcional)</span></Label>
+                <Textarea
+                  placeholder="Como as crianças responderam às propostas e interações do dia?"
+                  rows={2}
+                  value={form.reacaoCriancas}
+                  onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
+                <Textarea
+                  placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
+                  rows={3}
+                  value={form.reflexaoPedagogica}
+                  onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
+                />
+              </div>
+
+              <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-sky-900">Observação individual por aluno</p>
+                  <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
+                </div>
+
+                <div>
+                  <Label>Criança(s) da turma</Label>
+                  {criancas.length === 0 ? (
+                    <p className="text-xs text-gray-400 mt-2 italic">Nenhuma criança disponível para seleção.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {criancas.map(c => {
+                        const selecionada = avaliacaoIndividualForm.childIds.includes(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
+                            className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${selecionada ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-gray-200 bg-white hover:border-sky-300'}`}
+                            title={getCriancaNome(c)}
+                          >
+                            {c.photoUrl ? (
+                              <img src={c.photoUrl} alt={c.firstName} className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center">
+                                <UserCircle className="w-6 h-6 text-sky-400" />
+                              </div>
+                            )}
+                            <span className="text-xs font-medium text-center max-w-[72px] truncate">{c.firstName}</span>
+                            {selecionada && <span className="text-sky-600 text-xs font-bold">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label>Observação individual breve</Label>
+                  <Textarea
+                    placeholder={getAvaliacaoPlaceholder()}
+                    rows={3}
+                    value={avaliacaoIndividualForm.observacao}
+                    onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, observacao: e.target.value }))}
+                  />
+                </div>
+
+                {avaliacaoIndividualForm.childIds.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Selecionadas: {criancas.filter(c => avaliacaoIndividualForm.childIds.includes(c.id)).map(c => c.firstName).join(', ')}
+                  </p>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={salvarAvaliacaoIndividual}
+                  disabled={savingAvaliacaoIndividual}
+                  className="w-full bg-sky-600 hover:bg-sky-700"
+                >
+                  {savingAvaliacaoIndividual
+                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+                    : <><Save className="h-4 w-4 mr-2" /> {getPlanningObservationTitle(avaliacaoIndividualForm.childIds.length)}</>}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-2 border-green-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-green-700"><Clock className="h-5 w-5" /> Rotina do Dia</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm text-gray-500 mb-3">Marque os momentos da rotina que foram realizados hoje</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {form.rotina.map((item, idx) => (
-                  <button key={idx} onClick={() => toggleRotinaItem(idx)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${item.concluido ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <button key={idx} type="button" onClick={() => toggleRotinaItem(idx)} className={`flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${item.concluido ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
                     <CheckCircle className={`h-5 w-5 flex-shrink-0 ${item.concluido ? 'text-green-500' : 'text-gray-300'}`} />
                     <div>
                       <p className={`text-sm font-medium ${item.concluido ? 'text-green-700' : 'text-gray-700'}`}>{item.momento}</p>
@@ -1537,28 +1867,24 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* Microgestos */}
           <Card className="border-2 border-purple-100">
             <CardHeader><CardTitle className="flex items-center gap-2 text-purple-700"><Sparkles className="h-5 w-5" /> Microgestos Pedagógicos</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-500">Registre as pequenas ações pedagógicas intencionais que você realizou ao longo do dia</p>
 
-              {/* Formulário de microgesto */}
               <div className="bg-purple-50 rounded-xl p-4 space-y-3">
-                {/* Tipo */}
                 <div>
                   <Label>Tipo de Microgesto <span className="text-xs font-normal text-gray-400">(pode selecionar mais de um)</span></Label>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
                     {TIPOS_MICROGESTO.map(tipo => (
-                      <button key={tipo.id} onClick={() => setMicrogestoForm(f => ({
-                          ...f,
-                          tipos: f.tipos.includes(tipo.id)
-                            ? f.tipos.filter(t => t !== tipo.id).length > 0
-                              ? f.tipos.filter(t => t !== tipo.id)
-                              : [tipo.id]
-                            : [...f.tipos, tipo.id],
-                        }))}
-                        className={`p-2 rounded-lg border-2 text-center transition-all ${microgestoForm.tipos.includes(tipo.id) ? 'border-purple-400 bg-white shadow-sm' : 'border-transparent bg-white/50 hover:bg-white'}`}>
+                      <button key={tipo.id} type="button" onClick={() => setMicrogestoForm(f => ({
+                        ...f,
+                        tipos: f.tipos.includes(tipo.id)
+                          ? f.tipos.filter(t => t !== tipo.id).length > 0
+                            ? f.tipos.filter(t => t !== tipo.id)
+                            : [tipo.id]
+                          : [...f.tipos, tipo.id],
+                      }))} className={`p-2 rounded-lg border-2 text-center transition-all ${microgestoForm.tipos.includes(tipo.id) ? 'border-purple-400 bg-white shadow-sm' : 'border-transparent bg-white/50 hover:bg-white'}`}>
                         <span className="text-lg block">{tipo.emoji}</span>
                         <span className="text-xs font-medium text-gray-700">{tipo.label}</span>
                       </button>
@@ -1566,20 +1892,17 @@ export default function DiarioBordoPage() {
                   </div>
                 </div>
 
-                {/* Campo de Experiência */}
                 <div>
                   <Label>Campo de Experiência</Label>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {CAMPOS_EXPERIENCIA.map(c => (
-                      <button key={c.id} onClick={() => setMicrogestoForm(f => ({ ...f, campo: c.id }))}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-full border-2 text-xs font-medium transition-all ${microgestoForm.campo === c.id ? 'border-purple-500 bg-purple-100 text-purple-700' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'}`}>
+                      <button key={c.id} type="button" onClick={() => setMicrogestoForm(f => ({ ...f, campo: c.id }))} className={`flex items-center gap-1 px-3 py-1.5 rounded-full border-2 text-xs font-medium transition-all ${microgestoForm.campo === c.id ? 'border-purple-500 bg-purple-100 text-purple-700' : 'border-gray-200 bg-white text-gray-600 hover:border-purple-300'}`}>
                         {c.emoji} {c.label.split(',')[0]}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Seleção de criança por foto */}
                 <SeletorCrianca
                   criancas={criancas}
                   selecionadas={microgestoForm.criancasSelecionadas}
@@ -1588,13 +1911,11 @@ export default function DiarioBordoPage() {
                   label="Criança(s) envolvida(s)"
                 />
 
-                {/* Horário */}
                 <div>
                   <Label>Horário (opcional)</Label>
                   <Input type="time" value={microgestoForm.horario} onChange={e => setMicrogestoForm(f => ({ ...f, horario: e.target.value }))} />
                 </div>
 
-                {/* Descrição */}
                 <div>
                   <Label>Descrição do Microgesto *</Label>
                   <Textarea
@@ -1605,14 +1926,13 @@ export default function DiarioBordoPage() {
                   />
                 </div>
 
-                <Button onClick={adicionarMicrogesto} disabled={savingMicrogesto} variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-100">
+                <Button type="button" onClick={adicionarMicrogesto} disabled={savingMicrogesto} variant="outline" className="w-full border-purple-300 text-purple-700 hover:bg-purple-100">
                   {savingMicrogesto
                     ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
                     : <><Plus className="h-4 w-4 mr-2" /> Adicionar Microgesto</>}
                 </Button>
               </div>
 
-              {/* Lista de microgestos adicionados */}
               {form.microgestos.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase">{form.microgestos.length} microgesto(s) registrado(s)</p>
@@ -1636,7 +1956,7 @@ export default function DiarioBordoPage() {
                           )}
                         </div>
                         {m.horario && <span className="text-xs text-gray-400 flex-shrink-0">{m.horario}</span>}
-                        <button onClick={() => removerMicrogesto(m.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
+                        <button type="button" onClick={() => removerMicrogesto(m.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
@@ -1647,12 +1967,10 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-
-          {/* ── CARD D: Fechamento Geral do Dia ── */}
           <Card className="border-2 border-blue-100">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-blue-700">
-                <Star className="h-5 w-5 text-blue-500" /> Fechamento Geral do Dia
+                <Star className="h-5 w-5 text-blue-500" /> {getFechamentoTitle()}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1684,8 +2002,6 @@ export default function DiarioBordoPage() {
             </Button>
             <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
           </div>
-            </>
-          )}
         </div>
       )}
 
