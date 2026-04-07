@@ -1293,136 +1293,119 @@ export default function DiarioBordoPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
 
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-800 mb-2">
-                      Cumprimento do plano <span className="text-red-500">*</span>
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {([
-                        { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                        { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                        { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
-                      ]).map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
-                            form.statusExecucaoPlano === s.id
-                              ? s.cor + ' shadow-md'
-                              : 'bg-white ' + s.corOff
-                          }`}
-                        >
-                          <span>{s.emoji}</span> {s.label}
-                        </button>
-                      ))}
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 space-y-4 shadow-sm">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-emerald-900">Execução do Plano</h3>
+                      <p className="text-xs text-emerald-700">
+                        Registre a execução do que foi planejado e os ajustes feitos ao longo do dia.
+                      </p>
                     </div>
-                  </div>
 
-                  <div>
-                    <Label>O que foi executado?</Label>
-                    <Textarea
-                      placeholder="Descreva como o plano foi desenvolvido na prática: propostas realizadas, mediações e encaminhamentos."
-                      rows={3}
-                      value={form.execucaoPlanejamento}
-                      onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Materiais realmente utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
-                    <Textarea
-                      placeholder="Quais materiais e recursos foram efectivamente usados durante a atividade?"
-                      rows={2}
-                      value={form.materiaisUtilizados}
-                      onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
+                      <p className="text-sm font-semibold text-emerald-800 mb-2">
+                        Cumprimento do plano <span className="text-red-500">*</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {([
+                          { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                          { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
+                          { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
+                        ]).map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${
+                              form.statusExecucaoPlano === s.id
+                                ? s.cor + ' shadow-md'
+                                : 'bg-white ' + s.corOff
+                            }`}
+                          >
+                            <span>{s.emoji}</span> {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
+                      <div>
+                        <Label>
+                          {form.statusExecucaoPlano === 'NAO_REALIZADO'
+                            ? 'Motivo da não realização'
+                            : 'Justificativa da execução parcial'} <span className="font-normal text-gray-400">(obrigatório nesta situação)</span>
+                        </Label>
+                        <Textarea
+                          placeholder={
+                            form.statusExecucaoPlano === 'NAO_REALIZADO'
+                              ? 'Explique brevemente o que impediu a execução do plano.'
+                              : 'Explique brevemente o que foi realizado e o que ficou pendente.'
+                          }
+                          rows={2}
+                          value={form.execucaoPlanejamento}
+                          onChange={e => setForm(f => ({ ...f, execucaoPlanejamento: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
                       <Textarea
-                        placeholder="Que ajustes foram necessários em relação ao que estava previsto?"
-                        rows={3}
-                        value={form.adaptacoesRealizadas}
-                        onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                        placeholder="Quais materiais e recursos foram realmente utilizados?"
+                        rows={2}
+                        value={form.materiaisUtilizados}
+                        onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
                       />
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
+                        <Textarea
+                          placeholder="Que ajustes foram necessários em relação ao previsto?"
+                          rows={2}
+                          value={form.adaptacoesRealizadas}
+                          onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
+                        <Textarea
+                          placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
+                          rows={2}
+                          value={form.ocorrencias}
+                          onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-4 space-y-4 shadow-sm">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-sky-900">Avaliação do Dia</h3>
+                      <p className="text-xs text-sky-700">
+                        Faça a leitura pedagógica do dia de forma breve e objetiva.
+                      </p>
+                    </div>
+
                     <div>
-                      <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
+                      <Label>Reação das crianças <span className="font-normal text-gray-400">(opcional)</span></Label>
                       <Textarea
-                        placeholder="Registre fatos importantes, imprevistos ou situações que impactaram a aula."
-                        rows={3}
-                        value={form.ocorrencias}
-                        onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                        placeholder="Como as crianças responderam às propostas e interações do dia?"
+                        rows={2}
+                        value={form.reacaoCriancas}
+                        onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
                       />
                     </div>
-                  </div>
 
-                  <div>
-                    <Label>Reação das crianças</Label>
-                    <Textarea
-                      placeholder="Como as crianças responderam? Houve engajamento, resistência, surpresa, descobertas?"
-                      rows={2}
-                      value={form.reacaoCriancas}
-                      onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-800 mb-2">Objetivo foi atingido?</p>
-                    <div className="flex flex-wrap gap-2">
-                      {([
-                        { id: 'SIM' as const, label: 'Sim', emoji: '✅', cor: 'bg-emerald-600 text-white border-emerald-600', corOff: 'border-emerald-200 text-emerald-700' },
-                        { id: 'PARCIAL' as const, label: 'Parcialmente', emoji: '⚠️', cor: 'bg-amber-500 text-white border-amber-500', corOff: 'border-amber-200 text-amber-700' },
-                        { id: 'NAO' as const, label: 'Não', emoji: '❌', cor: 'bg-red-500 text-white border-red-500', corOff: 'border-red-200 text-red-600' },
-                      ]).map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setForm(f => ({ ...f, objetivoAtingido: s.id }))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                            form.objetivoAtingido === s.id
-                              ? s.cor + ' shadow-sm'
-                              : 'bg-white ' + s.corOff
-                          }`}
-                        >
-                          <span>{s.emoji}</span> {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <Label>O que funcionou bem?</Label>
+                      <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
                       <Textarea
-                        placeholder="Quais estratégias, materiais ou momentos tiveram maior impacto positivo?"
+                        placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
                         rows={3}
-                        value={form.oQueFuncionou}
-                        onChange={e => setForm(f => ({ ...f, oQueFuncionou: e.target.value }))}
+                        value={form.reflexaoPedagogica}
+                        onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
                       />
                     </div>
-                    <div>
-                      <Label>O que não funcionou?</Label>
-                      <Textarea
-                        placeholder="Quais dificuldades surgiram? O que precisaria ser diferente?"
-                        rows={3}
-                        value={form.oQueNaoFuncionou}
-                        onChange={e => setForm(f => ({ ...f, oQueNaoFuncionou: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>O que precisa ser retomado? <span className="text-red-500">*</span></Label>
-                    <Textarea
-                      placeholder="O que deve ser continuado, aprofundado ou corrigido no próximo dia?"
-                      rows={3}
-                      value={form.reflexaoPedagogica}
-                      onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
-                    />
                   </div>
 
                 </CardContent>
