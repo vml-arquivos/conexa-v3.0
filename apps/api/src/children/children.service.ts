@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -160,18 +160,61 @@ export class ChildrenService {
    * Upload de foto da criança
    */
   async uploadPhoto(id: string, file: Express.Multer.File, user: any) {
-    await this.findOne(id, user);
-    if (!file) throw new Error('Arquivo não recebido');
+    const child = await this.prisma.child.findFirst({
+      where: {
+        id,
+        mantenedoraId: user.mantenedoraId,
+      },
+      select: {
+        id: true,
+        unitId: true,
+      },
+    });
+
+    if (!child) {
+      throw new NotFoundException('Criança não encontrada');
+    }
+
+    if (!canAccessUnit(user, child.unitId)) {
+      throw new ForbiddenException('Você não tem acesso a esta unidade');
+    }
+
+    if (!file?.buffer) {
+      throw new BadRequestException('Arquivo não recebido');
+    }
 
     // Converte para base64 data URL — persiste sem S3
     const base64 = file.buffer.toString('base64');
     const photoUrl = `data:${file.mimetype};base64,${base64}`;
 
-    // Salva no banco
-    await this.prisma.child.update({
-      where: { id },
-      data: { photoUrl },
-    });
+    try {
+      await this.prisma.child.update({
+        where: { id },
+        data: { photoUrl },
+      });
+    } catch (error: any) {
+      const message = String(error?.message ?? '');
+      const missingPhotoUrlColumn =
+        message.includes('photoUrl')
+        && (
+          message.toLowerCase().includes('column')
+          || message.toLowerCase().includes('does not exist')
+          || message.toLowerCase().includes('unknown arg')
+        );
+
+      if (!missingPhotoUrlColumn) {
+        throw new InternalServerErrorException('Não foi possível salvar a foto da criança');
+      }
+
+      await this.prisma.$executeRawUnsafe(
+        'ALTER TABLE "Child" ADD COLUMN IF NOT EXISTS "photoUrl" TEXT',
+      );
+
+      await this.prisma.child.update({
+        where: { id },
+        data: { photoUrl },
+      });
+    }
 
     return { photoUrl, message: 'Foto atualizada com sucesso' };
   }
