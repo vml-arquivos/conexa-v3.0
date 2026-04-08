@@ -1910,6 +1910,29 @@ export default function DiarioBordoPage() {
                     />
                   </div>
                 )}
+                )}
+
+                {planejamentoHoje.activities && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                    <PlanningTextSection
+                      title="Desenvolvimento da Atividade"
+                      content={planejamentoHoje.activities}
+                      expanded={Boolean(expandedPlanningSections.activities)}
+                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, activities: !current.activities }))}
+                    />
+                  </div>
+                )}
+
+                {planejamentoHoje.recursos && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                    <PlanningTextSection
+                      title="Recursos / Materiais"
+                      content={planejamentoHoje.recursos}
+                      expanded={Boolean(expandedPlanningSections.resources)}
+                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, resources: !current.resources }))}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
