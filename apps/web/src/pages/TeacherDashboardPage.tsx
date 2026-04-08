@@ -14,7 +14,7 @@ import {
   Send, Download, Star, Lightbulb, ArrowRight, GraduationCap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import http from '../api/http';
+import http, { isAuthExpiredError } from '../api/http';
 import { createMicrogestureEvent, fetchRegisteredChildrenToday, type MicrogestureKind } from '../services/microgestures';
 import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
@@ -70,8 +70,12 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
       const res = await http.post(`/children/${crianca.id}/photo`, formData);
       const url = res.data?.photoUrl || res.data?.url;
       if (url) { onUpload(crianca.id, url); toast.success(`Foto de ${crianca.firstName} atualizada!`); }
-    } catch {
-      toast.error(`Não foi possível salvar a foto de ${crianca.firstName}.`);
+    } catch (error) {
+      if (isAuthExpiredError(error)) {
+        toast.error('Sua sessão expirou. Faça login novamente para salvar a foto.');
+      } else {
+        toast.error(`Não foi possível salvar a foto de ${crianca.firstName}.`);
+      }
     } finally { setUploading(false); }
   }
 
