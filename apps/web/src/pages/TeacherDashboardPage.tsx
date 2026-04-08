@@ -39,6 +39,67 @@ interface DashboardData {
   };
 }
 
+interface DashboardPlanningObjective {
+  campoExperiencia: string;
+  codigoBNCC: string;
+  objetivoBNCC: string;
+  objetivoCurriculo: string;
+  intencionalidade: string;
+}
+
+interface DashboardPlanningSummary {
+  title: string;
+  objectives: DashboardPlanningObjective[];
+  atividade: string;
+  recursos: string;
+}
+
+function toDisplayText(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatCampoExperienciaLabel(value: unknown): string {
+  return toDisplayText(value)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeDashboardPlanning(activePlanning: any, fallbackObjectives: any[]): DashboardPlanningSummary {
+  const normalizedObjectives = (
+    Array.isArray(activePlanning?.objetivosHoje) && activePlanning.objetivosHoje.length > 0
+      ? activePlanning.objetivosHoje
+      : fallbackObjectives.map((obj: any) => ({
+          campoExperiencia: obj.campo_label,
+          codigoBNCC: obj.codigo_bncc,
+          objetivoBNCC: obj.objetivo_bncc,
+          objetivoCurriculoDF: '',
+          intencionalidadePedagogica: obj.intencionalidade,
+        }))
+  )
+    .map((obj: any) => ({
+      campoExperiencia: formatCampoExperienciaLabel(obj?.campoExperiencia ?? obj?.campo_label),
+      codigoBNCC: toDisplayText(obj?.codigoBNCC ?? obj?.codigo_bncc),
+      objetivoBNCC: toDisplayText(obj?.objetivoBNCC ?? obj?.objetivo_bncc),
+      objetivoCurriculo: toDisplayText(obj?.objetivoCurriculoDF ?? obj?.objetivoCurriculo ?? obj?.objetivo_curriculo),
+      intencionalidade: toDisplayText(obj?.intencionalidadePedagogica ?? obj?.intencionalidade),
+    }))
+    .filter((obj: DashboardPlanningObjective) => (
+      obj.campoExperiencia
+      || obj.codigoBNCC
+      || obj.objetivoBNCC
+      || obj.objetivoCurriculo
+      || obj.intencionalidade
+    ));
+
+  return {
+    title: toDisplayText(activePlanning?.title),
+    objectives: normalizedObjectives,
+    atividade: toDisplayText(activePlanning?.atividade ?? activePlanning?.teacher?.atividade),
+    recursos: toDisplayText(activePlanning?.recursos ?? activePlanning?.teacher?.recursos),
+  };
+}
+
 // ─── Ações Rápidas ────────────────────────────────────────────────────────────
 const ACOES_RAPIDAS = [
   { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
@@ -238,6 +299,7 @@ export default function TeacherDashboardPage() {
   const diariosPct = Math.min(100, Math.round((diariosSemana / 5) * 100));
   const planejamentosPct = Math.min(100, Math.round((planejamentosSemana / 5) * 100));
   const registrosHojePct = totalAlunos > 0 ? Math.min(100, Math.round((registrosHoje / totalAlunos) * 100)) : 0;
+  const planejamentoResumoHoje = normalizeDashboardPlanning(insightsHoje?.planejamentoAtivo, objetivosHoje);
   const cardsResumoTurma = [
     {
       label: 'Crianças na turma',
@@ -453,43 +515,88 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  {(insightsHoje?.planejamentoAtivo?.objetivosHoje?.length > 0
-                    ? insightsHoje.planejamentoAtivo.objetivosHoje
-                    : objetivosHoje.map((obj: any) => ({
-                        campoExperiencia: obj.campo_label,
-                        codigoBNCC: obj.codigo_bncc,
-                        objetivoBNCC: obj.objetivo_bncc,
-                        objetivoCurriculoDF: '',
-                        intencionalidadePedagogica: obj.intencionalidade,
-                      }))
-                  ).slice(0, 3).map((obj: any, i: number) => (
-                    <div key={i} className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        {obj.codigoBNCC && (
-                          <span className="text-xs font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full">{obj.codigoBNCC}</span>
-                        )}
-                        <span className="text-xs text-slate-500">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
+                <div className="min-w-0">
+                  <div className="rounded-[24px] border border-amber-200/80 bg-white/90 p-4 shadow-sm shadow-amber-100/60 sm:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Planejamento do dia</p>
+                        <h3 className="mt-1 text-base font-semibold leading-tight text-slate-900 break-words">
+                          {planejamentoResumoHoje.title || 'Síntese pedagógica organizada para execução em sala'}
+                        </h3>
                       </div>
-                      <p className="text-sm font-medium leading-snug text-slate-800">{obj.objetivoBNCC}</p>
-                      {obj.intencionalidadePedagogica && (
-                        <p className="text-xs text-indigo-600 mt-2 flex items-start gap-1.5 rounded-xl bg-indigo-50 px-3 py-2">
-                          <Lightbulb className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                          {obj.intencionalidadePedagogica}
-                        </p>
+                      {planejamentoResumoHoje.objectives.length > 0 && (
+                        <span className="inline-flex shrink-0 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800">
+                          {planejamentoResumoHoje.objectives.length} objetivo(s)
+                        </span>
                       )}
                     </div>
-                  ))}
 
-                  {insightsHoje && !insightsHoje.planejamentoAtivo && objetivosHoje.length === 0 && (
-                    <div className="text-center rounded-2xl border border-dashed border-amber-300 bg-white/70 py-8 px-4">
-                      <p className="text-sm text-amber-700">Nenhum planejamento ativo para hoje.</p>
-                      <button onClick={() => navigate('/app/planejamento/novo')}
-                        className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
-                        Criar planejamento →
-                      </button>
-                    </div>
-                  )}
+                    {planejamentoResumoHoje.objectives.length > 0 ? (
+                      <div className="mt-4 space-y-3">
+                        {planejamentoResumoHoje.objectives.slice(0, 2).map((obj, i) => (
+                          <div key={`${obj.codigoBNCC || obj.campoExperiencia || 'objetivo'}-${i}`} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {obj.codigoBNCC && (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">{obj.codigoBNCC}</span>
+                              )}
+                              {obj.campoExperiencia && (
+                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">{obj.campoExperiencia}</span>
+                              )}
+                            </div>
+
+                            <div className="mt-3 space-y-3">
+                              {obj.objetivoBNCC && (
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Objetivo BNCC</p>
+                                  <p className="mt-1 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{obj.objetivoBNCC}</p>
+                                </div>
+                              )}
+                              {obj.objetivoCurriculo && (
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Objetivo do Currículo</p>
+                                  <p className="mt-1 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{obj.objetivoCurriculo}</p>
+                                </div>
+                              )}
+                              {obj.intencionalidade && (
+                                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-3">
+                                  <div className="flex items-center gap-1.5 text-indigo-700">
+                                    <Lightbulb className="h-3.5 w-3.5 shrink-0" />
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Intencionalidade Pedagógica</p>
+                                  </div>
+                                  <p className="mt-1.5 text-sm leading-relaxed text-indigo-950 whitespace-pre-wrap break-words">{obj.intencionalidade}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {(planejamentoResumoHoje.atividade || planejamentoResumoHoje.recursos) && (
+                          <div className="grid gap-3 xl:grid-cols-2">
+                            {planejamentoResumoHoje.atividade && (
+                              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Desenvolvimento da Atividade</p>
+                                <p className="mt-1.5 text-sm leading-relaxed text-amber-950 whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
+                              </div>
+                            )}
+                            {planejamentoResumoHoje.recursos && (
+                              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recursos e Materiais</p>
+                                <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{planejamentoResumoHoje.recursos}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-4 text-center rounded-2xl border border-dashed border-amber-300 bg-white/70 py-8 px-4">
+                        <p className="text-sm text-amber-700">Nenhum planejamento ativo para hoje.</p>
+                        <button onClick={() => navigate('/app/planejamento/novo')}
+                          className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
+                          Criar planejamento →
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
