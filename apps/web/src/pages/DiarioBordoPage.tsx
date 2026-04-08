@@ -1910,8 +1910,7 @@ export default function DiarioBordoPage() {
                     />
                   </div>
                 )}
-                )}
-
+                
                 {planejamentoHoje.activities && (
                   <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
                     <PlanningTextSection
