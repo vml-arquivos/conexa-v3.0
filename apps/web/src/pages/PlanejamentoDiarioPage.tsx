@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import http from '../api/http';
+import { gerarAtividade, type AtividadeGerada } from '../api/ia-assistiva';
 import {
   Calendar, ChevronLeft, ChevronRight, BookOpen, Target, Lightbulb,
   CheckCircle, Clock, Users, Sparkles, Save, Plus, Eye, FileText,
@@ -40,6 +43,14 @@ interface TemplatePlanejamento {
   status: 'rascunho' | 'finalizado' | 'aplicado';
   data_aplicacao?: string;
   criado_em: string;
+}
+
+interface SugestoesIA {
+  clareza: string;
+  alinhamentoIntencionalidade: string;
+  enriquecimentoPedagogico: string;
+  materiaisComplementares: string;
+  adaptacaoInclusiva: string;
 }
 
 // ─── Cores por campo ──────────────────────────────────────────────────────────
@@ -80,13 +91,18 @@ function getDiasDoMes(ano: number, mes: number): Date[] {
 }
 
 // ─── Template padrão por campo ────────────────────────────────────────────────
-function gerarTemplateInicial(obj: ObjetivoDia, segmento: SegmentoKey): Partial<TemplatePlanejamento> {
+function gerarTemplateInicial(
+  obj: ObjetivoDia,
+  segmento: SegmentoKey,
+  incluirExemploAtividade = true,
+): Partial<TemplatePlanejamento> {
+  const exemploAtividade = incluirExemploAtividade ? obj.exemplo_atividade : '';
   const roteiros: Record<string, string> = {
-    'eu-outro-nos': `1. ACOLHIMENTO (15 min)\n   - Roda de conversa sobre o tema da semana: "${obj.semana_tema}"\n   - Canção de boas-vindas e chamada afetiva\n\n2. DESENVOLVIMENTO (30 min)\n   - Apresentação do objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - Atividade principal: ${obj.exemplo_atividade || 'Exploração livre mediada pelo professor'}\n   - Interação em duplas/grupos pequenos\n\n3. REGISTRO (10 min)\n   - Desenho ou colagem sobre a experiência\n   - Roda de conversa: "O que aprendemos hoje?"\n\n4. ENCERRAMENTO (5 min)\n   - Organização do espaço\n   - Momento de despedida`,
-    'corpo-gestos': `1. AQUECIMENTO CORPORAL (10 min)\n   - Música e movimento livre\n   - Exploração do espaço com o corpo\n\n2. ATIVIDADE PRINCIPAL (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Circuito de movimento e expressão corporal'}\n   - Variações: individual, duplas, coletivo\n\n3. RELAXAMENTO (10 min)\n   - Respiração e alongamento\n   - Conversa sobre as sensações do corpo\n\n4. REGISTRO (5 min)\n   - Fotografia das atividades\n   - Relato oral das crianças`,
-    'tracos-sons': `1. SENSIBILIZAÇÃO (10 min)\n   - Apreciação de obra de arte / música relacionada ao tema\n   - Exploração de materiais disponíveis\n\n2. CRIAÇÃO (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Produção artística individual e coletiva'}\n   - Uso de diferentes suportes e materiais\n\n3. APRECIAÇÃO (10 min)\n   - Exposição das produções\n   - Cada criança fala sobre sua obra\n\n4. ORGANIZAÇÃO (5 min)\n   - Cuidado com os materiais\n   - Guarda das produções`,
-    'escuta-fala': `1. RODA DE LEITURA (15 min)\n   - Leitura deleite pelo professor\n   - Exploração do livro/texto relacionado ao tema: "${obj.semana_tema}"\n\n2. DESENVOLVIMENTO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Contação de histórias e recontagem pelas crianças'}\n   - Dramatização / fantoches / recursos visuais\n\n3. PRODUÇÃO (10 min)\n   - Criação coletiva de história\n   - Ditado ao professor ou escrita espontânea\n\n4. PARTILHA (5 min)\n   - Apresentação das produções\n   - Conexão com experiências pessoais`,
-    'espacos-tempos': `1. INVESTIGAÇÃO (15 min)\n   - Levantamento de hipóteses sobre o fenômeno do dia\n   - Observação do ambiente / materiais\n\n2. EXPERIMENTAÇÃO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Experimento científico ou exploração matemática'}\n   - Registro de observações\n\n3. SISTEMATIZAÇÃO (10 min)\n   - Organização dos dados coletados\n   - Comparação de resultados\n\n4. CONCLUSÃO (5 min)\n   - "O que descobrimos?"\n   - Conexão com a vida cotidiana`,
+    'eu-outro-nos': `1. ACOLHIMENTO (15 min)\n   - Roda de conversa sobre o tema da semana: "${obj.semana_tema}"\n   - Canção de boas-vindas e chamada afetiva\n\n2. DESENVOLVIMENTO (30 min)\n   - Apresentação do objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - Atividade principal: ${exemploAtividade || 'Exploração livre mediada pelo professor'}\n   - Interação em duplas/grupos pequenos\n\n3. REGISTRO (10 min)\n   - Desenho ou colagem sobre a experiência\n   - Roda de conversa: "O que aprendemos hoje?"\n\n4. ENCERRAMENTO (5 min)\n   - Organização do espaço\n   - Momento de despedida`,
+    'corpo-gestos': `1. AQUECIMENTO CORPORAL (10 min)\n   - Música e movimento livre\n   - Exploração do espaço com o corpo\n\n2. ATIVIDADE PRINCIPAL (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Circuito de movimento e expressão corporal'}\n   - Variações: individual, duplas, coletivo\n\n3. RELAXAMENTO (10 min)\n   - Respiração e alongamento\n   - Conversa sobre as sensações do corpo\n\n4. REGISTRO (5 min)\n   - Fotografia das atividades\n   - Relato oral das crianças`,
+    'tracos-sons': `1. SENSIBILIZAÇÃO (10 min)\n   - Apreciação de obra de arte / música relacionada ao tema\n   - Exploração de materiais disponíveis\n\n2. CRIAÇÃO (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Produção artística individual e coletiva'}\n   - Uso de diferentes suportes e materiais\n\n3. APRECIAÇÃO (10 min)\n   - Exposição das produções\n   - Cada criança fala sobre sua obra\n\n4. ORGANIZAÇÃO (5 min)\n   - Cuidado com os materiais\n   - Guarda das produções`,
+    'escuta-fala': `1. RODA DE LEITURA (15 min)\n   - Leitura deleite pelo professor\n   - Exploração do livro/texto relacionado ao tema: "${obj.semana_tema}"\n\n2. DESENVOLVIMENTO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Contação de histórias e recontagem pelas crianças'}\n   - Dramatização / fantoches / recursos visuais\n\n3. PRODUÇÃO (10 min)\n   - Criação coletiva de história\n   - Ditado ao professor ou escrita espontânea\n\n4. PARTILHA (5 min)\n   - Apresentação das produções\n   - Conexão com experiências pessoais`,
+    'espacos-tempos': `1. INVESTIGAÇÃO (15 min)\n   - Levantamento de hipóteses sobre o fenômeno do dia\n   - Observação do ambiente / materiais\n\n2. EXPERIMENTAÇÃO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Experimento científico ou exploração matemática'}\n   - Registro de observações\n\n3. SISTEMATIZAÇÃO (10 min)\n   - Organização dos dados coletados\n   - Comparação de resultados\n\n4. CONCLUSÃO (5 min)\n   - "O que descobrimos?"\n   - Conexão com a vida cotidiana`,
   };
 
   return {
@@ -107,6 +123,13 @@ function gerarTemplateInicial(obj: ObjetivoDia, segmento: SegmentoKey): Partial<
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function PlanejamentoDiarioPage() {
+  const { user } = useAuth();
+  const userLevels = normalizeRoles(user);
+  const userTypes = normalizeRoleTypes(user);
+  const isCoordenacaoUnidade = userTypes.includes('UNIDADE_COORDENADOR_PEDAGOGICO') || userLevels.includes('UNIDADE');
+  const isCoordenacaoGeral = userLevels.includes('STAFF_CENTRAL') || userLevels.includes('MANTENEDORA') || userLevels.includes('DEVELOPER');
+  const podeVerExemploMatriz = isCoordenacaoUnidade || isCoordenacaoGeral;
+
   const hoje = new Date();
   const [dataSelecionada, setDataSelecionada] = useState<Date>(hoje);
   const [segmentoSelecionado, setSegmentoSelecionado] = useState<SegmentoKey>('EI01');
@@ -116,6 +139,7 @@ export default function PlanejamentoDiarioPage() {
   const [templates, setTemplates] = useState<TemplatePlanejamento[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [gerandoIA, setGerandoIA] = useState(false);
+  const [sugestoesIA, setSugestoesIA] = useState<SugestoesIA | null>(null);
 
   const ddmm = formatarDataDDMM(dataSelecionada);
   const objetivosDia = getObjetivosDia(ddmm, segmentoSelecionado);
@@ -135,7 +159,8 @@ export default function PlanejamentoDiarioPage() {
   }
 
   function abrirTemplate(obj: ObjetivoDia) {
-    setTemplateAtivo(gerarTemplateInicial(obj, segmentoSelecionado));
+    setSugestoesIA(null);
+    setTemplateAtivo(gerarTemplateInicial(obj, segmentoSelecionado, podeVerExemploMatriz));
     setAba('template');
   }
 
@@ -169,29 +194,36 @@ export default function PlanejamentoDiarioPage() {
 
   async function gerarComIA() {
     if (!templateAtivo || !objetivosDia[0]) return;
+    if (!templateAtivo.roteiro?.trim()) {
+      toast.info('Escreva primeiro sua proposta de atividade para receber sugestões da IA.');
+      return;
+    }
+
     setGerandoIA(true);
     try {
       const obj = objetivosDia[0];
-      const res = await http.post('/ia-assistiva/gerar-atividade', {
+      const ia: AtividadeGerada = await gerarAtividade({
         faixaEtaria: segmentoSelecionado,
-        campoExperiencia: obj.campo_id,
-        objetivoBncc: obj.objetivo_bncc,
-        codigoBncc: obj.codigo_bncc,
-        semanaTema: obj.semana_tema,
-        intencionalidade: obj.intencionalidade,
+        campoDeExperiencia: obj.campo_label,
+        objetivoBNCC: obj.objetivo_bncc,
+        objetivoCurriculo: obj.objetivo_curriculo,
+        contextoAdicional:
+          `A professora já escreveu a seguinte proposta autoral e a IA deve apenas sugerir melhorias sem substituir a autoria:\n\n` +
+          `Proposta da professora:\n${templateAtivo.roteiro}\n\n` +
+          `Intencionalidade pedagógica registrada:\n${templateAtivo.intencionalidade || obj.intencionalidade || 'Não informada'}\n\n` +
+          'Retorne insumos que ajudem a melhorar clareza, alinhamento pedagógico, enriquecimento, materiais complementares e adaptação inclusiva. Não reescreva o plano inteiro como versão final.',
       });
-      const ia = res.data;
-      setTemplateAtivo(prev => ({
-        ...prev,
-        titulo: ia.titulo || prev?.titulo,
-        roteiro: ia.descricao || ia.roteiro || prev?.roteiro,
-        materiais: (ia.materiais || []).join('\n') || prev?.materiais,
-        avaliacao: ia.avaliacao || prev?.avaliacao,
-        adaptacoes: ia.adaptacoes || prev?.adaptacoes,
-      }));
-      toast.success('Planejamento enriquecido com IA!');
+
+      setSugestoesIA({
+        clareza: ia.descricao || 'Sem sugestão adicional de clareza.',
+        alinhamentoIntencionalidade: ia.intencionalidade || 'Sem sugestão adicional de alinhamento com a intencionalidade.',
+        enriquecimentoPedagogico: ia.etapas?.join('\n') || 'Sem sugestão adicional de enriquecimento pedagógico.',
+        materiaisComplementares: ia.materiais?.join('\n') || 'Sem sugestão adicional de materiais complementares.',
+        adaptacaoInclusiva: ia.adaptacoes || 'Sem sugestão adicional de adaptação inclusiva.',
+      });
+      toast.success('Sugestões da IA geradas sem alterar seu texto original.');
     } catch {
-      toast.error('IA temporariamente indisponível. Use o template gerado automaticamente.');
+      toast.error('IA temporariamente indisponível. Tente novamente em instantes.');
     } finally {
       setGerandoIA(false);
     }
@@ -390,21 +422,43 @@ export default function PlanejamentoDiarioPage() {
                           <p className={`text-xs font-medium ${style.text} mb-1`}>
                             {obj.semana_tema && <span className="italic">"{obj.semana_tema}" — </span>}
                           </p>
-                          <p className="text-sm text-gray-700 font-medium leading-snug">{obj.objetivo_bncc}</p>
+
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <p className="text-xs text-gray-500"><strong>Campo de Experiência:</strong></p>
+                              <p className="text-xs text-gray-600 mt-0.5">{obj.campo_label}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Target className="h-3 w-3" /> <strong>Objetivo BNCC:</strong>
+                              </p>
+                              <p className="text-sm text-gray-700 font-medium leading-snug mt-0.5">{obj.objetivo_bncc}</p>
+                            </div>
+
+                            {obj.objetivo_curriculo && (
+                              <div>
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                  <BookOpen className="h-3 w-3" /> <strong>Objetivo do Currículo:</strong>
+                                </p>
+                                <p className="text-xs text-gray-600 mt-0.5">{obj.objetivo_curriculo}</p>
+                              </div>
+                            )}
+                          </div>
 
                           {obj.intencionalidade && (
                             <div className="mt-2 pt-2 border-t border-current/10">
                               <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Lightbulb className="h-3 w-3" /> <strong>Intencionalidade:</strong>
+                                <Lightbulb className="h-3 w-3" /> <strong>Intencionalidade Pedagógica:</strong>
                               </p>
                               <p className="text-xs text-gray-600 mt-0.5">{obj.intencionalidade}</p>
                             </div>
                           )}
 
-                          {obj.exemplo_atividade && (
+                          {podeVerExemploMatriz && obj.exemplo_atividade && (
                             <div className="mt-2">
                               <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Star className="h-3 w-3" /> <strong>Exemplo:</strong>
+                                <Star className="h-3 w-3" /> <strong>Exemplo de Atividade:</strong>
                               </p>
                               <p className="text-xs text-gray-600 mt-0.5">{obj.exemplo_atividade}</p>
                             </div>
@@ -465,6 +519,10 @@ export default function PlanejamentoDiarioPage() {
             </div>
           ) : (
             <>
+              {(() => {
+                const professoraJaEscreveu = Boolean(templateAtivo.roteiro?.trim());
+                return (
+                  <>
               {/* Cabeçalho do template */}
               <div className={`rounded-2xl border-2 p-5 ${CAMPO_STYLES[templateAtivo.campo_id || 'outro']?.bg} ${CAMPO_STYLES[templateAtivo.campo_id || 'outro']?.border}`}>
                 <div className="flex items-start justify-between gap-4">
@@ -483,11 +541,13 @@ export default function PlanejamentoDiarioPage() {
                     </h2>
                     <p className="text-sm text-gray-600 mt-1">{templateAtivo.objetivo_bncc}</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={gerarComIA} disabled={gerandoIA}
-                    className="flex items-center gap-2 whitespace-nowrap">
-                    {gerandoIA ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {gerandoIA ? 'Gerando...' : 'Enriquecer com IA'}
-                  </Button>
+                  {professoraJaEscreveu && (
+                    <Button variant="outline" size="sm" onClick={gerarComIA} disabled={gerandoIA}
+                      className="flex items-center gap-2 whitespace-nowrap">
+                      {gerandoIA ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {gerandoIA ? 'Gerando...' : 'Receber sugestões da IA'}
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -546,6 +606,54 @@ export default function PlanejamentoDiarioPage() {
                 </div>
               </div>
 
+              {!professoraJaEscreveu && (
+                <Card className="border-dashed border-amber-300 bg-amber-50/60">
+                  <CardContent className="pt-4">
+                    <p className="text-sm font-medium text-amber-900">Apoio de IA disponível após escrita autoral</p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Escreva primeiro sua atividade no campo "Roteiro da Atividade". Depois, a ação para receber sugestões da IA será habilitada sem substituir seu texto.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {sugestoesIA && (
+                <Card className="border-2 border-violet-200 bg-violet-50/40">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2 text-violet-900">
+                      <Sparkles className="h-4 w-4" /> Sugestões editáveis da IA
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-semibold">Clareza da proposta</Label>
+                        <Textarea value={sugestoesIA.clareza} onChange={e => setSugestoesIA(prev => prev ? { ...prev, clareza: e.target.value } : prev)} className="mt-1 min-h-[110px]" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Alinhamento com a intencionalidade pedagógica</Label>
+                        <Textarea value={sugestoesIA.alinhamentoIntencionalidade} onChange={e => setSugestoesIA(prev => prev ? { ...prev, alinhamentoIntencionalidade: e.target.value } : prev)} className="mt-1 min-h-[110px]" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Enriquecimento pedagógico</Label>
+                        <Textarea value={sugestoesIA.enriquecimentoPedagogico} onChange={e => setSugestoesIA(prev => prev ? { ...prev, enriquecimentoPedagogico: e.target.value } : prev)} className="mt-1 min-h-[140px]" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold">Materiais complementares</Label>
+                        <Textarea value={sugestoesIA.materiaisComplementares} onChange={e => setSugestoesIA(prev => prev ? { ...prev, materiaisComplementares: e.target.value } : prev)} className="mt-1 min-h-[140px]" />
+                      </div>
+                      <div className="lg:col-span-2">
+                        <Label className="text-sm font-semibold">Adaptação inclusiva</Label>
+                        <Textarea value={sugestoesIA.adaptacaoInclusiva} onChange={e => setSugestoesIA(prev => prev ? { ...prev, adaptacaoInclusiva: e.target.value } : prev)} className="mt-1 min-h-[110px]" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-violet-900 mt-3">
+                      As sugestões acima são apenas apoio editável. O texto autoral da professora permanece preservado até ação explícita de edição manual.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Botões de ação */}
               <div className="flex gap-3 justify-end pt-4 border-t">
                 <Button variant="outline" onClick={() => setAba('calendario')}>
@@ -562,6 +670,9 @@ export default function PlanejamentoDiarioPage() {
                   {salvando ? 'Salvando...' : 'Salvar Planejamento'}
                 </Button>
               </div>
+                  </>
+                );
+              })()}
             </>
           )}
         </div>
