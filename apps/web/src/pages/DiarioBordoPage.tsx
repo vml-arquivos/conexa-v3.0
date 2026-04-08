@@ -510,7 +510,7 @@ export default function DiarioBordoPage() {
     status: string;
     // G3 FIX: campos da matriz pedagógica 2026
     camposExperiencia?: string[];
-    objetivosMatriz?: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }>;
+    objetivosMatriz?: Array<Record<string, any>>;
     intencionalidadeGeral?: string;
     recursos?: string;
     // Vínculo com matriz curricular — necessário para registrar ocorrências
@@ -937,7 +937,7 @@ export default function DiarioBordoPage() {
           let objectives = '';
           let activities = '';
           let camposExperiencia: string[] = [];
-          let objetivosMatriz: Array<{ objetivo_bncc?: string; intencionalidade?: string; campo?: string }> = [];
+          let objetivosMatriz: Array<Record<string, any>> = [];
           let intencionalidadeGeral = '';
           let recursos = '';
           try {
@@ -963,7 +963,7 @@ export default function DiarioBordoPage() {
               pedagogicalContent,
               'objetivoCurriculo',
               'curriculumAlignment',
-            ) || pickPlanningText(planHoje, 'curriculumAlignment', 'description');
+            ) || pickPlanningText(planHoje, 'curriculumAlignment');
             activities = pickPlanningText(
               day0.teacher,
               'atividade',
@@ -974,6 +974,12 @@ export default function DiarioBordoPage() {
             ) || pickPlanningText(planHoje, 'activities');
             camposExperiencia = pickPlanningList(pedagogicalContent, 'camposExperiencia');
             if (camposExperiencia.length === 0) {
+              camposExperiencia = parsedObjectives
+                .flatMap(obj => pickPlanningList(obj, 'camposExperiencia'))
+                .concat(parsedObjectives.map(obj => pickPlanningText(obj, 'campoExperiencia')).filter(Boolean))
+                .filter((campo, index, arr) => arr.indexOf(campo) === index);
+            }
+            if (camposExperiencia.length === 0) {
               const campoPrincipal = pickPlanningText(day0, 'campoExperiencia')
                 || pickPlanningText(pedagogicalContent, 'campoDeExperiencia', 'campoExperiencia');
               camposExperiencia = campoPrincipal ? [campoPrincipal] : [];
@@ -983,7 +989,9 @@ export default function DiarioBordoPage() {
               pedagogicalContent,
               'intencionalidadePedagogica',
               'intencionalidade',
-            ) || pickPlanningText(planHoje, 'description');
+            ) || parsedObjectives
+              .map(obj => pickPlanningText(obj, 'intencionalidadePedagogica', 'intencionalidade'))
+              .find(Boolean) || '';
             recursos = pickPlanningText(
               day0.teacher,
               'recursos',
