@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -80,13 +82,18 @@ function getDiasDoMes(ano: number, mes: number): Date[] {
 }
 
 // ─── Template padrão por campo ────────────────────────────────────────────────
-function gerarTemplateInicial(obj: ObjetivoDia, segmento: SegmentoKey): Partial<TemplatePlanejamento> {
+function gerarTemplateInicial(
+  obj: ObjetivoDia,
+  segmento: SegmentoKey,
+  incluirExemploAtividade = true,
+): Partial<TemplatePlanejamento> {
+  const exemploAtividade = incluirExemploAtividade ? obj.exemplo_atividade : '';
   const roteiros: Record<string, string> = {
-    'eu-outro-nos': `1. ACOLHIMENTO (15 min)\n   - Roda de conversa sobre o tema da semana: "${obj.semana_tema}"\n   - Canção de boas-vindas e chamada afetiva\n\n2. DESENVOLVIMENTO (30 min)\n   - Apresentação do objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - Atividade principal: ${obj.exemplo_atividade || 'Exploração livre mediada pelo professor'}\n   - Interação em duplas/grupos pequenos\n\n3. REGISTRO (10 min)\n   - Desenho ou colagem sobre a experiência\n   - Roda de conversa: "O que aprendemos hoje?"\n\n4. ENCERRAMENTO (5 min)\n   - Organização do espaço\n   - Momento de despedida`,
-    'corpo-gestos': `1. AQUECIMENTO CORPORAL (10 min)\n   - Música e movimento livre\n   - Exploração do espaço com o corpo\n\n2. ATIVIDADE PRINCIPAL (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Circuito de movimento e expressão corporal'}\n   - Variações: individual, duplas, coletivo\n\n3. RELAXAMENTO (10 min)\n   - Respiração e alongamento\n   - Conversa sobre as sensações do corpo\n\n4. REGISTRO (5 min)\n   - Fotografia das atividades\n   - Relato oral das crianças`,
-    'tracos-sons': `1. SENSIBILIZAÇÃO (10 min)\n   - Apreciação de obra de arte / música relacionada ao tema\n   - Exploração de materiais disponíveis\n\n2. CRIAÇÃO (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Produção artística individual e coletiva'}\n   - Uso de diferentes suportes e materiais\n\n3. APRECIAÇÃO (10 min)\n   - Exposição das produções\n   - Cada criança fala sobre sua obra\n\n4. ORGANIZAÇÃO (5 min)\n   - Cuidado com os materiais\n   - Guarda das produções`,
-    'escuta-fala': `1. RODA DE LEITURA (15 min)\n   - Leitura deleite pelo professor\n   - Exploração do livro/texto relacionado ao tema: "${obj.semana_tema}"\n\n2. DESENVOLVIMENTO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Contação de histórias e recontagem pelas crianças'}\n   - Dramatização / fantoches / recursos visuais\n\n3. PRODUÇÃO (10 min)\n   - Criação coletiva de história\n   - Ditado ao professor ou escrita espontânea\n\n4. PARTILHA (5 min)\n   - Apresentação das produções\n   - Conexão com experiências pessoais`,
-    'espacos-tempos': `1. INVESTIGAÇÃO (15 min)\n   - Levantamento de hipóteses sobre o fenômeno do dia\n   - Observação do ambiente / materiais\n\n2. EXPERIMENTAÇÃO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${obj.exemplo_atividade || 'Experimento científico ou exploração matemática'}\n   - Registro de observações\n\n3. SISTEMATIZAÇÃO (10 min)\n   - Organização dos dados coletados\n   - Comparação de resultados\n\n4. CONCLUSÃO (5 min)\n   - "O que descobrimos?"\n   - Conexão com a vida cotidiana`,
+    'eu-outro-nos': `1. ACOLHIMENTO (15 min)\n   - Roda de conversa sobre o tema da semana: "${obj.semana_tema}"\n   - Canção de boas-vindas e chamada afetiva\n\n2. DESENVOLVIMENTO (30 min)\n   - Apresentação do objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - Atividade principal: ${exemploAtividade || 'Exploração livre mediada pelo professor'}\n   - Interação em duplas/grupos pequenos\n\n3. REGISTRO (10 min)\n   - Desenho ou colagem sobre a experiência\n   - Roda de conversa: "O que aprendemos hoje?"\n\n4. ENCERRAMENTO (5 min)\n   - Organização do espaço\n   - Momento de despedida`,
+    'corpo-gestos': `1. AQUECIMENTO CORPORAL (10 min)\n   - Música e movimento livre\n   - Exploração do espaço com o corpo\n\n2. ATIVIDADE PRINCIPAL (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Circuito de movimento e expressão corporal'}\n   - Variações: individual, duplas, coletivo\n\n3. RELAXAMENTO (10 min)\n   - Respiração e alongamento\n   - Conversa sobre as sensações do corpo\n\n4. REGISTRO (5 min)\n   - Fotografia das atividades\n   - Relato oral das crianças`,
+    'tracos-sons': `1. SENSIBILIZAÇÃO (10 min)\n   - Apreciação de obra de arte / música relacionada ao tema\n   - Exploração de materiais disponíveis\n\n2. CRIAÇÃO (35 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Produção artística individual e coletiva'}\n   - Uso de diferentes suportes e materiais\n\n3. APRECIAÇÃO (10 min)\n   - Exposição das produções\n   - Cada criança fala sobre sua obra\n\n4. ORGANIZAÇÃO (5 min)\n   - Cuidado com os materiais\n   - Guarda das produções`,
+    'escuta-fala': `1. RODA DE LEITURA (15 min)\n   - Leitura deleite pelo professor\n   - Exploração do livro/texto relacionado ao tema: "${obj.semana_tema}"\n\n2. DESENVOLVIMENTO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Contação de histórias e recontagem pelas crianças'}\n   - Dramatização / fantoches / recursos visuais\n\n3. PRODUÇÃO (10 min)\n   - Criação coletiva de história\n   - Ditado ao professor ou escrita espontânea\n\n4. PARTILHA (5 min)\n   - Apresentação das produções\n   - Conexão com experiências pessoais`,
+    'espacos-tempos': `1. INVESTIGAÇÃO (15 min)\n   - Levantamento de hipóteses sobre o fenômeno do dia\n   - Observação do ambiente / materiais\n\n2. EXPERIMENTAÇÃO (30 min)\n   - Objetivo: ${obj.objetivo_curriculo || obj.objetivo_bncc}\n   - ${exemploAtividade || 'Experimento científico ou exploração matemática'}\n   - Registro de observações\n\n3. SISTEMATIZAÇÃO (10 min)\n   - Organização dos dados coletados\n   - Comparação de resultados\n\n4. CONCLUSÃO (5 min)\n   - "O que descobrimos?"\n   - Conexão com a vida cotidiana`,
   };
 
   return {
@@ -107,6 +114,13 @@ function gerarTemplateInicial(obj: ObjetivoDia, segmento: SegmentoKey): Partial<
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function PlanejamentoDiarioPage() {
+  const { user } = useAuth();
+  const userLevels = normalizeRoles(user);
+  const userTypes = normalizeRoleTypes(user);
+  const isCoordenacaoUnidade = userTypes.includes('UNIDADE_COORDENADOR_PEDAGOGICO') || userLevels.includes('UNIDADE');
+  const isCoordenacaoGeral = userLevels.includes('STAFF_CENTRAL') || userLevels.includes('MANTENEDORA') || userLevels.includes('DEVELOPER');
+  const podeVerExemploMatriz = isCoordenacaoUnidade || isCoordenacaoGeral;
+
   const hoje = new Date();
   const [dataSelecionada, setDataSelecionada] = useState<Date>(hoje);
   const [segmentoSelecionado, setSegmentoSelecionado] = useState<SegmentoKey>('EI01');
@@ -135,7 +149,7 @@ export default function PlanejamentoDiarioPage() {
   }
 
   function abrirTemplate(obj: ObjetivoDia) {
-    setTemplateAtivo(gerarTemplateInicial(obj, segmentoSelecionado));
+    setTemplateAtivo(gerarTemplateInicial(obj, segmentoSelecionado, podeVerExemploMatriz));
     setAba('template');
   }
 
@@ -390,21 +404,43 @@ export default function PlanejamentoDiarioPage() {
                           <p className={`text-xs font-medium ${style.text} mb-1`}>
                             {obj.semana_tema && <span className="italic">"{obj.semana_tema}" — </span>}
                           </p>
-                          <p className="text-sm text-gray-700 font-medium leading-snug">{obj.objetivo_bncc}</p>
+
+                          <div className="mt-2 space-y-2">
+                            <div>
+                              <p className="text-xs text-gray-500"><strong>Campo de Experiência:</strong></p>
+                              <p className="text-xs text-gray-600 mt-0.5">{obj.campo_label}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <Target className="h-3 w-3" /> <strong>Objetivo BNCC:</strong>
+                              </p>
+                              <p className="text-sm text-gray-700 font-medium leading-snug mt-0.5">{obj.objetivo_bncc}</p>
+                            </div>
+
+                            {obj.objetivo_curriculo && (
+                              <div>
+                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                  <BookOpen className="h-3 w-3" /> <strong>Objetivo do Currículo:</strong>
+                                </p>
+                                <p className="text-xs text-gray-600 mt-0.5">{obj.objetivo_curriculo}</p>
+                              </div>
+                            )}
+                          </div>
 
                           {obj.intencionalidade && (
                             <div className="mt-2 pt-2 border-t border-current/10">
                               <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Lightbulb className="h-3 w-3" /> <strong>Intencionalidade:</strong>
+                                <Lightbulb className="h-3 w-3" /> <strong>Intencionalidade Pedagógica:</strong>
                               </p>
                               <p className="text-xs text-gray-600 mt-0.5">{obj.intencionalidade}</p>
                             </div>
                           )}
 
-                          {obj.exemplo_atividade && (
+                          {podeVerExemploMatriz && obj.exemplo_atividade && (
                             <div className="mt-2">
                               <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Star className="h-3 w-3" /> <strong>Exemplo:</strong>
+                                <Star className="h-3 w-3" /> <strong>Exemplo de Atividade:</strong>
                               </p>
                               <p className="text-xs text-gray-600 mt-0.5">{obj.exemplo_atividade}</p>
                             </div>
