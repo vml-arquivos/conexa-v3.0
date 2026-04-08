@@ -173,6 +173,31 @@ function pickPlanningList(source: Record<string, any> | null | undefined, ...key
   return [] as string[];
 }
 
+function parsePlanningPayload(value: unknown) {
+  if (!value) return {} as Record<string, any>;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, any>;
+    } catch {
+      return {} as Record<string, any>;
+    }
+  }
+  return typeof value === 'object' ? value as Record<string, any> : {} as Record<string, any>;
+}
+
+function normalizePlanningObjectives(raw: unknown) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [] as any[];
+}
+
 function summarizePlanningObservation(planningTitle: string | undefined, observation: string) {
   const texto = observation.trim();
   if (!texto) return '';
@@ -918,31 +943,56 @@ export default function DiarioBordoPage() {
           try {
             const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
             const planHoje = detailRes.data;
-            let desc: any = {};
-            try {
-              desc = typeof planHoje.content === 'string'
-                ? JSON.parse(planHoje.content)
-                : planHoje.content ?? {};
-            } catch {
-              desc = {};
+            const pedagogicalContent = parsePlanningPayload(
+              planHoje.pedagogicalContent
+              ?? planHoje.description
+              ?? planHoje.content,
+            );
+            const day0 = pedagogicalContent.days?.[0] ?? {};
+            const parsedObjectives = normalizePlanningObjectives(
+              day0.objectives
+              ?? planHoje.objectives
+              ?? pedagogicalContent.objectives,
+            );
+
+            objectives = pickPlanningText(
+              day0,
+              'objetivoCurriculo',
+              'objetivoCurriculoDF',
+            ) || pickPlanningText(
+              pedagogicalContent,
+              'objetivoCurriculo',
+              'curriculumAlignment',
+            ) || pickPlanningText(planHoje, 'curriculumAlignment', 'description');
+            activities = pickPlanningText(
+              day0.teacher,
+              'atividade',
+            ) || pickPlanningText(
+              pedagogicalContent,
+              'activities',
+              'atividade',
+            ) || pickPlanningText(planHoje, 'activities');
+            camposExperiencia = pickPlanningList(pedagogicalContent, 'camposExperiencia');
+            if (camposExperiencia.length === 0) {
+              const campoPrincipal = pickPlanningText(day0, 'campoExperiencia')
+                || pickPlanningText(pedagogicalContent, 'campoDeExperiencia', 'campoExperiencia');
+              camposExperiencia = campoPrincipal ? [campoPrincipal] : [];
             }
-
-            const day0 = desc.days?.[0] ?? {};
-
-            let parsedObjectives: any[] = [];
-            try {
-              const raw = day0.objectives ?? planHoje.objectives ?? [];
-              parsedObjectives = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            } catch {
-              parsedObjectives = [];
-            }
-
-            objectives = '';
-            activities = day0.teacher?.atividade ?? '';
-            camposExperiencia = Array.isArray(desc.camposExperiencia) ? desc.camposExperiencia : [];
-            objetivosMatriz = Array.isArray(parsedObjectives) ? parsedObjectives : [];
-            intencionalidadeGeral = '';
-            recursos = day0.teacher?.recursos ?? '';
+            objetivosMatriz = normalizePlanningObjectives(parsedObjectives);
+            intencionalidadeGeral = pickPlanningText(
+              pedagogicalContent,
+              'intencionalidadePedagogica',
+              'intencionalidade',
+            ) || pickPlanningText(planHoje, 'description');
+            recursos = pickPlanningText(
+              day0.teacher,
+              'recursos',
+            ) || pickPlanningText(
+              pedagogicalContent,
+              'materials',
+              'resources',
+              'recursos',
+            ) || pickPlanningText(planHoje, 'resources');
           } catch {
             // Detalhes não críticos — continua com dados básicos
           }
@@ -1581,6 +1631,7 @@ export default function DiarioBordoPage() {
                     {planejamentoHoje.objetivosMatriz!.map((obj, i) => {
                       const fields = getObjectiveCardFields(obj as Record<string, any>);
                       if (!hasObjectiveCardContent(fields, planejamentoHoje.activities, planejamentoHoje.recursos)) return null;
+                      const showGeneralIntencionalidade = !fields.intencionalidade && Boolean(planejamentoHoje.intencionalidadeGeral);
                       return (
                         <div key={i} className="rounded-xl border border-indigo-200 bg-white/80 p-3 space-y-3">
                           {fields.campoExperiencia && (
@@ -1607,6 +1658,12 @@ export default function DiarioBordoPage() {
                               <p className="text-sm text-fuchsia-950 whitespace-pre-line">{fields.intencionalidade}</p>
                             </div>
                           )}
+                          {showGeneralIntencionalidade && (
+                            <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
+                              <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                              <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
+                            </div>
+                          )}
                           {planejamentoHoje.activities && (
                             <div>
                               <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
@@ -1629,6 +1686,12 @@ export default function DiarioBordoPage() {
                       <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
                         <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
                         <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.objectives}</p>
+                      </div>
+                    )}
+                    {planejamentoHoje.intencionalidadeGeral && (
+                      <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
+                        <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                        <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
                       </div>
                     )}
                     {planejamentoHoje.activities && (
