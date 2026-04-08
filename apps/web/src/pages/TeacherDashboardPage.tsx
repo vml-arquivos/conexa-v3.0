@@ -114,6 +114,14 @@ const ACOES_RAPIDAS = [
 ];
 
 // ─── Componente de Upload de Foto ─────────────────────────────────────────────
+function extractUploadedPhotoUrl(payload: any): string | undefined {
+  return resolveChildPhotoUrl(payload)
+    ?? resolveChildPhotoUrl(payload?.data)
+    ?? resolveChildPhotoUrl(payload?.child)
+    ?? (typeof payload?.url === 'string' ? payload.url.trim() : undefined)
+    ?? (typeof payload?.data?.url === 'string' ? payload.data.url.trim() : undefined);
+}
+
 function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string, url: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -128,16 +136,25 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
       const formData = new FormData();
       formData.append('file', file);
       formData.append('childId', crianca.id);
-      const res = await http.post(`/children/${crianca.id}/photo`, formData);
-      const url = res.data?.photoUrl || res.data?.url;
-      if (url) { onUpload(crianca.id, url); toast.success(`Foto de ${crianca.firstName} atualizada!`); }
+      const res = await http.post(`/children/${crianca.id}/photo`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const url = extractUploadedPhotoUrl(res.data);
+      if (!url) {
+        throw new Error('Resposta de upload sem photoUrl');
+      }
+      onUpload(crianca.id, url);
+      toast.success(`Foto de ${crianca.firstName} atualizada!`);
     } catch (error) {
       if (isAuthExpiredError(error)) {
         toast.error('Sua sessão expirou. Faça login novamente para salvar a foto.');
       } else {
-        toast.error(`Não foi possível salvar a foto de ${crianca.firstName}.`);
+        toast.error(`Não foi possível salvar a foto de ${crianca.firstName}. Tente novamente.`);
       }
-    } finally { setUploading(false); }
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
   }
 
   return (
