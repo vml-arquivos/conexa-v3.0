@@ -23,6 +23,7 @@ import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { ChildAvatar } from '../components/children/ChildAvatar';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -298,10 +299,10 @@ function getPlanningEmptyText() {
 
 function getObjectiveCardFields(obj: Record<string, any>) {
   return {
-    camposExperiencia: pickPlanningList(obj, 'camposExperiencia'),
-    campoExperiencia: pickPlanningText(obj, 'campoExperiencia'),
-    objetivoBNCC: pickPlanningText(obj, 'objetivoBNCC'),
-    objetivoCurriculo: pickPlanningText(obj, 'objetivoCurriculo'),
+    camposExperiencia: pickPlanningList(obj, 'camposExperiencia', 'campos_de_experiencia'),
+    campoExperiencia: pickPlanningText(obj, 'campoExperiencia', 'campo', 'campo_de_experiencia'),
+    objetivoBNCC: pickPlanningText(obj, 'objetivoBNCC', 'objetivo_bncc'),
+    objetivoCurriculo: pickPlanningText(obj, 'objetivoCurriculo', 'objetivoCurriculoDF', 'objetivo_curriculo'),
     intencionalidade: pickPlanningText(obj, 'intencionalidadePedagogica', 'intencionalidade'),
   };
 }
@@ -315,6 +316,150 @@ function hasObjectiveCardContent(fields: ReturnType<typeof getObjectiveCardField
     || fields.intencionalidade
     || atividade
     || recursos,
+  );
+}
+
+function normalizePlanningParagraphs(content?: string) {
+  if (!content) return [] as string[];
+  const normalized = content.replace(/\r/g, '').trim();
+  if (!normalized) return [] as string[];
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  if (paragraphs.length > 1) return paragraphs;
+
+  return normalized
+    .split('\n')
+    .map(part => part.trim())
+    .filter(Boolean);
+}
+
+function getPlanningPreviewText(content?: string, maxLength = 240) {
+  const normalized = (content ?? '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength).trimEnd()}...`
+    : normalized;
+}
+
+function isPlanningExpandable(content?: string, maxLength = 240) {
+  const normalized = (content ?? '').replace(/\s+/g, ' ').trim();
+  return normalized.length > maxLength;
+}
+
+function PlanningTextSection({
+  title,
+  content,
+  tone = 'indigo',
+  expanded = false,
+  onToggle,
+}: {
+  title: string;
+  content?: string;
+  tone?: 'indigo' | 'fuchsia';
+  expanded?: boolean;
+  onToggle?: () => void;
+}) {
+  if (!content?.trim()) return null;
+
+  const paragraphs = normalizePlanningParagraphs(content);
+  const expandable = isPlanningExpandable(content);
+  const labelClassName = tone === 'fuchsia'
+    ? 'text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1'
+    : 'text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1';
+  const textClassName = tone === 'fuchsia'
+    ? 'text-sm text-fuchsia-950 leading-6 break-words'
+    : 'text-sm text-indigo-900 leading-6 break-words';
+  const buttonClassName = tone === 'fuchsia'
+    ? 'text-xs font-semibold text-fuchsia-700 hover:text-fuchsia-900'
+    : 'text-xs font-semibold text-indigo-700 hover:text-indigo-900';
+
+  return (
+    <div>
+      <p className={labelClassName}>{title}</p>
+      {expanded ? (
+        <div className="space-y-2">
+          {paragraphs.map((paragraph, index) => (
+            <div key={`${title}-${index}`} className="rounded-lg border border-black/5 bg-white/60 px-3 py-2">
+              <p className={`${textClassName} whitespace-pre-line`}>{paragraph}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={`${textClassName} whitespace-pre-line`}>{getPlanningPreviewText(content)}</p>
+      )}
+      {expandable && onToggle && (
+        <button type="button" onClick={onToggle} className={`mt-2 inline-flex items-center gap-1 ${buttonClassName}`}>
+          {expanded ? 'Ver menos' : 'Ver mais'}
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CompactChildMultiSelect({
+  criancas,
+  selecionadas,
+  onChange,
+  label = 'Criança(s) envolvida(s)',
+  helperText,
+}: {
+  criancas: Crianca[];
+  selecionadas: string[];
+  onChange: (ids: string[]) => void;
+  label?: string;
+  helperText?: string;
+}) {
+  const criancasOrdenadas = criancas
+    .slice()
+    .sort((a, b) => getCriancaNome(a).localeCompare(getCriancaNome(b), 'pt-BR'));
+
+  return (
+    <div>
+      <Label className="text-sm font-medium text-gray-700 mb-2 block">{label}</Label>
+      {criancas.length === 0 ? (
+        <p className="text-xs text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
+      ) : (
+        <div className="space-y-3">
+          <select
+            multiple
+            value={selecionadas}
+            onChange={e => {
+              const ids = Array.from(e.target.selectedOptions).map(option => option.value);
+              onChange(ids);
+            }}
+            className="w-full min-h-28 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            {criancasOrdenadas.map(crianca => (
+              <option key={crianca.id} value={crianca.id}>{getCriancaNome(crianca)}</option>
+            ))}
+          </select>
+          {helperText && <p className="text-xs text-gray-500">{helperText}</p>}
+          {selecionadas.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {criancasOrdenadas
+                .filter(crianca => selecionadas.includes(crianca.id))
+                .map(crianca => (
+                  <button
+                    key={crianca.id}
+                    type="button"
+                    onClick={() => onChange(selecionadas.filter(id => id !== crianca.id))}
+                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:border-indigo-300 hover:bg-indigo-100"
+                    title={`Remover ${getCriancaNome(crianca)} da seleção`}
+                  >
+                    <span className="truncate max-w-[180px]">{getCriancaNome(crianca)}</span>
+                    <span className="text-indigo-500">×</span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -401,67 +546,6 @@ function getAvaliacaoTitle() {
   return 'Avaliação do Plano de Aula';
 }
 
-// ─── Seletor de Criança por Foto ──────────────────────────────────────────────
-function SeletorCrianca({
-  criancas,
-  selecionadas,
-  onToggle,
-  multiplo = false,
-  label = 'Criança(s) envolvida(s)',
-}: {
-  criancas: Crianca[];
-  selecionadas: string[];
-  onToggle: (id: string) => void;
-  multiplo?: boolean;
-  label?: string;
-}) {
-  return (
-    <div>
-      <Label className="text-sm font-medium text-gray-700 mb-2 block">{label} (opcional)</Label>
-      {criancas.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">Nenhuma criança cadastrada na turma</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {criancas.map(c => {
-            const sel = selecionadas.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onToggle(c.id)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${sel ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 bg-white hover:border-blue-300'}`}
-                title={`${c.firstName} ${c.lastName}`}
-              >
-                <ChildAvatar
-                  child={c}
-                  alt={c.firstName}
-                  sizeClassName="w-10 h-10"
-                  imageClassName="rounded-full object-cover border-2 border-white shadow"
-                  fallbackClassName="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-white shadow"
-                  iconClassName="w-6 h-6 text-blue-400"
-                />
-                <span className={`text-xs font-medium leading-tight text-center max-w-[60px] truncate ${sel ? 'text-blue-700' : 'text-gray-600'}`}>
-                  {c.firstName}
-                </span>
-                {sel && <span className="text-blue-500 text-xs">✓</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {!multiplo && selecionadas.length > 0 && (
-        <button
-          type="button"
-          onClick={() => onToggle(selecionadas[0])}
-          className="mt-1 text-xs text-gray-400 hover:text-red-400 flex items-center gap-1"
-        >
-          <X className="h-3 w-3" /> Remover seleção
-        </button>
-      )}
-    </div>
-  );
-}
-
 // ─── Componente Principal ─────────────────────────────────────────────────────────────
 export default function DiarioBordoPage() {
   const { user } = useAuth();
@@ -494,6 +578,12 @@ export default function DiarioBordoPage() {
   // Dados da turma e professor
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
+  const [draftRegistry, setDraftRegistry] = useLocalStorage<Record<string, {
+    form: ReturnType<typeof getInitialDiaryForm>;
+    microgestoForm: { tipos: string[]; descricao: string; campo: string; horario: string; criancasSelecionadas: string[] };
+    avaliacaoIndividualForm: ReturnType<typeof getInitialAvaliacaoIndividualForm>;
+    savedAt: string;
+  }>>('diario-bordo-drafts', {});
   // FIX P0: estado de loading/erro da turma para evitar spinner infinito
   const [loadingTurma, setLoadingTurma] = useState(true);
   const [turmaErro, setTurmaErro] = useState<string | null>(null);
@@ -545,6 +635,9 @@ export default function DiarioBordoPage() {
   const [obsForm, setObsForm] = useState(() => resetObsFormState());
   const [avaliacaoIndividualForm, setAvaliacaoIndividualForm] = useState(() => getInitialAvaliacaoIndividualForm());
   const [savingAvaliacaoIndividual, setSavingAvaliacaoIndividual] = useState(false);
+  const [expandedPlanningSections, setExpandedPlanningSections] = useState<Record<string, boolean>>({});
+  const draftKey = `diario:${currentUserId || 'anon'}:${classroomId || classroomIdFromQuery || 'sem-turma'}:${form.date}`;
+  const currentDraft = draftRegistry[draftKey] ?? null;
 
   useEffect(() => {
     loadDiarios();
@@ -1163,6 +1256,44 @@ export default function DiarioBordoPage() {
     }));
   }
 
+  function salvarRascunhoDiario() {
+    setDraftRegistry({
+      ...draftRegistry,
+      [draftKey]: {
+        form,
+        microgestoForm,
+        avaliacaoIndividualForm,
+        savedAt: new Date().toISOString(),
+      },
+    });
+    toast.success('Rascunho salvo com sucesso. Você pode continuar depois.');
+  }
+
+  function continuarRascunhoDiario() {
+    if (!currentDraft) {
+      toast.error('Nenhum rascunho disponível para esta turma e data.');
+      return;
+    }
+
+    setForm({ ...getInitialDiaryForm(dateFromQuery), ...currentDraft.form, date: currentDraft.form?.date || form.date });
+    setMicrogestoForm({ ...currentDraft.microgestoForm });
+    setAvaliacaoIndividualForm({ ...getInitialAvaliacaoIndividualForm(), ...currentDraft.avaliacaoIndividualForm });
+    setAba('novo');
+    toast.success('Rascunho carregado para continuar a edição.');
+  }
+
+  function descartarRascunhoDiario() {
+    if (!currentDraft) {
+      toast.error('Nenhum rascunho disponível para descartar.');
+      return;
+    }
+
+    const nextDraftRegistry = { ...draftRegistry };
+    delete nextDraftRegistry[draftKey];
+    setDraftRegistry(nextDraftRegistry);
+    toast.success('Rascunho descartado.');
+  }
+
   async function salvarDiario() {
     if (!chamadaCarregada) {
       toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
@@ -1270,9 +1401,13 @@ export default function DiarioBordoPage() {
         });
       }
       toast.success('Diário de Bordo salvo!');
+      const nextDraftRegistry = { ...draftRegistry };
+      delete nextDraftRegistry[draftKey];
+      setDraftRegistry(nextDraftRegistry);
       setAba('lista');
       loadDiarios();
       setForm(getInitialDiaryForm(dateFromQuery));
+      setMicrogestoForm({ tipos: ['ESCUTA'], descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
       setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
@@ -1285,6 +1420,25 @@ export default function DiarioBordoPage() {
     if (busca && !new Date(d.date || d.createdAt).toLocaleDateString('pt-BR').includes(busca) && !(d.momentoDestaque || '').toLowerCase().includes(busca.toLowerCase())) return false;
     return true;
   });
+
+  const planningObjectiveCards = (planejamentoHoje?.objetivosMatriz ?? [])
+    .map((obj, index) => ({ index, ...getObjectiveCardFields(obj as Record<string, any>) }))
+    .filter(card => hasObjectiveCardContent(card, undefined, undefined));
+
+  const planningCamposExperiencia = Array.from(new Set([
+    ...(planejamentoHoje?.camposExperiencia ?? []),
+    ...planningObjectiveCards.flatMap(card => card.camposExperiencia),
+    ...planningObjectiveCards
+      .map(card => card.campoExperiencia)
+      .filter((campo): campo is string => Boolean(campo && campo.trim())),
+  ].map(campo => campo.trim()).filter(Boolean)));
+
+  const planningIntencionalidades = Array.from(new Set([
+    ...planningObjectiveCards
+      .map(card => card.intencionalidade)
+      .filter((item): item is string => Boolean(item && item.trim())),
+    ...(planejamentoHoje?.intencionalidadeGeral?.trim() ? [planejamentoHoje.intencionalidadeGeral.trim()] : []),
+  ]));
 
   return (
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
@@ -1452,7 +1606,28 @@ export default function DiarioBordoPage() {
 
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-5 max-w-4xl">
+          {currentDraft && (
+            <Card className="border border-emerald-200 bg-emerald-50/70 shadow-sm">
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-emerald-900">Rascunho disponível para esta turma e data</p>
+                  <p className="text-xs text-emerald-700">
+                    Último salvamento: {new Date(currentDraft.savedAt).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" variant="outline" onClick={continuarRascunhoDiario} className="border-emerald-300 text-emerald-800 hover:bg-emerald-100">
+                    Continuar rascunho
+                  </Button>
+                  <Button type="button" variant="outline" onClick={descartarRascunhoDiario} className="border-red-200 text-red-700 hover:bg-red-50">
+                    Descartar rascunho
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {!chamadaCarregada && (
             <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
@@ -1623,98 +1798,96 @@ export default function DiarioBordoPage() {
                 <p className="text-sm font-semibold text-indigo-900 mt-1">{planejamentoHoje.title}</p>
               </CardHeader>
               <CardContent className="space-y-4 pt-0">
-                {(planejamentoHoje.camposExperiencia ?? []).length > 0 && (
-                  <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
+                {planningCamposExperiencia.length > 0 && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-2">Campo de Experiência</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {planejamentoHoje.camposExperiencia!.map((campo, i) => (
-                        <span key={i} className="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">{campo}</span>
+                      {planningCamposExperiencia.map((campo, i) => (
+                        <span key={i} className="max-w-full break-words rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
+                          {campo}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {(planejamentoHoje.objetivosMatriz ?? []).length > 0 ? (
-                  <div className="space-y-3">
-                    {planejamentoHoje.objetivosMatriz!.map((obj, i) => {
-                      const fields = getObjectiveCardFields(obj as Record<string, any>);
-                      if (!hasObjectiveCardContent(fields, planejamentoHoje.activities, planejamentoHoje.recursos)) return null;
-                      const showGeneralIntencionalidade = !fields.intencionalidade && Boolean(planejamentoHoje.intencionalidadeGeral);
-                      return (
-                        <div key={i} className="rounded-xl border border-indigo-200 bg-white/80 p-3 space-y-3">
-                          {fields.campoExperiencia && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
-                              <p className="text-sm font-medium text-indigo-900 whitespace-pre-line">{fields.campoExperiencia}</p>
+                {(planningObjectiveCards.length > 0 || planejamentoHoje.objectives) && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4 space-y-3">
+                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide">Objetivos</p>
+                    {planningObjectiveCards.length > 0 ? (
+                      <div className="space-y-3">
+                        {planningObjectiveCards.map(card => (
+                          <div key={card.index} className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="inline-flex items-center rounded-full bg-indigo-200 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+                                Objetivo {card.index + 1}
+                              </span>
                             </div>
-                          )}
-                          {fields.objetivoBNCC && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.objetivoBNCC}</p>
-                            </div>
-                          )}
-                          {fields.objetivoCurriculo && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.objetivoCurriculo}</p>
-                            </div>
-                          )}
-                          {fields.intencionalidade && (
-                            <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
-                              <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
-                              <p className="text-sm text-fuchsia-950 whitespace-pre-line">{fields.intencionalidade}</p>
-                            </div>
-                          )}
-                          {showGeneralIntencionalidade && (
-                            <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
-                              <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
-                              <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
-                            </div>
-                          )}
-                          {planejamentoHoje.activities && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
-                            </div>
-                          )}
-                          {planejamentoHoje.recursos && (
-                            <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Recursos / Materiais</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {card.objetivoBNCC && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
+                                <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{card.objetivoBNCC}</p>
+                              </div>
+                            )}
+                            {card.objetivoCurriculo && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                                <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{card.objetivoCurriculo}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
+                        <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{planejamentoHoje.objectives}</p>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    {planejamentoHoje.objectives && (
-                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
-                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.objectives}</p>
-                      </div>
-                    )}
-                    {planejamentoHoje.intencionalidadeGeral && (
-                      <div className="rounded-lg border border-fuchsia-200 bg-fuchsia-50 p-3">
-                        <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
-                        <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
-                      </div>
-                    )}
-                    {planejamentoHoje.activities && (
-                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
-                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
-                      </div>
-                    )}
-                    {planejamentoHoje.recursos && (
-                      <div className="rounded-xl border border-indigo-200 bg-white/70 p-3">
-                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
-                        <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
-                      </div>
-                    )}
-                  </>
+                )}
+
+                {planningIntencionalidades.length > 0 && (
+                  <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/80 p-3 sm:p-4 space-y-3">
+                    <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide">Intencionalidade Pedagógica</p>
+                    <div className="space-y-3">
+                      {planningIntencionalidades.map((intencionalidade, index) => {
+                        const sectionKey = `intencionalidade-${index}`;
+                        return (
+                          <div key={sectionKey} className="rounded-lg border border-fuchsia-100 bg-white/70 p-3">
+                            <PlanningTextSection
+                              title={planningIntencionalidades.length > 1 ? `Intencionalidade ${index + 1}` : 'Intencionalidade Pedagógica'}
+                              content={intencionalidade}
+                              tone="fuchsia"
+                              expanded={Boolean(expandedPlanningSections[sectionKey])}
+                              onToggle={() => setExpandedPlanningSections(current => ({ ...current, [sectionKey]: !current[sectionKey] }))}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {planejamentoHoje.activities && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                    <PlanningTextSection
+                      title="Desenvolvimento da Atividade"
+                      content={planejamentoHoje.activities}
+                      expanded={Boolean(expandedPlanningSections.activities)}
+                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, activities: !current.activities }))}
+                    />
+                  </div>
+                )}
+
+                {planejamentoHoje.recursos && (
+                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                    <PlanningTextSection
+                      title="Recursos / Materiais"
+                      content={planejamentoHoje.recursos}
+                      expanded={Boolean(expandedPlanningSections.resources)}
+                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, resources: !current.resources }))}
+                    />
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1779,12 +1952,12 @@ export default function DiarioBordoPage() {
                   </div>
                 </div>
 
-                <SeletorCrianca
+                <CompactChildMultiSelect
                   criancas={criancas}
                   selecionadas={microgestoForm.criancasSelecionadas}
-                  onToggle={toggleCriancaMicrogesto}
-                  multiplo={true}
+                  onChange={ids => setMicrogestoForm(f => ({ ...f, criancasSelecionadas: ids }))}
                   label="Criança(s) envolvida(s)"
+                  helperText="Seleção compacta para reduzir poluição visual no diário, inclusive no mobile."
                 />
 
                 <div>
@@ -1966,50 +2139,13 @@ export default function DiarioBordoPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <Label>Criança(s) da turma</Label>
-                    {criancas.length === 0 ? (
-                      <p className="text-xs text-gray-400 mt-2 italic">Nenhuma criança disponível para seleção.</p>
-                    ) : (
-                      <div className="space-y-3 mt-2">
-                        <select
-                          multiple
-                          value={avaliacaoIndividualForm.childIds}
-                          onChange={e => {
-                            const selecionadas = Array.from(e.target.selectedOptions).map(option => option.value);
-                            setAvaliacaoIndividualForm(f => ({ ...f, childIds: selecionadas }));
-                          }}
-                          className="w-full min-h-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                        >
-                          {criancas
-                            .slice()
-                            .sort((a, b) => getCriancaNome(a).localeCompare(getCriancaNome(b), 'pt-BR'))
-                            .map(c => (
-                              <option key={c.id} value={c.id}>{getCriancaNome(c)}</option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-gray-500">Use Ctrl/Cmd para selecionar mais de uma criança. A seleção permanece registrada abaixo de forma compacta para manter a área mais limpa.</p>
-                        {avaliacaoIndividualForm.childIds.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {criancas
-                              .filter(c => avaliacaoIndividualForm.childIds.includes(c.id))
-                              .map(c => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => toggleCriancaAvaliacaoIndividual(c.id)}
-                                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700 hover:border-sky-300 hover:bg-sky-100"
-                                  title={`Remover ${getCriancaNome(c)} da seleção`}
-                                >
-                                  <span className="truncate max-w-[140px]">{getCriancaNome(c)}</span>
-                                  <span className="text-sky-500">×</span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <CompactChildMultiSelect
+                    criancas={criancas}
+                    selecionadas={avaliacaoIndividualForm.childIds}
+                    onChange={ids => setAvaliacaoIndividualForm(f => ({ ...f, childIds: ids }))}
+                    label="Criança(s) da turma"
+                    helperText="Seleção compacta para observação individual, reduzindo a repetição visual de avatares no diário."
+                  />
 
                   <div>
                     <Label>Observação individual breve</Label>
@@ -2070,12 +2206,15 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
-            <Button onClick={salvarDiario} disabled={saving} className="flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
+              <Save className="mr-2 h-4 w-4" /> Salvar rascunho
+            </Button>
+            <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
               {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Guardar Diário do Dia
             </Button>
-            <Button variant="outline" onClick={() => setAba('lista')}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
           </div>
         </div>
       )}
