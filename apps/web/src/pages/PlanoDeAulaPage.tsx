@@ -179,13 +179,22 @@ function CardEntrada({ entrada, expanded, onToggle, ehProfessor }: {
       {/* Conteúdo expandido */}
       {expanded && (
         <div className="px-4 pb-5 border-t border-gray-100 pt-4 space-y-5">
+          {/* Campo de Experiência */}
+          <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+            <div className="flex items-center gap-2 mb-2">
+              <Layers className="h-4 w-4 text-indigo-600 flex-shrink-0" />
+              <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">Campo de Experiência</span>
+            </div>
+            <p className="text-sm text-indigo-900 leading-relaxed">{entrada.campo_label || 'Não cadastrado'}</p>
+          </div>
+
           {/* Objetivo BNCC */}
           <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
             <div className="flex items-center gap-2 mb-2">
               <Target className="h-4 w-4 text-blue-600 flex-shrink-0" />
               <span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Objetivo da BNCC — Transcrição Literal</span>
             </div>
-            <p className="text-sm text-blue-900 leading-relaxed">{entrada.objetivo_bncc}</p>
+            <p className="text-sm text-blue-900 leading-relaxed">{entrada.objetivo_bncc || 'Não cadastrado'}</p>
           </div>
 
           {/* Objetivo Currículo em Movimento */}
@@ -194,7 +203,7 @@ function CardEntrada({ entrada, expanded, onToggle, ehProfessor }: {
               <BookMarked className="h-4 w-4 text-purple-600 flex-shrink-0" />
               <span className="text-xs font-bold text-purple-700 uppercase tracking-wide">Objetivo do Currículo em Movimento</span>
             </div>
-            <p className="text-sm text-purple-900 leading-relaxed">{entrada.objetivo_curriculo}</p>
+            <p className="text-sm text-purple-900 leading-relaxed">{entrada.objetivo_curriculo || 'Não cadastrado'}</p>
           </div>
 
           {/* Intencionalidade Pedagógica */}
@@ -203,7 +212,7 @@ function CardEntrada({ entrada, expanded, onToggle, ehProfessor }: {
               <Lightbulb className="h-4 w-4 text-amber-600 flex-shrink-0" />
               <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Intencionalidade Pedagógica</span>
             </div>
-            <p className="text-sm text-amber-900 leading-relaxed">{entrada.intencionalidade}</p>
+            <p className="text-sm text-amber-900 leading-relaxed">{entrada.intencionalidade || 'Não cadastrada'}</p>
           </div>
 
           {/* Exemplos de Atividade — Visível apenas para Coordenação/Mantenedora */}

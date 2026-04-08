@@ -589,39 +589,43 @@ export default function PlanoDeAulaListaPage() {
                             {day.objectives?.length > 0 && (
                               <div>
                                 <p className="text-xs font-semibold text-gray-400 uppercase mb-1">Objetivos da Matriz 2026</p>
-                                {day.objectives.map((obj: any, i: number) => (
-                                  <div key={i} className="text-xs text-gray-700 border border-indigo-200 rounded-lg overflow-hidden mb-2">
-                                    <div className="px-2 py-1 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
-                                      <span className="font-bold text-indigo-700 uppercase tracking-wide">{obj.campoExperiencia?.replace(/_/g, ' ')}</span>
-                                      {obj.codigoBNCC && <span className="ml-auto font-mono text-gray-500">{obj.codigoBNCC}</span>}
-                                    </div>
-                                    <div className="px-2 py-1.5 space-y-1.5 bg-white">
-                                      <div>
-                                        <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo BNCC</p>
-                                        <p className="leading-relaxed">{obj.objetivoBNCC}</p>
+                                {day.objectives.map((obj: any, i: number) => {
+                                  const campoExperiencia = obj.campoExperiencia?.replace(/_/g, ' ')?.trim() || 'Não cadastrado';
+                                  const objetivoBNCC = obj.objetivoBNCC?.trim() || 'Não cadastrado';
+                                  const objetivoCurriculo = obj.objetivoCurriculoDF?.trim() || 'Não cadastrado';
+                                  const intencionalidade = obj.intencionalidadePedagogica?.trim() || 'Não cadastrada';
+
+                                  return (
+                                    <div key={i} className="border border-indigo-200 rounded-xl overflow-hidden mb-2 bg-white shadow-sm">
+                                      <div className="px-3 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.18em]">Campo de Experiência</span>
+                                        <span className="text-xs font-semibold text-indigo-900 break-words flex-1 min-w-[180px]">{campoExperiencia}</span>
+                                        {obj.codigoBNCC && <span className="text-[11px] font-mono text-indigo-700 bg-white/80 rounded-full px-2 py-0.5">{obj.codigoBNCC}</span>}
                                       </div>
-                                      {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
+                                      <div className="px-3 py-3 space-y-3 bg-white text-xs text-gray-700">
                                         <div>
-                                          <p className="font-semibold text-gray-400 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Objetivo do Currículo — DF</p>
-                                          <p className="leading-relaxed">{obj.objetivoCurriculoDF}</p>
+                                          <p className="font-semibold text-blue-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Objetivo da BNCC</p>
+                                          <p className="leading-relaxed text-gray-800">{objetivoBNCC}</p>
                                         </div>
-                                      )}
-                                      {obj.intencionalidadePedagogica && (
-                                        <div className="bg-indigo-50 rounded px-2 py-1">
-                                          <p className="font-semibold text-indigo-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>🎯 Intencionalidade Pedagógica</p>
-                                          <p className="text-indigo-800 leading-relaxed">{obj.intencionalidadePedagogica}</p>
+                                        <div>
+                                          <p className="font-semibold text-teal-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Objetivo do Currículo</p>
+                                          <p className="leading-relaxed text-gray-800">{objetivoCurriculo}</p>
                                         </div>
-                                      )}
-                                      {/* FIX P3: exemploAtividade visível para coordenação/unidade */}
-                                      {obj.exemploAtividade && (
-                                        <div className="bg-emerald-50 rounded px-2 py-1">
-                                          <p className="font-semibold text-emerald-600 uppercase tracking-wide mb-0.5" style={{fontSize:'10px'}}>Exemplo de Atividade</p>
-                                          <p className="text-emerald-800 leading-relaxed">{obj.exemploAtividade}</p>
+                                        <div className="rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2">
+                                          <p className="font-semibold text-violet-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Intencionalidade Pedagógica</p>
+                                          <p className="leading-relaxed text-violet-900">{intencionalidade}</p>
                                         </div>
-                                      )}
+                                        {/* FIX P3: exemploAtividade visível para coordenação/unidade */}
+                                        {obj.exemploAtividade && (
+                                          <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-2">
+                                            <p className="font-semibold text-emerald-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Exemplo de Atividade</p>
+                                            <p className="leading-relaxed text-emerald-800">{obj.exemploAtividade}</p>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                             {day.teacher?.atividade && (
@@ -672,44 +676,42 @@ export default function PlanoDeAulaListaPage() {
                       <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Objetivos da Matriz Pedagógica 2026</p>
                         <div className="space-y-2">
-                          {objectives.map((obj: any, i: number) => (
-                            <div key={i} className="border border-indigo-200 rounded-lg overflow-hidden">
-                              {/* Campo 1: Campo de Experiência */}
-                              <div className="px-3 py-1.5 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
-                                {obj.campo_emoji && <span>{obj.campo_emoji}</span>}
-                                <span className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
-                                  Campo de Experiência: {obj.campo_label}
-                                </span>
-                                <span className="ml-auto text-xs font-mono text-gray-500">{obj.codigo_bncc}</span>
-                              </div>
-                              {obj.semana_tema && (
-                                <div className="px-3 py-1 bg-gray-50 border-b border-gray-100">
-                                  <span className="text-xs text-gray-500 italic">Tema da semana: {obj.semana_tema}</span>
+                          {objectives.map((obj: any, i: number) => {
+                            const campoExperiencia = obj.campo_label?.trim() || 'Não cadastrado';
+                            const objetivoBNCC = obj.objetivo_bncc?.trim() || 'Não cadastrado';
+                            const objetivoCurriculo = obj.objetivo_curriculo?.trim() || 'Não cadastrado';
+                            const intencionalidade = obj.intencionalidade?.trim() || 'Não cadastrada';
+
+                            return (
+                              <div key={i} className="border border-indigo-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                                <div className="px-3 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center gap-1.5 flex-wrap">
+                                  {obj.campo_emoji && <span>{obj.campo_emoji}</span>}
+                                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.18em]">Campo de Experiência</span>
+                                  <span className="text-xs font-semibold text-indigo-900 break-words flex-1 min-w-[180px]">{campoExperiencia}</span>
+                                  <span className="text-[11px] font-mono text-indigo-700 bg-white/80 rounded-full px-2 py-0.5">{obj.codigo_bncc}</span>
                                 </div>
-                              )}
-                              <div className="px-3 py-2 space-y-2 bg-white">
-                                {/* Campo 2: Objetivo BNCC */}
-                                <div>
-                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo da BNCC (Transcrição Literal)</p>
-                                  <p className="text-xs text-gray-700 leading-relaxed">{obj.objetivo_bncc}</p>
-                                </div>
-                                {/* Campo 3: Objetivo Currículo em Movimento */}
-                                {obj.objetivo_curriculo && obj.objetivo_curriculo !== obj.objetivo_bncc && (
+                                {obj.semana_tema && (
+                                  <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                                    <span className="text-xs text-gray-500 italic">Tema da semana: {obj.semana_tema}</span>
+                                  </div>
+                                )}
+                                <div className="px-3 py-3 space-y-3 bg-white">
                                   <div>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo do Currículo em Movimento — DF</p>
-                                    <p className="text-xs text-gray-700 leading-relaxed">{obj.objetivo_curriculo}</p>
+                                    <p className="font-semibold text-blue-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Objetivo da BNCC</p>
+                                    <p className="text-xs text-gray-800 leading-relaxed">{objetivoBNCC}</p>
                                   </div>
-                                )}
-                                {/* Campo 4: Intencionalidade Pedagógica */}
-                                {obj.intencionalidade && (
-                                  <div className="bg-indigo-50 rounded px-2 py-1.5">
-                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">🎯 Intencionalidade Pedagógica</p>
-                                    <p className="text-xs text-indigo-800 leading-relaxed">{obj.intencionalidade}</p>
+                                  <div>
+                                    <p className="font-semibold text-teal-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Objetivo do Currículo</p>
+                                    <p className="text-xs text-gray-800 leading-relaxed">{objetivoCurriculo}</p>
                                   </div>
-                                )}
+                                  <div className="rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-2">
+                                    <p className="font-semibold text-violet-600 uppercase tracking-wide mb-1" style={{ fontSize: '10px' }}>Intencionalidade Pedagógica</p>
+                                    <p className="text-xs text-violet-900 leading-relaxed">{intencionalidade}</p>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

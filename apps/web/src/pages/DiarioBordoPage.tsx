@@ -407,12 +407,14 @@ function CompactChildMultiSelect({
   onChange,
   label = 'Criança(s) envolvida(s)',
   helperText,
+  showSelectedChips = true,
 }: {
   criancas: Crianca[];
   selecionadas: string[];
   onChange: (ids: string[]) => void;
   label?: string;
   helperText?: string;
+  showSelectedChips?: boolean;
 }) {
   const criancasOrdenadas = criancas
     .slice()
@@ -439,7 +441,7 @@ function CompactChildMultiSelect({
             ))}
           </select>
           {helperText && <p className="text-xs text-gray-500">{helperText}</p>}
-          {selecionadas.length > 0 && (
+          {showSelectedChips && selecionadas.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {criancasOrdenadas
                 .filter(crianca => selecionadas.includes(crianca.id))
@@ -1798,74 +1800,93 @@ export default function DiarioBordoPage() {
                 <p className="text-sm font-semibold text-indigo-900 mt-1">{planejamentoHoje.title}</p>
               </CardHeader>
               <CardContent className="space-y-4 pt-0">
-                {planningCamposExperiencia.length > 0 && (
-                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
-                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-2">Campo de Experiência</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {planningCamposExperiencia.map((campo, i) => (
-                        <span key={i} className="max-w-full break-words rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
-                          {campo}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {(planningObjectiveCards.length > 0 || planejamentoHoje.objectives) && (
+                {planningObjectiveCards.length > 0 ? (
                   <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4 space-y-3">
-                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide">Objetivos</p>
-                    {planningObjectiveCards.length > 0 ? (
-                      <div className="space-y-3">
-                        {planningObjectiveCards.map(card => (
-                          <div key={card.index} className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3 space-y-2">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide">Matriz Pedagógica do Dia</p>
+                    <div className="space-y-3">
+                      {planningObjectiveCards.map(card => {
+                        const campoPrincipal = card.campoExperiencia?.trim() || card.camposExperiencia[0]?.trim() || 'Não cadastrado';
+                        const objetivoBNCC = card.objetivoBNCC?.trim() || 'Não cadastrado';
+                        const objetivoCurriculo = card.objetivoCurriculo?.trim() || 'Não cadastrado';
+                        const intencionalidade = card.intencionalidade?.trim() || 'Não cadastrada';
+
+                        return (
+                          <div key={card.index} className="rounded-xl border border-indigo-100 bg-white shadow-sm overflow-hidden">
+                            <div className="px-3 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between gap-2 flex-wrap">
                               <span className="inline-flex items-center rounded-full bg-indigo-200 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
                                 Objetivo {card.index + 1}
                               </span>
                             </div>
-                            {card.objetivoBNCC && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo BNCC</p>
-                                <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{card.objetivoBNCC}</p>
+                            <div className="p-3 space-y-3">
+                              <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-3 py-2">
+                                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Campo de Experiência</p>
+                                <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{campoPrincipal}</p>
                               </div>
-                            )}
-                            {card.objetivoCurriculo && (
                               <div>
-                                <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
-                                <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{card.objetivoCurriculo}</p>
+                                <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">Objetivo da BNCC</p>
+                                <p className="text-sm text-gray-900 whitespace-pre-line break-words leading-6">{objetivoBNCC}</p>
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
-                        <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{planejamentoHoje.objectives}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {planningIntencionalidades.length > 0 && (
-                  <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/80 p-3 sm:p-4 space-y-3">
-                    <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide">Intencionalidade Pedagógica</p>
-                    <div className="space-y-3">
-                      {planningIntencionalidades.map((intencionalidade, index) => {
-                        const sectionKey = `intencionalidade-${index}`;
-                        return (
-                          <div key={sectionKey} className="rounded-lg border border-fuchsia-100 bg-white/70 p-3">
-                            <PlanningTextSection
-                              title={planningIntencionalidades.length > 1 ? `Intencionalidade ${index + 1}` : 'Intencionalidade Pedagógica'}
-                              content={intencionalidade}
-                              tone="fuchsia"
-                              expanded={Boolean(expandedPlanningSections[sectionKey])}
-                              onToggle={() => setExpandedPlanningSections(current => ({ ...current, [sectionKey]: !current[sectionKey] }))}
-                            />
+                              <div>
+                                <p className="text-[11px] font-semibold text-teal-600 uppercase tracking-wide mb-1">Objetivo do Currículo</p>
+                                <p className="text-sm text-gray-900 whitespace-pre-line break-words leading-6">{objetivoCurriculo}</p>
+                              </div>
+                              <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50/70 px-3 py-2">
+                                <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
+                                <p className="text-sm text-fuchsia-950 whitespace-pre-line break-words leading-6">{intencionalidade}</p>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
+                ) : (
+                  <>
+                    {planningCamposExperiencia.length > 0 && (
+                      <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
+                        <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-2">Campo de Experiência</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {planningCamposExperiencia.map((campo, i) => (
+                            <span key={i} className="max-w-full break-words rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
+                              {campo}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(planejamentoHoje.objectives || planningIntencionalidades.length > 0) && (
+                      <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4 space-y-3">
+                        {planejamentoHoje.objectives && (
+                          <div>
+                            <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-1">Objetivo da BNCC / Currículo</p>
+                            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-3">
+                              <p className="text-sm text-indigo-900 whitespace-pre-line break-words leading-6">{planejamentoHoje.objectives}</p>
+                            </div>
+                          </div>
+                        )}
+                        {planningIntencionalidades.length > 0 && (
+                          <div className="space-y-3">
+                            <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide">Intencionalidade Pedagógica</p>
+                            {planningIntencionalidades.map((intencionalidade, index) => {
+                              const sectionKey = `intencionalidade-${index}`;
+                              return (
+                                <div key={sectionKey} className="rounded-lg border border-fuchsia-100 bg-white/70 p-3">
+                                  <PlanningTextSection
+                                    title={planningIntencionalidades.length > 1 ? `Intencionalidade ${index + 1}` : 'Intencionalidade Pedagógica'}
+                                    content={intencionalidade}
+                                    tone="fuchsia"
+                                    expanded={Boolean(expandedPlanningSections[sectionKey])}
+                                    onToggle={() => setExpandedPlanningSections(current => ({ ...current, [sectionKey]: !current[sectionKey] }))}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {planejamentoHoje.activities && (
@@ -1957,7 +1978,8 @@ export default function DiarioBordoPage() {
                   selecionadas={microgestoForm.criancasSelecionadas}
                   onChange={ids => setMicrogestoForm(f => ({ ...f, criancasSelecionadas: ids }))}
                   label="Criança(s) envolvida(s)"
-                  helperText="Seleção compacta para reduzir poluição visual no diário, inclusive no mobile."
+                  helperText="Use apenas o select para vincular uma ou mais crianças ao microgesto."
+                  showSelectedChips={false}
                 />
 
                 <div>
