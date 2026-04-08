@@ -274,24 +274,22 @@ function getPlanningEmptyText() {
 function getObjectiveCardFields(obj: Record<string, any>) {
   return {
     camposExperiencia: pickPlanningList(obj, 'camposExperiencia'),
-    campoExperiencia: pickPlanningText(obj, 'campoExperiencia', 'campo_experiencia', 'campo'),
-    objetivoBNCC: pickPlanningText(obj, 'objetivoBNCC', 'objetivo_bncc'),
-    objetivoCurriculo: pickPlanningText(obj, 'objetivoCurriculoDF', 'objetivoCurriculo', 'objetivo_curriculo', 'objetivo_curriculo_movimento'),
-    intencionalidade: pickPlanningText(obj, 'intencionalidadePedagogica', 'intencionalidade', 'intencionalidade_pedagogica'),
-    desenvolvimento: pickPlanningText(obj, 'desenvolvimentoAtividade', 'desenvolvimento', 'activities', 'atividade', 'exemploAtividade', 'exemplo_atividade'),
-    recursos: pickPlanningText(obj, 'recursos', 'materiais', 'resources'),
+    campoExperiencia: pickPlanningText(obj, 'campoExperiencia'),
+    objetivoBNCC: pickPlanningText(obj, 'objetivoBNCC'),
+    objetivoCurriculo: pickPlanningText(obj, 'objetivoCurriculo'),
+    intencionalidade: pickPlanningText(obj, 'intencionalidadePedagogica', 'intencionalidade'),
   };
 }
 
-function hasObjectiveCardContent(fields: ReturnType<typeof getObjectiveCardFields>) {
+function hasObjectiveCardContent(fields: ReturnType<typeof getObjectiveCardFields>, atividade?: string, recursos?: string) {
   return Boolean(
     fields.camposExperiencia.length
     || fields.campoExperiencia
     || fields.objetivoBNCC
     || fields.objetivoCurriculo
     || fields.intencionalidade
-    || fields.desenvolvimento
-    || fields.recursos,
+    || atividade
+    || recursos,
   );
 }
 
@@ -920,47 +918,31 @@ export default function DiarioBordoPage() {
           try {
             const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
             const planHoje = detailRes.data;
-            const pc = typeof planHoje.pedagogicalContent === 'string'
-              ? JSON.parse(planHoje.pedagogicalContent)
-              : (planHoje.pedagogicalContent ?? {});
-            const desc = typeof planHoje.description === 'string' && planHoje.description.startsWith('{')
-              ? (() => { try { return JSON.parse(planHoje.description); } catch { return null; } })()
-              : null;
-            // FIX PARSING: dados do PlanningV2 estão em desc.days[0], não na raiz
-            const dayZero = desc?.days?.[0];
-            // objectives: tentar parsear planHoje.objectives se for array JSON
-            const objRaw = planHoje.objectives;
-            let parsedObjectives: Array<Record<string, unknown>> = [];
-            if (Array.isArray(objRaw)) {
-              parsedObjectives = objRaw;
-            } else if (typeof objRaw === 'string' && objRaw.startsWith('[')) {
-              try { parsedObjectives = JSON.parse(objRaw); } catch { /* silencioso */ }
+            let desc: any = {};
+            try {
+              desc = typeof planHoje.content === 'string'
+                ? JSON.parse(planHoje.content)
+                : planHoje.content ?? {};
+            } catch {
+              desc = {};
             }
-            objectives = pc?.objetivos || desc?.objectives_text || '';
-            activities = pc?.atividades || planHoje.activities
-              || dayZero?.teacher?.atividade || desc?.activities || '';
-            camposExperiencia = desc?.camposExperiencia ?? pc?.camposSelecionados ?? [];
-            objetivosMatriz = (dayZero?.objectives?.length ? dayZero.objectives : null)
-              ?? (parsedObjectives.length ? parsedObjectives : null)
-              ?? pc?.objetivosMatriz ?? [];
-            intencionalidadeGeral = pickPlanningText(
-              dayZero?.teacher,
-              'intencionalidadePedagogica',
-              'intencionalidade_pedagogica',
-              'intencionalidade',
-            ) || pickPlanningText(
-              desc,
-              'intencionalidadePedagogica',
-              'intencionalidade_pedagogica',
-              'intencionalidade',
-            ) || pickPlanningText(
-              pc,
-              'intencionalidadePedagogica',
-              'intencionalidade_pedagogica',
-              'intencionalidade',
-            );
-            recursos = pc?.recursos || dayZero?.teacher?.recursos
-              || desc?.resources || planHoje.resources || '';
+
+            const day0 = desc.days?.[0] ?? {};
+
+            let parsedObjectives: any[] = [];
+            try {
+              const raw = day0.objectives ?? planHoje.objectives ?? [];
+              parsedObjectives = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            } catch {
+              parsedObjectives = [];
+            }
+
+            objectives = '';
+            activities = day0.teacher?.atividade ?? '';
+            camposExperiencia = Array.isArray(desc.camposExperiencia) ? desc.camposExperiencia : [];
+            objetivosMatriz = Array.isArray(parsedObjectives) ? parsedObjectives : [];
+            intencionalidadeGeral = '';
+            recursos = day0.teacher?.recursos ?? '';
           } catch {
             // Detalhes não críticos — continua com dados básicos
           }
@@ -1247,7 +1229,7 @@ export default function DiarioBordoPage() {
   });
 
   return (
-    <PageShell title="Central da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
+    <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
@@ -1594,18 +1576,11 @@ export default function DiarioBordoPage() {
                   </div>
                 )}
 
-                {planejamentoHoje.intencionalidadeGeral && (
-                  <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3">
-                    <p className="text-[11px] font-semibold text-fuchsia-700 uppercase tracking-wide mb-1">Intencionalidade Pedagógica</p>
-                    <p className="text-sm text-fuchsia-950 whitespace-pre-line">{planejamentoHoje.intencionalidadeGeral}</p>
-                  </div>
-                )}
-
                 {(planejamentoHoje.objetivosMatriz ?? []).length > 0 ? (
                   <div className="space-y-3">
                     {planejamentoHoje.objetivosMatriz!.map((obj, i) => {
                       const fields = getObjectiveCardFields(obj as Record<string, any>);
-                      if (!hasObjectiveCardContent(fields)) return null;
+                      if (!hasObjectiveCardContent(fields, planejamentoHoje.activities, planejamentoHoje.recursos)) return null;
                       return (
                         <div key={i} className="rounded-xl border border-indigo-200 bg-white/80 p-3 space-y-3">
                           {fields.campoExperiencia && (
@@ -1632,16 +1607,16 @@ export default function DiarioBordoPage() {
                               <p className="text-sm text-fuchsia-950 whitespace-pre-line">{fields.intencionalidade}</p>
                             </div>
                           )}
-                          {fields.desenvolvimento && (
+                          {planejamentoHoje.activities && (
                             <div>
                               <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Desenvolvimento da Atividade</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.desenvolvimento}</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.activities}</p>
                             </div>
                           )}
-                          {fields.recursos && (
+                          {planejamentoHoje.recursos && (
                             <div>
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Materiais / Recursos Previstos</p>
-                              <p className="text-sm text-indigo-900 whitespace-pre-line">{fields.recursos}</p>
+                              <p className="text-[11px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">Recursos / Materiais</p>
+                              <p className="text-sm text-indigo-900 whitespace-pre-line">{planejamentoHoje.recursos}</p>
                             </div>
                           )}
                         </div>
