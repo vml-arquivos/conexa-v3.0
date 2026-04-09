@@ -164,6 +164,33 @@ const MARCACOES_RAPIDAS_CRIANCA = [
   { id: 'DEMONSTROU_AVANCO', label: 'Demonstrou avanço', emoji: '🚀' },
 ] as const;
 
+// ─── Observações Individuais por Criança ──────────────────────────────────────
+const OBSERVACOES_INDIVIDUAIS_TIPOS = [
+  // Desempenho e aprendizagem
+  { id: 'SE_DESTACOU', label: 'Se destacou na atividade', emoji: '⭐', grupo: 'desempenho' },
+  { id: 'DEMONSTROU_COMPREENSAO', label: 'Demonstrou compreensão', emoji: '💡', grupo: 'desempenho' },
+  { id: 'PARTICIPOU_ATIVAMENTE', label: 'Participou ativamente', emoji: '🤝', grupo: 'desempenho' },
+  { id: 'DEMONSTROU_AUTONOMIA', label: 'Demonstrou autonomia', emoji: '🙌', grupo: 'desempenho' },
+  { id: 'PARTICIPACAO_PARCIAL', label: 'Participação parcial', emoji: '😐', grupo: 'desempenho' },
+  { id: 'RECUSOU_PARTICIPAR', label: 'Recusou participar', emoji: '🚫', grupo: 'desempenho' },
+  { id: 'PRECISA_RETOMAR', label: 'Precisa retomar o conteúdo', emoji: '🔁', grupo: 'desempenho' },
+  // Comportamento e regulação emocional
+  { id: 'COMPORTAMENTO_AGITADO', label: 'Comportamento agitado', emoji: '😤', grupo: 'comportamento' },
+  { id: 'DIFICULDADE_CONCENTRACAO', label: 'Dificuldade de concentração', emoji: '🎯', grupo: 'comportamento' },
+  { id: 'COMPORTAMENTO_AGRESSIVO', label: 'Comportamento agressivo', emoji: '😠', grupo: 'comportamento' },
+  { id: 'INSTABILIDADE_EMOCIONAL', label: 'Instabilidade emocional / choro', emoji: '😢', grupo: 'comportamento' },
+  { id: 'ISOLAMENTO', label: 'Ficou isolado / não interagiu', emoji: '🤫', grupo: 'comportamento' },
+  // Desenvolvimento e sinais de alerta
+  { id: 'DIFICULDADE_FALA', label: 'Dificuldade na fala / comunicação', emoji: '💬', grupo: 'desenvolvimento' },
+  { id: 'ATENCAO_ESPECIAL', label: 'Precisa de atenção especial', emoji: '🏥', grupo: 'desenvolvimento' },
+  { id: 'RECUSOU_ALIMENTACAO', label: 'Recusou alimentação', emoji: '🍽️', grupo: 'desenvolvimento' },
+] as const;
+type ObservacaoIndividualTipo = typeof OBSERVACOES_INDIVIDUAIS_TIPOS[number]['id'];
+interface ObsIndividualDiario {
+  tipo: ObservacaoIndividualTipo;
+  criancaIds: string[];
+}
+
 // ─── Rotina Padrão ────────────────────────────────────────────────────────────
 const ROTINA_PADRAO = [
   { momento: 'Acolhida', descricao: 'Recepção das crianças, roda de conversa inicial', concluido: false },
@@ -274,6 +301,7 @@ function getInitialDiaryForm(dateFromQuery?: string) {
     oQueFuncionou: '',
     oQueNaoFuncionou: '',
     avaliacaoPlanoAula: '',
+    observacoesIndividuais: [] as ObsIndividualDiario[],
   };
 }
 
@@ -591,6 +619,7 @@ export default function DiarioBordoPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gerandoIA, setGerandoIA] = useState(false);
+  const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
@@ -1331,6 +1360,17 @@ export default function DiarioBordoPage() {
     }));
   }
 
+  // ─── Fechar painel de observações individuais ao clicar fora ───────────────
+  useEffect(() => {
+    if (!obsIndividualAberta) return;
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-obs-panel]')) setObsIndividualAberta(null);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [obsIndividualAberta]);
+
   // ─── Geração de Avaliação do Plano de Aula via Gemini ──────────────────────
   async function gerarAvaliacaoIA() {
     setGerandoIA(true);
@@ -1350,6 +1390,13 @@ export default function DiarioBordoPage() {
         reflexaoPedagogica: form.reflexaoPedagogica || undefined,
         textoComplementarProfessor: form.textoComplementarProfessor || undefined,
         camposExperiencia: planningCamposExperiencia.length ? planningCamposExperiencia : undefined,
+        observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0
+          ? form.observacoesIndividuais.map(o => ({
+              tipo: o.tipo,
+              label: OBSERVACOES_INDIVIDUAIS_TIPOS.find(t => t.id === o.tipo)?.label ?? o.tipo,
+              quantidadeCriancas: o.criancaIds.length,
+            }))
+          : undefined,
       };
       const res = await http.post<{ avaliacao: string }>('/diary-events/generate-avaliacao', payload);
       setForm(f => ({ ...f, avaliacaoPlanoAula: res.data.avaliacao }));
@@ -1506,6 +1553,7 @@ export default function DiarioBordoPage() {
             oQueFuncionou: form.oQueFuncionou || null,
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
+            observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
           },
         });
       }
@@ -2341,6 +2389,135 @@ export default function DiarioBordoPage() {
                 </div>
               )}
 
+              {/* ── Bloco 3.5: Observações Individuais por Criança ── */}
+              {criancas.length > 0 && (
+                <div className="rounded-2xl border-2 border-fuchsia-200 bg-white p-4 sm:p-5 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-700 font-bold text-sm flex-shrink-0">
+                      <Users className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-fuchsia-900">Observações individuais</p>
+                      <p className="text-xs text-fuchsia-600">Clique em um comportamento e selecione as crianças. Alimenta o RDIC.</p>
+                    </div>
+                  </div>
+                  {(['desempenho', 'comportamento', 'desenvolvimento'] as const).map(grupo => {
+                    const grupoLabel = grupo === 'desempenho' ? 'Desempenho e aprendizagem' : grupo === 'comportamento' ? 'Comportamento e regulação' : 'Desenvolvimento e sinais de alerta';
+                    const grupoTipos = OBSERVACOES_INDIVIDUAIS_TIPOS.filter(t => t.grupo === grupo);
+                    return (
+                      <div key={grupo} className="space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-fuchsia-400">{grupoLabel}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {grupoTipos.map(tipo => {
+                            const obs = (form.observacoesIndividuais ?? []).find(o => o.tipo === tipo.id);
+                            const count = obs?.criancaIds?.length ?? 0;
+                            const ativo = count > 0;
+                            return (
+                              <div key={tipo.id} className="relative" data-obs-panel>
+                                <button
+                                  type="button"
+                                  onClick={() => setObsIndividualAberta(prev => prev === tipo.id ? null : tipo.id)}
+                                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                    ativo
+                                      ? 'border-fuchsia-600 bg-fuchsia-600 text-white shadow-sm'
+                                      : 'border-fuchsia-200 bg-white text-fuchsia-700 hover:border-fuchsia-400 hover:bg-fuchsia-50'
+                                  }`}
+                                >
+                                  <span>{tipo.emoji}</span>
+                                  <span>{tipo.label}</span>
+                                  {ativo && (
+                                    <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px] font-bold">
+                                      {count}
+                                    </span>
+                                  )}
+                                </button>
+                                {obsIndividualAberta === tipo.id && (
+                                  <div className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border-2 border-fuchsia-200 bg-white shadow-xl p-3 space-y-3" data-obs-panel>
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-xs font-bold text-fuchsia-900">{tipo.emoji} {tipo.label}</p>
+                                      <button type="button" onClick={() => setObsIndividualAberta(null)} className="text-gray-400 hover:text-gray-600">
+                                        <X className="h-4 w-4" />
+                                      </button>
+                                    </div>
+                                    <p className="text-[10px] text-fuchsia-600">Selecione as crianças que se enquadram hoje:</p>
+                                    <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                                      {criancas.slice().sort((a, b) => a.firstName.localeCompare(b.firstName, 'pt-BR')).map(c => {
+                                        const selecionada = (obs?.criancaIds ?? []).includes(c.id);
+                                        return (
+                                          <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setForm(f => {
+                                                const atual = f.observacoesIndividuais ?? [];
+                                                const existente = atual.find(o => o.tipo === tipo.id);
+                                                if (existente) {
+                                                  const novas = selecionada
+                                                    ? existente.criancaIds.filter(id => id !== c.id)
+                                                    : [...existente.criancaIds, c.id];
+                                                  if (novas.length === 0) return { ...f, observacoesIndividuais: atual.filter(o => o.tipo !== tipo.id) };
+                                                  return { ...f, observacoesIndividuais: atual.map(o => o.tipo === tipo.id ? { ...o, criancaIds: novas } : o) };
+                                                }
+                                                return { ...f, observacoesIndividuais: [...atual, { tipo: tipo.id as ObservacaoIndividualTipo, criancaIds: [c.id] }] };
+                                              });
+                                            }}
+                                            className={`flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition-all text-center ${
+                                              selecionada ? 'border-fuchsia-500 bg-fuchsia-50' : 'border-gray-100 bg-white hover:border-fuchsia-200'
+                                            }`}
+                                          >
+                                            {c.photoUrl ? (
+                                              <img src={c.photoUrl} alt={c.firstName} className="h-8 w-8 rounded-full object-cover" />
+                                            ) : (
+                                              <div className="h-8 w-8 rounded-full bg-fuchsia-100 flex items-center justify-center text-fuchsia-700 font-bold text-xs">
+                                                {c.firstName[0]}{c.lastName?.[0] ?? ''}
+                                              </div>
+                                            )}
+                                            <span className="text-[10px] font-medium text-gray-700 leading-tight max-w-[56px] truncate">{c.firstName}</span>
+                                            {selecionada && <CheckCircle className="h-3 w-3 text-fuchsia-500" />}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setObsIndividualAberta(null)}
+                                      className="w-full rounded-xl bg-fuchsia-600 text-white text-xs font-bold py-2 hover:bg-fuchsia-700 transition-colors"
+                                    >
+                                      Confirmar seleção
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(form.observacoesIndividuais ?? []).length > 0 && (
+                    <div className="rounded-xl bg-fuchsia-50 border border-fuchsia-200 p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-fuchsia-500">Resumo das observações</p>
+                      {(form.observacoesIndividuais ?? []).map(obs => {
+                        const tipo = OBSERVACOES_INDIVIDUAIS_TIPOS.find(t => t.id === obs.tipo);
+                        const nomes = obs.criancaIds.map(id => criancas.find(c => c.id === id)?.firstName ?? id).join(', ');
+                        return (
+                          <div key={obs.tipo} className="flex items-start gap-2 text-xs text-fuchsia-800">
+                            <span>{tipo?.emoji}</span>
+                            <span><strong>{tipo?.label}:</strong> {nomes}</span>
+                            <button
+                              type="button"
+                              onClick={() => setForm(f => ({ ...f, observacoesIndividuais: (f.observacoesIndividuais ?? []).filter(o => o.tipo !== obs.tipo) }))}
+                              className="ml-auto text-fuchsia-300 hover:text-red-400 flex-shrink-0"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
               {/* ── Bloco 4: Complementares (materiais, adaptações, ocorrências) ── */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">

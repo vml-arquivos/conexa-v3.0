@@ -133,6 +133,11 @@ export class DiaryEventController {
       dto.textoComplementarProfessor
         ? `Observações complementares: ${dto.textoComplementarProfessor}`
         : '',
+      (dto.observacoesIndividuais ?? []).length > 0
+        ? `Observações individuais por criança:\n${(dto.observacoesIndividuais ?? [])
+            .map((o) => `  - ${o.label}: ${o.quantidadeCriancas} criança(s)`)
+            .join('\n')}`
+        : '',
     ]
       .filter(Boolean)
       .join('\n');
