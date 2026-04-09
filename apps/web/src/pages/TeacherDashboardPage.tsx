@@ -369,16 +369,6 @@ export default function TeacherDashboardPage() {
       progressClass: 'bg-sky-500',
     },
     {
-      label: 'Diários da semana',
-      value: diariosSemana,
-      helper: 'Meta visual de 5 registros',
-      icon: <BookOpen className="h-5 w-5" />,
-      accent: 'text-amber-700',
-      iconShell: 'bg-amber-500',
-      progress: diariosPct,
-      progressClass: 'bg-amber-500',
-    },
-    {
       label: 'Planejamentos no período',
       value: planejamentosSemana,
       helper: 'Acompanhamento da semana',
@@ -389,6 +379,14 @@ export default function TeacherDashboardPage() {
       progressClass: 'bg-violet-500',
     },
   ];
+  const destaquesResumoTurma = [
+    `${totalAlunos} criança(s) na turma`,
+    `${presentesHoje} presente(s) hoje`,
+    `${registrosHoje} registro(s) pedagógico(s) no dia`,
+  ];
+  if (planejamentoResumoHoje.objectives.length > 0) {
+    destaquesResumoTurma.push(`${planejamentoResumoHoje.objectives.length} objetivo(s) ativos`);
+  };
 
   return (
     <PageShell
@@ -428,11 +426,9 @@ export default function TeacherDashboardPage() {
                       Painel simplificado para leitura rápida, com foco em presença, registros do dia e planejamento pedagógico ativo.
                     </p>
                     <div className="flex flex-wrap gap-2 text-xs text-slate-100/90">
-                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{totalAlunos} criança(s) na turma</span>
-                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{registrosHoje} registro(s) hoje</span>
-                      {planejamentoResumoHoje.objectives.length > 0 && (
-                        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{planejamentoResumoHoje.objectives.length} objetivo(s) ativos</span>
-                      )}
+                      {destaquesResumoTurma.map((item) => (
+                        <span key={item} className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{item}</span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -541,28 +537,17 @@ export default function TeacherDashboardPage() {
                   </div>
 
                   <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Indicadores visuais da turma</p>
-                    <div className="mt-3 space-y-3">
-                      <div>
-                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
-                          <span>Diários da semana</span>
-                          <span>{diariosSemana}/5</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-amber-500" style={{ width: `${diariosPct}%` }} /></div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Leitura rápida da turma</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Diários da semana</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{diariosSemana}/5</p>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-amber-500" style={{ width: `${diariosPct}%` }} /></div>
                       </div>
-                      <div>
-                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
-                          <span>Planejamentos do período</span>
-                          <span>{planejamentosSemana}/5</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-500" style={{ width: `${planejamentosPct}%` }} /></div>
-                      </div>
-                      <div>
-                        <div className="mb-1 flex items-center justify-between text-xs text-slate-600">
-                          <span>Crianças com registro hoje</span>
-                          <span>{registrosHoje}/{totalAlunos || '?'}</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${registrosHojePct}%` }} /></div>
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Cobertura pedagógica</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">{registrosHoje}/{totalAlunos || '?'}</p>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${registrosHojePct}%` }} /></div>
                       </div>
                     </div>
                   </div>
@@ -664,10 +649,10 @@ export default function TeacherDashboardPage() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Minhas Crianças</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Cards mais enxutos, com foto real quando disponível, leitura rápida do status do dia e ações diretas.
+                    Acesso rápido às crianças da turma, com leitura objetiva do status do dia e ações essenciais.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span className="rounded-full bg-slate-100 px-3 py-1">{alunos.length} crianças</span>
                   <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{registrosHoje} com registro hoje</span>
                   <button onClick={() => navigate('/app/chamada')}
@@ -729,13 +714,13 @@ export default function TeacherDashboardPage() {
                               </span>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${temFoto ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                              <div className={`rounded-xl px-2.5 py-2 font-medium ${temFoto ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
                                 {temFoto ? 'Foto carregada' : 'Sem foto'}
-                              </span>
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                              </div>
+                              <div className={`rounded-xl px-2.5 py-2 font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                                 {registradoHoje ? 'Registro concluído' : 'Aguardando registro'}
-                              </span>
+                              </div>
                             </div>
                           </div>
                         </div>

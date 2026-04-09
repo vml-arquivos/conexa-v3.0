@@ -1983,28 +1983,6 @@ export default function DiarioBordoPage() {
                     />
                   </div>
                 )}
-                
-                {planejamentoHoje.activities && (
-                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
-                    <PlanningTextSection
-                      title="Desenvolvimento da Atividade"
-                      content={planejamentoHoje.activities}
-                      expanded={Boolean(expandedPlanningSections.activities)}
-                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, activities: !current.activities }))}
-                    />
-                  </div>
-                )}
-
-                {planejamentoHoje.recursos && (
-                  <div className="rounded-xl border border-indigo-200 bg-white/80 p-3 sm:p-4">
-                    <PlanningTextSection
-                      title="Recursos / Materiais"
-                      content={planejamentoHoje.recursos}
-                      expanded={Boolean(expandedPlanningSections.resources)}
-                      onToggle={() => setExpandedPlanningSections(current => ({ ...current, resources: !current.resources }))}
-                    />
-                  </div>
-                )}
               </CardContent>
             </Card>
           ) : (
@@ -2299,29 +2277,26 @@ export default function DiarioBordoPage() {
                 {planningObjectiveCards.length > 0 && (
                   <div className="rounded-xl border border-sky-200 bg-white/90 p-4 space-y-4">
                     <div className="space-y-1">
-                      <p className="text-sm font-semibold text-sky-900">Avaliação vinculada à matriz pedagógica</p>
-                      <p className="text-xs text-sky-700">A marcação abaixo usa somente os objetivos já carregados do planejamento e da matriz do dia.</p>
+                      <p className="text-sm font-semibold text-sky-900">Evidências por objetivo do plano</p>
+                      <p className="text-xs text-sky-700">
+                        Use os objetivos já exibidos no plano acima como referência. Aqui, a avaliação registra apenas o andamento e a evidência observada no dia, sem repetir metadados curriculares.
+                      </p>
                     </div>
 
                     <div className="space-y-3">
                       {planningObjectiveCards.map(card => {
-                        const campoPrincipal = card.campoExperiencia?.trim() || card.camposExperiencia[0]?.trim() || 'Não cadastrado';
-                        const objetivoBNCC = card.objetivoBNCC?.trim() || 'Não cadastrado';
-                        const objetivoCurriculo = card.objetivoCurriculo?.trim() || 'Não cadastrado';
-                        const intencionalidade = card.intencionalidade?.trim() || 'Não cadastrada';
                         const avaliacaoObjetivo = (form.avaliacoesObjetivos ?? []).find(item => item.objectiveIndex === card.index) ?? { objectiveIndex: card.index, status: '', observacao: '' };
 
                         return (
                           <div key={card.index} className="rounded-xl border border-sky-100 bg-sky-50/40 p-4 space-y-3">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                              <div className="space-y-2 min-w-0">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                              <div className="space-y-1 min-w-0">
                                 <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-800">
                                   Objetivo {card.index + 1}
                                 </span>
-                                <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">Campo de Experiência</p>
-                                  <p className="text-sm text-gray-900 break-words whitespace-pre-line">{campoPrincipal}</p>
-                                </div>
+                                <p className="text-xs text-sky-800">
+                                  Avalie somente a execução observada deste objetivo no dia. Os campos da matriz permanecem no bloco do plano acima.
+                                </p>
                               </div>
                               <div className="flex flex-wrap gap-2 lg:max-w-[360px] lg:justify-end">
                                 {STATUS_AVALIACAO_OBJETIVO.map(status => (
@@ -2337,26 +2312,10 @@ export default function DiarioBordoPage() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                              <div className="rounded-lg border border-blue-100 bg-white px-3 py-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-600">Objetivo da BNCC</p>
-                                <p className="text-sm text-gray-900 whitespace-pre-line break-words">{objetivoBNCC}</p>
-                              </div>
-                              <div className="rounded-lg border border-teal-100 bg-white px-3 py-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-600">Objetivo do Currículo</p>
-                                <p className="text-sm text-gray-900 whitespace-pre-line break-words">{objetivoCurriculo}</p>
-                              </div>
-                            </div>
-
-                            <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50/70 px-3 py-2">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-fuchsia-700">Intencionalidade Pedagógica</p>
-                              <p className="text-sm text-fuchsia-950 whitespace-pre-line break-words">{intencionalidade}</p>
-                            </div>
-
                             <div>
-                              <Label>Registro do professor para este objetivo <span className="font-normal text-gray-400">(opcional)</span></Label>
+                              <Label>Evidência observada neste objetivo <span className="font-normal text-gray-400">(opcional)</span></Label>
                               <Textarea
-                                placeholder="O que foi observado neste objetivo, o que avançou e o que ainda precisa ser retomado?"
+                                placeholder="Registre de forma breve o que avançou, o que exigiu mediação e o que precisa ser retomado neste objetivo."
                                 rows={2}
                                 value={avaliacaoObjetivo.observacao}
                                 onChange={e => updateAvaliacaoObjetivo(card.index, { observacao: e.target.value })}
