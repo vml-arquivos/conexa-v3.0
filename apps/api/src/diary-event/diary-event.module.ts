@@ -4,6 +4,7 @@ import { memoryStorage } from 'multer';
 import { DiaryEventService } from './diary-event.service';
 import { DiaryEventController } from './diary-event.controller';
 import { AuditService } from '../common/services/audit.service';
+import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { AuditService } from '../common/services/audit.service';
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
     }),
+    AiModule,
   ],
   controllers: [DiaryEventController],
   providers: [DiaryEventService, AuditService],
