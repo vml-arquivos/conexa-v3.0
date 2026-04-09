@@ -18,13 +18,14 @@ import {
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
   Camera, UploadCloud, Trash2, TriangleAlert, Pencil, ClipboardList,
-  WandSparkles, Loader2,
+  WandSparkles, Loader2, Printer,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { ChildAvatar } from '../components/children/ChildAvatar';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { abrirDiarioImprimivel, type DiaryPrintData } from '../components/PrintableDiary';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -1557,7 +1558,39 @@ export default function DiarioBordoPage() {
           },
         });
       }
-      toast.success('Diário de Bordo salvo!');
+      toast.success('Diário de Bordo salvo! Abrindo versão para impressão...');
+      // Gerar PDF imediatamente após salvar
+      const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+      // Buscar nome da turma via lookup (já disponível na URL ou no classroomId)
+      let turmaNomeResolvido = 'Turma';
+      try {
+        const turmasRes2 = await http.get('/lookup/classrooms/accessible');
+        const turmas2: any[] = Array.isArray(turmasRes2.data) ? turmasRes2.data : [];
+        const turmaAtual = turmas2.find((t: any) => t.id === classroomId);
+        if (turmaAtual?.name) turmaNomeResolvido = turmaAtual.name;
+      } catch { /* usa fallback */ }
+      const pdfData: DiaryPrintData = {
+        data: form.date,
+        turmaNome: turmaNomeResolvido,
+        professorNome: nomeProfessor,
+        planejamentoTitulo: planejamentoHoje?.title,
+        planejamentoAtividade: planejamentoHoje?.activities,
+        planejamentoRecursos: planejamentoHoje?.recursos,
+        planejamentoObjetivos: planejamentoHoje?.objetivosMatriz as any,
+        statusExecucaoPlano: form.statusExecucaoPlano || undefined,
+        execucaoPlanejamento: form.execucaoPlanejamento || undefined,
+        avaliacaoPlanoAula: form.avaliacaoPlanoAula || undefined,
+        momentoDestaque: form.momentoDestaque || undefined,
+        reflexaoPedagogica: form.reflexaoPedagogica || undefined,
+        presencas: presencasReais,
+        ausencias: ausenciasReais,
+        totalAlunos: criancas.length || undefined,
+        climaEmocional: form.climaEmocional || undefined,
+        rotina: form.rotina.reduce((acc, r) => { acc[r.momento] = r.concluido; return acc; }, {} as Record<string, boolean>),
+        observacoesIndividuais: (form.observacoesIndividuais ?? []) as any,
+        criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+      };
+      abrirDiarioImprimivel(pdfData);
       const nextDraftRegistry = { ...draftRegistry };
       delete nextDraftRegistry[draftKey];
       setDraftRegistry(nextDraftRegistry);
@@ -1751,6 +1784,36 @@ export default function DiarioBordoPage() {
                             <p className="text-sm text-orange-700">{diario.encaminhamentos}</p>
                           </div>
                         )}
+                        {/* Botão de impressão do diário */}
+                        <div className="flex justify-end pt-2 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext : {};
+                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const dataStr = (diario.date || diario.createdAt || '').substring(0, 10);
+                              abrirDiarioImprimivel({
+                                data: dataStr,
+                                turmaNome: 'Turma',
+                                professorNome: nomeProfessor,
+                                planejamentoTitulo: ctx.planejamentoTitulo,
+                                statusExecucaoPlano: ctx.statusExecucaoPlano,
+                                execucaoPlanejamento: ctx.execucaoPlanejamento,
+                                avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
+                                momentoDestaque: diario.momentoDestaque || ctx.momentoDestaque,
+                                reflexaoPedagogica: diario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                presencas: diario.presencas ?? ctx.presencas ?? 0,
+                                ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
+                                climaEmocional: diario.climaEmocional || ctx.climaEmocional,
+                                rotina: ctx.rotina as Record<string, boolean>,
+                                observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                              });
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                          >
+                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                          </button>
+                        </div>
                       </div>
                     )}
                   </CardContent>
