@@ -101,11 +101,11 @@ export function buildPrintableHTML(plan: Planning): string {
                   .map(
                     (obj) => `
                   <div class="objective-card">
-                    ${obj.campoExperiencia ? `<div class="obj-campo">${obj.campoExperiencia.replace(/_/g, ' ')}</div>` : ''}
-                    ${obj.codigoBNCC ? `<div class="obj-codigo">Código BNCC: ${obj.codigoBNCC}</div>` : ''}
-                    ${obj.objetivoBNCC ? `<div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivoBNCC}</div>` : ''}
-                    ${(obj.objetivoCurriculoDF || obj.objetivoCurriculo) ? `<div class="obj-text"><strong>Currículo em Movimento — DF:</strong> ${obj.objetivoCurriculoDF ?? obj.objetivoCurriculo}</div>` : ''}
-                    ${(obj.intencionalidadePedagogica || obj.intencionalidade) ? `<div class="obj-text"><strong>Intencionalidade Pedagógica:</strong> ${obj.intencionalidadePedagogica ?? obj.intencionalidade}</div>` : ''}
+                    <div class="obj-campo">${(obj.campoExperiencia || 'Não informado').replace(/_/g, ' ')}</div>
+                    <div class="obj-codigo">Código BNCC: ${obj.codigoBNCC || 'Não informado'}</div>
+                    <div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivoBNCC || 'Não informado'}</div>
+                    <div class="obj-text"><strong>Currículo em Movimento — DF:</strong> ${obj.objetivoCurriculoDF ?? obj.objetivoCurriculo ?? 'Não informado'}</div>
+                    <div class="obj-text"><strong>Intencionalidade Pedagógica:</strong> ${obj.intencionalidadePedagogica ?? obj.intencionalidade ?? 'Não informado'}</div>
                   </div>`,
                   )
                   .join('')}
@@ -161,11 +161,11 @@ export function buildPrintableHTML(plan: Planning): string {
               .map(
                 (obj: any) => `
               <div class="objective-card">
-                ${obj.campo_label ? `<div class="obj-campo">${obj.campo_emoji ?? ''} ${obj.campo_label}</div>` : ''}
-                ${obj.codigo_bncc ? `<div class="obj-codigo">Código BNCC: ${obj.codigo_bncc}</div>` : ''}
-                ${obj.objetivo_bncc ? `<div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivo_bncc}</div>` : ''}
-                ${obj.objetivo_curriculo ? `<div class="obj-text"><strong>Currículo em Movimento:</strong> ${obj.objetivo_curriculo}</div>` : ''}
-                ${obj.intencionalidade ? `<div class="obj-text"><strong>Intencionalidade:</strong> ${obj.intencionalidade}</div>` : ''}
+                <div class="obj-campo">${obj.campo_label ? `${obj.campo_emoji ?? ''} ${obj.campo_label}` : 'Não informado'}</div>
+                <div class="obj-codigo">Código BNCC: ${obj.codigo_bncc || 'Não informado'}</div>
+                <div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivo_bncc || 'Não informado'}</div>
+                <div class="obj-text"><strong>Currículo em Movimento:</strong> ${obj.objetivo_curriculo || 'Não informado'}</div>
+                <div class="obj-text"><strong>Intencionalidade Pedagógica:</strong> ${obj.intencionalidade || 'Não informado'}</div>
               </div>`,
               )
               .join('')}
