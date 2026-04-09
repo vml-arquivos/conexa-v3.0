@@ -65,6 +65,48 @@ function formatCampoExperienciaLabel(value: unknown): string {
     .trim();
 }
 
+function getPlanningFieldDisplay(value: unknown, fallback = 'Não informado'): string {
+  const normalized = toDisplayText(value);
+  return normalized || fallback;
+}
+
+function getPlanningMatrixFields(obj: DashboardPlanningObjective) {
+  return [
+    {
+      label: 'Campo de Experiência',
+      value: getPlanningFieldDisplay(obj.campoExperiencia),
+      tone: 'border-sky-100 bg-sky-50/80 text-sky-950',
+      labelTone: 'text-sky-700',
+    },
+    {
+      label: 'Objetivo BNCC',
+      value: getPlanningFieldDisplay(obj.objetivoBNCC),
+      tone: 'border-slate-200 bg-white text-slate-900',
+      labelTone: 'text-slate-500',
+    },
+    {
+      label: 'Objetivo do Currículo',
+      value: getPlanningFieldDisplay(obj.objetivoCurriculo),
+      tone: 'border-emerald-100 bg-emerald-50/80 text-emerald-950',
+      labelTone: 'text-emerald-700',
+    },
+    {
+      label: 'Intencionalidade Pedagógica',
+      value: getPlanningFieldDisplay(obj.intencionalidade),
+      tone: 'border-indigo-100 bg-indigo-50 text-indigo-950',
+      labelTone: 'text-indigo-700',
+    },
+  ];
+}
+
+function getPlanningCodeDisplay(value: unknown): string {
+  return getPlanningFieldDisplay(value, 'Código BNCC não informado');
+}
+
+function getPlanningObjectiveKey(obj: DashboardPlanningObjective, index: number): string {
+  return `${obj.codigoBNCC || obj.campoExperiencia || 'objetivo'}-${index}`;
+}
+
 function normalizeDashboardPlanning(activePlanning: any, fallbackObjectives: any[]): DashboardPlanningSummary {
   const normalizedObjectives = (
     Array.isArray(activePlanning?.objetivosHoje) && activePlanning.objetivosHoje.length > 0
@@ -319,24 +361,14 @@ export default function TeacherDashboardPage() {
   const planejamentoResumoHoje = normalizeDashboardPlanning(insightsHoje?.planejamentoAtivo, objetivosHoje);
   const cardsResumoTurma = [
     {
-      label: 'Crianças na turma',
-      value: totalAlunos,
-      helper: turma?.capacity ? `${turma.capacity} vagas planejadas` : 'Turma ativa',
-      icon: <Users className="h-5 w-5" />,
-      accent: 'text-blue-700',
-      iconShell: 'bg-blue-600',
-      progress: turma?.capacity ? Math.min(100, Math.round((totalAlunos / turma.capacity) * 100)) : 100,
-      progressClass: 'bg-blue-500',
-    },
-    {
-      label: 'Presença do dia',
-      value: presentesHoje,
-      helper: totalAlunos > 0 ? `${ausentesHoje} ausência(s)` : 'Sem turma vinculada',
-      icon: <CheckCircle className="h-5 w-5" />,
-      accent: 'text-emerald-700',
-      iconShell: 'bg-emerald-600',
-      progress: presencaPct,
-      progressClass: 'bg-emerald-500',
+      label: 'Registros do dia',
+      value: registrosHoje,
+      helper: totalAlunos > 0 ? `${registrosHojePct}% da turma acompanhada hoje` : 'Sem turma vinculada',
+      icon: <Sparkles className="h-5 w-5" />,
+      accent: 'text-sky-700',
+      iconShell: 'bg-sky-600',
+      progress: registrosHojePct,
+      progressClass: 'bg-sky-500',
     },
     {
       label: 'Diários da semana',
@@ -393,11 +425,17 @@ export default function TeacherDashboardPage() {
                       {turma?.segmento ? ` · segmento ${turma.segmento}` : ''}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-100/90">
-                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{totalAlunos} criança(s)</span>
-                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{presentesHoje} presente(s)</span>
-                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{diariosSemana} diário(s) na semana</span>
-                    <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{planejamentosSemana} planejamento(s) no período</span>
+                  <div className="space-y-2 text-sm text-slate-100/90">
+                    <p className="max-w-2xl text-sm leading-relaxed text-slate-200">
+                      Painel simplificado para leitura rápida, com foco em presença, registros do dia e planejamento pedagógico ativo.
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs text-slate-100/90">
+                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{totalAlunos} criança(s) na turma</span>
+                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{registrosHoje} registro(s) hoje</span>
+                      {planejamentoResumoHoje.objectives.length > 0 && (
+                        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{planejamentoResumoHoje.objectives.length} objetivo(s) ativos</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -551,38 +589,24 @@ export default function TeacherDashboardPage() {
                     {planejamentoResumoHoje.objectives.length > 0 ? (
                       <div className="mt-4 space-y-3">
                         {planejamentoResumoHoje.objectives.slice(0, 2).map((obj, i) => (
-                          <div key={`${obj.codigoBNCC || obj.campoExperiencia || 'objetivo'}-${i}`} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {obj.codigoBNCC && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">{obj.codigoBNCC}</span>
-                              )}
-                              {obj.campoExperiencia && (
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">{obj.campoExperiencia}</span>
-                              )}
+                          <div key={getPlanningObjectiveKey(obj, i)} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Objetivo da matriz</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900 break-words">{getPlanningCodeDisplay(obj.codigoBNCC)}</p>
+                              </div>
+                              <span className="inline-flex shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                                {getPlanningCodeDisplay(obj.codigoBNCC)}
+                              </span>
                             </div>
 
-                            <div className="mt-3 space-y-3">
-                              {obj.objetivoBNCC && (
-                                <div>
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Objetivo BNCC</p>
-                                  <p className="mt-1 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{obj.objetivoBNCC}</p>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              {getPlanningMatrixFields(obj).map((field) => (
+                                <div key={`${field.label}-${getPlanningObjectiveKey(obj, i)}`} className={`rounded-2xl border px-3 py-3 ${field.tone}`}>
+                                  <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${field.labelTone}`}>{field.label}</p>
+                                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">{field.value}</p>
                                 </div>
-                              )}
-                              {obj.objetivoCurriculo && (
-                                <div>
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Objetivo do Currículo</p>
-                                  <p className="mt-1 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{obj.objetivoCurriculo}</p>
-                                </div>
-                              )}
-                              {obj.intencionalidade && (
-                                <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-3">
-                                  <div className="flex items-center gap-1.5 text-indigo-700">
-                                    <Lightbulb className="h-3.5 w-3.5 shrink-0" />
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">Intencionalidade Pedagógica</p>
-                                  </div>
-                                  <p className="mt-1.5 text-sm leading-relaxed text-indigo-950 whitespace-pre-wrap break-words">{obj.intencionalidade}</p>
-                                </div>
-                              )}
+                              ))}
                             </div>
                           </div>
                         ))}
@@ -620,7 +644,7 @@ export default function TeacherDashboardPage() {
           )}
 
           {/* Abas */}
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+          <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
             {[
               { id: 'turma', label: 'Minha Turma', icon: <Users className="h-4 w-4" /> },
               { id: 'rdic', label: 'RDIC', icon: <Brain className="h-4 w-4" /> },
@@ -629,7 +653,7 @@ export default function TeacherDashboardPage() {
               { id: 'indicadores', label: 'Progresso', icon: <TrendingUp className="h-4 w-4" /> },
             ].map(tab => (
               <button key={tab.id} onClick={() => setAbaAtiva(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all flex-1 justify-center ${abaAtiva === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+                className={`flex min-w-[132px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${abaAtiva === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
                 {tab.icon} <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
@@ -707,15 +731,13 @@ export default function TeacherDashboardPage() {
                               </span>
                             </div>
 
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                              <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Foto</p>
-                                <p className="mt-1 text-xs font-medium text-slate-700">{temFoto ? 'Foto atualizada' : 'Avatar padrão'}</p>
-                              </div>
-                              <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Principal info</p>
-                                <p className="mt-1 text-xs font-medium text-slate-700">{registradoHoje ? 'Registro do dia feito' : 'Pedir observação'}</p>
-                              </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${temFoto ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+                                {temFoto ? 'Foto carregada' : 'Sem foto'}
+                              </span>
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                {registradoHoje ? 'Registro concluído' : 'Aguardando registro'}
+                              </span>
                             </div>
                           </div>
                         </div>
