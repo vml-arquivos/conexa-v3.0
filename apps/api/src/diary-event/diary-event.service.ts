@@ -168,40 +168,65 @@ export class DiaryEventService {
     // Validação de segmento etário removida: qualquer criança pode ter ocorrências registradas
     // independente da faixa etária da turma (chegada/saída, saúde, material, comportamento, etc.)
 
-    // Criar o evento
-    const diaryEvent = await this.prisma.diaryEvent.create({
-      data: {
-        type: createDto.type,
-        title: createDto.title,
-        description: createDto.description,
-        eventDate,
-        childId: createDto.childId,
-        classroomId: resolvedClassroomId,
+    // Criar ou atualizar o evento (upsert)
+    // O @@unique [mantenedoraId, unitId, classroomId, childId, eventDate, type] garante
+    // que um segundo save no mesmo dia atualiza o registro em vez de lançar P2002.
+    const eventData = {
+      type: createDto.type,
+      title: createDto.title,
+      description: createDto.description,
+      eventDate,
+      childId: createDto.childId,
+      classroomId: resolvedClassroomId,
+      ...(resolvedPlanningId ? { planningId: resolvedPlanningId } : {}),
+      ...(resolvedCurriculumEntryId ? { curriculumEntryId: resolvedCurriculumEntryId } : {}),
+      // Micro-gestos estruturados
+      medicaoAlimentar: createDto.medicaoAlimentar ?? undefined,
+      sonoMinutos: createDto.sonoMinutos ?? undefined,
+      trocaFraldaStatus: createDto.trocaFraldaStatus ?? undefined,
+      // Observações
+      observations: createDto.observations ?? undefined,
+      developmentNotes: createDto.developmentNotes ?? undefined,
+      behaviorNotes: createDto.behaviorNotes ?? undefined,
+      // Microgestos livres e metadados
+      tags: createDto.tags || [],
+      aiContext: {
+        ...(createDto.aiContext || {}),
+        microgestos: createDto.microgestos || [],
+        presencas: createDto.presencas ?? 0,
+        ausencias: createDto.ausencias ?? 0,
+      },
+      mediaUrls: createDto.mediaUrls || [],
+      createdBy: user.sub,
+      mantenedoraId: classroom.unit.mantenedoraId,
+      unitId: classroom.unitId,
+    };
+    const diaryEvent = await this.prisma.diaryEvent.upsert({
+      where: {
+        mantenedoraId_unitId_classroomId_childId_eventDate_type: {
+          mantenedoraId: classroom.unit.mantenedoraId,
+          unitId: classroom.unitId,
+          classroomId: resolvedClassroomId,
+          childId: createDto.childId,
+          eventDate,
+          type: createDto.type,
+        },
+      },
+      create: eventData,
+      update: {
+        title: eventData.title,
+        description: eventData.description,
         ...(resolvedPlanningId ? { planningId: resolvedPlanningId } : {}),
         ...(resolvedCurriculumEntryId ? { curriculumEntryId: resolvedCurriculumEntryId } : {}),
-
-        // Micro-gestos estruturados
-        medicaoAlimentar: createDto.medicaoAlimentar ?? undefined,
-        sonoMinutos: createDto.sonoMinutos ?? undefined,
-        trocaFraldaStatus: createDto.trocaFraldaStatus ?? undefined,
-
-        // Observações
-        observations: createDto.observations ?? undefined,
-        developmentNotes: createDto.developmentNotes ?? undefined,
-        behaviorNotes: createDto.behaviorNotes ?? undefined,
-
-        // Microgestos livres e metadados
-        tags: createDto.tags || [],
-        aiContext: {
-          ...(createDto.aiContext || {}),
-          microgestos: createDto.microgestos || [],
-          presencas: createDto.presencas ?? 0,
-          ausencias: createDto.ausencias ?? 0,
-        },
-        mediaUrls: createDto.mediaUrls || [],
-        createdBy: user.sub,
-        mantenedoraId: classroom.unit.mantenedoraId,
-        unitId: classroom.unitId,
+        medicaoAlimentar: eventData.medicaoAlimentar,
+        sonoMinutos: eventData.sonoMinutos,
+        trocaFraldaStatus: eventData.trocaFraldaStatus,
+        observations: eventData.observations,
+        developmentNotes: eventData.developmentNotes,
+        behaviorNotes: eventData.behaviorNotes,
+        tags: eventData.tags,
+        aiContext: eventData.aiContext,
+        mediaUrls: eventData.mediaUrls,
       },
       include: {
         child: {

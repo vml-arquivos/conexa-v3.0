@@ -562,52 +562,32 @@ export default function TeacherDashboardPage() {
                           {planejamentoResumoHoje.title || 'Síntese pedagógica organizada para execução em sala'}
                         </h3>
                       </div>
-                      {planejamentoResumoHoje.objectives.length > 0 && (
-                        <span className="inline-flex shrink-0 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800">
-                          {planejamentoResumoHoje.objectives.length} objetivo(s)
-                        </span>
-                      )}
+                      <button onClick={() => navigate('/app/planejamentos')}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100">
+                        Ver plano <ArrowRight className="h-3 w-3" />
+                      </button>
                     </div>
 
-                    {planejamentoResumoHoje.objectives.length > 0 ? (
+                    {(planejamentoResumoHoje.atividade || planejamentoResumoHoje.recursos || planejamentoResumoHoje.objectives.length > 0) ? (
                       <div className="mt-4 space-y-3">
-                        {planejamentoResumoHoje.objectives.slice(0, 2).map((obj, i) => (
-                          <div key={getPlanningObjectiveKey(obj, i)} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Objetivo da matriz</p>
-                                <p className="mt-1 text-sm font-semibold text-slate-900 break-words">{getPlanningCodeDisplay(obj.codigoBNCC)}</p>
-                              </div>
-                              <span className="inline-flex shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
-                                {getPlanningCodeDisplay(obj.codigoBNCC)}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 grid gap-3 md:grid-cols-2">
-                              {getPlanningMatrixFields(obj).map((field) => (
-                                <div key={`${field.label}-${getPlanningObjectiveKey(obj, i)}`} className={`rounded-2xl border px-3 py-3 ${field.tone}`}>
-                                  <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${field.labelTone}`}>{field.label}</p>
-                                  <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap break-words">{field.value}</p>
-                                </div>
-                              ))}
-                            </div>
+                        {planejamentoResumoHoje.atividade && (
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Desenvolvimento da Atividade</p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-amber-950 whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
                           </div>
-                        ))}
-
-                        {(planejamentoResumoHoje.atividade || planejamentoResumoHoje.recursos) && (
-                          <div className="grid gap-3 xl:grid-cols-2">
-                            {planejamentoResumoHoje.atividade && (
-                              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Desenvolvimento da Atividade</p>
-                                <p className="mt-1.5 text-sm leading-relaxed text-amber-950 whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
-                              </div>
-                            )}
-                            {planejamentoResumoHoje.recursos && (
-                              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recursos e Materiais</p>
-                                <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{planejamentoResumoHoje.recursos}</p>
-                              </div>
-                            )}
+                        )}
+                        {planejamentoResumoHoje.recursos && (
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recursos e Materiais</p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{planejamentoResumoHoje.recursos}</p>
+                          </div>
+                        )}
+                        {!planejamentoResumoHoje.atividade && !planejamentoResumoHoje.recursos && planejamentoResumoHoje.objectives.length > 0 && (
+                          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Campos de Experiência</p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
+                              {[...new Set(planejamentoResumoHoje.objectives.map(o => o.campoExperiencia).filter(Boolean))].join(' · ') || 'Não informado'}
+                            </p>
                           </div>
                         )}
                       </div>

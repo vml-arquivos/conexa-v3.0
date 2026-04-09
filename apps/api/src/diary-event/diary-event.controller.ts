@@ -142,12 +142,17 @@ export class DiaryEventController {
       .filter(Boolean)
       .join('\n');
 
-    const avaliacao = await this.geminiService.generateText(
-      linhasPrompt,
-      'Você é um assistente pedagógico especialista em Educação Infantil. Responda sempre em português brasileiro com linguagem profissional e pedagógica.',
-    );
-
-    return { avaliacao: avaliacao.trim() };
+    try {
+      const avaliacao = await this.geminiService.generateText(
+        linhasPrompt,
+        'Você é um assistente pedagógico especialista em Educação Infantil. Responda sempre em português brasileiro com linguagem profissional e pedagógica.',
+      );
+      return { avaliacao: avaliacao.trim() };
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'Não foi possível gerar a avaliação com IA. Verifique a configuração da chave Gemini ou tente novamente em instantes.',
+      );
+    }
   }
 
   /**
