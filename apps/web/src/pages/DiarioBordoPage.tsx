@@ -2111,43 +2111,39 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-50 border border-sky-200 w-fit text-xs font-semibold uppercase tracking-wide text-sky-700">
-              <ClipboardList className="h-4 w-4" /> {getAvaliacaoTitle()}
-            </div>
+          {/* ─── AVALIAÇÃO DA PRÁTICA (Execução + Avaliação condensadas) ─── */}
+          <Card className="border-2 border-indigo-200 bg-indigo-50/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-indigo-800">
+                <ClipboardList className="h-5 w-5 text-indigo-500" /> Avaliação da Prática
+              </CardTitle>
+              <p className="text-xs text-indigo-600 mt-0.5">
+                Registre o cumprimento do plano, a leitura da turma e a reflexão pedagógica em um único fluxo.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5">
 
-            <Card className="border-2 border-emerald-200 bg-emerald-50/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-emerald-800">
-                  <ClipboardList className="h-5 w-5 text-emerald-500" /> {getExecucaoTitle()}
-                </CardTitle>
-                <p className="text-xs text-emerald-600 mt-0.5">
-                  Registre o que foi executado no plano do dia e os ajustes pedagógicos feitos ao longo da rotina.
+              {/* Subseção 1: Cumprimento do plano */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+                <p className="text-sm font-semibold text-emerald-800">
+                  Cumprimento do plano {planejamentoHoje && <span className="text-red-500">*</span>}
                 </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-800 mb-2">
-                    Cumprimento do plano {planejamentoHoje && <span className="text-red-500">*</span>}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
-                      { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
-                      { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
-                    ]).map(s => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form.statusExecucaoPlano === s.id ? s.cor + ' shadow-md' : 'bg-white ' + s.corOff}`}
-                      >
-                        <span>{s.emoji}</span> {s.label}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { id: 'FEITO' as const, label: 'Cumprido', emoji: '✅', cor: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600', corOff: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50' },
+                    { id: 'PARCIAL' as const, label: 'Parcial', emoji: '⚠️', cor: 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500', corOff: 'border-amber-300 text-amber-700 hover:bg-amber-50' },
+                    { id: 'NAO_REALIZADO' as const, label: 'Não realizado', emoji: '❌', cor: 'bg-red-500 hover:bg-red-600 text-white border-red-500', corOff: 'border-red-300 text-red-600 hover:bg-red-50' },
+                  ]).map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, statusExecucaoPlano: s.id }))}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all ${form.statusExecucaoPlano === s.id ? s.cor + ' shadow-md' : 'bg-white ' + s.corOff}`}
+                    >
+                      <span>{s.emoji}</span> {s.label}
+                    </button>
+                  ))}
                 </div>
-
                 {(form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && (
                   <div>
                     <Label>
@@ -2161,257 +2157,227 @@ export default function DiarioBordoPage() {
                     />
                   </div>
                 )}
+              </div>
 
+              {/* Subseção 2: Leitura da turma + Fatores + Reflexão */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <Label>Leitura da turma <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Textarea
+                      placeholder="Como a turma respondeu à proposta, à rotina e às interações do dia?"
+                      rows={3}
+                      value={form.reacaoCriancas}
+                      onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
+                    />
+                  </div>
+                  <div className="rounded-xl border border-sky-200 bg-white/80 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-sky-900">Fatores que influenciaram</p>
+                    <div className="flex flex-wrap gap-2">
+                      {FATORES_QUE_INFLUENCIARAM.map(fator => {
+                        const ativo = form.fatoresInfluenciaram.includes(fator.id);
+                        return (
+                          <button
+                            key={fator.id}
+                            type="button"
+                            onClick={() => toggleFatorInfluenciou(fator.id)}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${ativo ? 'border-sky-500 bg-sky-600 text-white shadow-sm' : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50'}`}
+                          >
+                            {fator.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {form.fatoresInfluenciaram.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        Selecionados: {FATORES_QUE_INFLUENCIARAM.filter(fator => form.fatoresInfluenciaram.includes(fator.id)).map(fator => fator.label).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
+                    <Textarea
+                      placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
+                      rows={3}
+                      value={form.reflexaoPedagogica}
+                      onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Texto complementar <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Textarea
+                      placeholder="Nuances pedagógicas, decisões tomadas em sala e percepções complementares."
+                      rows={2}
+                      value={form.textoComplementarProfessor}
+                      onChange={e => setForm(f => ({ ...f, textoComplementarProfessor: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Subseção 3: Adaptações, materiais e ocorrências (grid compacto) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <Label>Materiais utilizados <span className="font-normal text-gray-400">(opcional)</span></Label>
                   <Textarea
-                    placeholder="Quais materiais e recursos foram realmente utilizados?"
+                    placeholder="Materiais e recursos realmente utilizados"
                     rows={2}
                     value={form.materiaisUtilizados}
                     onChange={e => setForm(f => ({ ...f, materiaisUtilizados: e.target.value }))}
                   />
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
-                    <Textarea
-                      placeholder="Que ajustes foram necessários em relação ao previsto?"
-                      rows={2}
-                      value={form.adaptacoesRealizadas}
-                      onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
-                    <Textarea
-                      placeholder="Registe imprevistos, acontecimentos ou situações importantes do dia."
-                      rows={2}
-                      value={form.ocorrencias}
-                      onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
-                    />
-                  </div>
+                <div>
+                  <Label>Adaptações realizadas <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Ajustes em relação ao previsto"
+                    rows={2}
+                    value={form.adaptacoesRealizadas}
+                    onChange={e => setForm(f => ({ ...f, adaptacoesRealizadas: e.target.value }))}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 border-sky-200 bg-sky-50/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sky-800">
-                  <ClipboardList className="h-5 w-5 text-sky-500" /> Avaliação do Dia
-                </CardTitle>
-                <p className="text-xs text-sky-600 mt-0.5">{getAvaliacaoIntro()}</p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_0.95fr] gap-4">
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Leitura da turma <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Textarea
-                        placeholder="Como a turma respondeu à proposta, à rotina e às interações do dia?"
-                        rows={3}
-                        value={form.reacaoCriancas}
-                        onChange={e => setForm(f => ({ ...f, reacaoCriancas: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-sky-900">Fatores que influenciaram a proposta</p>
-                        <p className="text-xs text-sky-700">Marque o que mais impactou a execução do plano e a resposta da turma.</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {FATORES_QUE_INFLUENCIARAM.map(fator => {
-                          const ativo = form.fatoresInfluenciaram.includes(fator.id);
-                          return (
-                            <button
-                              key={fator.id}
-                              type="button"
-                              onClick={() => toggleFatorInfluenciou(fator.id)}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${ativo ? 'border-sky-500 bg-sky-600 text-white shadow-sm' : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50'}`}
-                            >
-                              {fator.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {form.fatoresInfluenciaram.length > 0 && (
-                        <p className="text-xs text-gray-500">
-                          Selecionados: {FATORES_QUE_INFLUENCIARAM.filter(fator => form.fatoresInfluenciaram.includes(fator.id)).map(fator => fator.label).join(', ')}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label>Texto complementar do professor <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Textarea
-                        placeholder="Registre nuances pedagógicas, decisões tomadas em sala e percepções complementares do professor."
-                        rows={3}
-                        value={form.textoComplementarProfessor}
-                        onChange={e => setForm(f => ({ ...f, textoComplementarProfessor: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <Label>O que precisa ser retomado? <span className="text-red-500">*</span> <span className="font-normal text-gray-400">(obrigatório)</span></Label>
-                      <Textarea
-                        placeholder="O que continuar, aprofundar ou retomar no próximo dia?"
-                        rows={3}
-                        value={form.reflexaoPedagogica}
-                        onChange={e => setForm(f => ({ ...f, reflexaoPedagogica: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-2">
-                      <p className="text-sm font-semibold text-slate-800">Complementos já disponíveis na execução do plano</p>
-                      <p className="text-xs text-slate-600">
-                        Os campos de <strong>adaptações realizadas</strong>, <strong>ocorrências relevantes</strong> e <strong>materiais utilizados</strong> continuam na seção de execução do plano acima.
-                        Assim, evitamos repetição visual e mantemos um único ponto de edição para essas informações.
-                      </p>
-                    </div>
-                  </div>
+                <div>
+                  <Label>Ocorrências relevantes <span className="font-normal text-gray-400">(opcional)</span></Label>
+                  <Textarea
+                    placeholder="Imprevistos ou situações importantes do dia"
+                    rows={2}
+                    value={form.ocorrencias}
+                    onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))}
+                  />
                 </div>
+              </div>
 
-                {planningObjectiveCards.length > 0 && (
-                  <div className="rounded-xl border border-sky-200 bg-white/90 p-4 space-y-4">
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-sky-900">Evidências por objetivo do plano</p>
-                      <p className="text-xs text-sky-700">
-                        Use os objetivos já exibidos no plano acima como referência. Aqui, a avaliação registra apenas o andamento e a evidência observada no dia, sem repetir metadados curriculares.
-                      </p>
-                    </div>
-
-                    <div className="space-y-3">
-                      {planningObjectiveCards.map(card => {
-                        const avaliacaoObjetivo = (form.avaliacoesObjetivos ?? []).find(item => item.objectiveIndex === card.index) ?? { objectiveIndex: card.index, status: '', observacao: '' };
-
-                        return (
-                          <div key={card.index} className="rounded-xl border border-sky-100 bg-sky-50/40 p-4 space-y-3">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                              <div className="space-y-1 min-w-0">
-                                <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-800">
-                                  Objetivo {card.index + 1}
-                                </span>
-                                <p className="text-xs text-sky-800">
-                                  Avalie somente a execução observada deste objetivo no dia. Os campos da matriz permanecem no bloco do plano acima.
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2 lg:max-w-[360px] lg:justify-end">
-                                {STATUS_AVALIACAO_OBJETIVO.map(status => (
-                                  <button
-                                    key={status.id}
-                                    type="button"
-                                    onClick={() => updateAvaliacaoObjetivo(card.index, { status: status.id })}
-                                    className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${avaliacaoObjetivo.status === status.id ? status.activeClassName : `bg-white ${status.idleClassName}`}`}
-                                  >
-                                    <span className="mr-1">{status.emoji}</span>{status.label}
-                                  </button>
-                                ))}
-                              </div>
+              {/* Subseção 4: Evidências por objetivo do plano (preservado integralmente) */}
+              {planningObjectiveCards.length > 0 && (
+                <div className="rounded-xl border border-sky-200 bg-white/90 p-4 space-y-4">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-sky-900">Evidências por objetivo do plano</p>
+                    <p className="text-xs text-sky-700">
+                      Use os objetivos já exibidos no plano acima como referência. Aqui, a avaliação registra apenas o andamento e a evidência observada no dia, sem repetir metadados curriculares.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {planningObjectiveCards.map(card => {
+                      const avaliacaoObjetivo = (form.avaliacoesObjetivos ?? []).find(item => item.objectiveIndex === card.index) ?? { objectiveIndex: card.index, status: '', observacao: '' };
+                      return (
+                        <div key={card.index} className="rounded-xl border border-sky-100 bg-sky-50/40 p-4 space-y-3">
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="space-y-1 min-w-0">
+                              <span className="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-800">
+                                Objetivo {card.index + 1}
+                              </span>
+                              <p className="text-xs text-sky-800">
+                                Avalie somente a execução observada deste objetivo no dia. Os campos da matriz permanecem no bloco do plano acima.
+                              </p>
                             </div>
-
-                            <div>
-                              <Label>Evidência observada neste objetivo <span className="font-normal text-gray-400">(opcional)</span></Label>
-                              <Textarea
-                                placeholder="Registre de forma breve o que avançou, o que exigiu mediação e o que precisa ser retomado neste objetivo."
-                                rows={2}
-                                value={avaliacaoObjetivo.observacao}
-                                onChange={e => updateAvaliacaoObjetivo(card.index, { observacao: e.target.value })}
-                              />
+                            <div className="flex flex-wrap gap-2 lg:max-w-[360px] lg:justify-end">
+                              {STATUS_AVALIACAO_OBJETIVO.map(status => (
+                                <button
+                                  key={status.id}
+                                  type="button"
+                                  onClick={() => updateAvaliacaoObjetivo(card.index, { status: status.id })}
+                                  className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${avaliacaoObjetivo.status === status.id ? status.activeClassName : `bg-white ${status.idleClassName}`}`}
+                                >
+                                  <span className="mr-1">{status.emoji}</span>{status.label}
+                                </button>
+                              ))}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <div>
+                            <Label>Evidência observada neste objetivo <span className="font-normal text-gray-400">(opcional)</span></Label>
+                            <Textarea
+                              placeholder="Registre de forma breve o que avançou, o que exigiu mediação e o que precisa ser retomado neste objetivo."
+                              rows={2}
+                              value={avaliacaoObjetivo.observacao}
+                              onChange={e => updateAvaliacaoObjetivo(card.index, { observacao: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
+              )}
 
-                <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-sky-900">Registro por criança com marcações rápidas</p>
-                      <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
-                    </div>
-                    <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-                      Use esta seção para selecionar as crianças reais da turma e registrar uma leitura rápida vinculada ao plano do dia, sem abrir novo fluxo de RDIC.
-                    </div>
+              {/* Subseção 5: Avaliação individual leve (preservada integralmente) */}
+              <div className="rounded-xl border border-sky-200 bg-white/80 p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-sky-900">Registro por criança com marcações rápidas</p>
+                    <p className="text-xs text-sky-700">{getAvaliacaoIndividualHelper()}</p>
                   </div>
-
-                  <CompactChildMultiSelect
-                    criancas={criancas}
-                    selecionadas={avaliacaoIndividualForm.childIds}
-                    onChange={ids => setAvaliacaoIndividualForm(f => ({ ...f, childIds: ids }))}
-                    label="Criança(s) da turma"
-                    helperText="Seleção compacta para observação individual, reduzindo a repetição visual de avatares no diário."
-                  />
-
+                  <div className="rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                    Use esta seção para selecionar as crianças reais da turma e registrar uma leitura rápida vinculada ao plano do dia, sem abrir novo fluxo de RDIC.
+                  </div>
+                </div>
+                <CompactChildMultiSelect
+                  criancas={criancas}
+                  selecionadas={avaliacaoIndividualForm.childIds}
+                  onChange={ids => setAvaliacaoIndividualForm(f => ({ ...f, childIds: ids }))}
+                  label="Criança(s) da turma"
+                  helperText="Seleção compacta para observação individual, reduzindo a repetição visual de avatares no diário."
+                />
+                <div>
+                  <Label>Marcação rápida</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {MARCACOES_RAPIDAS_CRIANCA.map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setAvaliacaoIndividualForm(f => ({ ...f, marcacaoRapida: f.marcacaoRapida === item.id ? '' : item.id }))}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${avaliacaoIndividualForm.marcacaoRapida === item.id ? 'border-sky-500 bg-sky-600 text-white shadow-sm' : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50'}`}
+                      >
+                        <span className="mr-1">{item.emoji}</span>{item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <div>
-                    <Label>Marcação rápida</Label>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {MARCACOES_RAPIDAS_CRIANCA.map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setAvaliacaoIndividualForm(f => ({ ...f, marcacaoRapida: f.marcacaoRapida === item.id ? '' : item.id }))}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${avaliacaoIndividualForm.marcacaoRapida === item.id ? 'border-sky-500 bg-sky-600 text-white shadow-sm' : 'border-sky-200 bg-white text-sky-700 hover:bg-sky-50'}`}
-                        >
-                          <span className="mr-1">{item.emoji}</span>{item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div>
-                      <Label>Aspecto observado <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Input
-                        placeholder="Ex.: participação, linguagem, autonomia, interação"
-                        value={avaliacaoIndividualForm.focoObservado}
-                        onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, focoObservado: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <Label>Próximo passo <span className="font-normal text-gray-400">(opcional)</span></Label>
-                      <Input
-                        placeholder="Ex.: retomar proposta, ampliar desafio, observar novamente"
-                        value={avaliacaoIndividualForm.proximoPasso}
-                        onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, proximoPasso: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Observação individual breve</Label>
-                    <Textarea
-                      placeholder={getAvaliacaoPlaceholder()}
-                      rows={3}
-                      value={avaliacaoIndividualForm.observacao}
-                      onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, observacao: e.target.value }))}
+                    <Label>Aspecto observado <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Input
+                      placeholder="Ex.: participação, linguagem, autonomia, interação"
+                      value={avaliacaoIndividualForm.focoObservado}
+                      onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, focoObservado: e.target.value }))}
                     />
                   </div>
-
-                  {avaliacaoIndividualForm.childIds.length > 0 && (
-                    <p className="text-xs text-gray-500">
-                      Selecionadas: {criancas.filter(c => avaliacaoIndividualForm.childIds.includes(c.id)).map(c => c.firstName).join(', ')}
-                    </p>
-                  )}
-
-                  <Button
-                    type="button"
-                    onClick={salvarAvaliacaoIndividual}
-                    disabled={savingAvaliacaoIndividual}
-                    className="w-full bg-sky-600 hover:bg-sky-700"
-                  >
-                    {savingAvaliacaoIndividual
-                      ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
-                      : <><Save className="h-4 w-4 mr-2" /> {getPlanningObservationTitle(avaliacaoIndividualForm.childIds.length)}</>}
-                  </Button>
+                  <div>
+                    <Label>Próximo passo <span className="font-normal text-gray-400">(opcional)</span></Label>
+                    <Input
+                      placeholder="Ex.: retomar proposta, ampliar desafio, observar novamente"
+                      value={avaliacaoIndividualForm.proximoPasso}
+                      onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, proximoPasso: e.target.value }))}
+                    />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div>
+                  <Label>Observação individual breve</Label>
+                  <Textarea
+                    placeholder={getAvaliacaoPlaceholder()}
+                    rows={3}
+                    value={avaliacaoIndividualForm.observacao}
+                    onChange={e => setAvaliacaoIndividualForm(f => ({ ...f, observacao: e.target.value }))}
+                  />
+                </div>
+                {avaliacaoIndividualForm.childIds.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Selecionadas: {criancas.filter(c => avaliacaoIndividualForm.childIds.includes(c.id)).map(c => c.firstName).join(', ')}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  onClick={salvarAvaliacaoIndividual}
+                  disabled={savingAvaliacaoIndividual}
+                  className="w-full bg-sky-600 hover:bg-sky-700"
+                >
+                  {savingAvaliacaoIndividual
+                    ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Salvando...</>
+                    : <><Save className="h-4 w-4 mr-2" /> {getPlanningObservationTitle(avaliacaoIndividualForm.childIds.length)}</>}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="border-2 border-blue-100">
             <CardHeader className="pb-2">
