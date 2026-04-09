@@ -82,4 +82,13 @@ export class GenerateAvaliacaoDto {
   @IsString({ each: true })
   @IsOptional()
   camposExperiencia?: string[];
+
+  /** Observações individuais por criança (comportamentos marcados pelo professor) */
+  @IsArray()
+  @IsOptional()
+  observacoesIndividuais?: Array<{
+    tipo: string;
+    label: string;
+    quantidadeCriancas: number;
+  }>;
 }
