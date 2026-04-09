@@ -178,9 +178,7 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
       const formData = new FormData();
       formData.append('file', file);
       formData.append('childId', crianca.id);
-      const res = await http.post(`/children/${crianca.id}/photo`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await http.post(`/children/${crianca.id}/photo`, formData);
       const url = extractUploadedPhotoUrl(res.data);
       if (!url) {
         throw new Error('Resposta de upload sem photoUrl');

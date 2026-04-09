@@ -4,6 +4,12 @@ import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
 import { FilterChildDto } from './dto/filter-child.dto';
 import { canAccessUnit } from '../common/utils/can-access-unit';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
+
+const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
+const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
 
 @Injectable()
 export class ChildrenService {
@@ -168,6 +174,7 @@ export class ChildrenService {
       select: {
         id: true,
         unitId: true,
+        photoUrl: true,
       },
     });
 
@@ -183,9 +190,27 @@ export class ChildrenService {
       throw new BadRequestException('Arquivo não recebido');
     }
 
-    // Converte para base64 data URL — persiste sem S3
-    const base64 = file.buffer.toString('base64');
-    const photoUrl = `data:${file.mimetype};base64,${base64}`;
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Tipo de arquivo não permitido. Use JPEG, PNG, WebP ou GIF.');
+    }
+
+    fs.mkdirSync(CHILDREN_UPLOADS_DIR, { recursive: true });
+
+    if (child.photoUrl?.startsWith('/uploads/children/')) {
+      const oldRelativePath = child.photoUrl.replace(/^\/uploads\//, '');
+      const oldFilePath = path.join(UPLOADS_ROOT_DIR, oldRelativePath);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+    }
+
+    const ext = file.mimetype.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+    const filename = `${id}-${crypto.randomBytes(8).toString('hex')}.${ext}`;
+    const filepath = path.join(CHILDREN_UPLOADS_DIR, filename);
+    const photoUrl = `/uploads/children/${filename}`;
+
+    fs.writeFileSync(filepath, file.buffer);
 
     try {
       await this.prisma.child.update({
@@ -203,6 +228,9 @@ export class ChildrenService {
         );
 
       if (!missingPhotoUrlColumn) {
+        if (fs.existsSync(filepath)) {
+          fs.unlinkSync(filepath);
+        }
         throw new InternalServerErrorException('Não foi possível salvar a foto da criança');
       }
 

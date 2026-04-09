@@ -11,8 +11,10 @@ import {
   Request,
   UploadedFile,
   UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -78,7 +80,18 @@ export class ChildrenController {
    * Upload de foto da criança
    */
   @Post(':id/photo')
-  @UseInterceptors(FileInterceptor('file'))
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.PROFESSOR)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        const accepted = allowedMimes.includes(file.mimetype);
+        cb(accepted ? null : new BadRequestException('Tipo de arquivo não permitido'), accepted);
+      },
+    }),
+  )
   async uploadPhoto(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
