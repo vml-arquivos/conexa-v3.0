@@ -149,9 +149,7 @@ export default function SalaDeAulaVirtualPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await http.post(`/children/${alunoSelecionado.id}/photo`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const res = await http.post(`/children/${alunoSelecionado.id}/photo`, formData);
       const url = res.data?.photoUrl || res.data?.url;
       if (url) {
         setAlunoSelecionado(prev => prev ? { ...prev, photoUrl: url } : prev);

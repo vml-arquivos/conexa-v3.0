@@ -6,6 +6,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
+import * as express from 'express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -18,6 +20,14 @@ async function bootstrap() {
 
   // ─── Cookie Parser ────────────────────────────────────────────────────────
   app.use(cookieParser());
+
+  // ─── Limites de body para payloads JSON usuais ────────────────────────────
+  app.use(express.json({ limit: '2mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+  // ─── Arquivos estáticos de upload ──────────────────────────────────────────
+  const uploadsDir = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // ─── CORS estrito com whitelist explícita ─────────────────────────────────
   const allowedOrigins = [
