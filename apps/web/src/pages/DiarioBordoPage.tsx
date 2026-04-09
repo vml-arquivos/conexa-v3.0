@@ -641,6 +641,7 @@ export default function DiarioBordoPage() {
   // Dados da turma e professor
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
+  const [turmaNomeAtual, setTurmaNomeAtual] = useState<string>('Turma');
   const [draftRegistry, setDraftRegistry] = useLocalStorage<Record<string, {
     form: ReturnType<typeof getInitialDiaryForm>;
     microgestoForm: { tipos: string[]; descricao: string; campo: string; horario: string; criancasSelecionadas: string[] };
@@ -1049,6 +1050,7 @@ export default function DiarioBordoPage() {
         : turmas[0];
       const cid = turmaInicial.id;
       setClassroomId(cid);
+      setTurmaNomeAtual(turmaInicial.name || 'Turma');
 
       // Buscar crianças matriculadas na turma
       let lista: Crianca[] = [];
@@ -1571,7 +1573,7 @@ export default function DiarioBordoPage() {
       } catch { /* usa fallback */ }
       const pdfData: DiaryPrintData = {
         data: form.date,
-        turmaNome: turmaNomeResolvido,
+        turmaNome: turmaNomeResolvido || turmaNomeAtual,
         professorNome: nomeProfessor,
         planejamentoTitulo: planejamentoHoje?.title,
         planejamentoAtividade: planejamentoHoje?.activities,
@@ -1793,7 +1795,7 @@ export default function DiarioBordoPage() {
                               const dataStr = (diario.date || diario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: 'Turma',
+                                turmaNome: turmaNomeAtual,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -1804,7 +1806,17 @@ export default function DiarioBordoPage() {
                                 presencas: diario.presencas ?? ctx.presencas ?? 0,
                                 ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
                                 climaEmocional: diario.climaEmocional || ctx.climaEmocional,
-                                rotina: ctx.rotina as Record<string, boolean>,
+                                rotina: (() => {
+                                  const r = ctx.rotina;
+                                  if (!r) return undefined;
+                                  // Se já é Record<string,boolean> (novo formato)
+                                  if (!Array.isArray(r)) return r as Record<string, boolean>;
+                                  // Se é RotinaItem[] (formato antigo: {momento, concluido})
+                                  return (r as any[]).reduce((acc: Record<string, boolean>, item: any) => {
+                                    if (item?.momento) acc[item.momento] = Boolean(item.concluido);
+                                    return acc;
+                                  }, {});
+                                })(),
                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
                                 criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
                               });
