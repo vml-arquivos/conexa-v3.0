@@ -1814,15 +1814,114 @@ export default function DiarioBordoPage() {
                             </div>
                           </div>
                         )}
+                        {/* ── Avaliação do Plano de Aula ── */}
+                        {(() => {
+                          const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as Record<string, any> : {};
+                          const statusMap: Record<string, { label: string; color: string }> = {
+                            cumprido: { label: '✅ Cumprido', color: 'text-green-700 bg-green-50 border border-green-200' },
+                            parcial:  { label: '⚠️ Parcialmente cumprido', color: 'text-yellow-700 bg-yellow-50 border border-yellow-200' },
+                            nao_realizado: { label: '❌ Não realizado', color: 'text-red-700 bg-red-50 border border-red-200' },
+                          };
+                          const statusExec = ctx.statusExecucaoPlano ? statusMap[ctx.statusExecucaoPlano] : null;
+                          const hasBlock = ctx.planejamentoTitulo || statusExec || ctx.execucaoPlanejamento || ctx.avaliacaoPlanoAula || ctx.reacaoCriancas || ctx.materiaisUtilizados || ctx.adaptacoesRealizadas || ctx.textoComplementarProfessor || (ctx.fatoresInfluenciaram && ctx.fatoresInfluenciaram.length > 0);
+                          if (!hasBlock) return null;
+                          return (
+                            <div className="border border-blue-100 rounded-xl p-4 space-y-3 bg-blue-50/40">
+                              <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Avaliação do Plano de Aula</p>
+                              {ctx.planejamentoTitulo && (
+                                <p className="text-sm font-medium text-gray-800">📋 {ctx.planejamentoTitulo}</p>
+                              )}
+                              {statusExec && (
+                                <span className={`inline-block text-xs font-semibold px-2 py-1 rounded-full ${statusExec.color}`}>{statusExec.label}</span>
+                              )}
+                              {ctx.execucaoPlanejamento && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Como foi a execução do plano</p><p className="text-sm text-gray-700">{ctx.execucaoPlanejamento}</p></div>
+                              )}
+                              {ctx.avaliacaoPlanoAula && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Avaliação do Plano de Aula (IA)</p><p className="text-sm text-gray-700">{ctx.avaliacaoPlanoAula}</p></div>
+                              )}
+                              {ctx.reacaoCriancas && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Como a turma respondeu</p><p className="text-sm text-gray-700">{ctx.reacaoCriancas}</p></div>
+                              )}
+                              {ctx.fatoresInfluenciaram && ctx.fatoresInfluenciaram.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-gray-500 mb-1">Fatores que influenciaram</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {(ctx.fatoresInfluenciaram as string[]).map((f: string) => {
+                                      const fator = FATORES_QUE_INFLUENCIARAM.find(x => x.id === f);
+                                      return <span key={f} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{fator?.label ?? f}</span>;
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                              {ctx.materiaisUtilizados && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Materiais utilizados</p><p className="text-sm text-gray-700">{ctx.materiaisUtilizados}</p></div>
+                              )}
+                              {ctx.adaptacoesRealizadas && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Adaptações realizadas</p><p className="text-sm text-gray-700">{ctx.adaptacoesRealizadas}</p></div>
+                              )}
+                              {ctx.textoComplementarProfessor && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Texto complementar</p><p className="text-sm text-gray-700">{ctx.textoComplementarProfessor}</p></div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* ── Reflexão Pedagógica ── */}
                         {diario.reflexaoPedagogica && (
                           <div className="bg-indigo-50 rounded-lg p-3">
                             <p className="text-xs font-semibold text-indigo-500 uppercase mb-1">Reflexão Pedagógica</p>
                             <p className="text-sm text-indigo-700">{diario.reflexaoPedagogica}</p>
                           </div>
                         )}
+                        {/* ── Fechamento Geral do Dia ── */}
+                        {(() => {
+                          const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as Record<string, any> : {};
+                          const hasFechamento = ctx.oQueFuncionou || ctx.oQueNaoFuncionou || ctx.objetivoAtingido;
+                          if (!hasFechamento) return null;
+                          return (
+                            <div className="border border-emerald-100 rounded-xl p-4 space-y-3 bg-emerald-50/40">
+                              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Fechamento Geral do Dia</p>
+                              {ctx.oQueFuncionou && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">O que funcionou</p><p className="text-sm text-gray-700">{ctx.oQueFuncionou}</p></div>
+                              )}
+                              {ctx.oQueNaoFuncionou && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">O que não funcionou</p><p className="text-sm text-gray-700">{ctx.oQueNaoFuncionou}</p></div>
+                              )}
+                              {ctx.objetivoAtingido && (
+                                <div><p className="text-xs text-gray-500 mb-0.5">Objetivo atingido</p><p className="text-sm text-gray-700">{ctx.objetivoAtingido}</p></div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {/* ── Observações Individuais ── */}
+                        {(() => {
+                          const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as Record<string, any> : {};
+                          const obs: any[] = Array.isArray(ctx.observacoesIndividuais) ? ctx.observacoesIndividuais : [];
+                          if (obs.length === 0) return null;
+                          return (
+                            <div className="border border-violet-100 rounded-xl p-4 bg-violet-50/40">
+                              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wide mb-3">Observações Individuais ({obs.length})</p>
+                              <div className="space-y-2">
+                                {obs.map((o: any, i: number) => (
+                                  <div key={i} className="flex items-start gap-2 p-2 bg-white rounded-lg border border-violet-100">
+                                    <UserCircle className="h-4 w-4 text-violet-400 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-violet-700 truncate">{o.criancaNome || o.childId || 'Criança'}</p>
+                                      {o.marcacaoRapida && <span className="inline-block text-xs bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded-full mr-1">{o.marcacaoRapida}</span>}
+                                      {o.focoObservado && <p className="text-xs text-gray-600 mt-0.5"><span className="font-medium">Foco:</span> {o.focoObservado}</p>}
+                                      {o.observacao && <p className="text-xs text-gray-600 mt-0.5">{o.observacao}</p>}
+                                      {o.proximoPasso && <p className="text-xs text-gray-500 mt-0.5"><span className="font-medium">Próximo passo:</span> {o.proximoPasso}</p>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {/* ── Encaminhamentos e Próximos Passos ── */}
                         {diario.encaminhamentos && (
                           <div className="bg-orange-50 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-orange-500 uppercase mb-1">Encaminhamentos</p>
+                            <p className="text-xs font-semibold text-orange-500 uppercase mb-1">Encaminhamentos e Próximos Passos</p>
                             <p className="text-sm text-orange-700">{diario.encaminhamentos}</p>
                           </div>
                         )}
