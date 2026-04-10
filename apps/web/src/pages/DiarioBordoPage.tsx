@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -18,7 +18,7 @@ import {
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
   Camera, UploadCloud, Trash2, TriangleAlert, Pencil, ClipboardList,
-  WandSparkles, Loader2, Printer,
+  WandSparkles, Loader2, Printer, ChevronRight, ArrowLeft,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
@@ -611,10 +611,19 @@ function getAvaliacaoTitle() {
 export default function DiarioBordoPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const roles = normalizeRoles(user);
   const isDeveloper = roles.includes('DEVELOPER');
   const currentUserId = (user as any)?.id ?? (user as any)?.sub ?? '';
-  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>('lista');
+  const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
+  const childIdFromQuery = searchParams.get('childId') ?? undefined;
+  const dateFromQuery = searchParams.get('date') ?? undefined;
+  // PR 1: suporte a ?aba=novo para abrir diretamente no formulário de registro
+  const abaFromQuery = searchParams.get('aba') as 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | null;
+  // Se vier com ?aba=novo (via calendário) ou com ?date= (via chamada), abrir direto no formulário
+  const abaInicial: 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' =
+    (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
+  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>(abaInicial);
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
@@ -623,9 +632,6 @@ export default function DiarioBordoPage() {
   const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
-  const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
-  const childIdFromQuery = searchParams.get('childId') ?? undefined;
-  const dateFromQuery = searchParams.get('date') ?? undefined;
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -1632,6 +1638,40 @@ export default function DiarioBordoPage() {
 
   return (
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
+      {/* PR 1: Breadcrumb e navegação de volta ao calendário */}
+      <nav className="flex items-center gap-2 text-sm text-gray-500 -mt-4 mb-4">
+        <button
+          onClick={() => navigate('/app/teacher-dashboard')}
+          className="hover:text-gray-800 transition-colors"
+        >
+          Central da Turma
+        </button>
+        <ChevronRight className="h-3 w-3" />
+        <button
+          onClick={() => navigate('/app/diario-calendario')}
+          className="hover:text-gray-800 transition-colors"
+        >
+          Diário da Turma
+        </button>
+        <ChevronRight className="h-3 w-3" />
+        <span className="text-gray-800 font-medium">
+          {aba === 'novo' ? 'Registrar Dia' : aba === 'lista' ? 'Histórico' : aba === 'ocorrencias' ? 'Ocorrências' : aba === 'observacoes' ? 'Observações' : 'Microgestos'}
+        </span>
+      </nav>
+      {/* Botão voltar ao calendário (visível quando veio do calendário via ?aba=novo) */}
+      {abaFromQuery === 'novo' && (
+        <div className="mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/app/diario-calendario')}
+            className="flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar ao Calendário
+          </Button>
+        </div>
+      )}
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[

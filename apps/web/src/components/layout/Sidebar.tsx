@@ -26,7 +26,10 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/planejamentos',       label: 'Planos de Aula',         icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/planejamento/novo',   label: 'Novo Plano de Aula',     icon: <Calendar className="h-4 w-4" /> },
-  { path: '/app/diario-de-bordo',     label: 'Central da Turma',       icon: <ClipboardList className="h-4 w-4" /> },
+  // PR 1: entrada principal do professor → calendário de dias letivos
+  { path: '/app/diario-calendario',   label: 'Diário da Turma',        icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
+  // Histórico/arquivo (antes era a entrada principal)
+  { path: '/app/diario-de-bordo',     label: 'Histórico de Diários',    icon: <BookOpen className="h-4 w-4" /> },
   { path: '/app/rdic-crianca',        label: 'RDIC por Criança',       icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/chamada',             label: 'Chamada Diária',         icon: <UserCheck className="h-4 w-4" /> },
   { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },

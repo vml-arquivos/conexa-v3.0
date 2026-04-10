@@ -20,6 +20,7 @@ import RdxPage from '../pages/RdxPage';
 import PlanejamentosPage from '../pages/PlanejamentosPage';
 import RdicRiaPage from '../pages/RdicRiaPage';
 import DiarioBordoPage from '../pages/DiarioBordoPage';
+import DiarioCalendarioPage from '../pages/DiarioCalendarioPage';
 import MatrizPedagogicaPage from '../pages/MatrizPedagogicaPage';
 import ConfiguracoesPage from '../pages/ConfiguracoesPage';
 import AdminUsuariosPage from '../pages/AdminUsuariosPage';
@@ -227,7 +228,17 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Diário de Bordo com Microgestos ──────────────────────────────────────────────
+      // ─── Diário da Turma — Calendário por Dia Letivo (PR 1: nova entrada principal) ────
+      {
+        path: 'diario-calendario',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <DiarioCalendarioPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Diário de Bordo com Microgestos (preservado — entrada via calendário ou link direto) ──
       {
         path: 'diario-de-bordo',
         element: (

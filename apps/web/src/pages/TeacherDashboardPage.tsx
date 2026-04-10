@@ -145,7 +145,7 @@ function normalizeDashboardPlanning(activePlanning: any, fallbackObjectives: any
 // ─── Ações Rápidas ────────────────────────────────────────────────────────────
 const ACOES_RAPIDAS = [
   { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
-  { id: 'diario', label: 'Diário de Bordo', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-de-bordo' },
+  { id: 'diario', label: 'Diário da Turma', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-calendario' },
   { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
   { id: 'sala', label: 'Sala de Aula Virtual', desc: 'Tarefas e desempenho', icon: <GraduationCap className="h-6 w-6" />, cor: 'bg-violet-500', rota: '/app/sala-de-aula-virtual' },
   { id: 'rdic', label: 'RDIC por Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-crianca' },
@@ -982,8 +982,8 @@ export default function TeacherDashboardPage() {
                     <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(100, ((ind?.diariosEstaSemana ?? 0) / 5) * 100)}%` }} />
                     </div>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-blue-600 border-blue-200" onClick={() => navigate('/app/diario-de-bordo')}>
-                      <Plus className="h-3 w-3 mr-1" /> Novo Diário
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-blue-600 border-blue-200" onClick={() => navigate('/app/diario-calendario')}>
+                      <Plus className="h-3 w-3 mr-1" /> Abrir Diário
                     </Button>
                   </CardContent>
                 </Card>
