@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { DiaryEventType } from '@prisma/client';
+import { DiaryEventType, DiaryEventStatus } from '@prisma/client';
 
 const CUID_REGEX = /^c[a-z0-9]{24,}$/i;
 
@@ -120,4 +120,14 @@ export class CreateDiaryEventDto {
   @IsString({ each: true })
   @IsOptional()
   mediaUrls?: string[];
+
+  /**
+   * status é OPCIONAL.
+   * Quando não informado, o service usa PUBLICADO como padrão ao salvar
+   * (o professor está "publicando" ao clicar em Salvar).
+   * Valores aceitos: RASCUNHO | PUBLICADO | REVISADO | ARQUIVADO
+   */
+  @IsEnum(DiaryEventStatus)
+  @IsOptional()
+  status?: DiaryEventStatus;
 }

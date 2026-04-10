@@ -197,6 +197,9 @@ export class DiaryEventService {
         ausencias: createDto.ausencias ?? 0,
       },
       mediaUrls: createDto.mediaUrls || [],
+      // PR 2: status explícito — default PUBLICADO (professor salva = publica)
+      // Se o cliente enviar RASCUNHO explicitamente, respeita.
+      status: createDto.status ?? 'PUBLICADO',
       createdBy: user.sub,
       mantenedoraId: classroom.unit.mantenedoraId,
       unitId: classroom.unitId,
@@ -227,6 +230,8 @@ export class DiaryEventService {
         tags: eventData.tags,
         aiContext: eventData.aiContext,
         mediaUrls: eventData.mediaUrls,
+        // PR 2: atualiza status no re-save (upsert)
+        status: eventData.status,
       },
       include: {
         child: {

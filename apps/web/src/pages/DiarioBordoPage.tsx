@@ -1524,6 +1524,8 @@ export default function DiarioBordoPage() {
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
+          // PR 2: sinaliza ao backend que este save é uma publicação
+          status: 'PUBLICADO',
           // FIX: planningId undefined (não null) para evitar falha de validação CUID no DTO
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,

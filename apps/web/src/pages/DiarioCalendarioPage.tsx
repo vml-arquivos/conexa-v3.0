@@ -1,5 +1,5 @@
 /**
- * DiarioCalendarioPage — PR 1: Entrada principal do professor para o Diário da Turma
+ * DiarioCalendarioPage — PR 2: Entrada principal do professor para o Diário da Turma
  *
  * Responsabilidades:
  * - Exibir calendário/lista de dias letivos do ano 2026
@@ -7,11 +7,11 @@
  * - Ao clicar em um dia, navegar para DiarioBordoPage com ?date=YYYY-MM-DD&aba=novo
  * - Agrupar dias por mês para facilitar navegação
  *
- * Regras absolutas (PR 1):
+ * PR 2 — Fonte de status:
+ * - Usa item.status do backend (DiaryEventStatus: RASCUNHO | PUBLICADO | REVISADO | ARQUIVADO)
+ * - localStorage removido como fonte primária de status
  * - Sem migration, sem schema.prisma, sem endpoint novo
- * - Usa apenas GET /diary-events (já existente) com filtros de data
  * - Preserva RBAC atual
- * - Diff mínimo e seguro
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -198,7 +198,9 @@ export default function DiarioCalendarioPage() {
           mapa[data] = { data, status: 'SEM_DIARIO' };
         }
 
-        // Marcar dias com diário publicado
+        // PR 2: Usar item.status do backend como fonte primária de status.
+        // O backend retorna DiaryEventStatus: RASCUNHO | PUBLICADO | REVISADO | ARQUIVADO.
+        // REVISADO e ARQUIVADO são tratados como PUBLICADO para fins de exibição no calendário.
         for (const item of raw) {
           const eventDate = item.eventDate || item.createdAt || '';
           if (!eventDate) continue;
@@ -207,29 +209,44 @@ export default function DiarioCalendarioPage() {
           if (!mapa[data]) continue; // dia não letivo — ignorar
 
           const ctx = item.aiContext && typeof item.aiContext === 'object' ? item.aiContext : {};
+
+          // Mapear status do backend para StatusDia do calendário
+          const backendStatus: string = item.status ?? 'RASCUNHO';
+          let statusDia: StatusDia;
+          if (backendStatus === 'PUBLICADO' || backendStatus === 'REVISADO' || backendStatus === 'ARQUIVADO') {
+            statusDia = 'PUBLICADO';
+          } else {
+            // RASCUNHO (ou qualquer valor desconhecido) → RASCUNHO
+            statusDia = 'RASCUNHO';
+          }
+
+          // Se já existe um PUBLICADO neste dia, não rebaixar para RASCUNHO
+          // (pode haver múltiplos eventos por dia para crianças diferentes)
+          if (mapa[data].status === 'PUBLICADO' && statusDia === 'RASCUNHO') {
+            continue;
+          }
+
           mapa[data] = {
             data,
-            status: 'PUBLICADO',
+            status: statusDia,
             diarioId: item.id,
             momentoDestaque: item.momentoDestaque ?? ctx.momentoDestaque ?? item.description ?? '',
             climaEmocional: item.climaEmocional ?? ctx.climaEmocional ?? '',
           };
         }
 
-        // Verificar rascunhos no localStorage
-        // Chave do draft: `diario:${userId}:${classroomId}:${data}`
+        // localStorage: mantido apenas como fallback offline (não é mais fonte primária).
+        // Só marca RASCUNHO se o backend não retornou nenhum evento para aquele dia.
         const userId = (user as any)?.id ?? (user as any)?.sub ?? 'anon';
-        const cid = classroomId ?? 'sem-turma';
         try {
           const draftsRaw = localStorage.getItem('diario-bordo-drafts');
           if (draftsRaw) {
             const drafts: Record<string, { form: { date: string }; savedAt: string }> = JSON.parse(draftsRaw);
             for (const [key, draft] of Object.entries(drafts)) {
-              // Chave: `diario:${userId}:${classroomId}:${data}`
               if (!key.startsWith(`diario:${userId}:`)) continue;
               const data = draft?.form?.date;
               if (!data || !mapa[data]) continue;
-              // Só marcar como rascunho se ainda não publicado
+              // Só marcar como rascunho se o backend não tem nenhum evento para este dia
               if (mapa[data].status === 'SEM_DIARIO') {
                 mapa[data] = { ...mapa[data], status: 'RASCUNHO' };
               }
