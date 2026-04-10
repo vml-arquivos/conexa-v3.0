@@ -24,14 +24,12 @@ const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
-  { path: '/app/planejamentos',       label: 'Planos de Aula',         icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/planejamento/novo',   label: 'Novo Plano de Aula',     icon: <Calendar className="h-4 w-4" /> },
-  // PR 1: entrada principal do professor → calendário de dias letivos
-  { path: '/app/diario-calendario',   label: 'Diário da Turma',        icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
-  // Histórico/arquivo (antes era a entrada principal)
-  { path: '/app/diario-de-bordo',     label: 'Histórico de Diários',    icon: <BookOpen className="h-4 w-4" /> },
+  // Plano de Aula: entrada única → calendário de planejamentos
+  { path: '/app/planejamentos',       label: 'Plano de Aula',          icon: <BookOpen className="h-4 w-4" />, badge: 'Novo' },
+  // Diário: entrada única → calendário de dias letivos (PR 1/PR 2)
+  { path: '/app/diario-calendario',   label: 'Diário',                 icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
+  // Chamada Diária removida do menu principal (incorporada ao fluxo do Diário)
   { path: '/app/rdic-crianca',        label: 'RDIC por Criança',       icon: <Brain className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/chamada',             label: 'Chamada Diária',         icon: <UserCheck className="h-4 w-4" /> },
   { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais',   label: 'Atendimentos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica',   label: 'Matriz 2026',            icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
