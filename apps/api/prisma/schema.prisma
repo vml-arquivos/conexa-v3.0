@@ -2298,5 +2298,5 @@ model DevelopmentReport {
 
   @@index([childId, createdAt(sort: Desc)])
   @@index([classroomId, period])
-  @@map("DevelopmentReport")
+  @@map("development_report")
 }
