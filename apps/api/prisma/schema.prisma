@@ -552,6 +552,14 @@ model Child {
   usoImagem         Boolean?
   laudado           Boolean?
   nis               String? @db.VarChar(20)
+  codigoAluno       String? @db.VarChar(20)
+  inscricao         String? @db.VarChar(20)
+  nomeMae           String? @db.VarChar(255)
+  nomePai           String? @db.VarChar(255)
+  tipoLaudo         String? @db.VarChar(100)
+  cid               String? @db.VarChar(20)
+  descricaoLaudo    String? @db.Text
+  medicamentos      String? @db.Text
   // Foto do aluno
   photoUrl String? @db.Text
 
