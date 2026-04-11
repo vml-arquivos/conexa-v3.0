@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, User, Heart, AlertTriangle, Phone, FileText, Baby } from 'lucide-react';
 import http from '../../api/http';
+import { resolveChildPhotoUrl } from './ChildAvatar';
 
 interface ChildInfoModalProps {
   childId: string;
@@ -50,6 +51,9 @@ export function ChildInfoModal({ childId, onClose }: ChildInfoModalProps) {
 
   const nomeSexo = child?.gender === 'MASCULINO' ? 'Masculino' : child?.gender === 'FEMININO' ? 'Feminino' : 'Não informado';
 
+  // Resolve a URL da foto usando a mesma lógica do card (normaliza paths relativos para URL absoluta)
+  const fotoUrl = resolveChildPhotoUrl(child);
+
   return (
     <>
       {/* Overlay */}
@@ -79,11 +83,14 @@ export function ChildInfoModal({ childId, onClose }: ChildInfoModalProps) {
               <div className="w-20 h-20 rounded-full bg-white/20 ring-4 ring-white/50 flex items-center justify-center">
                 <span className="text-white/60 text-xs">...</span>
               </div>
-            ) : child?.photoUrl ? (
+            ) : fotoUrl ? (
               <img
-                src={child.photoUrl}
+                src={fotoUrl}
                 alt={`${child?.firstName ?? ''} ${child?.lastName ?? ''}`}
                 className="w-20 h-20 rounded-full object-cover ring-4 ring-white shadow-lg"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             ) : (
               <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-white text-2xl font-bold ring-4 ring-white/50">
