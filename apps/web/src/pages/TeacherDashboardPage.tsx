@@ -201,10 +201,12 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
   return (
     <>
       <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
-      <button onClick={() => inputRef.current?.click()} disabled={uploading}
-        className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-all shadow-md"
+      <button
+        onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
+        disabled={uploading}
+        className="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-blue-50 z-10"
         title="Adicionar foto">
-        {uploading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+        {uploading ? <RefreshCw className="h-2.5 w-2.5 text-blue-500 animate-spin" /> : <Camera className="h-2.5 w-2.5 text-gray-500" />}
       </button>
     </>
   );
@@ -650,7 +652,7 @@ export default function TeacherDashboardPage() {
                   <p className="text-gray-400">Nenhuma criança matriculada ainda</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   {alunos.map(aluno => {
                     const temFoto = hasChildPhoto(aluno);
                     const generoLabel = aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : 'Não informado';
@@ -658,75 +660,57 @@ export default function TeacherDashboardPage() {
 
                     return (
                       <div key={aluno.id}
-                        className="group rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
-                        <div className="flex items-start gap-4">
-                          <div className="relative shrink-0">
-                            {temFoto ? (
-                              <button onClick={() => setFotoAmpliada({ url: resolveChildPhotoUrl(aluno)!, nome: `${aluno.firstName} ${aluno.lastName}` })}>
-                                <ChildAvatar
-                                  child={aluno}
-                                  alt={aluno.nome}
-                                  sizeClassName="h-16 w-16"
-                                  imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all cursor-zoom-in group-hover:border-blue-300"
-                                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
-                                  iconClassName="h-10 w-10 text-slate-400"
-                                />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setModalCriancaInfo(aluno.id)}
-                                className="focus:outline-none"
-                                title="Ver ficha do aluno"
-                              >
-                                <ChildAvatar
-                                  child={aluno}
-                                  alt={aluno.nome}
-                                  sizeClassName="h-16 w-16"
-                                  imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all"
-                                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
-                                  iconClassName="h-10 w-10 text-slate-400"
-                                />
-                              </button>
-                            )}
-                            <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
-                          </div>
+                        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all duration-200 p-4 flex flex-col items-center gap-3">
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-base font-semibold text-slate-900">{aluno.firstName} {aluno.lastName}</p>
-                                <p className="mt-1 text-xs text-slate-500">{aluno.idade} meses · {generoLabel}</p>
-                              </div>
-                              <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                {registradoHoje ? 'Registrado hoje' : 'Sem registro'}
-                              </span>
+                        {/* Avatar + câmera */}
+                        <div className="relative w-14 h-14 flex-shrink-0 cursor-pointer"
+                          onClick={() => setModalCriancaInfo(aluno.id)}>
+                          {temFoto ? (
+                            <img
+                              src={resolveChildPhotoUrl(aluno)!}
+                              alt={`${aluno.firstName} ${aluno.lastName}`}
+                              className="w-14 h-14 rounded-full object-cover ring-2 ring-offset-1 ring-blue-100"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-base ring-2 ring-offset-1 ring-blue-100">
+                              {aluno.firstName?.[0]}{aluno.lastName?.[0]}
                             </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                              <div className={`rounded-xl px-2.5 py-2 font-medium ${temFoto ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
-                                {temFoto ? 'Foto carregada' : 'Sem foto'}
-                              </div>
-                              <div className={`rounded-xl px-2.5 py-2 font-medium ${registradoHoje ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                                {registradoHoje ? 'Registro concluído' : 'Aguardando registro'}
-                              </div>
-                            </div>
-                          </div>
+                          )}
+                          <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
                         </div>
 
-                        <div className="mt-4 grid grid-cols-3 gap-2">
+                        {/* Nome */}
+                        <p className="text-sm font-bold text-gray-800 text-center leading-tight w-full truncate">
+                          {aluno.firstName} {aluno.lastName}
+                        </p>
+
+                        {/* Subtítulo */}
+                        <p className="text-xs text-gray-400 text-center">
+                          {aluno.idade} meses · {generoLabel}
+                        </p>
+
+                        {/* Badge de registro */}
+                        <span className={registradoHoje
+                          ? 'text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full'
+                          : 'text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full'}>
+                          {registradoHoje ? 'Registrado hoje' : 'Sem registro'}
+                        </span>
+
+                        {/* Botões de ação */}
+                        <div className="flex gap-1.5 w-full mt-1">
                           <button
                             onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
                             title="Registrar microgesto"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100">
-                            <Plus className="h-3.5 w-3.5" /> Registrar
+                            className="flex-1 text-xs font-medium bg-blue-600 text-white rounded-xl py-2 hover:bg-blue-700 transition">
+                            Registrar
                           </button>
                           <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100">
-                            <Brain className="h-3.5 w-3.5" /> RDIC
+                            className="flex-1 text-xs font-medium border border-indigo-200 text-indigo-600 rounded-xl py-2 hover:bg-indigo-50 transition">
+                            RDIC
                           </button>
                           <button onClick={() => navigate('/app/rdx')} title="Fotos"
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-pink-50 px-3 py-2 text-xs font-medium text-pink-700 transition hover:bg-pink-100">
-                            <Camera className="h-3.5 w-3.5" /> Fotos
+                            className="flex-1 text-xs font-medium border border-pink-200 text-pink-600 rounded-xl py-2 hover:bg-pink-50 transition">
+                            Fotos
                           </button>
                         </div>
                       </div>
