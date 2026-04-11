@@ -546,7 +546,12 @@ model Child {
   allergies         String? @db.Text
   medicalConditions String? @db.Text
   medicationNeeds   String? @db.Text
-
+  raca              String? @db.VarChar(50)
+  peso              String? @db.VarChar(20)
+  celPai            String? @db.VarChar(20)
+  usoImagem         Boolean?
+  laudado           Boolean?
+  nis               String? @db.VarChar(20)
   // Foto do aluno
   photoUrl String? @db.Text
 
