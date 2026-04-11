@@ -6,7 +6,22 @@ const UNIT_ID_TESTE        = 'cmmbhsz1o0005mempvrlz3n0g';
 const UNIT_ID_TESTE   = 'unit-cepi-piloto-teste';
 const MANTENEDORA_ID  = 'mant-cocris-001';
 const CLASSROOM_CODE  = 'TURMA-TESTE-PILOTO';
-const ROLE_PROFESSOR_ID = 'cmlw6nyjl00097yvu0gf3ecdn';
+const ROLE_PROFESSOR_ID    = 'cmlw6nyjl00097yvu0gf3ecdn';
+const ROLE_COORDENADOR_ID  = 'cmlw6nyji00077yvuv2sxlsdq';
+const ROLE_DIRETOR_ID      = 'cmmebkutl000j10r9aoteojhf';
+const ROLE_NUTRICIONISTA_ID= 'cmmebm0ix000s10r9xauj2imk';
+
+// Usuários de teste para todos os perfis
+const USUARIOS_TESTE = [
+  { email: 'professor@testepiloto.com.br',     firstName: 'PROFESSORA',    lastName: 'PILOTO',         roleId: 'cmlw6nyjl00097yvu0gf3ecdn', level: 'PROFESSOR',     unitId: UNIT_ID_TESTE },
+  { email: 'coordenador@testepiloto.com.br',   firstName: 'COORDENADORA',  lastName: 'PILOTO',         roleId: 'cmlw6nyji00077yvuv2sxlsdq', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
+  { email: 'diretor@testepiloto.com.br',       firstName: 'DIRETORA',      lastName: 'PILOTO',         roleId: 'cmmebkutl000j10r9aoteojhf', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
+  { email: 'nutricionista@testepiloto.com.br', firstName: 'NUTRICIONISTA', lastName: 'PILOTO',         roleId: 'cmmebm0ix000s10r9xauj2imk', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
+  { email: 'secretaria@testepiloto.com.br',    firstName: 'SECRETÁRIA',    lastName: 'PILOTO',         roleId: 'cmlw6nyji00077yvuv2sxlsdq', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
+  { email: 'coordgeral@testepiloto.com.br',    firstName: 'COORD. GERAL',  lastName: 'PILOTO',         roleId: 'cmlw6nyjg00057yvuepi3pj4x', level: 'STAFF_CENTRAL', unitId: UNIT_ID_TESTE },
+
+
+];
 
 const ALUNOS: any[] = [
   {"firstName": "LUCAS", "lastName": "FERREIRA SANTOS", "cpf": "999.001.001-01", "dateOfBirth": "2021-03-15", "gender": "MASCULINO", "raca": "PARDA", "bloodType": "O+", "nomeMae": "ANA FERREIRA SANTOS", "nomePai": "CARLOS FERREIRA", "codigoAluno": "TESTE001", "inscricao": "T001", "laudado": true, "tipoLaudo": "TEA", "cid": "F84.0", "descricaoLaudo": "Transtorno do Espectro Autista grau leve. Apresenta dificuldade de interação social e comunicação verbal.", "medicamentos": "Risperidona 0,5mg (manhã)", "perfil": "tea", "emergencyContactPhone": "61 9 9111-0001"},
@@ -550,32 +565,36 @@ async function main() {
   });
   console.log(`  ✅ Unidade: ${unitTeste.name}`);
 
-  // ── 1. Professor teste ──────────────────────────────────────────────────
-  console.log('── Professor de teste ──');
-  const profTeste = await prisma.user.upsert({
-    where: { email: 'professor.teste@conexa.test' },
-    create: {
-      mantenedoraId: MANTENEDORA_ID,
-      unitId: UNIT_ID_TESTE,
-      email: 'professor.teste@conexa.test',
-      password: senhaHash,
-      firstName: 'PROFESSORA',
-      lastName: 'PILOTO',
-      status: 'ATIVO',
-      createdBy: 'seed-teste',
-      updatedBy: 'seed-teste',
-    },
-    update: {},
-  });
-  const existingRole = await prisma.userRole.findUnique({
-    where: { userId_roleId: { userId: profTeste.id, roleId: ROLE_PROFESSOR_ID } },
-  });
-  if (!existingRole) {
-    await prisma.userRole.create({
-      data: { userId: profTeste.id, roleId: ROLE_PROFESSOR_ID, scopeLevel: 'PROFESSOR', isActive: true },
+  // ── 1. Usuários de teste (todos os perfis) ─────────────────────────────
+  console.log('── Usuários de teste ──');
+  let profTeste: any = null;
+  for (const u of USUARIOS_TESTE) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      create: {
+        mantenedoraId: MANTENEDORA_ID,
+        unitId: u.unitId,
+        email: u.email,
+        password: senhaHash,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        status: 'ATIVO',
+        createdBy: 'seed-teste',
+        updatedBy: 'seed-teste',
+      },
+      update: {},
     });
+    const existingRole = await prisma.userRole.findUnique({
+      where: { userId_roleId: { userId: user.id, roleId: u.roleId } },
+    });
+    if (!existingRole) {
+      await prisma.userRole.create({
+        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true },
+      });
+    }
+    if (u.email === 'professor@testepiloto.com.br') profTeste = user;
+    console.log(`  ✅ ${u.email} → ${u.level}`);
   }
-  console.log('  ✅ professor.teste@conexa.test / Teste@123');
 
   // ── 2. Turma teste ──────────────────────────────────────────────────────
   console.log('\n── Turma de teste ──');
@@ -726,8 +745,13 @@ async function main() {
 
   console.log('\n🎉 Turma de teste criada com sucesso!');
   console.log('\n📋 RESUMO:');
-  console.log('  Login: professor.teste@conexa.test');
-  console.log('  Senha: Teste@123');
+  console.log('  Logins de teste (todos com senha Teste@123):');
+  console.log('  professor@testepiloto.com.br      → PROFESSOR');
+  console.log('  coordenador@testepiloto.com.br    → COORDENADOR');
+  console.log('  diretor@testepiloto.com.br        → DIRETOR');
+  console.log('  nutricionista@testepiloto.com.br  → NUTRICIONISTA');
+  console.log('  secretaria@testepiloto.com.br     → SECRETÁRIA');
+
   console.log('  Turma: Maternal II — PILOTO (Turma de Teste)');
   console.log('  Alunos: 10 (com TEA, TDAH, TOD, Down, perfis variados)');
   console.log(`  Planos de aula: ${planningMap.size}`);
