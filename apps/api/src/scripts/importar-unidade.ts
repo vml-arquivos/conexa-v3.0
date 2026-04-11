@@ -14,6 +14,13 @@ const ARQUIVO_ALUNOS       = path.resolve(process.argv[2] || '');
 const ARQUIVO_PROFISSIONAIS = path.resolve(process.argv[3] || '');
 // ─────────────────────────────────────────────────────────────────────────
 
+// ─── IDs de Role fixos (produção) ────────────────────────────────────────
+const ROLE_ID_PROFESSOR     = 'cmlw6nyjl00097yvu0gf3ecdn';
+const ROLE_ID_COORDENADOR   = 'cmlw6nyji00077yvuv2sxlsdq';
+const ROLE_ID_DIRETOR       = 'cmmebkutl000j10r9aoteojhf';
+const ROLE_ID_NUTRICIONISTA = 'cmmebm0ix000s10r9xauj2imk';
+// ─────────────────────────────────────────────────────────────────────────
+
 function normalizarNome(nome: string): { firstName: string; lastName: string } {
   const partes = nome.trim().split(' ').filter(Boolean);
   const firstName = partes[0] || '';
@@ -41,16 +48,19 @@ function turmaParaAgeGroup(turma: string): { ageGroupMin: number; ageGroupMax: n
   return { ageGroupMin: 0, ageGroupMax: 71 };
 }
 
-function mapearRole(funcao: string): RoleLevel | null {
+function mapearRole(funcao: string): { level: RoleLevel; roleId: string } | null {
   const f = funcao.trim().toUpperCase();
-  if (f.includes('PROFESSORA') || f.includes('PROFESSOR') || f.includes('MONITORA') || f.includes('MONITOR'))
-    return RoleLevel.PROFESSOR;
-  if (f.includes('COORDENADORA') || f.includes('COORDENADOR') || f.includes('DIRETORA') || f.includes('DIRETOR'))
-    return RoleLevel.UNIDADE;
+  if (f.includes('PROFESSORA') || f.includes('PROFESSOR') ||
+      f.includes('MONITORA')   || f.includes('MONITOR'))
+    return { level: RoleLevel.PROFESSOR, roleId: ROLE_ID_PROFESSOR };
+  if (f.includes('DIRETORA') || f.includes('DIRETOR'))
+    return { level: RoleLevel.UNIDADE, roleId: ROLE_ID_DIRETOR };
   if (f.includes('NUTRICIONISTA'))
-    return RoleLevel.UNIDADE;
-  if (f.includes('SECRETÁRIA') || f.includes('SECRETARIO') || f.includes('AUX. ADMINISTRATIVO'))
-    return RoleLevel.UNIDADE;
+    return { level: RoleLevel.UNIDADE, roleId: ROLE_ID_NUTRICIONISTA };
+  if (f.includes('COORDENADORA') || f.includes('COORDENADOR') ||
+      f.includes('SECRETÁRIA')   || f.includes('SECRETARIO') ||
+      f.includes('AUX. ADMINISTRATIVO'))
+    return { level: RoleLevel.UNIDADE, roleId: ROLE_ID_COORDENADOR };
   // Funções operacionais sem acesso ao sistema
   return null;
 }
@@ -205,36 +215,28 @@ async function main() {
   const senhaHash = await bcrypt.hash(SENHA_PADRAO, 10);
   let usersCreated = 0, usersSem = 0;
 
-  // Buscar Role padrão para PROFESSOR e UNIDADE desta mantenedora
-  const roleProfessor = await prisma.role.findFirst({
-    where: { mantenedoraId: MANTENEDORA_ID, level: RoleLevel.PROFESSOR, isActive: true },
-  });
-  const roleUnidade = await prisma.role.findFirst({
-    where: { mantenedoraId: MANTENEDORA_ID, level: RoleLevel.UNIDADE, isActive: true },
-  });
-
   for (const row of profRaw) {
     const funcao = (row['FUNÇÃO'] || '').toString().trim();
     const nome   = (row['NOME']   || '').toString().trim();
     const email  = (row['E-MAIL'] || '').toString().trim().toLowerCase().replace(/\s+/g, '');
     const tel    = normalizarTelefone(row['TELEFONE'] || '');
 
-    const level = mapearRole(funcao);
-    if (!level) {
-      console.log(`  ℹ️  ${nome} (${funcao}) — sem acesso ao sistema, pulado`);
+    const mapeado = mapearRole(funcao);
+    if (!mapeado) {
+      console.log(`  ℹ️  ${nome} (${funcao}) — sem acesso ao sistema, pulado`);
       usersSem++;
       continue;
     }
+    const { level, roleId } = mapeado;
 
     if (!email || !email.includes('@')) {
-      console.warn(`  ⚠️  ${nome} — e-mail inválido: "${email}", pulado`);
+      console.warn(`  ⚠️  ${nome} — e-mail inválido: "${email}", pulado`);
       usersSem++;
       continue;
     }
 
     try {
       const { firstName, lastName } = normalizarNome(nome);
-      const roleId = level === RoleLevel.PROFESSOR ? roleProfessor?.id : roleUnidade?.id;
 
       const user = await prisma.user.upsert({
         where: { email },
