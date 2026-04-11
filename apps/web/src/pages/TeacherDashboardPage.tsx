@@ -884,7 +884,7 @@ export default function TeacherDashboardPage() {
                       if (!entradaDiarioIA.trim()) { toast.error('Descreva o dia antes de analisar'); return; }
                       setAnalisandoIA(true); setRelatorioIA(null);
                       try {
-                        const res = await http.post('/ia-assistiva/relatorio-aluno', {
+                        const res = await http.post('/ia/relatorio-aluno', {
                           nomeAluno: `Turma — ${turma?.name || 'Minha Turma'}`,
                           faixaEtaria: turma?.segmento || 'EI02',
                           observacoes: [entradaDiarioIA],

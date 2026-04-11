@@ -90,7 +90,7 @@ export function DashboardDiretorPage() {
         http.get('/lookup/classrooms/accessible', { params: { unitId } }),
         http.get('/lookup/teachers/accessible', { params: { unitId } }),
         http.get('/pedidos-compra', { params: { unitId, status: 'ENVIADO' } }),
-        http.get('/plannings', { params: { unitId, status: 'SUBMETIDO', limit: 1 } }),
+        http.get('/plannings', { params: { unitId, status: 'EM_REVISAO', limit: 1 } }),
       ]);
       setDados({
         totalCriancas: criancasRes.status === 'fulfilled' ? (criancasRes.value.data?.total ?? criancasRes.value.data?.length ?? 0) : 0,
