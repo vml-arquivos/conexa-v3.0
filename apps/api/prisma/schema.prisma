@@ -946,7 +946,6 @@ model DiaryEvent {
   @@index([eventDate])
   @@index([curriculumEntryId])
   // Índices compostos de performance (alinhamento com produção)
-  @@unique([mantenedoraId, unitId, classroomId, childId, eventDate, type])
   @@index([unitId, eventDate(sort: Desc)])
   @@index([classroomId, eventDate(sort: Desc)])
   @@index([childId, eventDate(sort: Desc)])
