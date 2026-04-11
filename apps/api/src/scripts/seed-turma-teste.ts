@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
+export {};
+
 const prisma = new PrismaClient();
-const UNIT_ID_TESTE        = 'cmmbhsz1o0005mempvrlz3n0g';
 const UNIT_ID_TESTE   = 'unit-cepi-piloto-teste';
 const MANTENEDORA_ID  = 'mant-cocris-001';
 const CLASSROOM_CODE  = 'TURMA-TESTE-PILOTO';
@@ -557,6 +558,7 @@ async function main() {
       id: UNIT_ID_TESTE,
       mantenedoraId: MANTENEDORA_ID,
       name: 'CEPI PILOTO — Ambiente de Testes',
+      code: 'CEPI-PILOTO-TESTE',
       address: 'Ambiente de testes — não é uma unidade real',
       isActive: true,
       createdBy: 'seed-teste',
@@ -589,7 +591,7 @@ async function main() {
     });
     if (!existingRole) {
       await prisma.userRole.create({
-        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true },
+        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true isActive: true },
       });
     }
     if (u.email === 'professor@testepiloto.com.br') profTeste = user;
@@ -641,7 +643,7 @@ async function main() {
 
     await prisma.enrollment.upsert({
       where: { childId_classroomId: { childId: child.id, classroomId: classroom.id } },
-      create: { childId: child.id, classroomId: classroom.id, enrollmentDate: new Date('2026-02-03'), status: 'ATIVA', createdBy: 'seed-teste' },
+      create: { childId: child.id, classroomId: classroom.id, enrollmentDate: new Date('2026-02-03'), status: 'ATIVA' as any, createdBy: 'seed-teste' },
       update: {},
     });
 
@@ -679,9 +681,9 @@ async function main() {
     const planning = await prisma.planning.create({
       data: {
         mantenedoraId: MANTENEDORA_ID, unitId: UNIT_ID_TESTE,
-        classroomId: classroom.id, createdById: profTeste.id,
+        classroomId: classroom.id,
         title: p.title, startDate, endDate: new Date(`${d.toISOString().slice(0,10)}T17:00:00.000Z`),
-        status: 'EM_EXECUCAO',
+        status: 'APROVADO',
         activities: `Objetivo: ${p.objetivo}\n\nDesenvolvimento:\n1. Acolhimento e roda de conversa (15min)\n2. Atividade principal: ${p.title} (30min)\n3. Registro e fechamento (15min)`,
         recursos: 'Materiais pedagógicos disponíveis na sala',
         createdBy: 'seed-teste',
@@ -715,7 +717,7 @@ async function main() {
 
       // Verificar se já existe
       const existing = await prisma.diaryEvent.findFirst({
-        where: { childId, classroomId: classroom.id, type: e.type as any, eventDate: new Date(`${e.date}T12:00:00.000Z`) }
+        where: { childId, classroomId: classroom.id, type: e.type, eventDate: new Date(`${e.date}T12:00:00.000Z`) }
       });
       if (existing) continue;
 
@@ -723,7 +725,7 @@ async function main() {
         data: {
           mantenedoraId: MANTENEDORA_ID, unitId: UNIT_ID_TESTE,
           classroomId: classroom.id, childId,
-          type: e.type as any,
+          type: e.type,
           title: e.title,
           description: e.description,
           developmentNotes: e.developmentNotes ?? null,
