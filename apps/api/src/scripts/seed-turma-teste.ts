@@ -686,7 +686,7 @@ async function main() {
         type: 'SEMANAL',
         status: 'APROVADO',
         activities: `Objetivo: ${p.objetivo}\n\nDesenvolvimento:\n1. Acolhimento e roda de conversa (15min)\n2. Atividade principal: ${p.title} (30min)\n3. Registro e fechamento (15min)`,
-        createdBy: 'seed-teste',
+        createdBy: profTeste.id,
       }
     });
     planningMap.set(p.date, planning.id);
