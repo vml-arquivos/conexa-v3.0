@@ -77,14 +77,19 @@ interface RdicSalvo {
   childId: string;
   child?: { firstName: string; lastName: string };
   periodo: string;
-  bimestre: number;
+  periodoEnum?: string | null;
   anoLetivo: number;
-  dimensoes: DimensaoAvaliacao[];
-  observacaoGeral: string;
-  proximosPassos: string;
   status: 'RASCUNHO' | 'EM_REVISAO' | 'DEVOLVIDO' | 'APROVADO' | 'FINALIZADO' | 'PUBLICADO' | string;
+  rascunhoJson?: {
+    trimestre?: number;
+    dimensoes?: DimensaoAvaliacao[];
+    observacaoGeral?: string;
+    proximosPassos?: string;
+  } | null;
   reviewComment?: string;
-  createdAt: string;
+  criadoEm: string;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
 }
 
 interface RelatorioIAConsolidado {
@@ -486,7 +491,7 @@ export default function RdicCriancaPage() {
       // silencioso — Kanban fica com todos pendentes
     }
   }
-  async function selecionarAluno(aluno: Aluno) {
+   async function selecionarAluno(aluno: Aluno) {
     setAlunoSelecionado(aluno);
     setDimensoes(criarDimensoesVazias());
     setObservacaoGeral('');
@@ -494,9 +499,34 @@ export default function RdicCriancaPage() {
     setRelatorioIA(null);
     setMostrarRelatorioIA(false);
     setEtapa('formulario');
-    await carregarRdicsDoAluno(aluno.id);
-  }
 
+    try {
+      setLoadingRdics(true);
+      const res = await http.get('/rdic', { params: { childId: aluno.id } });
+      const lista: RdicSalvo[] = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      setRdicsDoAluno(lista);
+
+      // Pré-popular com rascunho existente do trimestre atual
+      const ano = new Date().getFullYear();
+      const trimestreAtual = TRIMESTRES.find(t => t.id === trimestre);
+      const periodo = trimestreAtual?.label ?? `${trimestre}º Trimestre`;
+      const rascunhoExistente = lista.find(
+        r => r.periodo === periodo &&
+             r.anoLetivo === ano &&
+             (r.status === 'RASCUNHO' || r.status === 'DEVOLVIDO')
+      );
+      if (rascunhoExistente?.rascunhoJson) {
+        const j = rascunhoExistente.rascunhoJson;
+        if (j.dimensoes && j.dimensoes.length > 0) setDimensoes(j.dimensoes);
+        if (j.observacaoGeral) setObservacaoGeral(j.observacaoGeral);
+        if (j.proximosPassos) setProximosPassos(j.proximosPassos);
+      }
+    } catch {
+      setRdicsDoAluno([]);
+    } finally {
+      setLoadingRdics(false);
+    }
+  }
   async function carregarRdicsDoAluno(childId: string) {
     try {
       setLoadingRdics(true);
@@ -1113,15 +1143,15 @@ export default function RdicCriancaPage() {
                 const printWindow = window.open('', '_blank');
                 if (!printWindow || !alunoSelecionado) return;
                 const rdicsHtml = rdicsDoAluno.map(rdic => {
-                  const prog = calcularProgresso(rdic.dimensoes ?? []);
-                  const dimHtml = (rdic.dimensoes ?? []).map(d => {
+                  const prog = calcularProgresso(rdic.rascunhoJson?.dimensoes ?? []);
+                  const dimHtml = (rdic.rascunhoJson?.dimensoes ?? []).map(d => {
                     const def = DIMENSOES_BNCC.find(x => x.id === d.dimensao);
                     const indsHtml = d.indicadores.map(ind =>
                       `<tr><td style="padding:4px 8px;font-size:12px;color:#555">${ind.codigo}</td><td style="padding:4px 8px;font-size:12px">${ind.descricao}</td><td style="padding:4px 8px;font-size:12px;text-align:center;font-weight:600;color:${ind.nivel==='CONSOLIDADO'?'#16a34a':ind.nivel==='AMPLIADO'?'#2563eb':ind.nivel==='EM_DESENVOLVIMENTO'?'#d97706':'#9ca3af'}">${ind.nivel.replace('_',' ')}</td></tr>`
                     ).join('');
                     return `<div style="margin-bottom:16px"><h4 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 6px">${def?.label ?? d.dimensao}</h4><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb"><thead><tr style="background:#f9fafb"><th style="padding:4px 8px;font-size:11px;text-align:left">Código</th><th style="padding:4px 8px;font-size:11px;text-align:left">Indicador</th><th style="padding:4px 8px;font-size:11px;text-align:center">Nível</th></tr></thead><tbody>${indsHtml}</tbody></table></div>`;
                   }).join('');
-                  return `<div style="page-break-inside:avoid;margin-bottom:32px;border:1px solid #e5e7eb;border-radius:8px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-size:15px;font-weight:700;margin:0">${rdic.periodo}</h3><span style="font-size:12px;padding:2px 8px;border-radius:12px;background:${rdic.status==='PUBLICADO'?'#dcfce7':rdic.status==='REVISAO'?'#fef9c3':'#f3f4f6'};color:${rdic.status==='PUBLICADO'?'#15803d':rdic.status==='REVISAO'?'#854d0e':'#6b7280'}">${rdic.status}</span></div>${dimHtml}<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Observação Geral:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.observacaoGeral || '—'}</p></div>${rdic.proximosPassos?`<div style="margin-top:8px;padding:12px;background:#f0fdf4;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Próximos Passos:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.proximosPassos}</p></div>`:''}<p style="font-size:11px;color:#9ca3af;margin-top:8px">Progresso: ${prog.pct}% preenchido · Registrado em ${new Date(rdic.createdAt).toLocaleDateString('pt-BR')}</p></div>`;
+                  return `<div style="page-break-inside:avoid;margin-bottom:32px;border:1px solid #e5e7eb;border-radius:8px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-size:15px;font-weight:700;margin:0">${rdic.periodo}</h3><span style="font-size:12px;padding:2px 8px;border-radius:12px;background:${rdic.status==='PUBLICADO'?'#dcfce7':rdic.status==='REVISAO'?'#fef9c3':'#f3f4f6'};color:${rdic.status==='PUBLICADO'?'#15803d':rdic.status==='REVISAO'?'#854d0e':'#6b7280'}">${rdic.status}</span></div>${dimHtml}<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Observação Geral:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.rascunhoJson?.observacaoGeral || '—'}</p></div>${rdic.rascunhoJson?.proximosPassos?`<div style="margin-top:8px;padding:12px;background:#f0fdf4;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Próximos Passos:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.rascunhoJson?.proximosPassos}</p></div>`:''}<p style="font-size:11px;color:#9ca3af;margin-top:8px">Progresso: ${prog.pct}% preenchido · Registrado em ${new Date(rdic.criadoEm).toLocaleDateString('pt-BR')}</p></div>`;
                 }).join('');
                 printWindow.document.write(`<!DOCTYPE html><html><head><title>RDIC — ${alunoSelecionado.firstName} ${alunoSelecionado.lastName}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;font-weight:400;color:#6b7280;margin:0 0 24px}@media print{.no-print{display:none}}</style></head><body><h1>RDIC — Relatório de Desenvolvimento Individual da Criança</h1><h2>${alunoSelecionado.firstName} ${alunoSelecionado.lastName} · ${turma?.name ?? ''} · ${turma?.unit?.name ?? ''}</h2><p style="font-size:12px;color:#9ca3af;margin-bottom:24px">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>${rdicsHtml}</body></html>`);
                 printWindow.document.close();
@@ -1148,7 +1178,7 @@ export default function RdicCriancaPage() {
           {!loadingRdics && rdicsDoAluno.length > 0 && (
             <div className="space-y-3">
               {rdicsDoAluno.map(rdic => {
-                const prog = calcularProgresso(rdic.dimensoes ?? []);
+                const prog = calcularProgresso(rdic.rascunhoJson?.dimensoes ?? []);
                 return (
                   <Card key={rdic.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
@@ -1171,7 +1201,7 @@ export default function RdicCriancaPage() {
                                rdic.status === 'DEVOLVIDO'  ? 'Devolvido' : 'Rascunho'}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 line-clamp-2">{rdic.observacaoGeral}</p>
+                          <p className="text-sm text-gray-600 line-clamp-2">{rdic.rascunhoJson?.observacaoGeral ?? ''}</p>
                           {rdic.status === 'DEVOLVIDO' && rdic.reviewComment && (
                             <div className="mt-2 bg-orange-50 border border-orange-200 rounded-lg p-2 flex gap-2">
                               <span className="text-xs font-semibold text-orange-700">Devolvido pela coordenação:</span>
@@ -1189,7 +1219,7 @@ export default function RdicCriancaPage() {
                               <span className="text-xs text-gray-500">{prog.pct}% preenchido</span>
                             </div>
                             <span className="text-xs text-gray-400">
-                              {new Date(rdic.createdAt).toLocaleDateString('pt-BR')}
+                              {new Date(rdic.criadoEm).toLocaleDateString('pt-BR')}
                             </span>
                           </div>
                         </div>
