@@ -685,7 +685,6 @@ async function main() {
         title: p.title, startDate, endDate: new Date(`${d.toISOString().slice(0,10)}T17:00:00.000Z`),
         status: 'APROVADO',
         activities: `Objetivo: ${p.objetivo}\n\nDesenvolvimento:\n1. Acolhimento e roda de conversa (15min)\n2. Atividade principal: ${p.title} (30min)\n3. Registro e fechamento (15min)`,
-        recursos: 'Materiais pedagógicos disponíveis na sala',
         createdBy: 'seed-teste',
       }
     });
