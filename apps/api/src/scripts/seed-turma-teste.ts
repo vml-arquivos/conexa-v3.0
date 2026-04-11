@@ -591,7 +591,7 @@ async function main() {
     });
     if (!existingRole) {
       await prisma.userRole.create({
-        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true isActive: true },
+        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true },
       });
     }
     if (u.email === 'professor@testepiloto.com.br') profTeste = user;
@@ -683,6 +683,7 @@ async function main() {
         mantenedoraId: MANTENEDORA_ID, unitId: UNIT_ID_TESTE,
         classroomId: classroom.id,
         title: p.title, startDate, endDate: new Date(`${d.toISOString().slice(0,10)}T17:00:00.000Z`),
+        type: 'SEMANAL',
         status: 'APROVADO',
         activities: `Objetivo: ${p.objetivo}\n\nDesenvolvimento:\n1. Acolhimento e roda de conversa (15min)\n2. Atividade principal: ${p.title} (30min)\n3. Registro e fechamento (15min)`,
         createdBy: 'seed-teste',
