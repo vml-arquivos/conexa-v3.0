@@ -19,6 +19,7 @@ import { createMicrogestureEvent, fetchRegisteredChildrenToday, type Microgestur
 import { getObjetivosDia, getSegmentosNaData, temObjetivoNaData, CAMPOS_EXPERIENCIA, type SegmentoKey } from '../data/lookupDiario2026';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { ChildAvatar, hasChildPhoto, resolveChildPhotoUrl } from '../components/children/ChildAvatar';
+import { ChildInfoModal } from '../components/children/ChildInfoModal';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface DashboardData {
@@ -235,6 +236,7 @@ export default function TeacherDashboardPage() {
   }, []);
 
   // Modal de microgesto rápido
+  const [modalCriancaInfo, setModalCriancaInfo] = useState<string | null>(null);
   const [modalCrianca, setModalCrianca] = useState<{ id: string; nome: string } | null>(null);
   const [microgestoRapido, setMicrogestoRapido] = useState<MicrogestureKind>('OBSERVACAO');
   const [microgestoTexto, setMicrogestoTexto] = useState('');
@@ -671,14 +673,20 @@ export default function TeacherDashboardPage() {
                                 />
                               </button>
                             ) : (
-                              <ChildAvatar
-                                child={aluno}
-                                alt={aluno.nome}
-                                sizeClassName="h-16 w-16"
-                                imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all"
-                                fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
-                                iconClassName="h-10 w-10 text-slate-400"
-                              />
+                              <button
+                                onClick={() => setModalCriancaInfo(aluno.id)}
+                                className="focus:outline-none"
+                                title="Ver ficha do aluno"
+                              >
+                                <ChildAvatar
+                                  child={aluno}
+                                  alt={aluno.nome}
+                                  sizeClassName="h-16 w-16"
+                                  imageClassName="rounded-2xl object-cover border border-blue-100 shadow-sm transition-all"
+                                  fallbackClassName="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-50"
+                                  iconClassName="h-10 w-10 text-slate-400"
+                                />
+                              </button>
                             )}
                             <FotoUpload crianca={aluno} onUpload={atualizarFoto} />
                           </div>
@@ -1071,6 +1079,13 @@ export default function TeacherDashboardPage() {
             </div>
           )}
         </div>
+      )}
+
+      {modalCriancaInfo && (
+        <ChildInfoModal
+          childId={modalCriancaInfo}
+          onClose={() => setModalCriancaInfo(null)}
+        />
       )}
 
       {/* Modal de microgesto rápido */}
