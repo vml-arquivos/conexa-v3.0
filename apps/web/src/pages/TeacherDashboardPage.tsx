@@ -697,16 +697,12 @@ export default function TeacherDashboardPage() {
                         </span>
 
                         {/* Botões de ação */}
-                        <div className="flex gap-1.5 w-full mt-1">
+                        <div className="flex gap-2 w-full mt-1">
                           <button
                             onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
                             title="Registrar microgesto"
                             className="flex-1 text-xs font-medium bg-blue-600 text-white rounded-xl py-2 hover:bg-blue-700 transition">
                             Registrar
-                          </button>
-                          <button onClick={() => navigate('/app/rdic-crianca')} title="RDIC"
-                            className="flex-1 text-xs font-medium border border-indigo-200 text-indigo-600 rounded-xl py-2 hover:bg-indigo-50 transition">
-                            RDIC
                           </button>
                           <button onClick={() => navigate('/app/rdx')} title="Fotos"
                             className="flex-1 text-xs font-medium border border-pink-200 text-pink-600 rounded-xl py-2 hover:bg-pink-50 transition">
