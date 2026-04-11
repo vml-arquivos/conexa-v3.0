@@ -18,7 +18,7 @@ import {
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
   Camera, UploadCloud, Trash2, TriangleAlert, Pencil, ClipboardList,
-  WandSparkles, Loader2, Printer, ChevronRight, ArrowLeft,
+  WandSparkles, Loader2, Printer, ChevronRight, ArrowLeft, ChevronLeft, History,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
@@ -26,6 +26,7 @@ import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { ChildAvatar } from '../components/children/ChildAvatar';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { abrirDiarioImprimivel, type DiaryPrintData } from '../components/PrintableDiary';
+import { CalendarioMensal, type CalendarioMensalEvento } from '../components/calendario/CalendarioMensal';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Crianca {
@@ -632,6 +633,13 @@ export default function DiarioBordoPage() {
   const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+
+  // ── Estado do Calendário Mensal ──────────────────────────────────────────────
+  const hojeStr = getPedagogicalToday();
+  const [calMes, setCalMes] = useState<number>(() => new Date().getMonth());
+  const [calAno, setCalAno] = useState<number>(() => new Date().getFullYear());
+  // Painel lateral: diário selecionado ao clicar em dia com diário
+  const [painelDiario, setPainelDiario] = useState<DiaryEntry | null>(null);
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -1690,8 +1698,257 @@ export default function DiarioBordoPage() {
         ))}
       </div>
 
-      {/* ─── LISTA DE DIÁRIOS ─── */}
-      {aba === 'lista' && (
+      {/* ─── LISTA DE DIÁRIOS (CALENDÁRIO MENSAL) ─── */}
+      {aba === 'lista' && (() => {
+        // Mapear diários para o formato de eventos do CalendarioMensal
+        const eventosCalendario: CalendarioMensalEvento[] = diarios.map(d => {
+          const dataStr = (d.date || d.createdAt || '').substring(0, 10);
+          const statusRaw = (d.status || '').toUpperCase();
+          let status: CalendarioMensalEvento['status'];
+          if (statusRaw === 'PUBLICADO' || statusRaw === 'REVISADO' || statusRaw === 'ARQUIVADO') {
+            status = 'publicado';
+          } else if (statusRaw === 'APROVADO') {
+            status = 'aprovado';
+          } else if (statusRaw === 'EM_REVISAO') {
+            status = 'em_revisao';
+          } else {
+            status = 'rascunho';
+          }
+          return { data: dataStr, status };
+        });
+
+        // Mapa data → diário completo para o painel lateral
+        const diarioMap = new Map<string, DiaryEntry>();
+        for (const d of diarios) {
+          const dataStr = (d.date || d.createdAt || '').substring(0, 10);
+          if (dataStr) diarioMap.set(dataStr, d);
+        }
+
+        function handleDiaClick(data: string, evento?: CalendarioMensalEvento) {
+          const diario = diarioMap.get(data);
+          if (diario) {
+            // Dia COM diário: abrir painel lateral
+            setPainelDiario(diario);
+          } else {
+            // Dia SEM diário (passado/hoje): navegar para formulário de criação
+            setPainelDiario(null);
+            setForm(f => ({ ...f, date: data }));
+            setAba('novo');
+          }
+        }
+
+        return (
+          <div className="space-y-4">
+            {/* Barra de ações */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/app/diario/historico')}
+                  className="flex items-center gap-2 text-gray-600 border-gray-200 hover:bg-gray-50"
+                >
+                  <History className="h-4 w-4" /> Ver histórico completo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 text-gray-600 border-gray-200 hover:bg-gray-50"
+                >
+                  <Printer className="h-4 w-4" /> Imprimir mês
+                </Button>
+              </div>
+              <Button onClick={() => setAba('novo')} size="sm" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" /> Novo Diário
+              </Button>
+            </div>
+
+            {loading && <LoadingState message="Carregando diários..." />}
+
+            {!loading && (
+              <div className="flex flex-col lg:flex-row gap-4 items-start">
+                {/* Calendário */}
+                <div className="w-full lg:max-w-sm flex-shrink-0">
+                  <CalendarioMensal
+                    mes={calMes}
+                    ano={calAno}
+                    eventos={eventosCalendario}
+                    onDiaClick={handleDiaClick}
+                    hoje={hojeStr}
+                    onMesAnterior={() => {
+                      if (calMes === 0) { setCalMes(11); setCalAno(a => a - 1); }
+                      else setCalMes(m => m - 1);
+                    }}
+                    onProximoMes={() => {
+                      if (calMes === 11) { setCalMes(0); setCalAno(a => a + 1); }
+                      else setCalMes(m => m + 1);
+                    }}
+                  />
+                </div>
+
+                {/* Painel lateral: visualização do diário selecionado */}
+                <div className="flex-1 min-w-0">
+                  {painelDiario ? (
+                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      {/* Cabeçalho do painel */}
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const clima = CLIMAS.find(c => c.id === painelDiario.climaEmocional) || CLIMAS[1];
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${clima.cor}`}>
+                                {clima.emoji} {clima.label}
+                              </span>
+                            );
+                          })()}
+                          <span className="text-sm font-semibold text-gray-800">
+                            {new Date(
+                              ((painelDiario.date || painelDiario.createdAt) || '').includes('T')
+                                ? (painelDiario.date || painelDiario.createdAt)
+                                : (painelDiario.date || painelDiario.createdAt) + 'T12:00:00'
+                            ).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setPainelDiario(null)}
+                          className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition"
+                          aria-label="Fechar painel"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {/* Conteúdo do diário */}
+                      <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+                        {/* Presenças */}
+                        {(painelDiario.presencas > 0 || painelDiario.ausencias > 0) && (
+                          <div className="flex gap-3 text-xs text-gray-500">
+                            {painelDiario.presencas > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3.5 w-3.5 text-green-500" />{painelDiario.presencas} presentes
+                              </span>
+                            )}
+                            {painelDiario.ausencias > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3.5 w-3.5 text-red-400" />{painelDiario.ausencias} ausentes
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Microgestos */}
+                        {painelDiario.microgestos?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Microgestos Pedagógicos</p>
+                            <div className="space-y-2">
+                              {painelDiario.microgestos.map((m: any, i: number) => {
+                                const tipo = TIPOS_MICROGESTO.find(t => t.id === m.tipo);
+                                return (
+                                  <div key={i} className="flex items-start gap-2 p-2 bg-purple-50 rounded-lg">
+                                    <span className="text-base flex-shrink-0">{tipo?.emoji || '✨'}</span>
+                                    <div className="flex-1">
+                                      <p className="text-xs font-medium text-purple-700">{tipo?.label || m.tipo}</p>
+                                      <p className="text-xs text-gray-600">{m.descricao}</p>
+                                      {m.criancaNome && (
+                                        <p className="text-xs text-gray-500 mt-0.5">{m.criancaNome}</p>
+                                      )}
+                                    </div>
+                                    {m.horario && <span className="text-xs text-gray-400 ml-auto flex-shrink-0">{m.horario}</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rotina */}
+                        {painelDiario.rotina?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Rotina do Dia</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {painelDiario.rotina.map((r: any, i: number) => (
+                                <div key={i} className={`flex items-center gap-2 p-2 rounded-lg text-xs ${r.concluido ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}`}>
+                                  <CheckCircle className={`h-3.5 w-3.5 flex-shrink-0 ${r.concluido ? 'text-green-500' : 'text-gray-300'}`} />
+                                  {r.momento}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Momento Destaque */}
+                        {painelDiario.momentoDestaque && (
+                          <div className="bg-yellow-50 rounded-xl p-3">
+                            <p className="text-xs font-semibold text-yellow-600 uppercase mb-1">Momento Destaque</p>
+                            <p className="text-sm text-yellow-800">{painelDiario.momentoDestaque}</p>
+                          </div>
+                        )}
+
+                        {/* Reflexão Pedagógica */}
+                        {painelDiario.reflexaoPedagogica && (
+                          <div className="bg-indigo-50 rounded-xl p-3">
+                            <p className="text-xs font-semibold text-indigo-500 uppercase mb-1">Reflexão Pedagógica</p>
+                            <p className="text-sm text-indigo-700">{painelDiario.reflexaoPedagogica}</p>
+                          </div>
+                        )}
+
+                        {/* Encaminhamentos */}
+                        {painelDiario.encaminhamentos && (
+                          <div className="bg-orange-50 rounded-xl p-3">
+                            <p className="text-xs font-semibold text-orange-500 uppercase mb-1">Encaminhamentos</p>
+                            <p className="text-sm text-orange-700">{painelDiario.encaminhamentos}</p>
+                          </div>
+                        )}
+
+                        {/* Botão imprimir diário individual */}
+                        <div className="flex justify-end pt-2 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
+                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const dataStr = (painelDiario.date || painelDiario.createdAt || '').substring(0, 10);
+                              abrirDiarioImprimivel({
+                                data: dataStr,
+                                turmaNome: 'Turma',
+                                professorNome: nomeProfessor,
+                                planejamentoTitulo: ctx.planejamentoTitulo,
+                                statusExecucaoPlano: ctx.statusExecucaoPlano,
+                                execucaoPlanejamento: ctx.execucaoPlanejamento,
+                                avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
+                                momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque,
+                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
+                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
+                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
+                                rotina: ctx.rotina as Record<string, boolean>,
+                                observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                              });
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                          >
+                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/40 text-gray-400">
+                      <Calendar className="h-10 w-10 mb-2 text-gray-300" />
+                      <p className="text-sm font-medium">Selecione um dia no calendário</p>
+                      <p className="text-xs mt-1">Dias com ponto colorido já possuem diário registrado</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ─── LISTA HISTÓRICA (mantida para referência interna) ─── */}
+      {false && (
         <div className="space-y-4">
           <div className="flex gap-3">
             <div className="relative flex-1">
