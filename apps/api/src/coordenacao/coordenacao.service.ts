@@ -250,6 +250,7 @@ export class CoordenacaoService {
       if (error instanceof ForbiddenException) throw error;
       console.error('[CoordenacaoService] getDashboardUnidade error:', error);
       return {
+        hasError: true,
         unitId,
         data: new Date().toISOString(),
         alertas: { turmasSemChamadaHoje: [], planejamentosParados: [] },
@@ -373,6 +374,7 @@ export class CoordenacaoService {
       if (error instanceof ForbiddenException) throw error;
       console.error('[CoordenacaoService] getDashboardGeral error:', error);
       return {
+        hasError: true,
         mantenedoraId: user.mantenedoraId,
         data: new Date().toISOString(),
         indicadoresGerais: {
