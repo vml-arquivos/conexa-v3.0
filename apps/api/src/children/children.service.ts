@@ -52,10 +52,23 @@ export class ChildrenService {
       }
       where.unitId = filters.unitId;
     } else {
-      // Se não especificou unidade, filtrar pelas unidades que o usuário tem acesso
-      if (user.unitIds && user.unitIds.length > 0) {
-        where.unitId = { in: user.unitIds };
+      // UNIDADE e PROFESSOR: restringir à própria unidade
+      const isUnitOrProfessor = user.roles?.some(
+        (r: any) => r.level === 'UNIDADE' || r.level === 'PROFESSOR'
+      );
+      if (isUnitOrProfessor && user.unitId) {
+        where.unitId = user.unitId;
       }
+      // STAFF_CENTRAL: filtrar por unitScopes se definido
+      const isStaffCentral = user.roles?.some((r: any) => r.level === 'STAFF_CENTRAL');
+      if (isStaffCentral) {
+        const scopes = user.roles?.find((r: any) => r.level === 'STAFF_CENTRAL')?.unitScopes ?? [];
+        if (scopes.length > 0) {
+          where.unitId = { in: scopes };
+        }
+        // sem scopes: acessa todos da mantenedora — where.mantenedoraId já filtra
+      }
+      // MANTENEDORA/DEVELOPER: where.mantenedoraId já é suficiente
     }
 
     // Filtro por status

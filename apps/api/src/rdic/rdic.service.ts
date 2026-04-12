@@ -101,7 +101,10 @@ export class RdicService {
 
   // ─── Atualizar rascunho ───────────────────────────────────────────────────
   async atualizar(id: string, dto: any, user: JwtPayload) {
-    const level = user.roles[0]?.level;
+    const level = user.roles?.find(r =>
+      ['DEVELOPER','MANTENEDORA','STAFF_CENTRAL','UNIDADE','PROFESSOR']
+      .includes(r.level)
+    )?.level ?? user.roles[0]?.level;
 
     // STAFF_CENTRAL: nunca pode editar
     if (level === 'STAFF_CENTRAL') {
@@ -156,7 +159,7 @@ export class RdicService {
 
   // ─── Aprovar (coord. unidade → APROVADO) ─────────────────────────────────
   async aprovar(id: string, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE') {
+    if (!user.roles?.some(r => r.level === 'UNIDADE')) {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode aprovar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
@@ -177,7 +180,7 @@ export class RdicService {
 
   // ─── Devolver ao professor (coord. unidade → DEVOLVIDO) ───────────────────
   async devolver(id: string, dto: { comment: string }, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE') {
+    if (!user.roles?.some(r => r.level === 'UNIDADE')) {
       throw new ForbiddenException('Apenas a coordenação pedagógica pode devolver o RDIC.');
     }
     if (!dto.comment || dto.comment.trim().length < 5) {
@@ -201,7 +204,7 @@ export class RdicService {
   // ─── Finalizar/Aprovar legado (coord. pedagógica unidade → FINALIZADO) ────
   // Mantido para compatibilidade; novos clientes devem usar /aprovar
   async finalizar(id: string, dto: any, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE') {
+    if (!user.roles?.some(r => r.level === 'UNIDADE')) {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode finalizar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
@@ -223,7 +226,7 @@ export class RdicService {
 
   // ─── Publicar (coord. pedagógica unidade → PUBLICADO) ────────────────────
   async publicar(id: string, user: JwtPayload) {
-    if (user.roles[0]?.level !== 'UNIDADE') {
+    if (!user.roles?.some(r => r.level === 'UNIDADE')) {
       throw new ForbiddenException('Apenas a coordenação pedagógica da unidade pode publicar o RDIC.');
     }
     const instancia = await this._buscarEValidar(id, user);
@@ -242,7 +245,10 @@ export class RdicService {
   // ─── Status de completude da turma por bimestre ───────────────────────────
   // GET /rdic/turma/status?classroomId&periodo&anoLetivo
   async turmaStatus(query: any, user: JwtPayload) {
-    const level = user.roles[0]?.level;
+    const level = user.roles?.find(r =>
+      ['DEVELOPER','MANTENEDORA','STAFF_CENTRAL','UNIDADE','PROFESSOR']
+      .includes(r.level)
+    )?.level ?? user.roles[0]?.level;
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
     const { classroomId, periodo, anoLetivo } = query;

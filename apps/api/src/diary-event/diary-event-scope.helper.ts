@@ -33,9 +33,18 @@ export function getScopedWhereForDiaryEvent(user: JwtPayload) {
     const staffRole = user.roles.find(
       (role) => role.level === RoleLevel.STAFF_CENTRAL,
     );
+    const scopes = staffRole?.unitScopes ?? [];
+    if (scopes.length > 0) {
+      return {
+        classroom: {
+          unitId: { in: scopes },
+          unit: { mantenedoraId: user.mantenedoraId },
+        },
+      };
+    }
+    // Sem unitScopes: acesso a todas as unidades da mantenedora
     return {
       classroom: {
-        unitId: { in: staffRole?.unitScopes || [] },
         unit: { mantenedoraId: user.mantenedoraId },
       },
     };
