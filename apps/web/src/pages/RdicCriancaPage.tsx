@@ -259,6 +259,26 @@ function calcularProgresso(dimensoes: DimensaoAvaliacao[]): { total: number; pre
   return { total, preenchidos, pct: total > 0 ? Math.round((preenchidos / total) * 100) : 0 };
 }
 
+// ─── Paleta de avatares por inicial ──────────────────────────────────────────
+const AVATAR_PALETTE: Record<string, string> = {
+  A:'from-rose-400 to-pink-500', B:'from-orange-400 to-amber-500',
+  C:'from-yellow-400 to-orange-400', D:'from-lime-400 to-green-500',
+  E:'from-emerald-400 to-teal-500', F:'from-cyan-400 to-sky-500',
+  G:'from-blue-400 to-indigo-500', H:'from-violet-400 to-purple-500',
+  I:'from-fuchsia-400 to-pink-500', J:'from-rose-400 to-red-500',
+  K:'from-amber-400 to-yellow-500', L:'from-teal-400 to-cyan-500',
+  M:'from-indigo-400 to-blue-500', N:'from-purple-400 to-violet-500',
+  O:'from-pink-400 to-rose-500', P:'from-sky-400 to-blue-500',
+  Q:'from-green-400 to-emerald-500', R:'from-orange-400 to-red-500',
+  S:'from-cyan-400 to-teal-500', T:'from-violet-400 to-indigo-500',
+  U:'from-amber-400 to-orange-500', V:'from-lime-400 to-teal-500',
+  W:'from-blue-400 to-cyan-500', X:'from-fuchsia-400 to-violet-500',
+  Y:'from-yellow-400 to-lime-500', Z:'from-rose-400 to-fuchsia-500',
+};
+function getAvatarGradient(nome: string): string {
+  return AVATAR_PALETTE[nome[0]?.toUpperCase() ?? 'A'] ?? 'from-indigo-400 to-purple-500';
+}
+
 // ─── Componente de Card de Criança ────────────────────────────────────────────
 function CardCrianca({
   aluno,
@@ -271,39 +291,62 @@ function CardCrianca({
   onClick: () => void;
   rdicsCount: number;
 }) {
-  const iniciais = `${aluno.firstName[0]}${aluno.lastName[0]}`.toUpperCase();
+  const iniciais = `${aluno.firstName[0] ?? ''}${aluno.lastName[0] ?? ''}`.toUpperCase();
+  const gradient = getAvatarGradient(aluno.firstName);
+  const genero = aluno.gender === 'FEMININO' ? 'Menina' : aluno.gender === 'MASCULINO' ? 'Menino' : '';
+  const generoIcon = aluno.gender === 'FEMININO' ? '♀' : aluno.gender === 'MASCULINO' ? '♂' : '';
+  const generoColor = aluno.gender === 'FEMININO' ? 'text-pink-400' : 'text-blue-400';
+
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left p-3 rounded-xl border-2 transition-all hover:shadow-md ${
+      className={`group w-full text-left rounded-2xl border-2 overflow-hidden transition-all duration-150 ${
         selecionado
-          ? 'border-blue-500 bg-blue-50 shadow-md'
-          : 'border-gray-200 bg-white hover:border-blue-300'
+          ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
+          : 'border-gray-100 bg-white hover:border-blue-300 hover:shadow-md'
       }`}
     >
-      <div className="flex items-center gap-3">
+      {/* Faixa de cor no topo */}
+      <div className={`h-1 w-full bg-gradient-to-r ${selecionado ? 'from-blue-500 to-blue-400' : gradient}`} />
+
+      <div className="flex items-center gap-3 p-3">
         {/* Avatar */}
-        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-          selecionado ? 'bg-blue-600' : 'bg-gradient-to-br from-indigo-400 to-purple-500'
+        <div className={`w-11 h-11 rounded-full flex-shrink-0 overflow-hidden ring-2 transition-all ${
+          selecionado ? 'ring-blue-300' : 'ring-white group-hover:ring-blue-100'
         }`}>
           {aluno.photoUrl ? (
-            <img src={aluno.photoUrl} alt={aluno.firstName} className="w-12 h-12 rounded-full object-cover" />
+            <img src={aluno.photoUrl} alt={aluno.firstName} className="w-full h-full object-cover" />
           ) : (
-            iniciais
+            <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${
+              selecionado ? 'from-blue-500 to-blue-600' : gradient
+            } text-white font-bold text-sm`}>
+              {iniciais}
+            </div>
           )}
         </div>
+
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className={`font-semibold text-sm truncate ${selecionado ? 'text-blue-800' : 'text-gray-800'}`}>
+          <p className={`font-semibold text-sm leading-tight truncate ${selecionado ? 'text-blue-900' : 'text-gray-800'}`}>
             {aluno.firstName} {aluno.lastName}
           </p>
-          <p className="text-xs text-gray-500">{aluno.idade} anos · {aluno.gender === 'FEMININO' ? 'Menina' : aluno.gender === 'MASCULINO' ? 'Menino' : 'N/I'}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {aluno.idade} meses
+            {genero && (
+              <span className={`ml-1.5 font-medium ${generoColor}`}>
+                {generoIcon} {genero}
+              </span>
+            )}
+          </p>
         </div>
+
         {/* Badge RDIC */}
-        <div className={`flex-shrink-0 text-xs px-2 py-1 rounded-full font-medium ${
-          rdicsCount > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+        <div className={`flex-shrink-0 text-[11px] px-2 py-1 rounded-lg font-semibold border ${
+          rdicsCount > 0
+            ? 'bg-green-50 text-green-700 border-green-200'
+            : 'bg-gray-50 text-gray-400 border-gray-200'
         }`}>
-          {rdicsCount > 0 ? `${rdicsCount} RDIC` : 'Sem RDIC'}
+          {rdicsCount > 0 ? `✓ ${rdicsCount}` : 'Sem RDIC'}
         </div>
       </div>
     </button>
@@ -717,7 +760,7 @@ export default function RdicCriancaPage() {
           ) : (
             <>
               {/* Abas Kanban */}
-              <div className="flex gap-2 border-b border-gray-200">
+              <div className="flex gap-2 bg-gray-100 rounded-2xl p-1.5">
                 {KANBAN_TABS.map(tab => {
                   const count = kanbanGrupos[tab.key]?.length ?? 0;
                   const ativo = kanbanTab === tab.key;
@@ -725,10 +768,10 @@ export default function RdicCriancaPage() {
                     <button
                       key={tab.key}
                       onClick={() => setKanbanTab(tab.key)}
-                      className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150 ${
                         ativo
-                          ? `${tab.color} border-current`
-                          : 'text-gray-500 border-transparent hover:text-gray-700'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
                       {tab.label}
