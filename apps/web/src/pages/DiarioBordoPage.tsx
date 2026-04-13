@@ -1577,6 +1577,13 @@ export default function DiarioBordoPage() {
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
             observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
+            // Persistir dados do planejamento para PDF futuro
+            planejamentoObjetivos: planejamentoHoje?.objetivosMatriz ?? null,
+            planejamentoAtividade: planejamentoHoje?.activities ?? null,
+            planejamentoRecursos: planejamentoHoje?.recursos ?? null,
+            planejamentoTitulo: planejamentoHoje?.title ?? null,
+            // Persistir nome da turma para PDF futuro
+            turmaNome: turmaNomeAtual || null,
             // Salvar lista de crianças para uso no PDF
             criancas: criancas.map(c => ({
               id: c.id,
@@ -2063,7 +2070,7 @@ export default function DiarioBordoPage() {
                               const dataStr = (painelDiario.date || painelDiario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: 'Turma',
+                                turmaNome: turmaNomeAtual || (ctx as any).turmaNome || 'Turma',
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -2079,6 +2086,14 @@ export default function DiarioBordoPage() {
                                 criancas: (ctx.criancas as any[])?.length > 0
                                   ? ctx.criancas as any[]
                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                  ?? (ctx as any).objetivosMatriz)
+                                  || undefined,
+                                planejamentoTitulo: (ctx as any).planejamentoTitulo || undefined,
+                                planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                  || (ctx as any).activities || undefined,
+                                planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                  || (ctx as any).recursos || undefined,
                               });
                             }}
                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
@@ -2382,6 +2397,14 @@ export default function DiarioBordoPage() {
                                 criancas: (ctx.criancas as any[])?.length > 0
                                   ? ctx.criancas as any[]
                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                  ?? (ctx as any).objetivosMatriz)
+                                  || undefined,
+                                planejamentoTitulo: (ctx as any).planejamentoTitulo || undefined,
+                                planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                  || (ctx as any).activities || undefined,
+                                planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                  || (ctx as any).recursos || undefined,
                               });
                             }}
                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
