@@ -683,4 +683,104 @@ export class ReportsService {
       unidades: unidadesData,
     };
   }
+
+  /**
+   * GET /reports/diary/summary?unitId=&classroomId=&mes=YYYY-MM
+   * Agrega aiContext de DiaryEvents do período: clima, presença, execução, microgestos.
+   */
+  async getDiarySummary(
+    user: JwtPayload,
+    params: { unitId?: string; classroomId?: string; mes?: string },
+  ) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    // Resolver escopo
+    let resolvedUnitId: string | undefined = params.unitId ?? user.unitId ?? undefined;
+    const isStaffOrAbove = user.roles?.some((r: any) =>
+      ['STAFF_CENTRAL','MANTENEDORA','DEVELOPER'].includes(r?.level)
+    );
+    if (!isStaffOrAbove && !resolvedUnitId) {
+      throw new ForbiddenException('unitId obrigatório para este perfil');
+    }
+    if (resolvedUnitId && !canAccessUnit(user, resolvedUnitId)) {
+      throw new ForbiddenException('Acesso não autorizado à unidade');
+    }
+
+    // Período
+    const mes = params.mes ?? new Date().toISOString().slice(0, 7);
+    const [ano, mesNum] = mes.split('-').map(Number);
+    const inicio = new Date(ano, mesNum - 1, 1);
+    const fim    = new Date(ano, mesNum, 0, 23, 59, 59);
+
+    // Buscar DiaryEvents do período
+    const where: any = {
+      mantenedoraId: user.mantenedoraId,
+      eventDate: { gte: inicio, lte: fim },
+    };
+    if (resolvedUnitId) where.unitId = resolvedUnitId;
+    if (params.classroomId) where.classroomId = params.classroomId;
+
+    const events = await this.prisma.diaryEvent.findMany({
+      where,
+      select: {
+        id: true,
+        status: true,
+        eventDate: true,
+        aiContext: true,
+        classroom: { select: { id: true, name: true } },
+      },
+      orderBy: { eventDate: 'desc' },
+      take: 500,
+    });
+
+    // Agregadores
+    let totalPublicados = 0, totalRascunhos = 0;
+    const clima: Record<string, number> = {};
+    const execucao: Record<string, number> = {};
+    const microgestosTipos: Record<string, number> = {};
+    let somaPresencas = 0, countPresencas = 0;
+    const momentosDestaque: string[] = [];
+
+    for (const e of events) {
+      const s = (e.status as string).toUpperCase();
+      if (['PUBLICADO','REVISADO','ARQUIVADO'].includes(s)) totalPublicados++;
+      else totalRascunhos++;
+
+      const ctx = e.aiContext && typeof e.aiContext === 'object' ? e.aiContext as any : {};
+
+      if (ctx.climaEmocional) {
+        clima[ctx.climaEmocional] = (clima[ctx.climaEmocional] ?? 0) + 1;
+      }
+      if (ctx.statusExecucaoPlano) {
+        execucao[ctx.statusExecucaoPlano] = (execucao[ctx.statusExecucaoPlano] ?? 0) + 1;
+      }
+      if (ctx.presencas != null) {
+        somaPresencas += Number(ctx.presencas);
+        countPresencas++;
+      }
+      if (ctx.momentoDestaque && momentosDestaque.length < 5) {
+        momentosDestaque.push(ctx.momentoDestaque);
+      }
+      if (Array.isArray(ctx.microgestos)) {
+        for (const m of ctx.microgestos) {
+          const tipo = m.tipo ?? m.tipos?.[0] ?? 'OUTRO';
+          microgestosTipos[tipo] = (microgestosTipos[tipo] ?? 0) + 1;
+        }
+      }
+    }
+
+    return {
+      mes,
+      unitId: resolvedUnitId ?? null,
+      classroomId: params.classroomId ?? null,
+      totalDiarios: events.length,
+      publicados: totalPublicados,
+      rascunhos: totalRascunhos,
+      presencaMedia: countPresencas > 0 ? Math.round(somaPresencas / countPresencas) : null,
+      climaEmocional: clima,
+      execucaoPlano: execucao,
+      microgestosTipos,
+      momentosDestaque,
+    };
+  }
 }
