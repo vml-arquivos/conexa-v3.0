@@ -908,4 +908,43 @@ export class MaterialRequestService {
       porProfessor,
     };
   }
+
+  /**
+   * DELETE /material-requests/:id
+   * Coordenadora (UNIDADE) ou acima apaga qualquer requisição da própria unidade.
+   * Professor apaga apenas as próprias, somente se RASCUNHO ou SOLICITADO.
+   */
+  async delete(id: string, user: JwtPayload): Promise<{ ok: boolean }> {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const req = await this.prisma.materialRequest.findUnique({
+      where: { id },
+      select: { id: true, status: true, createdBy: true, unitId: true, mantenedoraId: true },
+    });
+    if (!req) throw new NotFoundException('Requisição não encontrada');
+    if (req.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+
+    const isProfessor = user.roles?.some((r: any) => r?.level === 'PROFESSOR');
+    const isCoord = user.roles?.some((r: any) =>
+      ['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER'].includes(r?.level)
+    );
+
+    if (isProfessor && !isCoord) {
+      if (req.createdBy !== user.sub) {
+        throw new ForbiddenException('Você só pode apagar suas próprias requisições');
+      }
+      if (!['RASCUNHO','SOLICITADO'].includes(req.status)) {
+        throw new BadRequestException('Só é possível apagar requisições em rascunho ou aguardando análise');
+      }
+    }
+
+    if (isCoord && !['STAFF_CENTRAL','MANTENEDORA','DEVELOPER'].includes(
+      user.roles?.find((r: any) => r?.level)?.level ?? ''
+    )) {
+      if (req.unitId !== user.unitId) throw new ForbiddenException('Acesso negado a esta unidade');
+    }
+
+    await this.prisma.materialRequest.delete({ where: { id } });
+    return { ok: true };
+  }
 }
