@@ -128,9 +128,11 @@ function nomeCrianca(
   id: string,
   criancas?: Array<{ id: string; firstName: string; lastName: string }>,
 ): string {
+  if (!id) return '—';
   const c = criancas?.find(c => c.id === id);
-  if (!c) return id;
-  return `${c.firstName} ${c.lastName}`.trim();
+  if (!c) return ''; // retorna vazio ao invés de mostrar o ID
+  const nome = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim();
+  return nome || '—';
 }
 
 function esc(s?: string | null): string {
