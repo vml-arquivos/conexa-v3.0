@@ -3,6 +3,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
+function canAccessUnitInternal(user: JwtPayload, unitId: string): boolean {
+  if (!unitId) return false;
+  const isCentral = Array.isArray(user.roles) && user.roles.some((r: any) =>
+    ['STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].includes(r?.level)
+  );
+  if (isCentral) return true;
+  return user.unitId === unitId;
+}
+
 /** Verifica se o usuário tem role central (STAFF_CENTRAL, MANTENEDORA ou DEVELOPER) */
 function isCentralRole(user: JwtPayload): boolean {
   return (
@@ -369,10 +378,7 @@ export class InsightsService {
         ...(unitId ? { unitId } : {}),
         resolvido: false,
       },
-      orderBy: [
-        { severidade: 'desc' },
-        { criadoEm: 'desc' },
-      ],
+      orderBy: [{ severidade: 'desc' }, { criadoEm: 'desc' }],
       take: 30,
       select: {
         id: true,
@@ -389,10 +395,9 @@ export class InsightsService {
     });
 
     const mapNivel = (s: string) =>
-      s === 'CRITICA' || s === 'ALTA' ? 'critico'
-      : s === 'MEDIA' ? 'atencao' : 'info';
+      s === 'CRITICA' || s === 'ALTA' ? 'critico' : s === 'MEDIA' ? 'atencao' : 'info';
 
-    const resultado = alertas.map(a => ({
+    const resultado = alertas.map((a) => ({
       id: a.id,
       tipo: a.tipo,
       nivel: mapNivel(a.severidade as string),
@@ -406,9 +411,140 @@ export class InsightsService {
     return {
       unitId: unitId ?? null,
       total: resultado.length,
-      criticos: resultado.filter(a => a.nivel === 'critico'),
-      atencao:  resultado.filter(a => a.nivel === 'atencao'),
-      info:     resultado.filter(a => a.nivel === 'info'),
+      criticos: resultado.filter((a) => a.nivel === 'critico'),
+      atencao: resultado.filter((a) => a.nivel === 'atencao'),
+      info: resultado.filter((a) => a.nivel === 'info'),
+    };
+  }
+
+  /**
+   * GET /insights/classroom/score
+   * Score pedagógico de 0-100 de uma turma em um mês.
+   * Dimensões: diários (30%) + planejamento (25%) + chamada (25%) + rdic (20%)
+   */
+  async getClassroomScore(classroomId: string, mes: string, user: JwtPayload) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const classroom = await this.prisma.classroom.findUnique({
+      where: { id: classroomId },
+      select: { id: true, name: true, unitId: true },
+    });
+    if (!classroom) throw new ForbiddenException('Turma não encontrada');
+    if (!canAccessUnitInternal(user, classroom.unitId)) {
+      throw new ForbiddenException('Acesso não autorizado a esta turma');
+    }
+
+    const [ano, mesNum] = mes.split('-').map(Number);
+    const inicioMes = new Date(ano, mesNum - 1, 1);
+    const fimMes = new Date(ano, mesNum, 0, 23, 59, 59, 999);
+    const hoje = new Date();
+    const fimEfetivo = fimMes < hoje ? fimMes : hoje;
+
+    const [
+      totalDiariosPublicados,
+      totalDiariosRascunho,
+      totalPlanejamentos,
+      planejamentosExecutados,
+      totalChamadas,
+      rdicStatus,
+      enrollments,
+    ] = await Promise.all([
+      this.prisma.diaryEvent.count({
+        where: {
+          classroomId,
+          status: { in: ['PUBLICADO', 'REVISADO', 'ARQUIVADO'] as any[] },
+          eventDate: { gte: inicioMes, lte: fimEfetivo },
+        },
+      }),
+      this.prisma.diaryEvent.count({
+        where: {
+          classroomId,
+          status: 'RASCUNHO' as any,
+          eventDate: { gte: inicioMes, lte: fimEfetivo },
+        },
+      }),
+      this.prisma.planning.count({
+        where: {
+          classroomId,
+          startDate: { gte: inicioMes, lte: fimEfetivo },
+        },
+      }),
+      this.prisma.diaryEvent.count({
+        where: {
+          classroomId,
+          planningId: { not: null },
+          eventDate: { gte: inicioMes, lte: fimEfetivo },
+        },
+      }),
+      this.prisma.attendance.groupBy({
+        by: ['date'],
+        where: {
+          classroomId,
+          date: { gte: inicioMes, lte: fimEfetivo },
+        },
+      }),
+      this.prisma.rDIXInstancia.findMany({
+        where: { classroomId, anoLetivo: ano } as any,
+        select: { status: true },
+      }),
+      this.prisma.enrollment.count({
+        where: { classroomId, status: 'ATIVA' } as any,
+      }),
+    ]);
+
+    let diasLetivos = 0;
+    const cursor = new Date(inicioMes);
+    while (cursor <= fimEfetivo) {
+      const dow = cursor.getDay();
+      if (dow !== 0 && dow !== 6) diasLetivos++;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const pctDiarios = diasLetivos > 0
+      ? Math.min(100, Math.round((totalDiariosPublicados / diasLetivos) * 100))
+      : 0;
+
+    const pctPlanejamento = totalPlanejamentos > 0
+      ? Math.min(100, Math.round((planejamentosExecutados / totalPlanejamentos) * 100))
+      : totalPlanejamentos === 0 ? 0 : 0;
+
+    const pctChamada = diasLetivos > 0
+      ? Math.min(100, Math.round((totalChamadas.length / diasLetivos) * 100))
+      : 0;
+
+    const rdicTotal = enrollments;
+    const rdicIniciados = rdicStatus.filter(
+      (r: any) => !['PENDENTE', 'RASCUNHO'].includes(r.status)
+    ).length;
+    const pctRdic = rdicTotal > 0
+      ? Math.min(100, Math.round((rdicIniciados / rdicTotal) * 100))
+      : 0;
+
+    const score = Math.round(
+      pctDiarios * 0.30 +
+      pctPlanejamento * 0.25 +
+      pctChamada * 0.25 +
+      pctRdic * 0.20
+    );
+
+    const alertas: string[] = [];
+    if (pctChamada < 80) alertas.push(`Chamada abaixo de 80% no mês (${pctChamada}%)`);
+    if (pctDiarios < 60) alertas.push('Diários publicados abaixo de 60% dos dias letivos');
+    if (totalPlanejamentos === 0) alertas.push('Nenhum planejamento criado no mês');
+    if (pctRdic < 30 && mesNum >= 4) alertas.push(`RDIC com apenas ${pctRdic}% iniciado`);
+
+    return {
+      classroomId,
+      classroomName: classroom.name,
+      mes,
+      score,
+      dimensoes: {
+        diarios: { publicados: totalDiariosPublicados, rascunhos: totalDiariosRascunho, diasLetivos, pct: pctDiarios },
+        planejamento: { criados: totalPlanejamentos, executados: planejamentosExecutados, pct: pctPlanejamento },
+        chamada: { diasComChamada: totalChamadas.length, diasLetivos, pct: pctChamada },
+        rdic: { iniciados: rdicIniciados, total: rdicTotal, pct: pctRdic },
+      },
+      alertas,
     };
   }
 }

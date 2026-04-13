@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -79,5 +79,18 @@ export class InsightsController {
     @Request() req: any,
   ) {
     return this.insightsService.getUnitAlerts(req.user, unitId);
+  }
+
+  @Get('classroom/score')
+  @UseGuards(JwtAuthGuard)
+  async getClassroomScore(
+    @Query('classroomId') classroomId: string,
+    @Query('mes') mes: string,
+    @Request() req: any,
+  ) {
+    if (!classroomId || !mes) {
+      throw new BadRequestException('classroomId e mes (YYYY-MM) são obrigatórios');
+    }
+    return this.insightsService.getClassroomScore(classroomId, mes, req.user);
   }
 }
