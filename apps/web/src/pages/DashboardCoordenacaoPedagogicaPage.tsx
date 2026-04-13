@@ -75,6 +75,179 @@ interface DashboardData {
   turmasLista: TurmaResumo[];
 }
 
+// ─── Sub-componente: aba Pedagógico com sub-navegação ────────────────────────
+interface PedagogicoSubNavProps {
+  diarios: any[];
+  turmasLista: any[];
+  cobertura: any;
+  loadingCobertura: boolean;
+  carregarCobertura: () => void;
+  setCobertura: (v: any) => void;
+  setPendencias: (v: any) => void;
+  navigate: (path: string) => void;
+}
+
+function PedagogicoSubNav({
+  diarios, turmasLista, cobertura, loadingCobertura,
+  carregarCobertura, setCobertura, setPendencias, navigate,
+}: PedagogicoSubNavProps) {
+  const [subAba, setSubAba] = React.useState<'diarios' | 'turmas' | 'cobertura'>('diarios');
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navegação */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {[
+          { id: 'diarios',   label: 'Diários' },
+          { id: 'turmas',    label: 'Turmas e Registros' },
+          { id: 'cobertura', label: 'Cobertura' },
+        ].map(s => (
+          <button key={s.id} onClick={() => setSubAba(s.id as any)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              subAba === s.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-aba: Diários */}
+      {subAba === 'diarios' && (
+        <div className="space-y-3">
+          {diarios.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-gray-100 gap-2">
+              <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
+            </div>
+          ) : (
+            diarios.map((diario: any) => {
+              const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
+              const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status || '').toUpperCase());
+              const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? '✅ Cumprido'
+                : ctx.statusExecucaoPlano === 'PARCIAL' ? '⚠️ Parcial'
+                : ctx.statusExecucaoPlano === 'NAO_REALIZADO' ? '❌ Não realizado' : null;
+              const climaLabel = ctx.climaEmocional === 'OTIMO' ? '🌟 Ótimo'
+                : ctx.climaEmocional === 'BOM' ? '😊 Bom'
+                : ctx.climaEmocional === 'REGULAR' ? '😐 Regular'
+                : ctx.climaEmocional === 'AGITADO' ? '😬 Agitado'
+                : ctx.climaEmocional === 'DIFICIL' ? '😔 Difícil' : null;
+              return (
+                <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-emerald-100' : 'border-amber-100'}}`}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}}`}>
+                          {statusPubl ? 'Publicado' : 'Rascunho'}
+                        </span>
+                        {execLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-700">{execLabel}</span>}
+                        {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">{climaLabel}</span>}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {diario.classroom?.name || '—'}
+                        {diario.createdByUser && (
+                          <span className="text-xs font-normal text-gray-400 ml-2">
+                            · {diario.createdByUser.firstName} {diario.createdByUser.lastName}
+                          </span>
+                        )}
+                      </p>
+                      {ctx.presencas != null && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          👥 {ctx.presencas} presentes · {ctx.ausencias ?? 0} ausentes
+                        </p>
+                      )}
+                      {ctx.momentoDestaque && (
+                        <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-gray-400 flex-shrink-0">
+                      {diario.eventDate
+                        ? new Date(diario.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Sub-aba: Turmas */}
+      {subAba === 'turmas' && (
+        <div className="grid grid-cols-1 gap-3">
+          {turmasLista.map((turma: any) => (
+            <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-semibold text-gray-800">{turma.nome}</p>
+                  <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {turma.chamadaFeita ? '✅ Chamada' : '⏳ Pendente'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Observações', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'purple' },
+                  { label: 'Diários', path: `/app/diario-calendario?classroomId=${turma.id}`, color: 'blue' },
+                  { label: 'Atividades', path: `/app/sala-de-aula-virtual?classroomId=${turma.id}`, color: 'indigo' },
+                  { label: 'RDIC', path: `/app/rdic?classroomId=${turma.id}`, color: 'teal' },
+                ].map(item => (
+                  <button key={item.label} onClick={() => navigate(item.path)}
+                    className={`flex flex-col items-center gap-1 p-2.5 bg-${item.color}-50 rounded-xl hover:bg-${item.color}-100 transition-all`}>
+                    <span className={`text-[11px] font-medium text-${item.color}-700`}>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-aba: Cobertura */}
+      {subAba === 'cobertura' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Cobertura de Registros — Hoje</p>
+            <button
+              onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              Atualizar
+            </button>
+          </div>
+          {loadingCobertura ? (
+            <div className="flex items-center justify-center py-10 gap-2">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">Carregando...</p>
+            </div>
+          ) : !cobertura ? (
+            <button onClick={carregarCobertura}
+              className="w-full py-8 rounded-2xl border-2 border-dashed border-blue-200 text-sm text-blue-600 hover:bg-blue-50 transition-all">
+              Carregar dados de cobertura
+            </button>
+          ) : (
+            <div className="space-y-2">
+              {(cobertura.classrooms ?? []).map((cls: any) => (
+                <div key={cls.classroomId} className="bg-white rounded-2xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-gray-800">{cls.classroomName}</p>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-100 text-emerald-700' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                      {cls.coveragePct ?? 0}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className={`h-full rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-500' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                      style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardCoordenacaoPedagogicaPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -731,179 +904,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           ABA: PEDAGÓGICO (diários + turmas + cobertura)
       ══════════════════════════════════════════════════════════════════ */}
       {abaAtiva === 'pedagogico' && (
-        <div className="space-y-5">
-          {/* Sub-navegação interna */}
-          {(() => {
-            const [subAba, setSubAba] = React.useState<'diarios'|'turmas'|'cobertura'>('diarios');
-            return (
-              <div className="space-y-4">
-                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-                  {[
-                    { id: 'diarios',   label: 'Diários' },
-                    { id: 'turmas',    label: 'Turmas e Registros' },
-                    { id: 'cobertura', label: 'Cobertura' },
-                  ].map(s => (
-                    <button key={s.id} onClick={() => setSubAba(s.id as any)}
-                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        subAba === s.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                      }`}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Sub-aba: Diários */}
-                {subAba === 'diarios' && (
-                  <div className="space-y-4">
-                    <button
-                      onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); setSubAba('cobertura'); }}
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      Ver cobertura completa →
-                    </button>
-                    {diarios.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
-                        <ClipboardList className="h-10 w-10 text-gray-200" />
-                        <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {diarios.map((diario: any) => {
-                          const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
-                          const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status||'').toUpperCase());
-                          const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? 'Cumprido'
-                            : ctx.statusExecucaoPlano === 'PARCIAL' ? 'Parcial'
-                            : ctx.statusExecucaoPlano === 'NAO_REALIZADO' ? 'Não realizado' : null;
-                          return (
-                            <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-emerald-100' : 'border-amber-100'}`}>
-                              <div className="flex items-start justify-between gap-3 flex-wrap">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                                      {statusPubl ? 'Publicado' : 'Rascunho'}
-                                    </span>
-                                    {execLabel && (
-                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${ctx.statusExecucaoPlano === 'CUMPRIDO' ? 'bg-emerald-100 text-emerald-700' : ctx.statusExecucaoPlano === 'PARCIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                                        📋 {execLabel}
-                                      </span>
-                                    )}
-                                    {ctx.climaEmocional && (
-                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                                        {ctx.climaEmocional === 'OTIMO' ? '🌟 Ótimo' : ctx.climaEmocional === 'BOM' ? '😊 Bom' : ctx.climaEmocional === 'REGULAR' ? '😐 Regular' : ctx.climaEmocional === 'AGITADO' ? '😬 Agitado' : '😔 Difícil'}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-sm font-semibold text-gray-800 truncate">{diario.titulo || diario.turmaNome || '—'}</p>
-                                  <p className="text-xs text-gray-400 mt-0.5">
-                                    {diario.professorNome} · {diario.turmaNome}
-                                    {ctx.presencas != null && <span className="ml-2 text-emerald-600 font-medium">👥 {ctx.presencas} presentes</span>}
-                                  </p>
-                                  {ctx.momentoDestaque && (
-                                    <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
-                                  )}
-                                </div>
-                                <p className="text-xs font-semibold text-gray-500 flex-shrink-0">
-                                  {diario.data ? new Date(diario.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
-                                </p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Sub-aba: Turmas e Registros */}
-                {subAba === 'turmas' && (
-                  <div className="grid grid-cols-1 gap-3">
-                    {dashboard?.turmasLista?.map(turma => (
-                      <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                              <Users className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-800">{turma.nome}</p>
-                              <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
-                            </div>
-                          </div>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {turma.chamadaFeita ? '✅ Chamada feita' : '⏳ Chamada pendente'}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-4 gap-2">
-                          <button onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
-                            className="flex flex-col items-center gap-1 p-2.5 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
-                            <Brain className="h-4 w-4 text-purple-600" />
-                            <span className="text-[11px] font-medium text-purple-700">Observações</span>
-                          </button>
-                          <button onClick={() => navigate(`/app/diario-calendario?classroomId=${turma.id}`)}
-                            className="flex flex-col items-center gap-1 p-2.5 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all">
-                            <ClipboardList className="h-4 w-4 text-blue-600" />
-                            <span className="text-[11px] font-medium text-blue-700">Diários</span>
-                          </button>
-                          <button onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
-                            className="flex flex-col items-center gap-1 p-2.5 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
-                            <GraduationCap className="h-4 w-4 text-indigo-600" />
-                            <span className="text-[11px] font-medium text-indigo-700">Atividades</span>
-                          </button>
-                          <button onClick={() => navigate(`/app/rdic?classroomId=${turma.id}`)}
-                            className="flex flex-col items-center gap-1 p-2.5 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
-                            <TrendingUp className="h-4 w-4 text-teal-600" />
-                            <span className="text-[11px] font-medium text-teal-700">RDIC</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Sub-aba: Cobertura */}
-                {subAba === 'cobertura' && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-700">Cobertura de Registros — Hoje</p>
-                      <button onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
-                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 transition-colors">
-                        <RefreshCw className="h-3.5 w-3.5" /> Atualizar
-                      </button>
-                    </div>
-                    {loadingCobertura ? (
-                      <div className="flex items-center justify-center py-10 gap-2">
-                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-sm text-gray-500">Carregando cobertura...</p>
-                      </div>
-                    ) : !cobertura ? (
-                      <button onClick={() => carregarCobertura()}
-                        className="w-full py-8 rounded-2xl border-2 border-dashed border-blue-200 text-sm text-blue-600 hover:bg-blue-50 transition-all">
-                        Carregar dados de cobertura
-                      </button>
-                    ) : (
-                      <div className="space-y-3">
-                        {cobertura.classrooms?.map((cls: any) => (
-                          <div key={cls.classroomId} className="bg-white rounded-2xl border border-gray-100 p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-sm font-semibold text-gray-800">{cls.classroomName}</p>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls.coveragePct >= 80 ? 'bg-emerald-100 text-emerald-700' : cls.coveragePct >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
-                                {cls.coveragePct ?? 0}%
-                              </span>
-                            </div>
-                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                              <div className={`h-full rounded-full ${cls.coveragePct >= 80 ? 'bg-emerald-500' : cls.coveragePct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
-                                style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }} />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
+        <PedagogicoSubNav
+          diarios={diarios}
+          turmasLista={dashboard?.turmasLista ?? []}
+          cobertura={cobertura}
+          loadingCobertura={loadingCobertura}
+          carregarCobertura={carregarCobertura}
+          setCobertura={setCobertura}
+          setPendencias={setPendencias}
+          navigate={navigate}
+        />
       )}
 
       {/* ABA: DIÁRIOS */}
