@@ -38,24 +38,16 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
 
 // UNIDADE — Coordenadora Pedagógica ────────────────────────────────────────────
 const COORD_GESTAO: MenuItem[] = [
-  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
-  { path: '/app/coordenacao-pedagogica',        label: 'Coord. Pedagógica',      icon: <Building2 className="h-4 w-4" /> },
-  { path: '/app/coordenacao',                   label: 'Turmas & Reuniões',      icon: <Users className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
-  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica', label: 'Painel da Coordenação', icon: <Home className="h-4 w-4" /> },
+  { path: '/app/coordenacao',            label: 'Turmas & Reuniões',     icon: <Users className="h-4 w-4" /> },
+  { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',     icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/rdic-coord',           label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
-  { path: '/app/rdic-crianca',         label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
-  { path: '/app/inteligencia',         label: 'Painel de Inteligência',     icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/sala-de-aula-virtual', label: 'Sala de Aula Virtual',       icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/chamada',              label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/rdx',               label: 'Fotos da Turma',             icon: <Camera className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
-  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
-  { path: '/app/reports',           label: 'Relatórios',                 icon: <BarChart2 className="h-4 w-4" /> },
-  { path: '/app/painel-alergias',   label: 'Alergias e Dietas',          icon: <Apple className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',      label: 'RDIC — Revisão',      icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/rdic-crianca',    label: 'RDIC por Criança',    icon: <Brain className="h-4 w-4" /> },
+  { path: '/app/inteligencia',    label: 'Inteligência',        icon: <Sparkles className="h-4 w-4" /> },
+  { path: '/app/reports',         label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/painel-alergias', label: 'Alergias e Dietas',   icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
 ];
 
 // UNIDADE — Diretor ────────────────────────────────────────────────────────────
