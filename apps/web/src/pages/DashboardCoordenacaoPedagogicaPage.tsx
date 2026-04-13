@@ -595,7 +595,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             {[
               { icon: <Users className="h-5 w-5 text-blue-600"/>,          bg: 'bg-blue-50',   val: dashboard?.turmas ?? 0,                                          label: 'Turmas' },
               { icon: <Star className="h-5 w-5 text-purple-600"/>,         bg: 'bg-purple-50', val: dashboard?.professores ?? 0,                                     label: 'Professores' },
-              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
+              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Chamadas hoje' },
               { icon: <ClipboardList className="h-5 w-5 text-orange-600"/>,bg: 'bg-orange-50', val: dashboard?.diariosEstaSemana ?? 0,                               label: 'Diários esta semana' },
             ].map((c, i) => (
               <div key={i} className={`${c.bg} rounded-2xl border p-4 text-center`}>
@@ -1024,52 +1024,80 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {diarios.map(diario => {
-                const statusExec = diario.statusExecucaoPlano;
-                const execLabel = statusExec === 'CUMPRIDO' ? 'Cumprido'
-                  : statusExec === 'PARCIAL' ? 'Parcial'
-                  : statusExec === 'NAO_REALIZADO' ? 'Não realizado'
-                  : null;
-                const execCor = statusExec === 'CUMPRIDO' ? 'bg-emerald-100 text-emerald-700'
-                  : statusExec === 'PARCIAL' ? 'bg-amber-100 text-amber-700'
-                  : 'bg-red-100 text-red-600';
-                const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status||'').toUpperCase());
+              {diarios.map((diario: any) => {
+                // Mapeamento robusto: suporta campos da API (title/eventDate/classroom.name)
+                // e campos do mapeamento local (titulo/data/turmaNome/professorNome)
+                const titulo    = diario.title    || diario.titulo    || '—';
+                const turma     = diario.classroom?.name || diario.turmaNome || '—';
+                const professor = diario.createdByUser
+                  ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+                  : diario.professorNome || '—';
+                const dataRaw   = diario.eventDate || diario.data || diario.createdAt || '';
+                const dataFmt   = dataRaw
+                  ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
+                      .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  : '—';
+                const status    = (diario.status || '').toUpperCase();
+                const ctx       = diario.aiContext && typeof diario.aiContext === 'object'
+                  ? diario.aiContext as any : {};
+                const climaEmocional = diario.climaEmocional || ctx.climaEmocional;
+                const presencas      = diario.presencas ?? ctx.presencas;
+                const momentoDest    = diario.momentoDestaque || ctx.momentoDestaque;
+                const statusExec     = diario.statusExecucaoPlano || ctx.statusExecucaoPlano;
+                const camposBNCC     = (diario.camposBNCC ?? []) as string[];
+
+                const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
+                const statusCfg  = statusPubl
+                  ? { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Publicado' }
+                  : { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   label: 'Rascunho'  };
+
+                const climaEmoji: Record<string, string> = {
+                  OTIMO: '🌟', MUITO_BOM: '🌟', BOM: '😊', REGULAR: '😐', AGITADO: '😬', DIFICIL: '😔',
+                };
+                const execLabel: Record<string, { label: string; cor: string }> = {
+                  CUMPRIDO:      { label: 'Cumprido',     cor: 'bg-emerald-100 text-emerald-700' },
+                  PARCIAL:       { label: 'Parcial',      cor: 'bg-amber-100 text-amber-700'    },
+                  NAO_REALIZADO: { label: 'Não realizado', cor: 'bg-red-100 text-red-600'        },
+                };
 
                 return (
-                  <div
-                    key={diario.id}
-                    className={`rounded-2xl border p-4 bg-white transition-all ${statusPubl ? 'border-emerald-100 hover:border-emerald-200' : 'border-amber-100 hover:border-amber-200'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div key={diario.id}
+                    className={`rounded-2xl border p-3 bg-white ${statusCfg.border} hover:shadow-sm transition-all`}>
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-                            {statusPubl ? 'Publicado' : 'Rascunho'}
+                        {/* Badges */}
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
+                            {statusCfg.label}
                           </span>
-                          {execLabel && (
-                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCor}`}>
-                              📋 {execLabel}
+                          {climaEmocional && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium">
+                              {climaEmoji[climaEmocional] ?? ''} {climaEmocional}
                             </span>
                           )}
-                          {diario.climaEmocional && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                              {diario.climaEmocional === 'OTIMO' ? '🌟 Ótimo' : diario.climaEmocional === 'BOM' ? '😊 Bom' : diario.climaEmocional === 'REGULAR' ? '😐 Regular' : diario.climaEmocional === 'AGITADO' ? '😬 Agitado' : '😔 Difícil'}
+                          {statusExec && execLabel[statusExec] && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execLabel[statusExec].cor}`}>
+                              📋 {execLabel[statusExec].label}
                             </span>
                           )}
                         </div>
-                        <p className="text-sm font-semibold text-gray-800 truncate">{diario.titulo || diario.turmaNome}</p>
+                        {/* Turma e professor */}
+                        <p className="text-sm font-bold text-gray-800 truncate">{turma}</p>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          {diario.professorNome} · {diario.turmaNome}
-                          {diario.presencas != null && (
-                            <span className="ml-2 text-emerald-600 font-medium">👥 {diario.presencas} presentes</span>
+                          Prof. {professor}
+                          {presencas != null && (
+                            <span className="ml-2 text-emerald-600 font-medium">· {presencas} presentes</span>
                           )}
                         </p>
-                        {diario.momentoDestaque && (
-                          <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{diario.momentoDestaque}"</p>
+                        {/* Momento de destaque */}
+                        {(momentoDest || titulo !== '—') && (
+                          <p className="text-xs text-gray-500 mt-1.5 italic line-clamp-2">
+                            "{momentoDest || titulo}"
+                          </p>
                         )}
-                        {(diario.camposBNCC ?? []).length > 0 && (
+                        {camposBNCC.length > 0 && (
                           <div className="flex gap-1 mt-2 flex-wrap">
-                            {(diario.camposBNCC ?? []).slice(0, 3).map((c, i) => (
+                            {camposBNCC.slice(0, 3).map((c: string, i: number) => (
                               <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium">
                                 {c}
                               </span>
@@ -1077,11 +1105,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           </div>
                         )}
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-xs font-semibold text-gray-600">
-                          {diario.data ? new Date(diario.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
-                        </p>
-                      </div>
+                      {/* Data */}
+                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">
+                        {dataFmt}
+                      </span>
                     </div>
                   </div>
                 );
