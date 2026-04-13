@@ -633,6 +633,10 @@ export default function DiarioBordoPage() {
   const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO'>('TODOS');
+  const [filtroCrianca, setFiltroCrianca] = useState('');
+  const [filtroComportamento, setFiltroComportamento] = useState('');
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // ── Estado do Calendário Mensal ──────────────────────────────────────────────
   const hojeStr = getPedagogicalToday();
@@ -1623,7 +1627,31 @@ export default function DiarioBordoPage() {
   }
 
   const diariosFiltrados = diarios.filter(d => {
-    if (busca && !new Date(d.date || d.createdAt).toLocaleDateString('pt-BR').includes(busca) && !(d.momentoDestaque || '').toLowerCase().includes(busca.toLowerCase())) return false;
+    if (busca && !new Date(d.date || d.createdAt).toLocaleDateString('pt-BR').includes(busca) && !(d.momentoDestaque || '').toLowerCase().includes(busca.toLowerCase()) && !(d.reflexaoPedagogica || '').toLowerCase().includes(busca.toLowerCase())) return false;
+    if (filtroStatus !== 'TODOS') {
+      const s = (d.status || '').toUpperCase();
+      if (filtroStatus === 'PUBLICADO' && s !== 'PUBLICADO' && s !== 'REVISADO' && s !== 'ARQUIVADO') return false;
+      if (filtroStatus === 'RASCUNHO' && s !== 'RASCUNHO') return false;
+    }
+    if (filtroCrianca.trim()) {
+      const termo = filtroCrianca.toLowerCase();
+      const ctx = d.aiContext && typeof d.aiContext === 'object' ? d.aiContext as any : {};
+      const obsIds: string[] = (ctx.observacoesIndividuais ?? []).flatMap((o: any) => o.criancaIds ?? []);
+      const nomeMatch = criancas.some(c =>
+        obsIds.includes(c.id) &&
+        (`${c.firstName} ${c.lastName}`).toLowerCase().includes(termo)
+      );
+      const microMatch = (d.microgestos ?? []).some((m: any) =>
+        (m.criancaNome || '').toLowerCase().includes(termo)
+      );
+      if (!nomeMatch && !microMatch) return false;
+    }
+    if (filtroComportamento.trim()) {
+      const termo = filtroComportamento.toLowerCase();
+      const ctx = d.aiContext && typeof d.aiContext === 'object' ? d.aiContext as any : {};
+      const labels: string[] = (ctx.observacoesIndividuais ?? []).map((o: any) => (o.label || '').toLowerCase());
+      if (!labels.some(l => l.includes(termo))) return false;
+    }
     return true;
   });
 
@@ -1740,28 +1768,104 @@ export default function DiarioBordoPage() {
         return (
           <div className="space-y-4">
             {/* Barra de ações */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/app/diario/historico')}
-                  className="flex items-center gap-2 text-gray-600 border-gray-200 hover:bg-gray-50"
-                >
-                  <History className="h-4 w-4" /> Ver histórico completo
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.print()}
-                  className="flex items-center gap-2 text-gray-600 border-gray-200 hover:bg-gray-50"
-                >
-                  <Printer className="h-4 w-4" /> Imprimir mês
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/app/diario/historico')}
+                    className="flex items-center gap-2 text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <History className="h-4 w-4" /> Histórico completo
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMostrarFiltros(v => !v)}
+                    className={`flex items-center gap-2 border-gray-200 transition-colors ${mostrarFiltros ? 'bg-blue-50 text-blue-700 border-blue-200' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <Search className="h-4 w-4" />
+                    Buscar e filtrar
+                    {(busca || filtroStatus !== 'TODOS' || filtroCrianca || filtroComportamento) && (
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold">!</span>
+                    )}
+                  </Button>
+                </div>
+                <Button onClick={() => setAba('novo')} size="sm" className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" /> Novo Diário
                 </Button>
               </div>
-              <Button onClick={() => setAba('novo')} size="sm" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" /> Novo Diário
-              </Button>
+
+              {/* Painel de filtros expansível */}
+              {mostrarFiltros && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Filtros de busca</p>
+
+                  {/* Busca geral */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Buscar por data, momento destaque ou reflexão..."
+                      value={busca}
+                      onChange={e => setBusca(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Filtro por status */}
+                    <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1">
+                      {([
+                        { id: 'TODOS',     label: 'Todos' },
+                        { id: 'PUBLICADO', label: 'Publicados' },
+                        { id: 'RASCUNHO',  label: 'Rascunhos' },
+                      ] as const).map(op => (
+                        <button
+                          key={op.id}
+                          onClick={() => setFiltroStatus(op.id)}
+                          className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition-all ${
+                            filtroStatus === op.id
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-gray-500 hover:text-gray-800'
+                          }`}
+                        >
+                          {op.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Busca por criança */}
+                    <input
+                      type="text"
+                      placeholder="🧒 Nome da criança..."
+                      value={filtroCrianca}
+                      onChange={e => setFiltroCrianca(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+
+                    {/* Busca por comportamento */}
+                    <input
+                      type="text"
+                      placeholder="🔍 Comportamento observado..."
+                      value={filtroComportamento}
+                      onChange={e => setFiltroComportamento(e.target.value)}
+                      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    />
+                  </div>
+
+                  {/* Limpar filtros */}
+                  {(busca || filtroStatus !== 'TODOS' || filtroCrianca || filtroComportamento) && (
+                    <button
+                      onClick={() => { setBusca(''); setFiltroStatus('TODOS'); setFiltroCrianca(''); setFiltroComportamento(''); }}
+                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                    >
+                      ✕ Limpar todos os filtros
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {loading && <LoadingState message="Carregando diários..." />}
@@ -1934,10 +2038,20 @@ export default function DiarioBordoPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/40 text-gray-400">
-                      <Calendar className="h-10 w-10 mb-2 text-gray-300" />
-                      <p className="text-sm font-medium">Selecione um dia no calendário</p>
-                      <p className="text-xs mt-1">Dias com ponto colorido já possuem diário registrado</p>
+                    <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/40 text-gray-400 gap-3">
+                      <Calendar className="h-10 w-10 text-gray-300" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-500">Selecione um dia no calendário</p>
+                        <p className="text-xs mt-0.5 text-gray-400">Dias com ponto colorido já possuem diário registrado</p>
+                      </div>
+                      {diarios.length > 0 && (
+                        <button
+                          onClick={() => window.print()}
+                          className="inline-flex items-center gap-2 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-100 transition-colors"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Imprimir mês ({diarios.length} diários)
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
