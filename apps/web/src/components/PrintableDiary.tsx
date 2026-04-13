@@ -133,7 +133,8 @@ function nomeCrianca(
   return `${c.firstName} ${c.lastName}`.trim();
 }
 
-function esc(s: string): string {
+function esc(s?: string | null): string {
+  if (!s) return '';
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -557,8 +558,9 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
       transition: opacity 0.15s;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-print { background: #fff; color: #4f46e5; }
-    .btn-close { background: rgba(255,255,255,0.15); color: #fff; }
+    .btn-print  { background: #fff; color: #4f46e5; }
+    .btn-pdf    { background: #10b981; color: #fff; }
+    .btn-close  { background: rgba(255,255,255,0.15); color: #fff; }
 
     @media print {
       .action-bar { display: none !important; }
@@ -588,7 +590,8 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   <!-- Barra de ação -->
   <div class="action-bar">
     <span>📋 Diário da Turma — ${esc(d.turmaNome)} — ${d.data.split('-').reverse().join('/')}</span>
-    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+    <button class="btn btn-pdf" onclick="(function(){ var p=document.createElement('p'); p.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);background:#1e1b4b;color:#fff;padding:8px 20px;border-radius:8px;font-size:10pt;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);'; p.textContent='Na janela de impressão, escolha Destino → Salvar como PDF'; document.body.appendChild(p); setTimeout(function(){ document.body.removeChild(p); window.print(); },1200); })();">📄 Gerar PDF</button>
+    <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir</button>
     <button class="btn btn-close" onclick="window.close()">✕ Fechar</button>
   </div>
 
