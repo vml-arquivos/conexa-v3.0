@@ -61,14 +61,24 @@ export class DevelopmentObservationsService {
       where.createdBy = user.sub;
     }
 
-    return this.prisma.developmentObservation.findMany({
-      where,
-      orderBy: { date: 'desc' },
-      take: Number(limit) || 100,
-      include: {
-        child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
-      },
-    });
+    try {
+      return await this.prisma.developmentObservation.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        take: Number(limit) || 100,
+        include: {
+          child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
+        },
+      });
+    } catch (error: any) {
+      if (
+        error?.code === 'P2021' &&
+        String(error?.meta?.table ?? '').includes('development_observation')
+      ) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   /** Detalhe de uma observação */
