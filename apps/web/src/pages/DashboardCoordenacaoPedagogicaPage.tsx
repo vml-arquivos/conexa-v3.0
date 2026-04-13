@@ -51,8 +51,18 @@ interface Planejamento {
   template?: { id: string; name: string; type: string };
 }
 interface Diario {
-  id: string; professorNome: string; turmaNome: string;
-  data: string; titulo: string;
+  id: string;
+  professorNome: string;
+  turmaNome: string;
+  data: string;
+  titulo: string;
+  status?: string;
+  climaEmocional?: string;
+  presencas?: number;
+  ausencias?: number;
+  momentoDestaque?: string;
+  statusExecucaoPlano?: string;
+  camposBNCC?: string[];
 }
 interface TurmaResumo {
   id: string; nome: string; totalAlunos: number; professor: string | null; chamadaFeita: boolean;
@@ -234,6 +244,15 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         setDiarios(rawDiarios.map((d: any) => ({
           id: d.id,
           titulo: d.title ?? 'Diário de Bordo',
+          status: d.status ?? 'RASCUNHO',
+          climaEmocional: d.climaEmocional ?? d.aiContext?.climaEmocional ?? null,
+          presencas: d.presencas ?? d.aiContext?.presencas ?? null,
+          ausencias: d.ausencias ?? d.aiContext?.ausencias ?? null,
+          momentoDestaque: d.momentoDestaque ?? d.aiContext?.momentoDestaque ?? null,
+          statusExecucaoPlano: d.aiContext?.statusExecucaoPlano ?? null,
+          camposBNCC: d.aiContext?.planejamentoObjetivos
+            ? (d.aiContext.planejamentoObjetivos as any[]).map((o: any) => o.campoExperiencia).filter(Boolean)
+            : [],
           data: d.eventDate ? d.eventDate.slice(0, 10) : d.createdAt?.slice(0, 10) ?? '',
           professorNome: d.createdByUser
             ? `${d.createdByUser.firstName} ${d.createdByUser.lastName}`.trim()
@@ -713,33 +732,112 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Header com resumo */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {(() => {
+              const publicados = diarios.filter(d => ['PUBLICADO','REVISADO','ARQUIVADO'].includes((d.status||'').toUpperCase())).length;
+              const rascunhos = diarios.filter(d => (d.status||'').toUpperCase() === 'RASCUNHO').length;
+              const comExecucao = diarios.filter(d => d.statusExecucaoPlano === 'CUMPRIDO').length;
+              const presencaMedia = diarios.filter(d => d.presencas != null).reduce((acc, d, _, arr) => {
+                const total = (d.presencas ?? 0) + (d.ausencias ?? 0);
+                return total > 0 ? acc + ((d.presencas ?? 0) / total) * 100 / arr.length : acc;
+              }, 0);
+              return (
+                <>
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-emerald-700">{publicados}</p>
+                    <p className="text-xs text-emerald-600 mt-0.5 font-medium">Publicados</p>
+                  </div>
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-amber-700">{rascunhos}</p>
+                    <p className="text-xs text-amber-600 mt-0.5 font-medium">Rascunhos</p>
+                  </div>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-blue-700">{comExecucao}</p>
+                    <p className="text-xs text-blue-600 mt-0.5 font-medium">Plano cumprido</p>
+                  </div>
+                  <div className="rounded-2xl border border-violet-100 bg-violet-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-violet-700">{presencaMedia > 0 ? `${Math.round(presencaMedia)}%` : '—'}</p>
+                    <p className="text-xs text-violet-600 mt-0.5 font-medium">Presença média</p>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Lista de diários */}
           {diarios.length === 0 ? (
-            <div className="text-center py-16">
-              <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-200"/>
-              <p className="text-xl font-bold text-gray-400">Nenhum diário esta semana</p>
+            <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
+              <ClipboardList className="h-10 w-10 text-gray-200" />
+              <p className="text-sm text-gray-400 font-medium">Nenhum diário registrado neste período.</p>
             </div>
-          ) : diarios.map(diario => {
-            const d = new Date(diario.data + 'T12:00:00');
-            return (
-              <Card key={diario.id} className="rounded-2xl border-2 hover:border-blue-300 transition-all">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <ClipboardList className="h-5 w-5 text-blue-600"/>
+          ) : (
+            <div className="space-y-2">
+              {diarios.map(diario => {
+                const statusExec = diario.statusExecucaoPlano;
+                const execLabel = statusExec === 'CUMPRIDO' ? 'Cumprido'
+                  : statusExec === 'PARCIAL' ? 'Parcial'
+                  : statusExec === 'NAO_REALIZADO' ? 'Não realizado'
+                  : null;
+                const execCor = statusExec === 'CUMPRIDO' ? 'bg-emerald-100 text-emerald-700'
+                  : statusExec === 'PARCIAL' ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-600';
+                const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status||'').toUpperCase());
+
+                return (
+                  <div
+                    key={diario.id}
+                    className={`rounded-2xl border p-4 bg-white transition-all ${statusPubl ? 'border-emerald-100 hover:border-emerald-200' : 'border-amber-100 hover:border-amber-200'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                            {statusPubl ? 'Publicado' : 'Rascunho'}
+                          </span>
+                          {execLabel && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCor}`}>
+                              📋 {execLabel}
+                            </span>
+                          )}
+                          {diario.climaEmocional && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                              {diario.climaEmocional === 'OTIMO' ? '🌟 Ótimo' : diario.climaEmocional === 'BOM' ? '😊 Bom' : diario.climaEmocional === 'REGULAR' ? '😐 Regular' : diario.climaEmocional === 'AGITADO' ? '😬 Agitado' : '😔 Difícil'}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm font-semibold text-gray-800 truncate">{diario.titulo || diario.turmaNome}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {diario.professorNome} · {diario.turmaNome}
+                          {diario.presencas != null && (
+                            <span className="ml-2 text-emerald-600 font-medium">👥 {diario.presencas} presentes</span>
+                          )}
+                        </p>
+                        {diario.momentoDestaque && (
+                          <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{diario.momentoDestaque}"</p>
+                        )}
+                        {(diario.camposBNCC ?? []).length > 0 && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {(diario.camposBNCC ?? []).slice(0, 3).map((c, i) => (
+                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <p className="font-semibold text-sm">{diario.titulo}</p>
-                        <p className="text-xs text-gray-500">{diario.professorNome} · {diario.turmaNome} · {d.getDate()}/{d.getMonth()+1}</p>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-semibold text-gray-600">
+                          {diario.data ? new Date(diario.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
+                        </p>
                       </div>
                     </div>
-                    <Button size="sm" variant="ghost" className="rounded-xl"><Eye className="h-4 w-4"/></Button>
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
