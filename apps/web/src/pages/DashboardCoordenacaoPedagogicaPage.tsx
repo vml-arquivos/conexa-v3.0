@@ -30,11 +30,6 @@ const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string 
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-interface Requisicao {
-  id: string; professorNome: string; turmaNome: string;
-  itens: Array<{ item: string; quantidade: number }>; urgencia: string;
-  justificativa: string; criadoEm: string;
-}
 interface Planejamento {
   id: string;
   title: string;
@@ -251,10 +246,9 @@ function PedagogicoSubNav({
 export default function DashboardCoordenacaoPedagogicaPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -365,47 +359,27 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           alertas: [],
           turmasLista: turmasArr,
         });
-        if (Array.isArray(raw?.requisicoesPendentesDetalhes) && raw.requisicoesPendentesDetalhes.length > 0) {
-          setRequisicoes(raw.requisicoesPendentesDetalhes.map((r: Record<string, unknown>) => {
-            let itens: Array<{item: string; quantidade: number}> = [];
-            try { const desc = JSON.parse(r.description as string ?? '{}'); itens = desc.itens ?? []; } catch { itens = []; }
-            return {
-              id: r.id as string,
-              professorNome: (r.createdByUser as any)
-                ? `${(r.createdByUser as any).firstName} ${(r.createdByUser as any).lastName}`.trim()
-                : (r.createdBy as string) ?? 'Professor',
-              turmaNome: (r.classroom as any)?.name ?? (r.classroomId as string) ?? '—',
-              itens: itens.length > 0 ? itens : [{ item: r.title as string ?? 'Material', quantidade: 1 }],
-              urgencia: (r.priority as string)?.toUpperCase() === 'ALTA' ? 'ALTA' : (r.priority as string)?.toUpperCase() === 'BAIXA' ? 'BAIXA' : 'MEDIA',
-              justificativa: '',
-              criadoEm: (r.requestedDate as string) ?? new Date().toISOString(),
-            };
-          }));
-        }
         if (Array.isArray(raw?.planejamentosParaRevisao) && raw.planejamentosParaRevisao.length > 0) {
           setPlanejamentos(raw.planejamentosParaRevisao.map((p: Record<string, unknown>) => ({
             id: p.id as string,
+            title: (p.title as string) ?? 'Plano de Aula',
+            status: (p.status as string) ?? 'RASCUNHO',
+            type: (p.type as string) ?? '',
+            startDate: (p.startDate as string) ?? '',
+            endDate: (p.endDate as string) ?? '',
             professorNome: (p.createdBy as string) ?? 'Professor',
-            turmaNome: (p.classroomId as string) ?? '—',
-            semana: p.startDate ? new Date(p.startDate as string).toLocaleDateString('pt-BR') : '—',
-            objetivos: undefined,
+            turmaNome: ((p.grupo as Record<string, unknown> | null)?.turmaNome as string)
+              ?? ((p.classroom as Record<string, unknown> | null)?.name as string)
+              ?? (p.classroomId as string)
+              ?? '—',
+            templateNome: ((p.template as Record<string, unknown> | null)?.name as string) ?? undefined,
+            objectives: (p.objectives as string) ?? undefined,
+            reviewComment: (p.reviewComment as string) ?? undefined,
+            createdByUser: (p.createdByUser as Planejamento['createdByUser']) ?? undefined,
+            classroom: (p.classroom as Planejamento['classroom']) ?? undefined,
+            template: (p.template as Planejamento['template']) ?? undefined,
           })));
         }
-      }
-      if (reqRes.status === 'fulfilled' && Array.isArray(reqRes.value.data) && reqRes.value.data.length > 0) {
-        setRequisicoes(reqRes.value.data.map((r: any) => ({
-          ...r,
-          professorNome: r.createdByUser
-            ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}`.trim()
-            : r.createdBy ?? 'Professor',
-          turmaNome: r.classroom?.name ?? r.classroomId ?? '—',
-          itens: Array.isArray(r.items) && r.items.length > 0
-            ? r.items.map((i: any) => ({ item: i.name ?? i.description ?? 'Material', quantidade: i.quantity ?? 1 }))
-            : [{ item: r.title ?? 'Material', quantidade: 1 }],
-          urgencia: r.priority === 'ALTA' ? 'ALTA' : r.priority === 'BAIXA' ? 'BAIXA' : 'MEDIA',
-          justificativa: r.justification ?? r.notes ?? '',
-          criadoEm: r.requestedDate ?? r.createdAt ?? new Date().toISOString(),
-        })));
       }
       if (planRes.status === 'fulfilled') {
         const rawPlans: Record<string, unknown>[] = Array.isArray(planRes.value.data) ? planRes.value.data : [];
@@ -421,7 +395,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             startDate: (p.startDate as string) ?? '',
             endDate: (p.endDate as string) ?? '',
             professorNome: user ? `${user.firstName} ${user.lastName}`.trim() : (p.createdBy as string) ?? 'Professor',
-            turmaNome: classroom?.name ?? (p.classroomId as string) ?? '—',
+            turmaNome: ((p.porTurma as Record<string, unknown> | null)?.turmaNome as string)
+              ?? ((p.grupo as Record<string, unknown> | null)?.turmaNome as string)
+              ?? classroom?.name
+              ?? (p.classroomId as string)
+              ?? '—',
             templateNome: template?.name ?? undefined,
             objectives: (p.objectives as string) ?? undefined,
             reviewComment: (p.reviewComment as string) ?? undefined,
@@ -458,29 +436,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         ?? 'Erro desconhecido';
       setErroPainel(msg);
       toast.error('Erro ao carregar painel');
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
-  }
-
-  async function aprovarRequisicao(id: string) {
-    try {
-      setProcessando(id);
-      await http.patch(`/material-requests/${id}/review`, { decision: 'APPROVED' });
-      toast.success('Pedido aprovado! ✅');
-      setRequisicoes(prev => prev.filter(r => r.id !== id));
-    } catch { toast.error('Erro ao aprovar'); }
-    finally { setProcessando(null); }
-  }
-
-  async function rejeitarRequisicao(id: string, motivo: string) {
-    try {
-      setProcessando(id);
-      await http.patch(`/material-requests/${id}/review`, { decision: 'REJECTED', notes: motivo });
-      toast.success('Pedido devolvido ao professor');
-      setRequisicoes(prev => prev.filter(r => r.id !== id));
-      setItemParaRejeitar(null); setMotivoRejeicao('');
-    } catch { toast.error('Erro ao devolver'); }
-    finally { setProcessando(null); }
   }
 
   async function aprovarPlanejamento(id: string) {
@@ -489,8 +447,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       await http.post(`/plannings/${id}/aprovar`);
       toast.success('Planejamento aprovado! ✅');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
-    } catch { toast.error('Erro ao aprovar'); }
-    finally { setProcessando(null); }
+    } catch {
+      toast.error('Erro ao aprovar');
+    } finally {
+      setProcessando(null);
+    }
   }
 
   async function devolverPlanejamento(id: string, motivo: string) {
@@ -552,8 +513,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <Button className="flex-1 rounded-xl bg-orange-500 hover:bg-orange-600"
                 onClick={() => {
                   if (!motivoRejeicao.trim()) { toast.error('Escreva uma orientação'); return; }
-                  if (itemParaRejeitar.tipo === 'req') rejeitarRequisicao(itemParaRejeitar.id, motivoRejeicao);
-                  else devolverPlanejamento(itemParaRejeitar.id, motivoRejeicao);
+                  devolverPlanejamento(itemParaRejeitar.id, motivoRejeicao);
                 }}>Devolver</Button>
             </div>
           </div>
@@ -587,7 +547,15 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Abas */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
         {abas.map(aba => (
-          <button key={aba.id} onClick={() => setAbaAtiva(aba.id as any)}
+          <button
+            key={aba.id}
+            onClick={() => {
+              if ((aba.id as string) === 'requisicoes') {
+                navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests');
+                return;
+              }
+              setAbaAtiva(aba.id as any);
+            }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
               abaAtiva === aba.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {aba.icon}{aba.label}
@@ -746,7 +714,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             )}
             {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
               <button
-                onClick={() => setAbaAtiva('requisicoes')}
+                onClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
                 className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all"
               >
                 <span className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
@@ -793,67 +761,6 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         </div>
       )}
 
-      {/* ABA: PEDIDOS DE MATERIAL */}
-      {abaAtiva === 'requisicoes' && (
-        <div className="space-y-4">
-          {requisicoes.length === 0 ? (
-            <div className="text-center py-16">
-              <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-300"/>
-              <p className="text-xl font-bold text-gray-400">Tudo em dia!</p>
-              <p className="text-gray-400 text-sm mt-2">Nenhum pedido aguardando análise</p>
-            </div>
-          ) : requisicoes.map(req => {
-            const urg = URGENCIA_CONFIG[req.urgencia] ?? URGENCIA_CONFIG['MEDIA'];
-            const d = new Date(req.criadoEm);
-            return (
-              <Card key={req.id} className="rounded-2xl border-2 overflow-hidden">
-                <div className={`px-4 py-2 flex items-center justify-between ${req.urgencia === 'ALTA' ? 'bg-red-50' : req.urgencia === 'MEDIA' ? 'bg-yellow-50' : 'bg-green-50'}`}>
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${urg.dot}`}/>
-                    <span className="text-sm font-semibold">{req.professorNome}</span>
-                    <span className="text-xs text-gray-500">· {req.turmaNome}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full border font-medium ${urg.cor}`}>{urg.label}</span>
-                </div>
-                <CardContent className="p-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 mb-2">O que está pedindo:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {req.itens.map((item, idx) => (
-                        <span key={idx} className="px-3 py-1.5 bg-gray-100 rounded-xl text-sm font-medium">{item.quantidade}x {item.item}</span>
-                      ))}
-                    </div>
-                  </div>
-                  {req.justificativa && (
-                    <div className="p-3 bg-blue-50 rounded-xl">
-                      <p className="text-xs text-blue-600 font-medium mb-1">Por que precisa:</p>
-                      <p className="text-sm text-blue-800">{req.justificativa}</p>
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-400">Pedido em {d.getDate()} de {MESES[d.getMonth()]}</p>
-                  {canApprove ? (
-                  <div className="flex gap-3 pt-1">
-                    <Button onClick={() => aprovarRequisicao(req.id)} disabled={processando === req.id}
-                      className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 font-bold">
-                      <ThumbsUp className="h-4 w-4 mr-2"/>Aprovar
-                    </Button>
-                    <Button onClick={() => setItemParaRejeitar({ id: req.id, tipo: 'req' })} disabled={processando === req.id}
-                      variant="outline" className="flex-1 h-11 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold">
-                      <MessageSquare className="h-4 w-4 mr-2"/>Devolver
-                    </Button>
-                  </div>
-                  ) : (
-                  <div className="pt-1">
-                    <span className="text-xs text-gray-400 italic">Visualização — aprovação é responsabilidade da Coordenação da Unidade</span>
-                  </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
       {/* ABA: PLANEJAMENTOS */}
       {abaAtiva === 'planejamentos' && (() => {
         const STATUS_PLAN_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
@@ -874,6 +781,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           acc[p.status] = (acc[p.status] ?? 0) + 1;
           return acc;
         }, {});
+        const gruposPlanejamento = plansFiltrados.reduce<Array<{ turmaNome: string; itens: Planejamento[] }>>((acc, plan) => {
+          const turmaNome = plan.turmaNome?.trim() || 'Sem turma';
+          const grupoExistente = acc.find(grupo => grupo.turmaNome === turmaNome);
+          if (grupoExistente) {
+            grupoExistente.itens.push(plan);
+          } else {
+            acc.push({ turmaNome, itens: [plan] });
+          }
+          return acc;
+        }, []);
         return (
           <div className="space-y-4">
             {/* Filtros por status */}
@@ -900,140 +817,157 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 <p className="text-xl font-bold text-gray-400">Nenhum planejamento encontrado</p>
                 <p className="text-sm text-gray-400 mt-1">Os planejamentos criados pelos professores aparecerão aqui</p>
               </div>
-            ) : plansFiltrados.map(plan => {
-              const cfg = STATUS_PLAN_CONFIG[plan.status] ?? STATUS_PLAN_CONFIG['RASCUNHO'];
-              const dataInicio = plan.startDate ? new Date(plan.startDate).toLocaleDateString('pt-BR') : '—';
-              const dataFim = plan.endDate ? new Date(plan.endDate).toLocaleDateString('pt-BR') : '—';
-              const expandido = planExpandido === plan.id;
-              return (
-                <Card key={plan.id} className={`rounded-2xl border-2 transition-all ${
-                  plan.status === 'EM_REVISAO' ? 'border-yellow-300 shadow-yellow-100 shadow-md' :
-                  plan.status === 'DEVOLVIDO'  ? 'border-orange-300' :
-                  plan.status === 'APROVADO'   ? 'border-green-300' : 'border-gray-200'
-                }`}>
-                  <CardContent className="p-4 space-y-3">
-                    {/* Cabeçalho */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-800 truncate">{plan.title}</p>
-                        <p className="text-sm text-gray-600 font-medium">{plan.professorNome}</p>
-                        <p className="text-xs text-gray-500">
-                          {plan.turmaNome}
-                          {plan.templateNome && <span className="ml-1 text-blue-600">· {plan.templateNome}</span>}
-                          {plan.type && <span className="ml-1">· {TIPO_PLAN[plan.type] ?? plan.type}</span>}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{dataInicio} → {dataFim}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <span className={`px-2 py-1 text-xs rounded-full font-semibold border ${cfg.cor}`}>
-                          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`}/>{cfg.label}
-                        </span>
-                        <button onClick={() => setPlanExpandido(expandido ? null : plan.id)}
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                          <Eye className="h-3 w-3"/>{expandido ? 'Fechar' : 'Ver detalhes'}
-                        </button>
-                      </div>
-                    </div>
+            ) : gruposPlanejamento.map(grupo => (
+              <div key={grupo.turmaNome} className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                  <GraduationCap className="h-4 w-4 text-blue-600" />
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{grupo.turmaNome}</h3>
+                  <span className="text-xs text-gray-400">{grupo.itens.length} planejamento(s)</span>
+                </div>
+                {grupo.itens.map(plan => {
+                  const cfg = STATUS_PLAN_CONFIG[plan.status] ?? STATUS_PLAN_CONFIG.RASCUNHO;
+                  const dataInicio = plan.startDate ? new Date(plan.startDate).toLocaleDateString('pt-BR') : '—';
+                  const dataFim = plan.endDate ? new Date(plan.endDate).toLocaleDateString('pt-BR') : '—';
+                  const expandido = planExpandido === plan.id;
 
-                    {/* Detalhes expandidos */}
-                    {expandido && (
-                      <div className="space-y-2 border-t pt-3">
-                        {plan.objectives && (() => {
-                          let objetivos: any[] = [];
-                          try {
-                            const parsed = JSON.parse(plan.objectives as string);
-                            objetivos = Array.isArray(parsed) ? parsed : [];
-                          } catch {
-                            // não é JSON — exibir como texto simples
-                          }
-                          if (objetivos.length === 0) {
-                            return (
-                              <div className="p-3 bg-gray-50 rounded-xl">
-                                <p className="text-xs text-gray-500 font-medium mb-1">Objetivos:</p>
-                                <p className="text-sm text-gray-700">{plan.objectives}</p>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="space-y-2">
-                              <p className="text-xs text-gray-500 font-medium">Objetivos da Matriz:</p>
-                              {objetivos.map((obj: any, idx: number) => (
-                                <div key={idx} className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-                                  {obj.codigoBNCC && (
-                                    <span className="inline-block text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded mb-1">
-                                      {obj.codigoBNCC}
-                                    </span>
-                                  )}
-                                  {obj.objetivoBNCC && (
-                                    <p className="text-sm text-gray-700">{obj.objetivoBNCC}</p>
-                                  )}
-                                  {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
-                                    <div className="mt-1">
-                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo do Currículo — DF</p>
-                                      <p className="text-xs text-gray-600">{obj.objetivoCurriculoDF}</p>
+                  return (
+                    <Card key={plan.id} className={`rounded-2xl border-2 transition-all ${
+                      plan.status === 'EM_REVISAO' ? 'border-yellow-300 shadow-yellow-100 shadow-md' :
+                      plan.status === 'DEVOLVIDO' ? 'border-orange-300' :
+                      plan.status === 'APROVADO' ? 'border-green-300' : 'border-gray-200'
+                    }`}>
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-800 truncate">{plan.title}</p>
+                            <p className="text-sm text-gray-600 font-medium">{plan.professorNome}</p>
+                            <p className="text-xs text-gray-500">
+                              {plan.turmaNome}
+                              {plan.templateNome && <span className="ml-1 text-blue-600">· {plan.templateNome}</span>}
+                              {plan.type && <span className="ml-1">· {TIPO_PLAN[plan.type] ?? plan.type}</span>}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">{dataInicio} → {dataFim}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            <span className={`px-2 py-1 text-xs rounded-full font-semibold border ${cfg.cor}`}>
+                              <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`}/>{cfg.label}
+                            </span>
+                            <button
+                              onClick={() => setPlanExpandido(expandido ? null : plan.id)}
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <Eye className="h-3 w-3"/>{expandido ? 'Fechar' : 'Ver detalhes'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {expandido && (
+                          <div className="space-y-2 border-t pt-3">
+                            {plan.objectives && (() => {
+                              let objetivos: any[] = [];
+                              try {
+                                const parsed = JSON.parse(plan.objectives as string);
+                                objetivos = Array.isArray(parsed) ? parsed : [];
+                              } catch {
+                                objetivos = [];
+                              }
+
+                              if (objetivos.length === 0) {
+                                return (
+                                  <div className="p-3 bg-gray-50 rounded-xl">
+                                    <p className="text-xs text-gray-500 font-medium mb-1">Objetivos:</p>
+                                    <p className="text-sm text-gray-700">{plan.objectives}</p>
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="space-y-2">
+                                  <p className="text-xs text-gray-500 font-medium">Objetivos da Matriz:</p>
+                                  {objetivos.map((obj: any, idx: number) => (
+                                    <div key={idx} className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                                      {obj.codigoBNCC && (
+                                        <span className="inline-block text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded mb-1">
+                                          {obj.codigoBNCC}
+                                        </span>
+                                      )}
+                                      {obj.objetivoBNCC && (
+                                        <p className="text-sm text-gray-700">{obj.objetivoBNCC}</p>
+                                      )}
+                                      {obj.objetivoCurriculoDF && obj.objetivoCurriculoDF !== obj.objetivoBNCC && (
+                                        <div className="mt-1">
+                                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Objetivo do Currículo — DF</p>
+                                          <p className="text-xs text-gray-600">{obj.objetivoCurriculoDF}</p>
+                                        </div>
+                                      )}
+                                      {obj.intencionalidadePedagogica && (
+                                        <div className="mt-1.5 bg-indigo-50 border border-indigo-100 rounded p-1.5">
+                                          <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">🎯 Intencionalidade Pedagógica</p>
+                                          <p className="text-xs text-indigo-800">{obj.intencionalidadePedagogica}</p>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                  {obj.intencionalidadePedagogica && (
-                                    <div className="mt-1.5 bg-indigo-50 border border-indigo-100 rounded p-1.5">
-                                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-0.5">🎯 Intencionalidade Pedagógica</p>
-                                      <p className="text-xs text-indigo-800">{obj.intencionalidadePedagogica}</p>
-                                    </div>
-                                  )}
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                        {plan.reviewComment && (
-                          <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
-                            <p className="text-xs text-orange-600 font-medium mb-1">Observação de devolução:</p>
-                            <p className="text-sm text-orange-800">{plan.reviewComment}</p>
+                              );
+                            })()}
+                            {plan.reviewComment && (
+                              <div className="p-3 bg-orange-50 rounded-xl border border-orange-200">
+                                <p className="text-xs text-orange-600 font-medium mb-1">Observação de devolução:</p>
+                                <p className="text-sm text-orange-800">{plan.reviewComment}</p>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => navigate(`/app/planejamentos/${plan.id}`)}
+                              className="w-full py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 font-medium flex items-center justify-center gap-2"
+                            >
+                              <Eye className="h-4 w-4"/>Abrir plano de aula completo
+                            </button>
                           </div>
                         )}
-                        <button
-                          onClick={() => navigate(`/app/planejamentos/${plan.id}`)}
-                          className="w-full py-2 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 font-medium flex items-center justify-center gap-2">
-                          <Eye className="h-4 w-4"/>Abrir plano de aula completo
-                        </button>
-                      </div>
-                    )}
 
-                    {/* Ações contextuais por status */}
-                    {plan.status === 'EM_REVISAO' && canApprove && (
-                      <div className="flex gap-3 pt-1">
-                        <Button onClick={() => aprovarPlanejamento(plan.id)} disabled={processando === plan.id}
-                          className="flex-1 h-10 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-sm">
-                          <ThumbsUp className="h-4 w-4 mr-1.5"/>Aprovar
-                        </Button>
-                        <Button onClick={() => setItemParaRejeitar({ id: plan.id, tipo: 'plan' })} disabled={processando === plan.id}
-                          variant="outline" className="flex-1 h-10 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold text-sm">
-                          <MessageSquare className="h-4 w-4 mr-1.5"/>Devolver
-                        </Button>
-                      </div>
-                    )}
-                    {plan.status === 'EM_REVISAO' && !canApprove && (
-                      <div className="pt-1 p-2 bg-blue-50 rounded-xl">
-                        <p className="text-xs text-blue-600 text-center">Aguardando aprovação da Coordenação da Unidade</p>
-                      </div>
-                    )}
-                    {plan.status === 'DEVOLVIDO' && (
-                      <div className="p-2 bg-orange-50 rounded-xl">
-                        <p className="text-xs text-orange-600 font-medium text-center">
-                          Aguardando correções do professor
-                        </p>
-                      </div>
-                    )}
-                    {plan.status === 'APROVADO' && (
-                      <div className="p-2 bg-green-50 rounded-xl">
-                        <p className="text-xs text-green-600 font-medium text-center flex items-center justify-center gap-1">
-                          <CheckCircle className="h-3.5 w-3.5"/>Planejamento aprovado
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        {plan.status === 'EM_REVISAO' && canApprove && (
+                          <div className="flex gap-3 pt-1">
+                            <Button
+                              onClick={() => aprovarPlanejamento(plan.id)}
+                              disabled={processando === plan.id}
+                              className="flex-1 h-10 rounded-xl bg-green-600 hover:bg-green-700 font-bold text-sm"
+                            >
+                              <ThumbsUp className="h-4 w-4 mr-1.5"/>Aprovar
+                            </Button>
+                            <Button
+                              onClick={() => setItemParaRejeitar({ id: plan.id, tipo: 'plan' })}
+                              disabled={processando === plan.id}
+                              variant="outline"
+                              className="flex-1 h-10 rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50 font-bold text-sm"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1.5"/>Devolver
+                            </Button>
+                          </div>
+                        )}
+                        {plan.status === 'EM_REVISAO' && !canApprove && (
+                          <div className="pt-1 p-2 bg-blue-50 rounded-xl">
+                            <p className="text-xs text-blue-600 text-center">Aguardando aprovação da Coordenação da Unidade</p>
+                          </div>
+                        )}
+                        {plan.status === 'DEVOLVIDO' && (
+                          <div className="p-2 bg-orange-50 rounded-xl">
+                            <p className="text-xs text-orange-600 font-medium text-center">Aguardando correções do professor</p>
+                          </div>
+                        )}
+                        {plan.status === 'APROVADO' && (
+                          <div className="p-2 bg-green-50 rounded-xl">
+                            <p className="text-xs text-green-600 font-medium text-center flex items-center justify-center gap-1">
+                              <CheckCircle className="h-3.5 w-3.5"/>Planejamento aprovado
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         );
       })()}
