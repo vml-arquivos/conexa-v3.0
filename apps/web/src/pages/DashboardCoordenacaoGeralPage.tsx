@@ -188,6 +188,22 @@ export default function DashboardCoordenacaoGeralPage() {
   const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'requisicoes' | 'reunioes' | 'ocorrencias'>('visao');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'otimo' | 'atencao' | 'critico'>('todas');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rdicRede, setRdicRede] = useState<Array<{
+    unidadeNome: string;
+    total: number;
+    iniciados: number;
+    aprovados: number;
+    pct: number;
+  }>>([]);
+  const [diariosCobertura, setDiariosCobertura] = useState<Array<{
+    unidadeNome: string;
+    publicados: number;
+    rascunhos: number;
+    semDiario: number;
+    total: number;
+    pct: number;
+  }>>([]);
+  const [loadingRdic, setLoadingRdic] = useState(false);
 
   const hoje = getPedagogicalToday();
   const ha30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
@@ -223,6 +239,50 @@ export default function DashboardCoordenacaoGeralPage() {
   }, [refreshKey]); // eslint-disable-line
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ─── Carregar RDIC e diários por unidade quando aba pedagógico abre ──────────
+  useEffect(() => {
+    if (abaAtiva !== 'pedagogico') return;
+    if (rdicRede.length > 0) return; // já carregado
+    setLoadingRdic(true);
+    const unidadesParaBuscar = dashboard?.consolidadoUnidades ?? [];
+    if (unidadesParaBuscar.length === 0) { setLoadingRdic(false); return; }
+
+    Promise.allSettled(
+      unidadesParaBuscar.map(u =>
+        http.get('/rdic/turma/status', {
+          params: { periodo: '1º Trimestre', anoLetivo: 2026, unitId: u.id }
+        }).then(r => ({ unidadeId: u.id, unidadeNome: u.nome, data: r.data }))
+         .catch(() => ({ unidadeId: u.id, unidadeNome: u.nome, data: null }))
+      )
+    ).then(results => {
+      const rdic = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => (r as any).value)
+        .map(({ unidadeNome, data }: any) => {
+          const c = data?.contagem ?? {};
+          const total = c.total ?? 0;
+          const pendente = c.pendente ?? total;
+          const iniciados = total - pendente;
+          const aprovados = (c.aprovado ?? 0) + (c.finalizado ?? 0) + (c.publicado ?? 0);
+          const pct = total > 0 ? Math.round((iniciados / total) * 100) : 0;
+          return { unidadeNome, total, iniciados, aprovados, pct };
+        })
+        .filter(r => r.total > 0);
+      setRdicRede(rdic);
+    }).finally(() => setLoadingRdic(false));
+
+    // Cobertura de diários por unidade via dashboard/geral
+    const diarios = unidadesParaBuscar.map(u => ({
+      unidadeNome: u.nome,
+      publicados: u.diariosHoje ?? 0,
+      rascunhos: 0,
+      semDiario: Math.max(0, (u.totalTurmas ?? 0) - (u.diariosHoje ?? 0)),
+      total: u.totalTurmas ?? 0,
+      pct: u.totalTurmas > 0 ? Math.round(((u.diariosHoje ?? 0) / u.totalTurmas) * 100) : 0,
+    })).filter(d => d.total > 0);
+    setDiariosCobertura(diarios);
+  }, [abaAtiva, dashboard]);
 
   // ─── Dados derivados ─────────────────────────────────────────────────────
   const ind = dashboard?.indicadoresGerais;
@@ -546,6 +606,65 @@ export default function DashboardCoordenacaoGeralPage() {
       ══════════════════════════════════════════════════════════════════ */}
       {abaAtiva === 'pedagogico' && (
         <div className="space-y-5">
+          {/* ── RDIC por Unidade — 1º Trimestre ── */}
+          <SectionCard title="RDIC por Unidade — 1º Trimestre 2026" icon={<Brain className="h-4 w-4 text-indigo-500" />}>
+            {loadingRdic ? (
+              <div className="h-24 animate-pulse bg-gray-100 rounded-xl" />
+            ) : rdicRede.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">Sem dados de RDIC disponíveis</p>
+            ) : (
+              <div className="space-y-3">
+                {rdicRede.map((u, i) => (
+                  <div key={i}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700 truncate max-w-[60%]">{u.unidadeNome}</span>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-gray-400">{u.iniciados}/{u.total} iniciados</span>
+                        <span className={`font-bold ${u.pct >= 70 ? 'text-emerald-600' : u.pct >= 30 ? 'text-amber-600' : 'text-red-500'}`}>
+                          {u.pct}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 70 ? 'bg-emerald-500' : u.pct >= 30 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        style={{ width: `${u.pct}%` }}
+                      />
+                    </div>
+                    {u.aprovados > 0 && (
+                      <p className="text-[10px] text-emerald-600 mt-0.5">{u.aprovados} aprovado(s)</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+
+          {/* ── Cobertura de Diários Hoje por Unidade ── */}
+          {diariosCobertura.length > 0 && (
+            <SectionCard title="Cobertura de Diários Hoje" icon={<BookOpen className="h-4 w-4 text-blue-500" />}>
+              <div className="space-y-2">
+                {diariosCobertura.map((u, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-36 truncate flex-shrink-0">{u.unidadeNome}</span>
+                    <div className="flex-1 h-5 rounded-full bg-gray-100 overflow-hidden relative">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 80 ? 'bg-emerald-400' : u.pct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        style={{ width: `${Math.max(u.pct, 3)}%` }}
+                      />
+                      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-multiply">
+                        {u.pct}%
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0">
+                      {u.publicados}/{u.total} turmas
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
           <SectionCard title="Funil de Planejamentos (últimos 30 dias)" icon={<TrendingUp className="h-4 w-4 text-purple-500" />}>
             {loading ? (
               <div className="h-40 animate-pulse bg-gray-100 rounded-xl" />
