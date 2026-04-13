@@ -582,75 +582,135 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         ))}
       </div>
 
-      {/* ABA: INÍCIO */}
+      {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="space-y-5">
+
+          {/* Alertas automáticos */}
+          {dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" /> Atenção hoje
+              </p>
+              <ul className="space-y-1">
+                {(dashboard.alertas as any[]).map((a: any, i: number) => (
+                  <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
+                    {typeof a === 'string' ? a : (a.mensagem ?? JSON.stringify(a))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* KPIs do dia */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: <Users className="h-6 w-6 text-blue-600"/>, bg: 'bg-blue-100', val: dashboard?.turmas ?? 0, label: 'Turmas' },
-              { icon: <Star className="h-6 w-6 text-purple-600"/>, bg: 'bg-purple-100', val: dashboard?.professores ?? 0, label: 'Professores' },
-              { icon: <TrendingUp className="h-6 w-6 text-green-600"/>, bg: 'bg-green-100', val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
-              { icon: <ClipboardList className="h-6 w-6 text-orange-600"/>, bg: 'bg-orange-100', val: dashboard?.diariosEstaSemana ?? 0, label: 'Diários esta semana' },
+              { icon: <Users className="h-5 w-5 text-blue-600"/>,          bg: 'bg-blue-50',   val: dashboard?.turmas ?? 0,                                          label: 'Turmas' },
+              { icon: <Star className="h-5 w-5 text-purple-600"/>,         bg: 'bg-purple-50', val: dashboard?.professores ?? 0,                                     label: 'Professores' },
+              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
+              { icon: <ClipboardList className="h-5 w-5 text-orange-600"/>,bg: 'bg-orange-50', val: dashboard?.diariosEstaSemana ?? 0,                               label: 'Diários esta semana' },
             ].map((c, i) => (
-              <Card key={i} className="rounded-2xl border-2 text-center">
-                <CardContent className="pt-5 pb-4">
-                  <div className={`w-12 h-12 ${c.bg} rounded-2xl flex items-center justify-center mx-auto mb-3`}>{c.icon}</div>
-                  <p className="text-3xl font-bold text-gray-800">{c.val}</p>
-                  <p className="text-sm text-gray-500 mt-1">{c.label}</p>
-                </CardContent>
-              </Card>
+              <div key={i} className={`${c.bg} rounded-2xl border p-4 text-center`}>
+                <div className="flex justify-center mb-2">{c.icon}</div>
+                <p className="text-2xl font-bold text-gray-800">{c.val}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
+              </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
-              <button onClick={() => setAbaAtiva('requisicoes')}
-                className="p-5 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <ShoppingCart className="h-6 w-6 text-red-500"/>
-                  <span className="bg-red-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.requisicoesParaAnalisar}</span>
-                </div>
-                <p className="font-bold text-red-800">Pedidos de material</p>
-                <p className="text-sm text-red-600 mt-1">{canApprove ? "aguardando aprovação" : "para visualizar e analisar"}</p>
-                <div className="flex items-center gap-1 mt-3 text-red-500 text-sm font-medium">Analisar agora <ChevronRight className="h-4 w-4"/></div>
-              </button>
-            )}
-            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
-              <button onClick={() => setAbaAtiva('planejamentos')}
-                className="p-5 bg-yellow-50 border-2 border-yellow-200 rounded-2xl text-left hover:bg-yellow-100 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <BookOpen className="h-6 w-6 text-yellow-600"/>
-                  <span className="bg-yellow-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.planejamentosParaRevisar}</span>
-                </div>
-                <p className="font-bold text-yellow-800">Planejamentos</p>
-                <p className="text-sm text-yellow-600 mt-1">para revisar e aprovar</p>
-                <div className="flex items-center gap-1 mt-3 text-yellow-600 text-sm font-medium">Revisar agora <ChevronRight className="h-4 w-4"/></div>
-              </button>
-            )}
-            <button onClick={() => setAbaAtiva('diarios')}
-              className="p-5 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <ClipboardList className="h-6 w-6 text-blue-500"/>
-                <span className="bg-blue-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.diariosEstaSemana ?? 0}</span>
+          {/* Status das turmas hoje */}
+          {(dashboard?.turmasLista ?? []).length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-800">Status das Turmas — Hoje</p>
+                <button
+                  onClick={() => setAbaAtiva('pedagogico')}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Ver pedagógico →
+                </button>
               </div>
-              <p className="font-bold text-blue-800">Diários da semana</p>
-              <p className="text-sm text-blue-600 mt-1">registros dos professores</p>
-              <div className="flex items-center gap-1 mt-3 text-blue-500 text-sm font-medium">Ver diários <ChevronRight className="h-4 w-4"/></div>
+              <div className="divide-y divide-gray-50">
+                {(dashboard.turmasLista ?? []).map(turma => (
+                  <div key={turma.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{turma.nome}</p>
+                        <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                        turma.chamadaFeita ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
+                      </span>
+                      <button
+                        onClick={() => navigate(`/app/turma/${turma.id}/painel`)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        Painel →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ações pendentes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
+              <button
+                onClick={() => setAbaAtiva('planejamentos')}
+                className="flex items-center gap-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-left hover:bg-amber-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.planejamentosParaRevisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Planejamentos</p>
+                  <p className="text-xs text-amber-600">aguardando revisão</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-amber-500 ml-auto" />
+              </button>
+            )}
+            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
+              <button
+                onClick={() => setAbaAtiva('requisicoes')}
+                className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.requisicoesParaAnalisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-red-800">Pedidos material</p>
+                  <p className="text-xs text-red-600">para analisar</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
+              </button>
+            )}
+            <button
+              onClick={() => setAbaAtiva('pedagogico')}
+              className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all"
+            >
+              <span className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
+                <ClipboardList className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-blue-800">Pedagógico</p>
+                <p className="text-xs text-blue-600">{dashboard?.diariosEstaSemana ?? 0} diários esta semana</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto" />
             </button>
           </div>
 
-          {dashboard?.alertas && dashboard.alertas.length > 0 && (
-            <Card className="rounded-2xl border-2 border-orange-200 bg-orange-50">
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-orange-800"><AlertCircle className="h-5 w-5"/>Atenção</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {dashboard.alertas.map((a, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-orange-700">
-                    <span className="w-2 h-2 bg-orange-400 rounded-full mt-1.5 flex-shrink-0"/>{a}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+          {/* Recados */}
+          <RecadosWidget unitId={unitIdParam} />
         </div>
       )}
 
