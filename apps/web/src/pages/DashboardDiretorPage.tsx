@@ -38,6 +38,13 @@ interface DashboardData {
   totalProfessores: number;
   pedidosPendentes: number;
   planejamentosAtivos: number;
+  // Pedagógico
+  diariosHoje: number;
+  diariosEstaSemana: number;
+  turmasComChamadaHoje: number;
+  planejamentosEmRevisao: number;
+  rdicIniciadosTrimestre: number;
+  rdicAprovadosTrimestre: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -66,6 +73,7 @@ export function DashboardDiretorPage() {
   // ── Estado: Visão Geral ──
   const [dados, setDados] = useState<DashboardData | null>(null);
   const [loadingDados, setLoadingDados] = useState(false);
+  const [alertasPedagogicos, setAlertasPedagogicos] = useState<string[]>([]);
 
   // ── Estado: Pedidos ──
   const [pedidos, setPedidos] = useState<PedidoCompra[]>([]);
@@ -85,19 +93,56 @@ export function DashboardDiretorPage() {
     setLoadingDados(true);
     try {
       const unitId = (user as any)?.unitId;
-      const [criancasRes, turmasRes, profRes, pedidosRes, planRes] = await Promise.allSettled([
+      const hoje = new Date().toISOString().slice(0, 10);
+      const inicioSemana = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const [criancasRes, turmasRes, profRes, pedidosRes, planRes, coordRes, rdic1Res] = await Promise.allSettled([
         http.get('/children', { params: { unitId, limit: 1 } }),
         http.get('/lookup/classrooms/accessible', { params: { unitId } }),
         http.get('/lookup/teachers/accessible', { params: { unitId } }),
         http.get('/pedidos-compra', { params: { unitId, status: 'ENVIADO' } }),
         http.get('/plannings', { params: { unitId, status: 'EM_REVISAO', limit: 1 } }),
+        http.get('/coordenacao/dashboard/unidade', { params: unitId ? { unitId } : {} }),
+        http.get('/rdic/turma/status', { params: { periodo: '1º Trimestre', anoLetivo: 2026, ...(unitId ? { unitId } : {}) } }).catch(() => ({ data: null })),
       ]);
+
+      const coordData = coordRes.status === 'fulfilled' ? coordRes.value.data : null;
+      const ind = coordData?.indicadores ?? {};
+      const rdic1Data = rdic1Res.status === 'fulfilled' ? (rdic1Res.value as any)?.data : null;
+
+      const diariosHoje = ind.diariosHoje ?? 0;
+      const turmasComChamada = ind.turmasComChamadaHoje ?? 0;
+      const totalTurmasVal = turmasRes.status === 'fulfilled' ? (Array.isArray(turmasRes.value.data) ? turmasRes.value.data.length : 0) : 0;
+      const planEmRevisao = ind.planejamentosEmRevisao ?? (planRes.status === 'fulfilled' ? (planRes.value.data?.total ?? 0) : 0);
+
+      const rdicTotal = rdic1Data?.contagem?.total ?? 0;
+      const rdicAprov = (rdic1Data?.contagem?.aprovado ?? 0) + (rdic1Data?.contagem?.finalizado ?? 0) + (rdic1Data?.contagem?.publicado ?? 0);
+      const rdicIniciados = rdicTotal - (rdic1Data?.contagem?.pendente ?? rdicTotal);
+
+      // Alertas automáticos
+      const alertas: string[] = [];
+      if (turmasComChamada < totalTurmasVal && totalTurmasVal > 0) {
+        alertas.push(`${totalTurmasVal - turmasComChamada} turma(s) sem chamada hoje`);
+      }
+      if (planEmRevisao > 0) {
+        alertas.push(`${planEmRevisao} planejamento(s) aguardando revisão`);
+      }
+      if (rdicTotal > 0 && rdicIniciados / rdicTotal < 0.3) {
+        alertas.push(`RDIC do 1º Trimestre: apenas ${Math.round((rdicIniciados / rdicTotal) * 100)}% iniciados`);
+      }
+      setAlertasPedagogicos(alertas);
+
       setDados({
         totalCriancas: criancasRes.status === 'fulfilled' ? (criancasRes.value.data?.total ?? criancasRes.value.data?.length ?? 0) : 0,
-        totalTurmas: turmasRes.status === 'fulfilled' ? (Array.isArray(turmasRes.value.data) ? turmasRes.value.data.length : 0) : 0,
+        totalTurmas: totalTurmasVal,
         totalProfessores: profRes.status === 'fulfilled' ? (Array.isArray(profRes.value.data) ? profRes.value.data.length : 0) : 0,
         pedidosPendentes: pedidosRes.status === 'fulfilled' ? (Array.isArray(pedidosRes.value.data) ? pedidosRes.value.data.length : pedidosRes.value.data?.data?.length ?? 0) : 0,
-        planejamentosAtivos: planRes.status === 'fulfilled' ? (planRes.value.data?.total ?? 0) : 0,
+        planejamentosAtivos: planEmRevisao,
+        diariosHoje,
+        diariosEstaSemana: ind.diariosEstaSemana ?? diariosHoje,
+        turmasComChamadaHoje: turmasComChamada,
+        planejamentosEmRevisao: planEmRevisao,
+        rdicIniciadosTrimestre: rdicIniciados,
+        rdicAprovadosTrimestre: rdicAprov,
       });
     } catch {
       setDados(null);
@@ -259,22 +304,112 @@ export function DashboardDiretorPage() {
             <div className="text-center py-12 text-gray-500">Carregando dados da unidade...</div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {/* ── Alertas automáticos ── */}
+              {alertasPedagogicos.length > 0 && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-amber-800">Atenção necessária hoje</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {alertasPedagogicos.map((a, i) => (
+                      <li key={i} className="text-sm text-amber-700 flex items-start gap-1.5">
+                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                        {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ── Cards operacionais ── */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { label: 'Crianças Matriculadas', value: dados?.totalCriancas ?? 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: 'Turmas Ativas', value: dados?.totalTurmas ?? 0, icon: BookOpen, color: 'text-green-600', bg: 'bg-green-50' },
-                  { label: 'Professores', value: dados?.totalProfessores ?? 0, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50' },
-                  { label: 'Pedidos Pendentes', value: dados?.pedidosPendentes ?? 0, icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-50' },
-                  { label: 'Planej. Submetidos', value: dados?.planejamentosAtivos ?? 0, icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                ].map(({ label, value, icon: Icon, color, bg }) => (
-                  <div key={label} className={`${bg} rounded-xl border p-4 flex flex-col gap-2`}>
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${color}`} />
-                      <span className="text-xs font-medium text-gray-600">{label}</span>
+                  { label: 'Crianças',       value: dados?.totalCriancas ?? 0,    icon: Users,       color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-100' },
+                  { label: 'Turmas',         value: dados?.totalTurmas ?? 0,      icon: BookOpen,    color: 'text-green-600',  bg: 'bg-green-50',  border: 'border-green-100' },
+                  { label: 'Professores',    value: dados?.totalProfessores ?? 0, icon: Users,       color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+                  { label: 'Pedidos Pend.',  value: dados?.pedidosPendentes ?? 0, icon: ShoppingCart,color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+                ].map(({ label, value, icon: Icon, color, bg, border }) => (
+                  <div key={label} className={`${bg} ${border} rounded-2xl border p-4`}>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Icon className={`w-3.5 h-3.5 ${color}`} />
+                      <span className="text-xs font-medium text-gray-500">{label}</span>
                     </div>
-                    <span className={`text-2xl font-bold ${color}`}>{value}</span>
+                    <span className={`text-3xl font-bold ${color}`}>{value}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* ── Pulso pedagógico de hoje ── */}
+              <div className="rounded-2xl border border-gray-100 bg-white p-5">
+                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-blue-500" />
+                  Pulso Pedagógico — Hoje
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Chamada */}
+                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      {(dados?.turmasComChamadaHoje ?? 0) >= (dados?.totalTurmas ?? 1)
+                        ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                        : <Clock className="h-3.5 w-3.5 text-amber-500" />
+                      }
+                    </div>
+                    <p className="text-xl font-bold text-gray-800">
+                      {dados?.turmasComChamadaHoje ?? 0}/{dados?.totalTurmas ?? 0}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Chamadas feitas</p>
+                  </div>
+
+                  {/* Diários */}
+                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <BookOpen className="h-3.5 w-3.5 text-blue-400" />
+                    </div>
+                    <p className="text-xl font-bold text-gray-800">{dados?.diariosHoje ?? 0}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Diários hoje</p>
+                  </div>
+
+                  {/* Planejamentos em revisão */}
+                  <div className={`rounded-xl border p-3 text-center ${(dados?.planejamentosEmRevisao ?? 0) > 0 ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Eye className={`h-3.5 w-3.5 ${(dados?.planejamentosEmRevisao ?? 0) > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
+                    </div>
+                    <p className={`text-xl font-bold ${(dados?.planejamentosEmRevisao ?? 0) > 0 ? 'text-amber-700' : 'text-gray-800'}`}>
+                      {dados?.planejamentosEmRevisao ?? 0}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Planos p/ revisar</p>
+                  </div>
+
+                  {/* RDIC trimestre */}
+                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <TrendingUp className="h-3.5 w-3.5 text-violet-400" />
+                    </div>
+                    <p className="text-xl font-bold text-gray-800">
+                      {dados?.rdicAprovadosTrimestre ?? 0}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">RDIC aprovados 1T</p>
+                  </div>
+                </div>
+
+                {/* Barra de cobertura de chamada */}
+                {(dados?.totalTurmas ?? 0) > 0 && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>Cobertura de chamada hoje</span>
+                      <span className="font-semibold">
+                        {Math.round(((dados?.turmasComChamadaHoje ?? 0) / (dados?.totalTurmas ?? 1)) * 100)}%
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${Math.round(((dados?.turmasComChamadaHoje ?? 0) / (dados?.totalTurmas ?? 1)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
