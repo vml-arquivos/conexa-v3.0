@@ -38,9 +38,10 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
 
 // UNIDADE — Coordenadora Pedagógica ────────────────────────────────────────────
 const COORD_GESTAO: MenuItem[] = [
-  { path: '/app/coordenacao-pedagogica', label: 'Painel da Coordenação', icon: <Home className="h-4 w-4" /> },
-  { path: '/app/coordenacao',            label: 'Turmas & Reuniões',     icon: <Users className="h-4 w-4" /> },
-  { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',     icon: <ShoppingBag className="h-4 w-4" /> },
+  { path: '/app/coordenacao-pedagogica', label: 'Painel da Coordenação',    icon: <Home className="h-4 w-4" /> },
+  { path: '/app/coordenacao',            label: 'Turmas & Reuniões',        icon: <Users className="h-4 w-4" /> },
+  { path: '/app/material-requests',      label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',        icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
   { path: '/app/rdic-coord',      label: 'RDIC — Revisão',      icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
