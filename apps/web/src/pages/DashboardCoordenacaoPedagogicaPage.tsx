@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -74,13 +75,186 @@ interface DashboardData {
   turmasLista: TurmaResumo[];
 }
 
+// ─── Sub-componente: aba Pedagógico com sub-navegação ────────────────────────
+interface PedagogicoSubNavProps {
+  diarios: any[];
+  turmasLista: any[];
+  cobertura: any;
+  loadingCobertura: boolean;
+  carregarCobertura: () => void;
+  setCobertura: (v: any) => void;
+  setPendencias: (v: any) => void;
+  navigate: (path: string) => void;
+}
+
+function PedagogicoSubNav({
+  diarios, turmasLista, cobertura, loadingCobertura,
+  carregarCobertura, setCobertura, setPendencias, navigate,
+}: PedagogicoSubNavProps) {
+  const [subAba, setSubAba] = React.useState<'diarios' | 'turmas' | 'cobertura'>('diarios');
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navegação */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {[
+          { id: 'diarios',   label: 'Diários' },
+          { id: 'turmas',    label: 'Turmas e Registros' },
+          { id: 'cobertura', label: 'Cobertura' },
+        ].map(s => (
+          <button key={s.id} onClick={() => setSubAba(s.id as any)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              subAba === s.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-aba: Diários */}
+      {subAba === 'diarios' && (
+        <div className="space-y-3">
+          {diarios.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-gray-100 gap-2">
+              <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
+            </div>
+          ) : (
+            diarios.map((diario: any) => {
+              const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
+              const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status || '').toUpperCase());
+              const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? '✅ Cumprido'
+                : ctx.statusExecucaoPlano === 'PARCIAL' ? '⚠️ Parcial'
+                : ctx.statusExecucaoPlano === 'NAO_REALIZADO' ? '❌ Não realizado' : null;
+              const climaLabel = ctx.climaEmocional === 'OTIMO' ? '🌟 Ótimo'
+                : ctx.climaEmocional === 'BOM' ? '😊 Bom'
+                : ctx.climaEmocional === 'REGULAR' ? '😐 Regular'
+                : ctx.climaEmocional === 'AGITADO' ? '😬 Agitado'
+                : ctx.climaEmocional === 'DIFICIL' ? '😔 Difícil' : null;
+              return (
+                <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-emerald-100' : 'border-amber-100'}}`}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}}`}>
+                          {statusPubl ? 'Publicado' : 'Rascunho'}
+                        </span>
+                        {execLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-700">{execLabel}</span>}
+                        {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">{climaLabel}</span>}
+                      </div>
+                      <p className="text-sm font-semibold text-gray-800 truncate">
+                        {diario.classroom?.name || '—'}
+                        {diario.createdByUser && (
+                          <span className="text-xs font-normal text-gray-400 ml-2">
+                            · {diario.createdByUser.firstName} {diario.createdByUser.lastName}
+                          </span>
+                        )}
+                      </p>
+                      {ctx.presencas != null && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          👥 {ctx.presencas} presentes · {ctx.ausencias ?? 0} ausentes
+                        </p>
+                      )}
+                      {ctx.momentoDestaque && (
+                        <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-gray-400 flex-shrink-0">
+                      {diario.eventDate
+                        ? new Date(diario.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* Sub-aba: Turmas */}
+      {subAba === 'turmas' && (
+        <div className="grid grid-cols-1 gap-3">
+          {turmasLista.map((turma: any) => (
+            <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-semibold text-gray-800">{turma.nome}</p>
+                  <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {turma.chamadaFeita ? '✅ Chamada' : '⏳ Pendente'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Observações', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'purple' },
+                  { label: 'Diários', path: `/app/diario-calendario?classroomId=${turma.id}`, color: 'blue' },
+                  { label: 'Atividades', path: `/app/sala-de-aula-virtual?classroomId=${turma.id}`, color: 'indigo' },
+                  { label: 'RDIC', path: `/app/rdic?classroomId=${turma.id}`, color: 'teal' },
+                ].map(item => (
+                  <button key={item.label} onClick={() => navigate(item.path)}
+                    className={`flex flex-col items-center gap-1 p-2.5 bg-${item.color}-50 rounded-xl hover:bg-${item.color}-100 transition-all`}>
+                    <span className={`text-[11px] font-medium text-${item.color}-700`}>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sub-aba: Cobertura */}
+      {subAba === 'cobertura' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Cobertura de Registros — Hoje</p>
+            <button
+              onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              Atualizar
+            </button>
+          </div>
+          {loadingCobertura ? (
+            <div className="flex items-center justify-center py-10 gap-2">
+              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-500">Carregando...</p>
+            </div>
+          ) : !cobertura ? (
+            <button onClick={carregarCobertura}
+              className="w-full py-8 rounded-2xl border-2 border-dashed border-blue-200 text-sm text-blue-600 hover:bg-blue-50 transition-all">
+              Carregar dados de cobertura
+            </button>
+          ) : (
+            <div className="space-y-2">
+              {(cobertura.classrooms ?? []).map((cls: any) => (
+                <div key={cls.classroomId} className="bg-white rounded-2xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-gray-800">{cls.classroomName}</p>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-100 text-emerald-700' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                      {cls.coveragePct ?? 0}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className={`h-full rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-500' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                      style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardCoordenacaoPedagogicaPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -92,6 +266,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     pendentes: Array<{ childId: string; nome: string; classroomId: string; classroomName: string }>;
   }
   const [cobertura, setCobertura] = useState<CoberturaData | null>(null);
+  const [alertasReais, setAlertasReais] = useState<{
+    total: number;
+    criticos: any[];
+    atencao: any[];
+    info: any[];
+  } | null>(null);
+  const [resumoDiarios, setResumoDiarios] = useState<any | null>(null);
+  const [loadingAlertas, setLoadingAlertas] = useState(false);
   const [pendencias, setPendencias] = useState<PendenciasData | null>(null);
   const [loadingCobertura, setLoadingCobertura] = useState(false);
   const apiCache = useApiCache(60_000);
@@ -154,6 +336,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         http.get('/coordenacao/planejamentos', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/diarios', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
       ]);
+      // Carregar alertas e resumo em paralelo (não bloqueante)
+      const mes = new Date().toISOString().slice(0, 7);
+      setLoadingAlertas(true);
+      Promise.allSettled([
+        http.get('/insights/unit/alerts', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/reports/diary/summary', { params: { mes, ...(unitIdParam ? { unitId: unitIdParam } : {}) } }),
+      ]).then(([alertasRes, resumoRes]) => {
+        if (alertasRes.status === 'fulfilled') setAlertasReais(alertasRes.value.data);
+        if (resumoRes.status === 'fulfilled') setResumoDiarios(resumoRes.value.data);
+      }).finally(() => setLoadingAlertas(false));
       if (dashRes.status === 'fulfilled') {
         const raw = dashRes.value.data;
         const ind = raw?.indicadores ?? {};
@@ -333,15 +525,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
 
   const abas = [
-    { id: 'inicio', label: 'Início', icon: <Star className="h-4 w-4" /> },
-    { id: 'requisicoes', label: 'Pedidos de Material', icon: <ShoppingCart className="h-4 w-4" />, badge: dashboard?.requisicoesParaAnalisar },
+    { id: 'inicio',        label: 'Início',       icon: <Star className="h-4 w-4" /> },
+    { id: 'pedagogico',    label: 'Pedagógico',   icon: <Brain className="h-4 w-4" />, badge: dashboard?.diariosEstaSemana },
     { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
-    { id: 'diarios', label: 'Diários da Semana', icon: <ClipboardList className="h-4 w-4" /> },
-    { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
-    { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
-    { id: 'relatorios', label: 'Relatórios', icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'cobertura', label: 'Cobertura', icon: <BarChart2 className="h-4 w-4" /> },
-    { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
+    { id: 'relatorios',    label: 'Relatórios',   icon: <TrendingUp className="h-4 w-4" /> },
+    { id: 'ocorrencias',   label: 'Ocorrências',  icon: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -412,75 +600,196 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         ))}
       </div>
 
-      {/* ABA: INÍCIO */}
+      {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="space-y-5">
+
+          {/* Alertas automáticos calculados no dashboard (fallback) */}
+          {!loadingAlertas && (!alertasReais || alertasReais.total === 0) && dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" /> Atenção hoje
+              </p>
+              <ul className="space-y-1">
+                {(dashboard.alertas as any[]).map((a: any, i: number) => (
+                  <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
+                    {typeof a === 'string' ? a : (a.mensagem ?? JSON.stringify(a))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* KPIs do dia */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: <Users className="h-6 w-6 text-blue-600"/>, bg: 'bg-blue-100', val: dashboard?.turmas ?? 0, label: 'Turmas' },
-              { icon: <Star className="h-6 w-6 text-purple-600"/>, bg: 'bg-purple-100', val: dashboard?.professores ?? 0, label: 'Professores' },
-              { icon: <TrendingUp className="h-6 w-6 text-green-600"/>, bg: 'bg-green-100', val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
-              { icon: <ClipboardList className="h-6 w-6 text-orange-600"/>, bg: 'bg-orange-100', val: dashboard?.diariosEstaSemana ?? 0, label: 'Diários esta semana' },
+              { icon: <Users className="h-5 w-5 text-blue-600"/>,          bg: 'bg-blue-50',   val: dashboard?.turmas ?? 0,                                          label: 'Turmas' },
+              { icon: <Star className="h-5 w-5 text-purple-600"/>,         bg: 'bg-purple-50', val: dashboard?.professores ?? 0,                                     label: 'Professores' },
+              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Presença hoje' },
+              { icon: <ClipboardList className="h-5 w-5 text-orange-600"/>,bg: 'bg-orange-50', val: dashboard?.diariosEstaSemana ?? 0,                               label: 'Diários esta semana' },
             ].map((c, i) => (
-              <Card key={i} className="rounded-2xl border-2 text-center">
-                <CardContent className="pt-5 pb-4">
-                  <div className={`w-12 h-12 ${c.bg} rounded-2xl flex items-center justify-center mx-auto mb-3`}>{c.icon}</div>
-                  <p className="text-3xl font-bold text-gray-800">{c.val}</p>
-                  <p className="text-sm text-gray-500 mt-1">{c.label}</p>
-                </CardContent>
-              </Card>
+              <div key={i} className={`${c.bg} rounded-2xl border p-4 text-center`}>
+                <div className="flex justify-center mb-2">{c.icon}</div>
+                <p className="text-2xl font-bold text-gray-800">{c.val}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
+              </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
-              <button onClick={() => setAbaAtiva('requisicoes')}
-                className="p-5 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <ShoppingCart className="h-6 w-6 text-red-500"/>
-                  <span className="bg-red-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.requisicoesParaAnalisar}</span>
-                </div>
-                <p className="font-bold text-red-800">Pedidos de material</p>
-                <p className="text-sm text-red-600 mt-1">{canApprove ? "aguardando aprovação" : "para visualizar e analisar"}</p>
-                <div className="flex items-center gap-1 mt-3 text-red-500 text-sm font-medium">Analisar agora <ChevronRight className="h-4 w-4"/></div>
-              </button>
-            )}
-            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
-              <button onClick={() => setAbaAtiva('planejamentos')}
-                className="p-5 bg-yellow-50 border-2 border-yellow-200 rounded-2xl text-left hover:bg-yellow-100 transition-all">
-                <div className="flex items-center justify-between mb-2">
-                  <BookOpen className="h-6 w-6 text-yellow-600"/>
-                  <span className="bg-yellow-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.planejamentosParaRevisar}</span>
-                </div>
-                <p className="font-bold text-yellow-800">Planejamentos</p>
-                <p className="text-sm text-yellow-600 mt-1">para revisar e aprovar</p>
-                <div className="flex items-center gap-1 mt-3 text-yellow-600 text-sm font-medium">Revisar agora <ChevronRight className="h-4 w-4"/></div>
-              </button>
-            )}
-            <button onClick={() => setAbaAtiva('diarios')}
-              className="p-5 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <ClipboardList className="h-6 w-6 text-blue-500"/>
-                <span className="bg-blue-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center">{dashboard?.diariosEstaSemana ?? 0}</span>
-              </div>
-              <p className="font-bold text-blue-800">Diários da semana</p>
-              <p className="text-sm text-blue-600 mt-1">registros dos professores</p>
-              <div className="flex items-center gap-1 mt-3 text-blue-500 text-sm font-medium">Ver diários <ChevronRight className="h-4 w-4"/></div>
-            </button>
-          </div>
-
-          {dashboard?.alertas && dashboard.alertas.length > 0 && (
-            <Card className="rounded-2xl border-2 border-orange-200 bg-orange-50">
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-orange-800"><AlertCircle className="h-5 w-5"/>Atenção</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {dashboard.alertas.map((a, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-orange-700">
-                    <span className="w-2 h-2 bg-orange-400 rounded-full mt-1.5 flex-shrink-0"/>{a}
-                  </div>
-                ))}
+          {loadingAlertas && (
+            <Card className="rounded-2xl border-2 border-blue-200 bg-blue-50">
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-blue-800"><AlertCircle className="h-5 w-5"/>Atualizando alertas</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-blue-700">Carregando alertas da unidade e resumo de diários...</p>
               </CardContent>
             </Card>
           )}
+
+          {/* Alertas reais do banco */}
+          {alertasReais && alertasReais.total > 0 && (
+            <div className="space-y-2">
+              {alertasReais.criticos.length > 0 && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {alertasReais.criticos.length} alerta{alertasReais.criticos.length > 1 ? 's' : ''} crítico{alertasReais.criticos.length > 1 ? 's' : ''}
+                  </p>
+                  <ul className="space-y-1">
+                    {alertasReais.criticos.map((a: any) => (
+                      <li key={a.id} className="text-sm text-red-700 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
+                        <span><strong>{a.titulo}</strong> — {a.descricao}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {alertasReais.atencao.length > 0 && (
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-sm font-bold text-orange-800 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {alertasReais.atencao.length} atenção
+                  </p>
+                  <ul className="space-y-1">
+                    {alertasReais.atencao.map((a: any) => (
+                      <li key={a.id} className="text-sm text-orange-700 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />
+                        {a.titulo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Status das turmas hoje */}
+          {(dashboard?.turmasLista ?? []).length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-sm font-bold text-gray-800">Status das Turmas — Hoje</p>
+                <button
+                  onClick={() => setAbaAtiva('pedagogico')}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Ver pedagógico →
+                </button>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {(dashboard.turmasLista ?? []).map(turma => (
+                  <div key={turma.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Users className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{turma.nome}</p>
+                        <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                        turma.chamadaFeita ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
+                      </span>
+                      <button
+                        onClick={() => navigate(`/app/turma/${turma.id}/painel`)}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        Painel →
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ações pendentes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
+              <button
+                onClick={() => setAbaAtiva('planejamentos')}
+                className="flex items-center gap-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-left hover:bg-amber-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.planejamentosParaRevisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Planejamentos</p>
+                  <p className="text-xs text-amber-600">aguardando revisão</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-amber-500 ml-auto" />
+              </button>
+            )}
+            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
+              <button
+                onClick={() => setAbaAtiva('requisicoes')}
+                className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.requisicoesParaAnalisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-red-800">Pedidos de material</p>
+                  <p className="text-xs text-red-600">{canApprove ? 'aguardando aprovação' : 'para visualizar e analisar'}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
+              </button>
+            )}
+            <button
+              onClick={() => setAbaAtiva('pedagogico')}
+              className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all"
+            >
+              <span className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
+                <ClipboardList className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-blue-800">Pedagógico</p>
+                <p className="text-xs text-blue-600">{dashboard?.diariosEstaSemana ?? 0} diários esta semana</p>
+                {resumoDiarios && (
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    {resumoDiarios.climaEmocional?.BOM > 0 && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                        Bom: {resumoDiarios.climaEmocional.BOM}
+                      </span>
+                    )}
+                    {resumoDiarios.execucaoPlano?.CUMPRIDO > 0 && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                        Cumpridos: {resumoDiarios.execucaoPlano.CUMPRIDO}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
+            </button>
+          </div>
+
+          {/* Recados */}
+          <RecadosWidget unitId={unitIdParam} />
         </div>
       )}
 
@@ -729,6 +1038,22 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         );
       })()}
 
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: PEDAGÓGICO (diários + turmas + cobertura)
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'pedagogico' && (
+        <PedagogicoSubNav
+          diarios={diarios}
+          turmasLista={dashboard?.turmasLista ?? []}
+          cobertura={cobertura}
+          loadingCobertura={loadingCobertura}
+          carregarCobertura={carregarCobertura}
+          setCobertura={setCobertura}
+          setPendencias={setPendencias}
+          navigate={navigate}
+        />
+      )}
 
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (

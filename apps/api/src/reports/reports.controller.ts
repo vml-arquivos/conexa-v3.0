@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -145,5 +145,16 @@ export class ReportsController {
       daysWithout ? parseInt(daysWithout, 10) : 1,
       user,
     );
+  }
+
+  @Get('diary/summary')
+  @UseGuards(JwtAuthGuard)
+  getDiarySummary(
+    @Query('unitId') unitId: string,
+    @Query('classroomId') classroomId: string,
+    @Query('mes') mes: string,
+    @Request() req: any,
+  ) {
+    return this.reportsService.getDiarySummary(req.user, { unitId, classroomId, mes });
   }
 }
