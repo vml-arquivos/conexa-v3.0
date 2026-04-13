@@ -26,7 +26,8 @@
     "seed:units:cocris": "node prisma/seed-units-from-json.js",
     "seed:catalog": "node scripts/seed-catalog.js",
     "seed:alimentos": "node scripts/seed-alimentos.js",
-    "seed:alimentos:reset": "node scripts/seed-alimentos.js --reset"
+    "seed:alimentos:reset": "node scripts/seed-alimentos.js --reset",
+    "seed:teste": "ts-node src/scripts/seed-turma-teste.ts"
   },
   "repository": {
     "type": "git",
