@@ -266,6 +266,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     pendentes: Array<{ childId: string; nome: string; classroomId: string; classroomName: string }>;
   }
   const [cobertura, setCobertura] = useState<CoberturaData | null>(null);
+  const [alertasReais, setAlertasReais] = useState<{
+    total: number;
+    criticos: any[];
+    atencao: any[];
+    info: any[];
+  } | null>(null);
+  const [resumoDiarios, setResumoDiarios] = useState<any | null>(null);
+  const [loadingAlertas, setLoadingAlertas] = useState(false);
   const [pendencias, setPendencias] = useState<PendenciasData | null>(null);
   const [loadingCobertura, setLoadingCobertura] = useState(false);
   const apiCache = useApiCache(60_000);
@@ -328,6 +336,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         http.get('/coordenacao/planejamentos', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/diarios', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
       ]);
+      // Carregar alertas e resumo em paralelo (não bloqueante)
+      const mes = new Date().toISOString().slice(0, 7);
+      setLoadingAlertas(true);
+      Promise.allSettled([
+        http.get('/insights/unit/alerts', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/reports/diary/summary', { params: { mes, ...(unitIdParam ? { unitId: unitIdParam } : {}) } }),
+      ]).then(([alertasRes, resumoRes]) => {
+        if (alertasRes.status === 'fulfilled') setAlertasReais(alertasRes.value.data);
+        if (resumoRes.status === 'fulfilled') setResumoDiarios(resumoRes.value.data);
+      }).finally(() => setLoadingAlertas(false));
       if (dashRes.status === 'fulfilled') {
         const raw = dashRes.value.data;
         const ind = raw?.indicadores ?? {};
@@ -586,8 +604,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {abaAtiva === 'inicio' && (
         <div className="space-y-5">
 
-          {/* Alertas automáticos */}
-          {dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
+          {/* Alertas automáticos calculados no dashboard (fallback) */}
+          {!loadingAlertas && (!alertasReais || alertasReais.total === 0) && dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" /> Atenção hoje
@@ -618,6 +636,53 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               </div>
             ))}
           </div>
+
+          {loadingAlertas && (
+            <Card className="rounded-2xl border-2 border-blue-200 bg-blue-50">
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-blue-800"><AlertCircle className="h-5 w-5"/>Atualizando alertas</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-blue-700">Carregando alertas da unidade e resumo de diários...</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Alertas reais do banco */}
+          {alertasReais && alertasReais.total > 0 && (
+            <div className="space-y-2">
+              {alertasReais.criticos.length > 0 && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {alertasReais.criticos.length} alerta{alertasReais.criticos.length > 1 ? 's' : ''} crítico{alertasReais.criticos.length > 1 ? 's' : ''}
+                  </p>
+                  <ul className="space-y-1">
+                    {alertasReais.criticos.map((a: any) => (
+                      <li key={a.id} className="text-sm text-red-700 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
+                        <span><strong>{a.titulo}</strong> — {a.descricao}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {alertasReais.atencao.length > 0 && (
+                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                  <p className="text-sm font-bold text-orange-800 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    {alertasReais.atencao.length} atenção
+                  </p>
+                  <ul className="space-y-1">
+                    {alertasReais.atencao.map((a: any) => (
+                      <li key={a.id} className="text-sm text-orange-700 flex items-start gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />
+                        {a.titulo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Status das turmas hoje */}
           {(dashboard?.turmasLista ?? []).length > 0 && (
@@ -688,8 +753,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   {dashboard?.requisicoesParaAnalisar}
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-red-800">Pedidos material</p>
-                  <p className="text-xs text-red-600">para analisar</p>
+                  <p className="text-sm font-bold text-red-800">Pedidos de material</p>
+                  <p className="text-xs text-red-600">{canApprove ? 'aguardando aprovação' : 'para visualizar e analisar'}</p>
                 </div>
                 <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
               </button>
@@ -701,11 +766,25 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <span className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
                 <ClipboardList className="h-5 w-5" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-bold text-blue-800">Pedagógico</p>
                 <p className="text-xs text-blue-600">{dashboard?.diariosEstaSemana ?? 0} diários esta semana</p>
+                {resumoDiarios && (
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    {resumoDiarios.climaEmocional?.BOM > 0 && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                        Bom: {resumoDiarios.climaEmocional.BOM}
+                      </span>
+                    )}
+                    {resumoDiarios.execucaoPlano?.CUMPRIDO > 0 && (
+                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
+                        Cumpridos: {resumoDiarios.execucaoPlano.CUMPRIDO}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto" />
+              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
             </button>
           </div>
 
