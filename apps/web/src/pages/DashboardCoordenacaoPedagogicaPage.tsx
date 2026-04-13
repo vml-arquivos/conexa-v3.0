@@ -11,7 +11,7 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
   Eye, ThumbsUp, MessageSquare, TrendingUp,
-  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2,
+  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -248,7 +248,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<
+    'inicio'|'turmas'|'planejamentos'|'relatorios'|
+    'requisicoes'|'diarios'|'observacoes'|'sala'|'cobertura'|'ocorrencias'|'pedagogico'
+  >('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -487,11 +490,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
 
   const abas = [
-    { id: 'inicio',        label: 'Início',       icon: <Star className="h-4 w-4" /> },
-    { id: 'pedagogico',    label: 'Pedagógico',   icon: <Brain className="h-4 w-4" />, badge: dashboard?.diariosEstaSemana },
-    { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
-    { id: 'relatorios',    label: 'Relatórios',   icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'ocorrencias',   label: 'Ocorrências',  icon: <TriangleAlert className="h-4 w-4" /> },
+    { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,
+      badge: (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0) || undefined },
+    { id: 'turmas',        label: 'Turmas',         icon: <Users className="h-4 w-4" /> },
+    { id: 'planejamentos', label: 'Planejamentos',  icon: <BookOpen className="h-4 w-4" />,
+      badge: dashboard?.planejamentosParaRevisar },
+    { id: 'relatorios',    label: 'Relatórios',     icon: <TrendingUp className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -759,6 +763,182 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
           {/* Recados */}
           <RecadosWidget unitId={unitIdParam} />
+        </div>
+      )}
+
+      {/* ABA: TURMAS — visão consolidada de todas as turmas da unidade */}
+      {abaAtiva === 'turmas' && (
+        <div className="space-y-4">
+
+          {/* Resumo pedagógico da semana */}
+          {dashboard && (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: 'Diários esta semana',
+                  val: dashboard.diariosEstaSemana ?? (dashboard as any).indicadores?.diariosHoje ?? 0,
+                  icon: <ClipboardList className="h-4 w-4 text-blue-600" />,
+                  bg: 'bg-blue-50',
+                  onClick: () => setAbaAtiva('diarios' as any),
+                },
+                {
+                  label: 'Turmas com chamada',
+                  val: `${(dashboard as any).indicadores?.turmasComChamadaHoje ?? 0}/${(dashboard as any).indicadores?.totalTurmas ?? dashboard.turmas ?? 0}`,
+                  icon: <CheckCircle className="h-4 w-4 text-emerald-600" />,
+                  bg: 'bg-emerald-50',
+                  onClick: undefined as (() => void) | undefined,
+                },
+                {
+                  label: 'Cobertura hoje',
+                  val: (dashboard as any).indicadores?.diariosHoje > 0 ? `${(dashboard as any).indicadores.diariosHoje} reg.` : '—',
+                  icon: <BarChart2 className="h-4 w-4 text-purple-600" />,
+                  bg: 'bg-purple-50',
+                  onClick: () => { setCobertura(null); setPendencias(null); carregarCobertura(); },
+                },
+              ].map(c => (
+                <button
+                  key={c.label}
+                  onClick={c.onClick}
+                  disabled={!c.onClick}
+                  className={`${c.bg} rounded-2xl p-3 text-center ${c.onClick ? 'hover:opacity-90 cursor-pointer transition-opacity' : 'cursor-default'}`}
+                >
+                  <div className="flex justify-center mb-1">{c.icon}</div>
+                  <p className="text-lg font-bold text-gray-800">{c.val}</p>
+                  <p className="text-[11px] text-gray-500">{c.label}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Lista de turmas com acesso rápido */}
+          <div className="space-y-2">
+            {(dashboard?.turmasLista ?? []).map(turma => (
+              <div key={turma.id}
+                className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-blue-200 transition-colors">
+                {/* Cabeçalho da turma */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{turma.nome}</p>
+                      <p className="text-xs text-gray-400">
+                        {turma.totalAlunos} alunos · Prof. {turma.professor || '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                      turma.chamadaFeita
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
+                    </span>
+                  </div>
+                </div>
+                {/* Ações rápidas */}
+                <div className="grid grid-cols-5 gap-0 border-t border-gray-50">
+                  {[
+                    { label: 'Diários',    path: `/app/diario-de-bordo?classroomId=${turma.id}`, color: 'text-blue-600',   bg: 'hover:bg-blue-50'   },
+                    { label: 'Planos',     path: `/app/planejamentos?classroomId=${turma.id}`,   color: 'text-amber-600',  bg: 'hover:bg-amber-50'  },
+                    { label: 'RDIC',       path: `/app/rdic-coord?classroomId=${turma.id}`,      color: 'text-violet-600', bg: 'hover:bg-violet-50' },
+                    { label: 'Painel',     path: `/app/turma/${turma.id}/painel`,                color: 'text-teal-600',   bg: 'hover:bg-teal-50'   },
+                    { label: 'Obs.',       path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-pink-600', bg: 'hover:bg-pink-50' },
+                  ].map(item => (
+                    <button
+                      key={item.label}
+                      onClick={() => navigate(item.path)}
+                      className={`py-2.5 text-[11px] font-semibold ${item.color} ${item.bg} transition-colors text-center border-r border-gray-50 last:border-0`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Diários recentes da unidade */}
+          {diarios.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">
+                Diários recentes — todas as turmas
+              </p>
+              <div className="space-y-2">
+                {diarios.slice(0, 6).map((diario: any) => {
+                  const turmaNm    = diario.classroom?.name || diario.turmaNome || '—';
+                  const professorNm = diario.createdByUser
+                    ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+                    : diario.professorNome || '—';
+                  const dataRaw  = diario.eventDate || diario.data || '';
+                  const dataFmt  = dataRaw
+                    ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
+                        .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                    : '—';
+                  const ctx      = diario.aiContext && typeof diario.aiContext === 'object'
+                    ? diario.aiContext as any : {};
+                  const publicado = ['PUBLICADO','REVISADO','ARQUIVADO']
+                    .includes((diario.status || '').toUpperCase());
+                  return (
+                    <div key={diario.id}
+                      className={`rounded-xl border px-4 py-2.5 bg-white flex items-center justify-between gap-3 ${
+                        publicado ? 'border-emerald-100' : 'border-amber-100'
+                      }`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{turmaNm}</p>
+                        <p className="text-xs text-gray-400">
+                          {professorNm}
+                          {ctx.presencas != null && <span className="ml-2 text-emerald-600">· {ctx.presencas} pres.</span>}
+                          {ctx.climaEmocional && <span className="ml-1">· {ctx.climaEmocional}</span>}
+                        </p>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{dataFmt}</span>
+                    </div>
+                  );
+                })}
+                {diarios.length > 6 && (
+                  <button
+                    onClick={() => setAbaAtiva('diarios' as any)}
+                    className="w-full py-2 text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    Ver todos os {diarios.length} diários →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cobertura inline */}
+          {cobertura && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">Cobertura — hoje</p>
+              <div className="space-y-2">
+                {(cobertura.classrooms ?? []).map((cls: any) => (
+                  <div key={cls.classroomId}
+                    className="bg-white rounded-xl border border-gray-100 px-4 py-2.5 flex items-center gap-3">
+                    <p className="text-sm font-medium text-gray-800 flex-1 truncate">{cls.classroomName}</p>
+                    <div className="w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
+                      <div
+                        className={`h-full rounded-full ${
+                          (cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-500'
+                          : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400'
+                          : 'bg-red-400'
+                        }`}
+                        style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-bold flex-shrink-0 ${
+                      (cls.coveragePct ?? 0) >= 80 ? 'text-emerald-600'
+                      : (cls.coveragePct ?? 0) >= 40 ? 'text-amber-600'
+                      : 'text-red-500'
+                    }`}>{cls.coveragePct ?? 0}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1176,237 +1356,27 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       )}
 
       {/* ABA: RELATÓRIOS */}
+      {/* ABA: RELATÓRIOS */}
       {abaAtiva === 'relatorios' && (
-        <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-teal-800 mb-1">Relatórios de Desenvolvimento por Turma</p>
-            <p className="text-sm text-teal-700">
-              Selecione uma turma para visualizar o relatório consolidado de desenvolvimento, evolução e observações individuais de cada aluno.
-            </p>
-          </div>
-
-          {/* Acesso rápido por turma */}
-          <div className="grid grid-cols-1 gap-3">
-            {dashboard?.turmasLista?.map(turma => (
-              <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-teal-200 transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                      <Users className="h-5 w-5 text-teal-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{turma.nome}</p>
-                      <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor}</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {turma.chamadaFeita ? '✅ Chamada feita' : '⏳ Chamada pendente'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
-                    <Brain className="h-5 w-5 text-purple-600" />
-                    <span className="text-xs font-medium text-purple-700">Observações</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
-                    <GraduationCap className="h-5 w-5 text-indigo-600" />
-                    <span className="text-xs font-medium text-indigo-700">Atividades</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/rdic?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
-                    <ClipboardList className="h-5 w-5 text-teal-600" />
-                    <span className="text-xs font-medium text-teal-700">RDICs</span>
-                  </button>
-                </div>
-              </div>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400 px-1">Acesso direto aos relatórios da unidade</p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Diários por turma',     path: unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports',                         icon: <ClipboardList className="h-5 w-5 text-blue-600" />,   bg: 'bg-blue-50',   border: 'border-blue-100'   },
+              { label: 'Consumo de materiais',  path: unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais', icon: <ShoppingCart className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-50', border: 'border-orange-100' },
+              { label: 'Desenvolvimento',       path: unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil', icon: <Brain className="h-5 w-5 text-purple-600" />,        bg: 'bg-purple-50', border: 'border-purple-100' },
+              { label: 'RDICs publicados',      path: '/app/rdic-geral',                                                                           icon: <FileText className="h-5 w-5 text-teal-600" />,        bg: 'bg-teal-50',   border: 'border-teal-100'   },
+              { label: 'Requisições aprovadas', path: '/app/material-requests',                                                                    icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,  bg: 'bg-emerald-50',border: 'border-emerald-100' },
+              { label: 'Ocorrências',           path: '/app/ocorrencias',                                                                          icon: <TriangleAlert className="h-5 w-5 text-red-500" />,    bg: 'bg-red-50',    border: 'border-red-100'    },
+            ].map(item => (
+              <button key={item.label} onClick={() => navigate(item.path)}
+                className={`${item.bg} border ${item.border} rounded-2xl p-4 text-left hover:opacity-90 transition-opacity`}>
+                <div className="mb-2">{item.icon}</div>
+                <p className="text-sm font-semibold text-gray-800">{item.label}</p>
+              </button>
             ))}
           </div>
-
-          {/* Atalhos de relatórios gerais */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports')}
-              className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
-              <TrendingUp className="h-6 w-6 text-blue-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Relatório de Diários</p>
-              <p className="text-xs text-gray-400">Por turma e período</p>
-            </button>
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais')}
-              className="p-4 bg-white border-2 border-orange-100 rounded-2xl text-left hover:border-orange-300 hover:shadow-sm transition-all">
-              <ShoppingCart className="h-6 w-6 text-orange-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Consumo de Materiais</p>
-              <p className="text-xs text-gray-400">Pedidos e gastos</p>
-            </button>
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil')}
-              className="p-4 bg-white border-2 border-purple-100 rounded-2xl text-left hover:border-purple-300 hover:shadow-sm transition-all">
-              <Brain className="h-6 w-6 text-purple-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Desenvolvimento Infantil</p>
-              <p className="text-xs text-gray-400">Observações individuais</p>
-            </button>
-            <button
-              onClick={() => navigate('/app/rdic-geral')}
-              className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
-              <ClipboardList className="h-6 w-6 text-teal-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">RDICs Publicados</p>
-              <p className="text-xs text-gray-400">Relatórios individuais</p>
-            </button>
-          </div>
         </div>
-      )}
-
-      {/* ABA: COBERTURA DE REGISTROS */}
-      {abaAtiva === 'cobertura' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-gray-700">Cobertura de Registros — Hoje</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Crianças com pelo menos 1 DiaryEvent registrado hoje</p>
-            </div>
-            <button
-              onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Atualizar">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
-
-          {loadingCobertura ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura...</div>
-          ) : (
-            <>
-              {/* Indicadores da Unidade */}
-              {cobertura && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-700">{cobertura.totalComRegistro}</p>
-                    <p className="text-xs text-blue-500 mt-1">Com registro hoje</p>
-                  </div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-700">{cobertura.totalCriancas}</p>
-                    <p className="text-xs text-gray-500 mt-1">Total de crianças</p>
-                  </div>
-                  <div className={`border rounded-xl p-4 text-center ${
-                    cobertura.percentualGeral >= 80 ? 'bg-green-50 border-green-200' :
-                    cobertura.percentualGeral >= 50 ? 'bg-yellow-50 border-yellow-200' :
-                    'bg-red-50 border-red-200'
-                  }`}>
-                    <p className={`text-2xl font-bold ${
-                      cobertura.percentualGeral >= 80 ? 'text-green-700' :
-                      cobertura.percentualGeral >= 50 ? 'text-yellow-700' : 'text-red-700'
-                    }`}>{cobertura.percentualGeral}%</p>
-                    <p className="text-xs text-gray-500 mt-1">Cobertura geral</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Barra de cobertura global */}
-              {cobertura && (
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Cobertura da unidade hoje</span>
-                    <span className="text-sm font-bold text-gray-600">{cobertura.percentualGeral}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className={`h-3 rounded-full transition-all duration-700 ${
-                        cobertura.percentualGeral >= 80 ? 'bg-green-500' :
-                        cobertura.percentualGeral >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${cobertura.percentualGeral}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Por turma */}
-              {cobertura && cobertura.turmas.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700">Por turma</p>
-                  {cobertura.turmas.map(t => (
-                    <div key={t.classroomId} className="bg-white border border-gray-200 rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm text-gray-800">{t.classroomName}</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          t.percentual >= 80 ? 'bg-green-100 text-green-700' :
-                          t.percentual >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>{t.criancasComRegistro}/{t.totalCriancas} · {t.percentual}%</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${
-                            t.percentual >= 80 ? 'bg-green-500' :
-                            t.percentual >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${t.percentual}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Pendências */}
-              {pendencias && pendencias.totalPendentes > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                    <p className="text-sm font-semibold text-orange-700">
-                      {pendencias.totalPendentes} {pendencias.totalPendentes === 1 ? 'criança sem' : 'crianças sem'} registro hoje
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    {pendencias.pendentes.map(p => (
-                      <div key={p.childId} className="flex items-center gap-3 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2">
-                        <div className="w-7 h-7 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 text-xs font-bold flex-shrink-0">
-                          {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{p.nome}</p>
-                          <p className="text-xs text-gray-400">{p.classroomName}</p>
-                        </div>
-                        <span className="text-xs text-orange-500 font-medium">Sem registro</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {pendencias && pendencias.totalPendentes === 0 && (
-                <div className="text-center py-8 bg-green-50 border border-green-200 rounded-xl">
-                  <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
-                  <p className="font-semibold text-green-700">Todas as crianças têm registro hoje!</p>
-                  <p className="text-xs text-green-500 mt-1">Cobertura completa</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Aba Ocorrências */}
-      {abaAtiva === 'ocorrencias' && (
-        <div className="space-y-4">
-          <OcorrenciasPanel titulo="Ocorrências da Unidade" unitId={unitIdParam} />
-        </div>
-      )}
-
-      {/* Widget de Recados */}
-      {abaAtiva === 'inicio' && (
-        <RecadosWidget
-          titulo="Recados para Professoras"
-          podeEnviar={true}
-          unitId={undefined}
-          turmas={dashboard?.turmasLista?.map(t => ({ id: t.id, name: t.nome })) ?? []}
-        />
       )}
     </PageShell>
   );

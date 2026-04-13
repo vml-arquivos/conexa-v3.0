@@ -1720,12 +1720,26 @@ export default function DiarioBordoPage() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
           { id: 'lista', label: 'Meus Diários', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Diário do Dia', icon: <Plus className="h-4 w-4" /> },
+          { id: 'novo', label: 'Diário do Dia', icon: <Plus className="h-4 w-4" />, onClickOverride: () => {
+            // Se já existe diário salvo para hoje, mostrar no painel lateral
+            const hoje = new Date().toISOString().split('T')[0];
+            const diarioHoje = diarios.find((d: any) => {
+              const dataStr = (d.date || d.createdAt || '').substring(0, 10);
+              return dataStr === hoje;
+            });
+            if (diarioHoje) {
+              setPainelDiario(diarioHoje as any);
+              setAba('lista');
+            } else {
+              setPainelDiario(null);
+              setAba('novo');
+            }
+          }},
           { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
         ].map(tab => (
-          <button key={tab.id} onClick={() => setAba(tab.id as any)}
+          <button key={tab.id} onClick={() => (tab as any).onClickOverride ? (tab as any).onClickOverride() : setAba(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
             {tab.icon} {tab.label}
           </button>
@@ -2011,8 +2025,35 @@ export default function DiarioBordoPage() {
                           </div>
                         )}
 
-                        {/* Botão imprimir diário individual */}
-                        <div className="flex justify-end pt-2 border-t border-gray-100">
+                        {/* Botões: Editar e Imprimir */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              // Editar: carregar os dados do diário no formulário
+                              const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object'
+                                ? painelDiario.aiContext as any : {};
+                              setForm((f: any) => ({
+                                ...f,
+                                date: (painelDiario.date || painelDiario.createdAt || '').substring(0, 10) || f.date,
+                                momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque || '',
+                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
+                                encaminhamentos: painelDiario.encaminhamentos || ctx.encaminhamentos || '',
+                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional || '',
+                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
+                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
+                                avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
+                                statusExecucaoPlano: ctx.statusExecucaoPlano || '',
+                                execucaoPlanejamento: ctx.execucaoPlanejamento || '',
+                                observacoesIndividuais: ctx.observacoesIndividuais || [],
+                                microgestos: painelDiario.microgestos || ctx.microgestos || [],
+                              }));
+                              setPainelDiario(null);
+                              setAba('novo');
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+                          >
+                            ✏️ Editar
+                          </button>
                           <button
                             onClick={() => {
                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
