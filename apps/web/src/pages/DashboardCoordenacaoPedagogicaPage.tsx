@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -80,7 +81,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
   const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'>('inicio');
+  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'requisicoes'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -333,15 +334,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
 
   const abas = [
-    { id: 'inicio', label: 'Início', icon: <Star className="h-4 w-4" /> },
-    { id: 'requisicoes', label: 'Pedidos de Material', icon: <ShoppingCart className="h-4 w-4" />, badge: dashboard?.requisicoesParaAnalisar },
+    { id: 'inicio',        label: 'Início',       icon: <Star className="h-4 w-4" /> },
+    { id: 'pedagogico',    label: 'Pedagógico',   icon: <Brain className="h-4 w-4" />, badge: dashboard?.diariosEstaSemana },
     { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
-    { id: 'diarios', label: 'Diários da Semana', icon: <ClipboardList className="h-4 w-4" /> },
-    { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
-    { id: 'sala', label: 'Sala de Aula Virtual', icon: <GraduationCap className="h-4 w-4" /> },
-    { id: 'relatorios', label: 'Relatórios', icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'cobertura', label: 'Cobertura', icon: <BarChart2 className="h-4 w-4" /> },
-    { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
+    { id: 'relatorios',    label: 'Relatórios',   icon: <TrendingUp className="h-4 w-4" /> },
+    { id: 'ocorrencias',   label: 'Ocorrências',  icon: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -729,6 +726,185 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         );
       })()}
 
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: PEDAGÓGICO (diários + turmas + cobertura)
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'pedagogico' && (
+        <div className="space-y-5">
+          {/* Sub-navegação interna */}
+          {(() => {
+            const [subAba, setSubAba] = React.useState<'diarios'|'turmas'|'cobertura'>('diarios');
+            return (
+              <div className="space-y-4">
+                <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+                  {[
+                    { id: 'diarios',   label: 'Diários' },
+                    { id: 'turmas',    label: 'Turmas e Registros' },
+                    { id: 'cobertura', label: 'Cobertura' },
+                  ].map(s => (
+                    <button key={s.id} onClick={() => setSubAba(s.id as any)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        subAba === s.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Sub-aba: Diários */}
+                {subAba === 'diarios' && (
+                  <div className="space-y-4">
+                    <button
+                      onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); setSubAba('cobertura'); }}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Ver cobertura completa →
+                    </button>
+                    {diarios.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
+                        <ClipboardList className="h-10 w-10 text-gray-200" />
+                        <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {diarios.map((diario: any) => {
+                          const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
+                          const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status||'').toUpperCase());
+                          const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? 'Cumprido'
+                            : ctx.statusExecucaoPlano === 'PARCIAL' ? 'Parcial'
+                            : ctx.statusExecucaoPlano === 'NAO_REALIZADO' ? 'Não realizado' : null;
+                          return (
+                            <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-emerald-100' : 'border-amber-100'}`}>
+                              <div className="flex items-start justify-between gap-3 flex-wrap">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                                      {statusPubl ? 'Publicado' : 'Rascunho'}
+                                    </span>
+                                    {execLabel && (
+                                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${ctx.statusExecucaoPlano === 'CUMPRIDO' ? 'bg-emerald-100 text-emerald-700' : ctx.statusExecucaoPlano === 'PARCIAL' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                                        📋 {execLabel}
+                                      </span>
+                                    )}
+                                    {ctx.climaEmocional && (
+                                      <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                        {ctx.climaEmocional === 'OTIMO' ? '🌟 Ótimo' : ctx.climaEmocional === 'BOM' ? '😊 Bom' : ctx.climaEmocional === 'REGULAR' ? '😐 Regular' : ctx.climaEmocional === 'AGITADO' ? '😬 Agitado' : '😔 Difícil'}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm font-semibold text-gray-800 truncate">{diario.titulo || diario.turmaNome || '—'}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5">
+                                    {diario.professorNome} · {diario.turmaNome}
+                                    {ctx.presencas != null && <span className="ml-2 text-emerald-600 font-medium">👥 {ctx.presencas} presentes</span>}
+                                  </p>
+                                  {ctx.momentoDestaque && (
+                                    <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
+                                  )}
+                                </div>
+                                <p className="text-xs font-semibold text-gray-500 flex-shrink-0">
+                                  {diario.data ? new Date(diario.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-aba: Turmas e Registros */}
+                {subAba === 'turmas' && (
+                  <div className="grid grid-cols-1 gap-3">
+                    {dashboard?.turmasLista?.map(turma => (
+                      <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                              <Users className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-800">{turma.nome}</p>
+                              <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
+                            </div>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {turma.chamadaFeita ? '✅ Chamada feita' : '⏳ Chamada pendente'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          <button onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
+                            className="flex flex-col items-center gap-1 p-2.5 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
+                            <Brain className="h-4 w-4 text-purple-600" />
+                            <span className="text-[11px] font-medium text-purple-700">Observações</span>
+                          </button>
+                          <button onClick={() => navigate(`/app/diario-calendario?classroomId=${turma.id}`)}
+                            className="flex flex-col items-center gap-1 p-2.5 bg-blue-50 rounded-xl hover:bg-blue-100 transition-all">
+                            <ClipboardList className="h-4 w-4 text-blue-600" />
+                            <span className="text-[11px] font-medium text-blue-700">Diários</span>
+                          </button>
+                          <button onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
+                            className="flex flex-col items-center gap-1 p-2.5 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
+                            <GraduationCap className="h-4 w-4 text-indigo-600" />
+                            <span className="text-[11px] font-medium text-indigo-700">Atividades</span>
+                          </button>
+                          <button onClick={() => navigate(`/app/rdic?classroomId=${turma.id}`)}
+                            className="flex flex-col items-center gap-1 p-2.5 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
+                            <TrendingUp className="h-4 w-4 text-teal-600" />
+                            <span className="text-[11px] font-medium text-teal-700">RDIC</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Sub-aba: Cobertura */}
+                {subAba === 'cobertura' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-700">Cobertura de Registros — Hoje</p>
+                      <button onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
+                        className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                        <RefreshCw className="h-3.5 w-3.5" /> Atualizar
+                      </button>
+                    </div>
+                    {loadingCobertura ? (
+                      <div className="flex items-center justify-center py-10 gap-2">
+                        <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm text-gray-500">Carregando cobertura...</p>
+                      </div>
+                    ) : !cobertura ? (
+                      <button onClick={() => carregarCobertura()}
+                        className="w-full py-8 rounded-2xl border-2 border-dashed border-blue-200 text-sm text-blue-600 hover:bg-blue-50 transition-all">
+                        Carregar dados de cobertura
+                      </button>
+                    ) : (
+                      <div className="space-y-3">
+                        {cobertura.classrooms?.map((cls: any) => (
+                          <div key={cls.classroomId} className="bg-white rounded-2xl border border-gray-100 p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-semibold text-gray-800">{cls.classroomName}</p>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls.coveragePct >= 80 ? 'bg-emerald-100 text-emerald-700' : cls.coveragePct >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                                {cls.coveragePct ?? 0}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                              <div className={`h-full rounded-full ${cls.coveragePct >= 80 ? 'bg-emerald-500' : cls.coveragePct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (
