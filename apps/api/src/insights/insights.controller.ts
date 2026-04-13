@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -70,5 +70,14 @@ export class InsightsController {
     @Query('endDate') endDate?: string,
   ) {
     return this.insightsService.getGovernanceCoverage(user, { unitId, startDate, endDate });
+  }
+
+  @Get('unit/alerts')
+  @UseGuards(JwtAuthGuard)
+  getUnitAlerts(
+    @Query('unitId') unitId: string,
+    @Request() req: any,
+  ) {
+    return this.insightsService.getUnitAlerts(req.user, unitId);
   }
 }

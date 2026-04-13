@@ -354,4 +354,61 @@ export class InsightsService {
       coverage,
     };
   }
+
+  /**
+   * GET /insights/unit/alerts
+   * Alertas operacionais ativos para a unidade (lê AlertaOperacional do banco).
+   */
+  async getUnitAlerts(user: JwtPayload, unitIdOverride?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const { unitId, mantenedoraId } = resolveUnitScope(user, unitIdOverride);
+
+    const alertas = await this.prisma.alertaOperacional.findMany({
+      where: {
+        mantenedoraId,
+        ...(unitId ? { unitId } : {}),
+        resolvido: false,
+      },
+      orderBy: [
+        { severidade: 'desc' },
+        { criadoEm: 'desc' },
+      ],
+      take: 30,
+      select: {
+        id: true,
+        tipo: true,
+        severidade: true,
+        titulo: true,
+        descricao: true,
+        unitId: true,
+        classroomId: true,
+        childId: true,
+        criadoEm: true,
+        metadados: true,
+      },
+    });
+
+    const mapNivel = (s: string) =>
+      s === 'CRITICA' || s === 'ALTA' ? 'critico'
+      : s === 'MEDIA' ? 'atencao' : 'info';
+
+    const resultado = alertas.map(a => ({
+      id: a.id,
+      tipo: a.tipo,
+      nivel: mapNivel(a.severidade as string),
+      titulo: a.titulo,
+      descricao: a.descricao,
+      classroomId: a.classroomId,
+      childId: a.childId,
+      criadoEm: a.criadoEm,
+    }));
+
+    return {
+      unitId: unitId ?? null,
+      total: resultado.length,
+      criticos: resultado.filter(a => a.nivel === 'critico'),
+      atencao:  resultado.filter(a => a.nivel === 'atencao'),
+      info:     resultado.filter(a => a.nivel === 'info'),
+    };
+  }
 }
