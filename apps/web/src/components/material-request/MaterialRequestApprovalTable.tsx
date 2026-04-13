@@ -663,6 +663,8 @@ export function MaterialRequestApprovalTable() {
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
 
   const [detalheId, setDetalheId] = useState<string | null>(null);
+  const [modalApagar, setModalApagar] = useState<{ id: string; titulo: string } | null>(null);
+  const [apagando, setApagando] = useState(false);
 
   useEffect(() => {
     getAccessibleClassrooms().then(setClassrooms).catch(() => setClassrooms([]));
@@ -715,6 +717,23 @@ export function MaterialRequestApprovalTable() {
     setModalRejeitar({ id, titulo });
     setMotivoRejeicao('');
     setDetalheId(null);
+  }
+
+  async function handleConfirmarApagar() {
+    if (!modalApagar) return;
+    try {
+      setApagando(true);
+      await import('../../api/http').then(m =>
+        m.default.delete(`/material-requests/${modalApagar.id}`)
+      );
+      setToast({ msg: 'Requisição apagada.', tipo: 'ok' });
+      setModalApagar(null);
+      await carregar();
+    } catch {
+      setToast({ msg: 'Erro ao apagar. Tente novamente.', tipo: 'erro' });
+    } finally {
+      setApagando(false);
+    }
   }
 
   async function handleConfirmarRejeicao() {
@@ -902,6 +921,13 @@ export function MaterialRequestApprovalTable() {
                               Rejeitar
                             </button>
                           )}
+                          <button
+                            onClick={() => setModalApagar({ id: req.id, titulo: req.title })}
+                            disabled={isProcessing}
+                            className="px-2.5 py-1 text-xs font-medium text-gray-500 border border-gray-200 rounded hover:bg-gray-100 hover:text-red-600 hover:border-red-200 disabled:opacity-50 transition-colors"
+                          >
+                            Apagar
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -951,6 +977,38 @@ export function MaterialRequestApprovalTable() {
                 className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {processando ? 'Rejeitando...' : 'Confirmar Rejeição'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalApagar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">
+              Apagar requisição?
+            </h2>
+            <p className="text-sm text-gray-500 mb-1 line-clamp-2">
+              {modalApagar.titulo}
+            </p>
+            <p className="text-sm text-red-600 mb-6">
+              Esta ação é permanente e não pode ser desfeita.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setModalApagar(null)}
+                disabled={apagando}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarApagar}
+                disabled={apagando}
+                className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {apagando ? 'Apagando...' : 'Sim, apagar'}
               </button>
             </div>
           </div>
