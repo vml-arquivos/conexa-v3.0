@@ -1575,6 +1575,12 @@ export default function DiarioBordoPage() {
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
             observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
+            // Salvar lista de crianças para uso no PDF
+            criancas: criancas.map(c => ({
+              id: c.id,
+              firstName: c.firstName,
+              lastName: c.lastName,
+            })),
           },
         });
       }
@@ -2027,7 +2033,9 @@ export default function DiarioBordoPage() {
                                 climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
                                 rotina: ctx.rotina as Record<string, boolean>,
                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                criancas: (ctx.criancas as any[])?.length > 0
+                                  ? ctx.criancas as any[]
+                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
                               });
                             }}
                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
@@ -2318,7 +2326,9 @@ export default function DiarioBordoPage() {
                                 climaEmocional: diario.climaEmocional || ctx.climaEmocional,
                                 rotina: ctx.rotina as Record<string, boolean>,
                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                criancas: (ctx.criancas as any[])?.length > 0
+                                  ? ctx.criancas as any[]
+                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
                               });
                             }}
                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
