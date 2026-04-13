@@ -23,6 +23,16 @@ function resolveUnitId(user: JwtPayload, override?: string): string | null {
 
 @Injectable()
 export class CoordenacaoService {
+  private cache = new Map<string, { data: unknown; expiresAt: number }>();
+
+  private async cached<T>(key: string, ttlSeconds: number, fn: () => Promise<T>): Promise<T> {
+    const hit = this.cache.get(key);
+    if (hit && hit.expiresAt > Date.now()) return hit.data as T;
+    const data = await fn();
+    this.cache.set(key, { data, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return data;
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── REUNIÕES / PAUTAS ───────────────────────────────────────────────────
@@ -123,6 +133,9 @@ export class CoordenacaoService {
     const unitIdRaw = resolveUnitId(user, unitIdOverride);
     if (!unitIdRaw) throw new ForbiddenException('Selecione uma unidade para ver o dashboard da unidade');
     const unitId: string = unitIdRaw;
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `coord:unidade:${unitId}:${today}`;
+    return this.cached(cacheKey, 60, async () => {
     try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -265,12 +278,16 @@ export class CoordenacaoService {
         proximasReunioes: [],
       };
     }
+    });
   }
 
   // ─── DASHBOARD GERAL ──────────────────────────────────────────────────────
 
   async getDashboardGeral(user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+    const today = new Date().toISOString().slice(0, 10);
+    const cacheKey = `coord:geral:${user.mantenedoraId}:${today}`;
+    return this.cached(cacheKey, 120, async () => {
     try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -387,6 +404,7 @@ export class CoordenacaoService {
         proximasReunioes: [],
       };
     }
+    });
   }
 
   // ─── PLANEJAMENTOS (aceita unitId override) ────────────────────────────────
