@@ -781,16 +781,58 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           acc[p.status] = (acc[p.status] ?? 0) + 1;
           return acc;
         }, {});
-        const gruposPlanejamento = plansFiltrados.reduce<Array<{ turmaNome: string; itens: Planejamento[] }>>((acc, plan) => {
-          const turmaNome = plan.turmaNome?.trim() || 'Sem turma';
-          const grupoExistente = acc.find(grupo => grupo.turmaNome === turmaNome);
-          if (grupoExistente) {
-            grupoExistente.itens.push(plan);
-          } else {
-            acc.push({ turmaNome, itens: [plan] });
-          }
-          return acc;
-        }, []);
+        const ordemStatus: Record<string, number> = {
+          EM_REVISAO: 0,
+          DEVOLVIDO: 1,
+          RASCUNHO: 2,
+          APROVADO: 3,
+          PUBLICADO: 4,
+          CONCLUIDO: 5,
+        };
+        const gruposPlanejamento = Object.values(
+          plansFiltrados.reduce<Record<string, {
+            turmaNome: string;
+            professores: string[];
+            itens: Planejamento[];
+            statusResumo: Record<string, number>;
+          }>>((acc, plan) => {
+            const turmaNome = plan.turmaNome?.trim() || 'Sem turma';
+            const professorNome = plan.professorNome?.trim() || 'Professor não informado';
+            const chaveGrupo = turmaNome.toLocaleLowerCase('pt-BR');
+
+            if (!acc[chaveGrupo]) {
+              acc[chaveGrupo] = {
+                turmaNome,
+                professores: [],
+                itens: [],
+                statusResumo: {},
+              };
+            }
+
+            if (!acc[chaveGrupo].professores.includes(professorNome)) {
+              acc[chaveGrupo].professores.push(professorNome);
+            }
+
+            acc[chaveGrupo].itens.push(plan);
+            acc[chaveGrupo].statusResumo[plan.status] = (acc[chaveGrupo].statusResumo[plan.status] ?? 0) + 1;
+            return acc;
+          }, {})
+        )
+          .map(grupo => ({
+            ...grupo,
+            professores: [...grupo.professores].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+            itens: [...grupo.itens].sort((a, b) => {
+              const diffStatus = (ordemStatus[a.status] ?? 99) - (ordemStatus[b.status] ?? 99);
+              if (diffStatus !== 0) return diffStatus;
+
+              const dataA = a.startDate ? new Date(a.startDate).getTime() : 0;
+              const dataB = b.startDate ? new Date(b.startDate).getTime() : 0;
+              if (dataA !== dataB) return dataB - dataA;
+
+              return a.title.localeCompare(b.title, 'pt-BR');
+            }),
+          }))
+          .sort((a, b) => a.turmaNome.localeCompare(b.turmaNome, 'pt-BR'));
         return (
           <div className="space-y-4">
             {/* Filtros por status */}
@@ -818,11 +860,38 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 <p className="text-sm text-gray-400 mt-1">Os planejamentos criados pelos professores aparecerão aqui</p>
               </div>
             ) : gruposPlanejamento.map(grupo => (
-              <div key={grupo.turmaNome} className="space-y-3">
-                <div className="flex items-center gap-2 px-1">
-                  <GraduationCap className="h-4 w-4 text-blue-600" />
-                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{grupo.turmaNome}</h3>
-                  <span className="text-xs text-gray-400">{grupo.itens.length} planejamento(s)</span>
+              <div key={grupo.turmaNome} className="space-y-3 rounded-3xl border border-blue-100 bg-gradient-to-br from-slate-50 via-white to-blue-50/70 p-4 md:p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <GraduationCap className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-gray-800 truncate">{grupo.turmaNome}</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {grupo.professores.length === 1
+                          ? `Prof. ${grupo.professores[0]}`
+                          : grupo.professores.length > 1
+                            ? `${grupo.professores.length} professores vinculados`
+                            : 'Professor não informado'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {grupo.itens.length} planejamento{grupo.itens.length !== 1 ? 's' : ''}
+                    </span>
+                    {Object.entries(grupo.statusResumo)
+                      .sort(([statusA], [statusB]) => (ordemStatus[statusA] ?? 99) - (ordemStatus[statusB] ?? 99))
+                      .map(([status, quantidade]) => {
+                        const statusConfig = STATUS_PLAN_CONFIG[status] ?? STATUS_PLAN_CONFIG.RASCUNHO;
+                        return (
+                          <span key={status} className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConfig.cor}`}>
+                            {quantidade} {statusConfig.label}
+                          </span>
+                        );
+                      })}
+                  </div>
                 </div>
                 {grupo.itens.map(plan => {
                   const cfg = STATUS_PLAN_CONFIG[plan.status] ?? STATUS_PLAN_CONFIG.RASCUNHO;
@@ -842,8 +911,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             <p className="font-bold text-gray-800 truncate">{plan.title}</p>
                             <p className="text-sm text-gray-600 font-medium">{plan.professorNome}</p>
                             <p className="text-xs text-gray-500">
-                              {plan.turmaNome}
-                              {plan.templateNome && <span className="ml-1 text-blue-600">· {plan.templateNome}</span>}
+                              {plan.templateNome ? <span className="text-blue-600">{plan.templateNome}</span> : 'Planejamento da turma'}
                               {plan.type && <span className="ml-1">· {TIPO_PLAN[plan.type] ?? plan.type}</span>}
                             </p>
                             <p className="text-xs text-gray-400 mt-0.5">{dataInicio} → {dataFim}</p>
