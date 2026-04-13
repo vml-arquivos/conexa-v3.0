@@ -678,6 +678,8 @@ export default function DesenvolvimentoInfantilPage() {
         if (unitIdParam) {
           const valido = data.some((u: any) => u.id === unitIdParam);
           setSelectedUnitId(valido ? unitIdParam : '');
+        } else {
+          setSelectedUnitId('');
         }
       })
       .catch(() => {
