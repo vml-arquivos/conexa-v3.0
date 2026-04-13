@@ -72,16 +72,27 @@ export class RecadosService {
       where.mantenedoraId = user.mantenedoraId;
     }
 
-    const recados = await this.prisma.recadoTurma.findMany({
-      where,
-      orderBy: [{ importante: 'desc' }, { criadoEm: 'desc' }],
-      take: 50,
-      include: {
-        leituras: { where: { userId: user.sub }, select: { lidoEm: true } },
-      },
-    });
+    let recados: any[] = [];
+    try {
+      recados = await this.prisma.recadoTurma.findMany({
+        where,
+        orderBy: [{ importante: 'desc' }, { criadoEm: 'desc' }],
+        take: 50,
+        include: {
+          leituras: { where: { userId: user.sub }, select: { lidoEm: true } },
+        },
+      });
+    } catch (error: any) {
+      if (
+        error?.code === 'P2021' &&
+        String(error?.meta?.table ?? '').includes('recado_turma')
+      ) {
+        return [];
+      }
+      throw error;
+    }
 
-    return recados.map(r => ({
+    return recados.map((r: any) => ({
       ...r,
       lido: r.leituras.length > 0,
       lidoEm: r.leituras[0]?.lidoEm ?? null,

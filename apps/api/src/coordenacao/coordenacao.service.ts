@@ -189,7 +189,6 @@ export class CoordenacaoService {
         classroom: {
           select: { id: true, name: true },
         },
-        items: true,
       },
       orderBy: { requestedDate: 'desc' },
       take: 20,
@@ -625,7 +624,6 @@ export class CoordenacaoService {
         classroom: {
           select: { id: true, name: true },
         },
-        items: true,
       },
       orderBy: { requestedDate: 'desc' },
       take: 100,

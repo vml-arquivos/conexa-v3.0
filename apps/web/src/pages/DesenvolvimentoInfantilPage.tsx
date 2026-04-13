@@ -673,9 +673,20 @@ export default function DesenvolvimentoInfantilPage() {
   // ─── Carregar unidades ─────────────────────────────────────────────────────
   useEffect(() => {
     getAccessibleUnits()
-      .then((data) => setUnidades(data))
-      .catch(() => setUnidades([]));
-  }, []);
+      .then((data) => {
+        setUnidades(data);
+        if (unitIdParam) {
+          const valido = data.some((u: any) => u.id === unitIdParam);
+          setSelectedUnitId(valido ? unitIdParam : '');
+        } else {
+          setSelectedUnitId('');
+        }
+      })
+      .catch(() => {
+        setUnidades([]);
+        if (unitIdParam) setSelectedUnitId('');
+      });
+  }, [unitIdParam]);
 
   // ─── Carregar turmas quando unidade muda ──────────────────────────────────
   useEffect(() => {
