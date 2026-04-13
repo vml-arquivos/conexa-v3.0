@@ -324,7 +324,10 @@ export class RdicService {
   // ─── Consolidado da turma (dados para relatório) ──────────────────────────
   // GET /rdic/turma/consolidado?classroomId&periodo&anoLetivo
   async turmaConsolidado(query: any, user: JwtPayload) {
-    const level = user.roles[0]?.level;
+    const level = user.roles?.find(r =>
+      ['DEVELOPER','MANTENEDORA','STAFF_CENTRAL','UNIDADE','PROFESSOR']
+      .includes(r.level)
+    )?.level ?? user.roles[0]?.level;
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
     const { classroomId, periodo, anoLetivo } = query;
@@ -373,8 +376,10 @@ export class RdicService {
   // ─── Listar RDICs com controle de acesso por role ─────────────────────────
   async listar(query: any, user: JwtPayload) {
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
-    const level = user.roles[0]?.level;
-
+    const level = user.roles?.find(r =>
+      ['DEVELOPER','MANTENEDORA','STAFF_CENTRAL','UNIDADE','PROFESSOR']
+      .includes(r.level)
+    )?.level ?? user.roles[0]?.level;
     const where: any = { mantenedoraId: user.mantenedoraId };
 
     // PROFESSOR: vê apenas os RDICs que ele criou (qualquer status)
@@ -421,8 +426,10 @@ export class RdicService {
   // ─── Detalhe de um RDIC ───────────────────────────────────────────────────
   async getById(id: string, user: JwtPayload) {
     const instancia = await this._buscarEValidar(id, user);
-    const level = user.roles[0]?.level;
-
+    const level = user.roles?.find(r =>
+      ['DEVELOPER','MANTENEDORA','STAFF_CENTRAL','UNIDADE','PROFESSOR']
+      .includes(r.level)
+    )?.level ?? user.roles[0]?.level;
     // STAFF_CENTRAL só pode ler APROVADO/PUBLICADO/FINALIZADO
     if (level === 'STAFF_CENTRAL' && !['APROVADO', 'PUBLICADO', 'FINALIZADO'].includes(instancia.status)) {
       throw new ForbiddenException(
