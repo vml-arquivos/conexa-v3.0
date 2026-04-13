@@ -57,7 +57,8 @@ export interface DiaryPrintData {
   ausencias: number;
   totalAlunos?: number;
   climaEmocional?: string;
-  rotina?: Record<string, boolean>;
+  /** Aceita Record<string,boolean> (novo) ou RotinaItem[] legado {momento, concluido} */
+  rotina?: Record<string, boolean> | Array<{ momento: string; concluido: boolean; descricao?: string }>;
 
   // Observações individuais (descritores)
   observacoesIndividuais?: DiaryObservacaoIndividual[];
@@ -230,8 +231,23 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   }
 
   // ── Bloco: Presença e Rotina ──
-  const rotinaItems = Object.entries(d.rotina ?? {})
-    .map(([key, val]) => ({ label: ROTINA_LABELS[key] ?? key, realizado: Boolean(val) }));
+  // Normalizar rotina: aceita Record<string,boolean> ou RotinaItem[] legado
+  const rotinaItems: Array<{ label: string; realizado: boolean }> = (() => {
+    const r = d.rotina;
+    if (!r) return [];
+    if (Array.isArray(r)) {
+      // Formato legado: [{momento, concluido, descricao}]
+      return r.map(item => ({
+        label: ROTINA_LABELS[item.momento] ?? item.momento,
+        realizado: Boolean(item.concluido),
+      }));
+    }
+    // Formato novo: Record<string, boolean>
+    return Object.entries(r).map(([key, val]) => ({
+      label: ROTINA_LABELS[key] ?? key,
+      realizado: Boolean(val),
+    }));
+  })();
 
   const rotinaHTML = rotinaItems.length > 0
     ? `<div class="rotina-grid">
