@@ -7,7 +7,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import {
   Users, BookOpen, ShoppingCart,
-  Camera, UserCircle, CheckCircle,
+  Camera, UserCircle, CheckCircle, ClipboardList,
   ChevronRight, Bell, Calendar, X,
   Brain, Sparkles, TrendingUp, Award,
   Plus, Edit3, RefreshCw, FileText,
@@ -322,6 +322,57 @@ export default function TeacherDashboardPage() {
     }
   }
 
+  async function handleEvidenciaRapidaUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    const classroomId = insightsHoje?.planejamentoAtivo?.classroomId || data?.classroom?.id;
+    if (!classroomId) {
+      toast.error('Turma não identificada para registrar evidências.');
+      return;
+    }
+
+    try {
+      const res = await http.get('/diary-events', {
+        params: {
+          classroomId,
+          startDate: new Date().toISOString().split('T')[0],
+          limit: 1,
+        },
+      });
+
+      const events = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const diarioHoje = events[0];
+
+      if (!diarioHoje?.id) {
+        toast.info('Crie o diário do dia antes de adicionar evidências.');
+        navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(classroomId)}`);
+        return;
+      }
+
+      let sucesso = 0;
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          await http.post(`/diary-events/${diarioHoje.id}/media`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          sucesso++;
+        } catch {
+          // continua tentando os demais arquivos
+        }
+      }
+
+      if (sucesso > 0) {
+        toast.success(`${sucesso} evidência${sucesso > 1 ? 's' : ''} registrada${sucesso > 1 ? 's' : ''} com sucesso!`);
+      } else {
+        toast.error('Não foi possível registrar as evidências. Tente no diário.');
+      }
+    } catch {
+      toast.error('Erro ao registrar evidência. Tente no diário.');
+    }
+  }
+
   function atualizarFoto(childId: string, url: string) {
     setData(prev => prev ? {
       ...prev,
@@ -601,6 +652,36 @@ export default function TeacherDashboardPage() {
                         <button onClick={() => navigate('/app/planejamento/novo')}
                           className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
                           Criar planejamento →
+                        </button>
+                      </div>
+                    )}
+
+                    {insightsHoje?.planejamentoAtivo?.id && (
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          onClick={() => navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(insightsHoje.planejamentoAtivo.classroomId)}`)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                          Registrar Diário do Dia
+                        </button>
+                        <button
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.multiple = true;
+                            input.onchange = async (e) => {
+                              const files = (e.target as HTMLInputElement).files;
+                              await handleEvidenciaRapidaUpload(files);
+                            };
+                            input.click();
+                          }}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                          title="Registrar evidência fotográfica do dia"
+                        >
+                          <Camera className="h-4 w-4" />
+                          Evidência
                         </button>
                       </div>
                     )}
