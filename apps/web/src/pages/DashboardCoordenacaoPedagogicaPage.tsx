@@ -11,7 +11,7 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
   Eye, ThumbsUp, MessageSquare, TrendingUp,
-  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText,
+  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText, ArrowRight,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -500,6 +500,76 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   );
 
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
+  const primeiroNome = (((user?.nome as string) || 'Coordenação').trim().split(' ')[0]) || 'Coordenação';
+  const totalTurmasHoje = dashboard?.turmasLista?.length ?? dashboard?.turmas ?? 0;
+  const turmasComChamadaHoje = (dashboard?.turmasLista ?? []).filter(t => t.chamadaFeita).length;
+  const turmasPendentesHoje = Math.max(totalTurmasHoje - turmasComChamadaHoje, 0);
+  const diariosPublicados = diarios.filter(d => ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((d.status || '').toUpperCase())).length;
+  const diariosRascunho = diarios.filter(d => (d.status || '').toUpperCase() === 'RASCUNHO').length;
+  const kpisInicio = [
+    {
+      label: 'Turmas acompanhadas',
+      valor: dashboard?.turmas ?? 0,
+      detalhe: `${dashboard?.alunosTotal ?? 0} alunos vinculados`,
+      icon: <Users className="h-5 w-5 text-blue-600" />,
+      shell: 'from-blue-50 to-white border-blue-100',
+      accent: 'bg-blue-500',
+    },
+    {
+      label: 'Professores ativos',
+      valor: dashboard?.professores ?? 0,
+      detalhe: `${dashboard?.planejamentosParaRevisar ?? 0} planejamento(s) em análise`,
+      icon: <GraduationCap className="h-5 w-5 text-violet-600" />,
+      shell: 'from-violet-50 to-white border-violet-100',
+      accent: 'bg-violet-500',
+    },
+    {
+      label: 'Chamadas do dia',
+      valor: totalTurmasHoje > 0 ? `${turmasComChamadaHoje}/${totalTurmasHoje}` : '—',
+      detalhe: turmasPendentesHoje > 0 ? `${turmasPendentesHoje} turma(s) ainda pendente(s)` : 'Cobertura completa até agora',
+      icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,
+      shell: 'from-emerald-50 to-white border-emerald-100',
+      accent: 'bg-emerald-500',
+    },
+    {
+      label: 'Diários monitorados',
+      valor: dashboard?.diariosEstaSemana ?? 0,
+      detalhe: `${diariosPublicados} publicados · ${diariosRascunho} rascunho(s)`,
+      icon: <ClipboardList className="h-5 w-5 text-amber-600" />,
+      shell: 'from-amber-50 to-white border-amber-100',
+      accent: 'bg-amber-500',
+    },
+  ] as const;
+  const atalhosExecutivos = [
+    {
+      label: 'Visão pedagógica',
+      desc: 'Diários, cobertura e turmas com navegação consolidada',
+      icon: <Brain className="h-5 w-5" />,
+      className: 'from-sky-600 via-blue-600 to-indigo-700',
+      action: () => setAbaAtiva('pedagogico'),
+    },
+    {
+      label: 'Revisar planejamentos',
+      desc: `${dashboard?.planejamentosParaRevisar ?? 0} item(ns) aguardando retorno`,
+      icon: <BookOpen className="h-5 w-5" />,
+      className: 'from-amber-500 via-orange-500 to-rose-500',
+      action: () => setAbaAtiva('planejamentos'),
+    },
+    {
+      label: 'Pedidos de material',
+      desc: canApprove ? 'Aprove, devolva ou acompanhe prioridades' : 'Acompanhe o funil e os itens urgentes',
+      icon: <ShoppingCart className="h-5 w-5" />,
+      className: 'from-rose-500 via-red-500 to-pink-600',
+      action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+    },
+    {
+      label: 'Relatórios da unidade',
+      desc: 'Acesse indicadores e leitura rápida dos registros',
+      icon: <FileText className="h-5 w-5" />,
+      className: 'from-emerald-500 via-teal-500 to-cyan-600',
+      action: () => setAbaAtiva('relatorios'),
+    },
+  ] as const;
 
   const abas = [
     { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,
@@ -513,7 +583,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   return (
     <PageShell
       title={`Painel da Coordenação Pedagógica`}
-      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Acompanhe e apoie o trabalho dos professores.`}
+      subtitle={`Bem-vindo, ${primeiroNome}! Acompanhe a operação pedagógica com leitura rápida, decisões seguras e navegação fluida em qualquer tela.`}
     >
       {/* Modal motivo rejeição */}
       {itemParaRejeitar && canApprove && (
@@ -589,6 +659,60 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {abaAtiva === 'inicio' && (
         <div className="space-y-5">
 
+          <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-5 sm:p-6 text-white shadow-[0_30px_80px_rgba(15,23,42,0.28)]">
+            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl" />
+            <div className="absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-fuchsia-500/15 blur-3xl" />
+            <div className="relative space-y-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100">
+                    <Star className="h-3.5 w-3.5" />
+                    Cockpit executivo da unidade
+                  </div>
+                  <div>
+                    <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Operação pedagógica com visão premium e resposta rápida</h2>
+                    <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-6 text-blue-100/85">
+                      Consolide pendências, cobertura, diários e movimentação das turmas em um único fluxo, com leitura clara no desktop e navegação simplificada no mobile.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:min-w-[320px]">
+                  <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100/75">Pendências vivas</p>
+                    <p className="mt-2 text-3xl font-bold">{totalPendencias}</p>
+                    <p className="mt-1 text-xs text-blue-100/80">{(dashboard?.planejamentosParaRevisar ?? 0)} planos · {(dashboard?.requisicoesParaAnalisar ?? 0)} pedidos</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100/75">Cobertura de hoje</p>
+                    <p className="mt-2 text-3xl font-bold">{totalTurmasHoje > 0 ? `${Math.round((turmasComChamadaHoje / totalTurmasHoje) * 100)}%` : '—'}</p>
+                    <p className="mt-1 text-xs text-blue-100/80">{turmasComChamadaHoje} de {totalTurmasHoje} turmas com chamada</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                {atalhosExecutivos.map(item => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    className={`group rounded-2xl bg-gradient-to-br ${item.className} p-[1px] text-left shadow-lg transition-transform duration-200 hover:-translate-y-0.5`}
+                  >
+                    <div className="h-full rounded-2xl bg-slate-950/75 px-4 py-4 backdrop-blur-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12 text-white">
+                          {item.icon}
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
+                      </div>
+                      <p className="mt-4 text-sm font-semibold text-white">{item.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-blue-100/80">{item.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Alertas automáticos calculados no dashboard (fallback) */}
           {!loadingAlertas && (!alertasReais || alertasReais.total === 0) && dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -607,17 +731,23 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           )}
 
           {/* KPIs do dia */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { icon: <Users className="h-5 w-5 text-blue-600"/>,          bg: 'bg-blue-50',   val: dashboard?.turmas ?? 0,                                          label: 'Turmas' },
-              { icon: <Star className="h-5 w-5 text-purple-600"/>,         bg: 'bg-purple-50', val: dashboard?.professores ?? 0,                                     label: 'Professores' },
-              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Chamadas hoje' },
-              { icon: <ClipboardList className="h-5 w-5 text-orange-600"/>,bg: 'bg-orange-50', val: dashboard?.diariosEstaSemana ?? 0,                               label: 'Diários esta semana' },
-            ].map((c, i) => (
-              <div key={i} className={`${c.bg} rounded-2xl border p-4 text-center`}>
-                <div className="flex justify-center mb-2">{c.icon}</div>
-                <p className="text-2xl font-bold text-gray-800">{c.val}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {kpisInicio.map((card) => (
+              <div key={card.label} className={`relative overflow-hidden rounded-[24px] border bg-gradient-to-br ${card.shell} p-4 shadow-sm`}>
+                <div className={`absolute right-0 top-0 h-20 w-20 -translate-y-6 translate-x-6 rounded-full ${card.accent} opacity-10 blur-2xl`} />
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className="space-y-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+                      {card.icon}
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">{card.label}</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900">{card.valor}</p>
+                      <p className="mt-1 text-xs leading-5 text-gray-500">{card.detalhe}</p>
+                    </div>
+                  </div>
+                  <span className={`mt-1 inline-flex h-2.5 w-2.5 rounded-full ${card.accent}`} />
+                </div>
               </div>
             ))}
           </div>
