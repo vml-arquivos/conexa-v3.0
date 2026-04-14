@@ -1060,25 +1060,25 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">Cobertura — hoje</p>
               <div className="space-y-2">
-                {(cobertura.classrooms ?? []).map((cls: any) => (
+                {(cobertura.turmas ?? []).map((cls: any) => (
                   <div key={cls.classroomId}
                     className="bg-white rounded-xl border border-gray-100 px-4 py-2.5 flex items-center gap-3">
                     <p className="text-sm font-medium text-gray-800 flex-1 truncate">{cls.classroomName}</p>
                     <div className="w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
                       <div
                         className={`h-full rounded-full ${
-                          (cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-500'
-                          : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400'
+                          (cls.percentual ?? 0) >= 80 ? 'bg-emerald-500'
+                          : (cls.percentual ?? 0) >= 40 ? 'bg-amber-400'
                           : 'bg-red-400'
                         }`}
-                        style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }}
+                        style={{ width: `${Math.max(cls.percentual ?? 0, 2)}%` }}
                       />
                     </div>
                     <span className={`text-xs font-bold flex-shrink-0 ${
-                      (cls.coveragePct ?? 0) >= 80 ? 'text-emerald-600'
-                      : (cls.coveragePct ?? 0) >= 40 ? 'text-amber-600'
+                      (cls.percentual ?? 0) >= 80 ? 'text-emerald-600'
+                      : (cls.percentual ?? 0) >= 40 ? 'text-amber-600'
                       : 'text-red-500'
-                    }`}>{cls.coveragePct ?? 0}%</span>
+                    }`}>{cls.percentual ?? 0}%</span>
                   </div>
                 ))}
               </div>
@@ -1274,7 +1274,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       Cancelar
                     </button>
                     <button
-                      onClick={() => handleRejeitar(itemParaRejeitar.id, 'plan')}
+                      onClick={() => devolverPlanejamento(itemParaRejeitar.id, motivoRejeicao)}
                       disabled={!motivoRejeicao.trim()}
                       className="flex-1 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-40"
                     >
