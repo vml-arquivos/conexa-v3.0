@@ -115,6 +115,20 @@ function PedagogicoSubNav({
             </div>
           ) : (
             diarios.map((diario: any) => {
+              const legacyTurma = diario['turmaNome'];
+              const legacyProfessor = diario['professorNome'];
+              const legacyData = diario['data'];
+              const turma = diario.classroom?.name || legacyTurma || '—';
+              const professor = diario.createdByUser
+                ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+                : legacyProfessor || '—';
+              const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+              const dataFmt = dataRaw
+                ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
+                : '—';
               const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
               const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status || '').toUpperCase());
               const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? '✅ Cumprido'
@@ -137,10 +151,10 @@ function PedagogicoSubNav({
                         {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">{climaLabel}</span>}
                       </div>
                       <p className="text-sm font-semibold text-gray-800 truncate">
-                        {diario.classroom?.name || '—'}
-                        {diario.createdByUser && (
+                        {turma}
+                        {professor !== '—' && (
                           <span className="text-xs font-normal text-gray-400 ml-2">
-                            · {diario.createdByUser.firstName} {diario.createdByUser.lastName}
+                            · {professor}
                           </span>
                         )}
                       </p>
@@ -154,9 +168,7 @@ function PedagogicoSubNav({
                       )}
                     </div>
                     <p className="text-xs font-semibold text-gray-400 flex-shrink-0">
-                      {diario.eventDate
-                        ? new Date(diario.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                        : '—'}
+                      {dataFmt}
                     </p>
                   </div>
                 </div>
@@ -868,13 +880,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               </p>
               <div className="space-y-2">
                 {diarios.slice(0, 6).map((diario: any) => {
-                  const turmaNm    = diario.classroom?.name || diario.turmaNome || '—';
+                  const legacyTurma = diario['turmaNome'];
+                  const legacyProfessor = diario['professorNome'];
+                  const legacyData = diario['data'];
+                  const turmaNm = diario.classroom?.name || legacyTurma || '—';
                   const professorNm = diario.createdByUser
                     ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
-                    : diario.professorNome || '—';
-                  const dataRaw  = diario.eventDate || diario.data || '';
-                  const dataFmt  = dataRaw
-                    ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
+                    : legacyProfessor || '—';
+                  const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+                  const dataFmt = dataRaw
+                    ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`)
                         .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                     : '—';
                   const ctx      = diario.aiContext && typeof diario.aiContext === 'object'
@@ -1205,16 +1220,18 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           ) : (
             <div className="space-y-2">
               {diarios.map((diario: any) => {
-                // Mapeamento robusto: suporta campos da API (title/eventDate/classroom.name)
-                // e campos do mapeamento local (titulo/data/turmaNome/professorNome)
-                const titulo    = diario.title    || diario.titulo    || '—';
-                const turma     = diario.classroom?.name || diario.turmaNome || '—';
+                const legacyTitulo = diario['titulo'];
+                const legacyTurma = diario['turmaNome'];
+                const legacyProfessor = diario['professorNome'];
+                const legacyData = diario['data'];
+                const titulo = diario.title || legacyTitulo || '—';
+                const turma = diario.classroom?.name || legacyTurma || '—';
                 const professor = diario.createdByUser
                   ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
-                  : diario.professorNome || '—';
-                const dataRaw   = diario.eventDate || diario.data || diario.createdAt || '';
-                const dataFmt   = dataRaw
-                  ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
+                  : legacyProfessor || '—';
+                const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+                const dataFmt = dataRaw
+                  ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`)
                       .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                   : '—';
                 const status    = (diario.status || '').toUpperCase();
