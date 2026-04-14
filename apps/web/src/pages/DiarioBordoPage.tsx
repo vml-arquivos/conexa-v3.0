@@ -340,9 +340,10 @@ function getPlanningObservationPreview(planningTitle: string | undefined, observ
   return resumo.length > 180 ? `${resumo.slice(0, 177)}...` : resumo;
 }
 
-function getCriancaNome(crianca?: Crianca) {
+function getCriancaNome(crianca?: Crianca | null) {
   if (!crianca) return 'Criança';
-  return `${crianca.firstName} ${crianca.lastName}`.trim();
+  const nome = `${crianca.firstName ?? ''} ${crianca.lastName ?? ''}`.trim();
+  return nome || 'Criança';
 }
 
 function getPlanningStatusLabel(status?: string) {
@@ -1582,7 +1583,6 @@ export default function DiarioBordoPage() {
             planejamentoObjetivos: planejamentoHoje?.objetivosMatriz ?? null,
             planejamentoAtividade: planejamentoHoje?.activities ?? null,
             planejamentoRecursos: planejamentoHoje?.recursos ?? null,
-            planejamentoTitulo: planejamentoHoje?.title ?? null,
             // Persistir nome da turma para PDF futuro
             turmaNome: turmaNomeAtual || null,
             // Salvar lista de crianças para uso no PDF
@@ -2099,7 +2099,17 @@ export default function DiarioBordoPage() {
                                 presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
                                 ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
                                 climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
-                                rotina: ctx.rotina as Record<string, boolean>,
+                                rotina: (() => {
+                                  const r = ctx.rotina;
+                                  if (!r) return undefined;
+                                  if (Array.isArray(r)) {
+                                    return Object.fromEntries(
+                                      (r as Array<{ momento: string; concluido: boolean }>)
+                                        .map(item => [item.momento, item.concluido])
+                                    );
+                                  }
+                                  return r as Record<string, boolean>;
+                                })(),
                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
                                 criancas: (ctx.criancas as any[])?.length > 0
                                   ? ctx.criancas as any[]
@@ -2107,7 +2117,6 @@ export default function DiarioBordoPage() {
                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
                                   ?? (ctx as any).objetivosMatriz)
                                   || undefined,
-                                planejamentoTitulo: (ctx as any).planejamentoTitulo || undefined,
                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
                                   || (ctx as any).activities || undefined,
                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
@@ -2418,7 +2427,6 @@ export default function DiarioBordoPage() {
                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
                                   ?? (ctx as any).objetivosMatriz)
                                   || undefined,
-                                planejamentoTitulo: (ctx as any).planejamentoTitulo || undefined,
                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
                                   || (ctx as any).activities || undefined,
                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
@@ -2473,10 +2481,11 @@ export default function DiarioBordoPage() {
                   Realize a Chamada Diária antes de guardar o Diário do Dia. As presenças serão importadas automaticamente após a chamada.
                 </p>
                 <button
-                  onClick={() => { if (classroomId) window.location.href = '/app/chamada'; }}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors font-medium"
+                  onClick={() => navigate(`/app/chamada?classroomId=${classroomId}&date=${form.date}`)}
+                  className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors w-fit"
                 >
-                  <Users className="h-3.5 w-3.5" /> Ir para Chamada Diária
+                  <CheckCircle className="h-4 w-4" />
+                  Ir para Chamada Diária
                 </button>
               </div>
             </div>
