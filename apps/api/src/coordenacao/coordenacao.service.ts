@@ -487,16 +487,84 @@ export class CoordenacaoService {
       start.setDate(start.getDate() - 7);
       where.eventDate = { gte: start, lte: end };
     }
-    return this.prisma.diaryEvent.findMany({
+    const eventos = await this.prisma.diaryEvent.findMany({
       where,
       include: {
-        classroom:     { select: { id: true, name: true } },
-        child:         { select: { id: true, firstName: true, lastName: true } },
+        classroom: { select: { id: true, name: true } },
+        child: { select: { id: true, firstName: true, lastName: true } },
         createdByUser: { select: { id: true, firstName: true, lastName: true, email: true } },
+        curriculumEntry: {
+          select: {
+            id: true,
+            campoDeExperiencia: true,
+            objetivoBNCC: true,
+            objetivoBNCCCode: true,
+            objetivoCurriculo: true,
+            intencionalidade: true,
+          },
+        },
+        planning: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            description: true,
+            pedagogicalContent: true,
+          },
+        },
       },
       orderBy: { eventDate: 'desc' },
       take: 200,
     });
+
+    const planningIds = eventos
+      .map((e) => e.planningId)
+      .filter((id): id is string => Boolean(id));
+
+    const conferenciasMap = new Map<string, { status: string; observacao: string | null }>();
+    if (planningIds.length > 0) {
+      try {
+        const conferencias = await this.prisma.planningConferencia.findMany({
+          where: { planningId: { in: planningIds } },
+          select: { planningId: true, status: true, observacao: true, dataConferencia: true },
+          orderBy: { dataConferencia: 'desc' },
+        });
+        for (const c of conferencias) {
+          if (!conferenciasMap.has(c.planningId)) {
+            conferenciasMap.set(c.planningId, {
+              status: c.status,
+              observacao: c.observacao,
+            });
+          }
+        }
+      } catch {
+        // fallback silencioso caso o modelo/tabela não esteja disponível em algum ambiente
+      }
+    }
+
+    const metricasPorTurma = new Map<string, {
+      total: number; publicados: number; comMatriz: number; comPlano: number;
+    }>();
+
+    for (const e of eventos) {
+      const cid = e.classroomId;
+      if (!metricasPorTurma.has(cid)) {
+        metricasPorTurma.set(cid, { total: 0, publicados: 0, comMatriz: 0, comPlano: 0 });
+      }
+      const m = metricasPorTurma.get(cid)!;
+      m.total += 1;
+      if (['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes(e.status)) m.publicados += 1;
+      if (e.curriculumEntryId) m.comMatriz += 1;
+      if (e.planningId) m.comPlano += 1;
+    }
+
+    return {
+      diarios: eventos.map((e) => ({
+        ...e,
+        conferencia: e.planningId ? conferenciasMap.get(e.planningId) ?? null : null,
+      })),
+      metricas: Object.fromEntries(metricasPorTurma),
+    };
   }
 
   // ─── TURMAS COM STATS (aceita unitId override) ─────────────────────────────

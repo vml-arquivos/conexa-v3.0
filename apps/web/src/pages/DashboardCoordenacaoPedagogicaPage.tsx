@@ -259,7 +259,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
-  const [diarios, setDiarios] = useState<Diario[]>([]);
+  const [diarios, setDiarios] = useState<any[]>([]);
+  const [metricasExecucao, setMetricasExecucao] = useState<Record<string, {
+    total: number; publicados: number; comMatriz: number; comPlano: number;
+  }>>({});
   const [abaAtiva, setAbaAtiva] = useState<
     'inicio'|'turmas'|'planejamentos'|'relatorios'|
     'requisicoes'|'diarios'|'observacoes'|'sala'|'cobertura'|'ocorrencias'|'pedagogico'
@@ -426,25 +429,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         }));
       }
       if (diarRes.status === 'fulfilled') {
-        const rawDiarios: any[] = Array.isArray(diarRes.value.data) ? diarRes.value.data : [];
-        setDiarios(rawDiarios.map((d: any) => ({
-          id: d.id,
-          titulo: d.title ?? 'Diário de Bordo',
-          status: d.status ?? 'RASCUNHO',
-          climaEmocional: d.climaEmocional ?? d.aiContext?.climaEmocional ?? null,
-          presencas: d.presencas ?? d.aiContext?.presencas ?? null,
-          ausencias: d.ausencias ?? d.aiContext?.ausencias ?? null,
-          momentoDestaque: d.momentoDestaque ?? d.aiContext?.momentoDestaque ?? null,
-          statusExecucaoPlano: d.aiContext?.statusExecucaoPlano ?? null,
-          camposBNCC: d.aiContext?.planejamentoObjetivos
-            ? (d.aiContext.planejamentoObjetivos as any[]).map((o: any) => o.campoExperiencia).filter(Boolean)
-            : [],
-          data: d.eventDate ? d.eventDate.slice(0, 10) : d.createdAt?.slice(0, 10) ?? '',
-          professorNome: d.createdByUser
-            ? `${d.createdByUser.firstName} ${d.createdByUser.lastName}`.trim()
-            : d.createdBy ?? 'Professor',
-          turmaNome: d.classroom?.name ?? d.classroomId ?? '—',
-        })));
+        const payload = diarRes.value.data;
+        const listaDiarios = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload?.diarios) ? payload.diarios : []);
+        setDiarios(listaDiarios);
+        if (payload?.metricas) setMetricasExecucao(payload.metricas);
       }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
@@ -1342,100 +1332,155 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           </div>
 
           {/* Lista de diários */}
-          {diarios.length === 0 ? (
+          {(diarios as any[]).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
               <ClipboardList className="h-10 w-10 text-gray-200" />
-              <p className="text-sm text-gray-400 font-medium">Nenhum diário registrado neste período.</p>
+              <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {diarios.map((diario: any) => {
-                const legacyTitulo = diario['titulo'];
-                const legacyTurma = diario['turmaNome'];
-                const legacyProfessor = diario['professorNome'];
-                const legacyData = diario['data'];
-                const titulo = diario.title || legacyTitulo || '—';
-                const turma = diario.classroom?.name || legacyTurma || '—';
+            <div className="space-y-3">
+              {(diarios as any[]).map((diario: any) => {
+                const turma = diario.classroom?.name || diario.turmaNome || '—';
                 const professor = diario.createdByUser
                   ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
-                  : legacyProfessor || '—';
-                const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+                  : diario.professorNome || '—';
+                const dataRaw = diario.eventDate || diario.data || diario.createdAt || '';
                 const dataFmt = dataRaw
-                  ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`)
-                      .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
+                    weekday: 'short', day: '2-digit', month: '2-digit',
+                  })
                   : '—';
-                const status    = (diario.status || '').toUpperCase();
-                const ctx       = diario.aiContext && typeof diario.aiContext === 'object'
+                const status = (diario.status || '').toUpperCase();
+                const ctx = diario.aiContext && typeof diario.aiContext === 'object'
                   ? diario.aiContext as any : {};
-                const climaEmocional = diario.climaEmocional || ctx.climaEmocional;
-                const presencas      = diario.presencas ?? ctx.presencas;
-                const momentoDest    = diario.momentoDestaque || ctx.momentoDestaque;
-                const statusExec     = diario.statusExecucaoPlano || ctx.statusExecucaoPlano;
-                const camposBNCC     = (diario.camposBNCC ?? []) as string[];
+                const publicado = ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes(status);
 
-                const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
-                const statusCfg  = statusPubl
-                  ? { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Publicado' }
-                  : { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   label: 'Rascunho'  };
+                const entrada = diario.curriculumEntry;
+                const campo = entrada?.campoDeExperiencia?.replace(/_/g, ' ') ?? null;
+                const bncc = entrada?.objetivoBNCC ?? null;
+                const curricDF = entrada?.objetivoCurriculo ?? null;
+                const intenc = entrada?.intencionalidade ?? null;
+                const codigoBNCC = entrada?.objetivoBNCCCode ?? null;
 
-                const climaEmoji: Record<string, string> = {
-                  OTIMO: '🌟', MUITO_BOM: '🌟', BOM: '😊', REGULAR: '😐', AGITADO: '😬', DIFICIL: '😔',
+                const conferencia = diario.conferencia;
+                const plano = diario.planning;
+                const execStatus = ctx.statusExecucaoPlano || conferencia?.status || null;
+
+                const EXEC_CFG: Record<string, { label: string; bg: string; text: string }> = {
+                  CUMPRIDO: { label: 'Cumprido', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                  FEITO: { label: 'Feito', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                  PARCIAL: { label: 'Parcial', bg: 'bg-amber-50', text: 'text-amber-700' },
+                  NAO_REALIZADO: { label: 'Não realizado', bg: 'bg-red-50', text: 'text-red-700' },
                 };
-                const execLabel: Record<string, { label: string; cor: string }> = {
-                  CUMPRIDO:      { label: 'Cumprido',     cor: 'bg-emerald-100 text-emerald-700' },
-                  PARCIAL:       { label: 'Parcial',      cor: 'bg-amber-100 text-amber-700'    },
-                  NAO_REALIZADO: { label: 'Não realizado', cor: 'bg-red-100 text-red-600'        },
+                const execCfg = execStatus ? (EXEC_CFG[execStatus] ?? null) : null;
+
+                const CLIMA: Record<string, string> = {
+                  OTIMO: 'Ótimo', BOM: 'Bom', REGULAR: 'Regular', AGITADO: 'Agitado', DIFICIL: 'Difícil',
                 };
+
+                const metricasTurma = metricasExecucao[diario.classroomId] ?? null;
 
                 return (
-                  <div key={diario.id}
-                    className={`rounded-2xl border p-3 bg-white ${statusCfg.border} hover:shadow-sm transition-all`}>
-                    <div className="flex items-start justify-between gap-2">
+                  <div
+                    key={diario.id}
+                    className={`rounded-2xl border bg-white overflow-hidden ${
+                      publicado ? 'border-emerald-200' : 'border-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/70">
                       <div className="flex-1 min-w-0">
-                        {/* Badges */}
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
-                            {statusCfg.label}
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+                            publicado
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {publicado ? 'Publicado' : 'Rascunho'}
                           </span>
-                          {climaEmocional && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium">
-                              {climaEmoji[climaEmocional] ?? ''} {climaEmocional}
+                          {execCfg && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCfg.bg} ${execCfg.text}`}>
+                              Execução: {execCfg.label}
                             </span>
                           )}
-                          {statusExec && execLabel[statusExec] && (
-                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execLabel[statusExec].cor}`}>
-                              📋 {execLabel[statusExec].label}
+                          {diario.curriculumEntryId && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              BNCC vinculada
                             </span>
                           )}
                         </div>
-                        {/* Turma e professor */}
-                        <p className="text-sm font-bold text-gray-800 truncate">{turma}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-sm font-bold text-gray-900 truncate">{turma}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
                           Prof. {professor}
-                          {presencas != null && (
-                            <span className="ml-2 text-emerald-600 font-medium">· {presencas} presentes</span>
+                          {diario.presencas != null && (
+                            <span className="ml-2 text-emerald-600 font-medium">· {diario.presencas} presentes</span>
+                          )}
+                          {diario.ausencias != null && (
+                            <span className="ml-2 text-rose-500 font-medium">· {diario.ausencias} ausências</span>
                           )}
                         </p>
-                        {/* Momento de destaque */}
-                        {(momentoDest || titulo !== '—') && (
-                          <p className="text-xs text-gray-500 mt-1.5 italic line-clamp-2">
-                            "{momentoDest || titulo}"
-                          </p>
-                        )}
-                        {camposBNCC.length > 0 && (
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            {camposBNCC.slice(0, 3).map((c: string, i: number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium">
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                      {/* Data */}
-                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">
-                        {dataFmt}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">{dataFmt}</span>
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      {(diario.momentoDestaque || diario.title) && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Registro</p>
+                          <p className="mt-1 text-sm text-gray-700 leading-6">
+                            {diario.momentoDestaque || diario.title}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">BNCC / Currículo</p>
+                          {entrada ? (
+                            <div className="mt-2 space-y-1.5 text-sm text-indigo-900">
+                              {campo && <p><span className="font-semibold">Campo:</span> {campo}</p>}
+                              {codigoBNCC && <p><span className="font-semibold">Código:</span> {codigoBNCC}</p>}
+                              {bncc && <p><span className="font-semibold">Objetivo BNCC:</span> {bncc}</p>}
+                              {curricDF && <p><span className="font-semibold">Currículo:</span> {curricDF}</p>}
+                              {intenc && <p><span className="font-semibold">Intencionalidade:</span> {intenc}</p>}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-indigo-700">Sem vínculo de BNCC neste diário.</p>
+                          )}
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Conferência de execução</p>
+                          {plano ? (
+                            <div className="mt-2 space-y-1.5 text-sm text-emerald-900">
+                              <p><span className="font-semibold">Plano:</span> {plano.title}</p>
+                              <p><span className="font-semibold">Status do plano:</span> {plano.status}</p>
+                              {execCfg && <p><span className="font-semibold">Execução:</span> {execCfg.label}</p>}
+                              {conferencia?.observacao && <p><span className="font-semibold">Observação:</span> {conferencia.observacao}</p>}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-emerald-700">Diário sem planejamento vinculado.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Clima</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{CLIMA[diario.climaEmocional || ctx.climaEmocional] ?? '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Métrica turma</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.publicados}/${metricasTurma.total} publicados` : '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com BNCC</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comMatriz}/${metricasTurma.total}` : '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com plano</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comPlano}/${metricasTurma.total}` : '—'}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
