@@ -129,11 +129,11 @@ function nomeCrianca(
   id: string,
   criancas?: Array<{ id: string; firstName: string; lastName: string }>,
 ): string {
-  if (!id) return '—';
+  if (!id) return '';
   const c = criancas?.find(c => c.id === id);
-  if (!c) return ''; // retorna vazio ao invés de mostrar o ID
+  if (!c) return ''; // nunca exibir IDs criptografados
   const nome = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim();
-  return nome || '—';
+  return nome || '';
 }
 
 function esc(s?: string | null): string {
@@ -295,7 +295,10 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
   // ── Bloco: Observações Individuais ──
   let obsHTML = '';
-  const obs = (d.observacoesIndividuais ?? []).filter(o => o.criancaIds.length > 0);
+  const obs = (d.observacoesIndividuais ?? []).filter(o =>
+    o.criancaIds.length > 0 &&
+    o.criancaIds.some(id => nomeCrianca(id, d.criancas).length > 0)
+  );
   if (obs.length > 0) {
     // Agrupar por grupo
     const grupos: Record<string, DiaryObservacaoIndividual[]> = {};
@@ -311,7 +314,11 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
           <div class="obs-item">
             <div class="obs-comportamento">${esc(item.label)}</div>
             <div class="obs-criancas">
-              ${item.criancaIds.map(id => `<span class="obs-chip">${esc(nomeCrianca(id, d.criancas))}</span>`).join('')}
+              ${item.criancaIds
+                .map(id => nomeCrianca(id, d.criancas))
+                .filter(n => n.length > 0)
+                .map(n => `<span class="obs-chip">${esc(n)}</span>`)
+                .join('')}
             </div>
           </div>`).join('')}
       </div>`).join('');
