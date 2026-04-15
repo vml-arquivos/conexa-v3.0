@@ -503,22 +503,82 @@ export class DiaryEventService {
 
   async uploadMedia(id: string, file: Express.Multer.File, user: JwtPayload): Promise<{ mediaUrls: string[] }> {
     if (!file) throw new BadRequestException('Arquivo obrigatório');
-    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Arquivo muito grande (máx. 5 MB)');
-    const event = await this.prisma.diaryEvent.findUnique({ where: { id } });
-    if (!event) throw new NotFoundException('Evento não encontrado');
-    const isCreator = event.createdBy === user.sub;
-    const isUnitScope = user.unitId && event.unitId === user.unitId;
-    const isCentral = user.roles.some((r) =>
-      r.level === RoleLevel.STAFF_CENTRAL ||
-      r.level === RoleLevel.MANTENEDORA ||
-      r.level === RoleLevel.DEVELOPER
-    );
-    if (!isCreator && !isUnitScope && !isCentral) throw new ForbiddenException('Acesso negado');
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('Arquivo muito grande (máx. 5 MB)');
+    }
+
+    const event = await this.prisma.diaryEvent.findUnique({
+      where: { id },
+      include: {
+        classroom: {
+          select: {
+            id: true,
+            unitId: true,
+            unit: {
+              select: {
+                id: true,
+                mantenedoraId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+
+    const isDeveloper = user.roles.some((role) => role.level === RoleLevel.DEVELOPER);
+    if (!isDeveloper) {
+      const isMantenedora = user.roles.some((role) => role.level === RoleLevel.MANTENEDORA);
+      if (isMantenedora && event.mantenedoraId !== user.mantenedoraId) {
+        throw new ForbiddenException('Acesso negado');
+      }
+
+      const isStaffCentral = user.roles.some((role) => role.level === RoleLevel.STAFF_CENTRAL);
+      if (isStaffCentral) {
+        const staffRole = user.roles.find((role) => role.level === RoleLevel.STAFF_CENTRAL);
+        const scopes = staffRole?.unitScopes ?? [];
+        const hasScopedAccess = scopes.length > 0
+          ? scopes.includes(event.unitId)
+          : Boolean(user.unitId && event.unitId === user.unitId);
+
+        if (!hasScopedAccess || event.mantenedoraId !== user.mantenedoraId) {
+          throw new ForbiddenException('Acesso negado');
+        }
+      }
+
+      const isUnidade = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+      if (isUnidade && event.unitId !== user.unitId) {
+        throw new ForbiddenException('Acesso negado');
+      }
+
+      const isProfessor = user.roles.some((role) => role.level === RoleLevel.PROFESSOR);
+      if (isProfessor) {
+        const isTeacherOfClassroom = await this.prisma.classroomTeacher.findFirst({
+          where: {
+            classroomId: event.classroomId,
+            teacherId: user.sub,
+            isActive: true,
+          },
+        });
+
+        if (!isTeacherOfClassroom) {
+          throw new ForbiddenException('Acesso negado');
+        }
+      }
+    }
+
     const base64 = file.buffer.toString('base64');
     const dataUrl = `data:${file.mimetype};base64,${base64}`;
-    const existing: string[] = Array.isArray(event.mediaUrls) ? (event.mediaUrls as string[]) : [];
+    const existing: string[] = Array.isArray(event.mediaUrls)
+      ? (event.mediaUrls as string[])
+      : [];
     const mediaUrls = [...existing, dataUrl];
+
     await this.prisma.diaryEvent.update({ where: { id }, data: { mediaUrls } });
+
     return { mediaUrls };
   }
 
