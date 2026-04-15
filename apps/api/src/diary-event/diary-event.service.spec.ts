@@ -1,8 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DiaryEventService } from './diary-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
-import { BadRequestException } from '@nestjs/common';
 import { DiaryEventType, PlanningStatus, RoleLevel } from '@prisma/client';
 
 describe('DiaryEventService - Ocorrências', () => {
@@ -28,7 +32,11 @@ describe('DiaryEventService - Ocorrências', () => {
     },
     planning: { findUnique: jest.fn() },
     curriculumMatrixEntry: { findUnique: jest.fn() },
-    diaryEvent: { create: jest.fn().mockResolvedValue({ id: 'event-1' }) },
+    diaryEvent: {
+      create: jest.fn().mockResolvedValue({ id: 'event-1' }),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
     classroomTeacher: { findFirst: jest.fn().mockResolvedValue({ id: 'ct-1' }) },
     enrollment: { findFirst: jest.fn().mockResolvedValue({ classroomId: 'class-1' }) },
   };
@@ -48,9 +56,10 @@ describe('DiaryEventService - Ocorrências', () => {
         { provide: AuditService, useValue: mockAuditService },
       ],
     }).compile();
+
     service = module.get<DiaryEventService>(DiaryEventService);
     jest.clearAllMocks();
-    // Restaurar mocks padrão após clearAllMocks
+
     mockPrismaService.unit.findUnique.mockResolvedValue({ nonSchoolDays: [] });
     mockPrismaService.child.findUnique.mockResolvedValue({
       id: 'child-1',
@@ -65,13 +74,23 @@ describe('DiaryEventService - Ocorrências', () => {
       unitId: 'unit-1',
     });
     mockPrismaService.diaryEvent.create.mockResolvedValue({ id: 'event-1' });
+    mockPrismaService.diaryEvent.findUnique.mockResolvedValue({
+      id: 'event-1',
+      classroomId: 'class-1',
+      unitId: 'unit-1',
+      mantenedoraId: 'mant-1',
+      mediaUrls: ['data:image/png;base64,old'],
+      createdBy: 'user-1',
+      classroom: {
+        id: 'class-1',
+        unitId: 'unit-1',
+        unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
+      },
+    });
+    mockPrismaService.diaryEvent.update.mockResolvedValue({ id: 'event-1' });
     mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
     mockPrismaService.enrollment.findFirst.mockResolvedValue({ classroomId: 'class-1' });
   });
-
-  // FIX P0: O backend atual NÃO exige planningId para ocorrências.
-  // O teste antigo que exigia foi removido pois contradiz o comportamento atual do serviço.
-  // Ocorrências são independentes de planejamento — professor pode registrar sem planejamento ativo.
 
   it('deve criar ocorrência sem planningId (planejamento é opcional para ocorrências)', async () => {
     const dto = {
@@ -84,16 +103,13 @@ describe('DiaryEventService - Ocorrências', () => {
       tags: ['ocorrencia'],
     };
 
-    // Não deve lançar exceção — planning é opcional
     const result = await service.create(dto as any, mockUser);
     expect(result).toBeDefined();
     expect(result.id).toBe('event-1');
-    // Confirma que NÃO buscou planning (não foi fornecido planningId)
     expect(mockPrismaService.planning.findUnique).not.toHaveBeenCalled();
   });
 
   it('deve criar ocorrência com planningId válido em status EM_EXECUCAO', async () => {
-    // CUID válido para passar a sanitização CUID_RE
     const validPlanningId = 'clxxxxxxxxxxxxxxxxxxxxxxxx';
     mockPrismaService.planning.findUnique.mockResolvedValue({
       id: validPlanningId,
@@ -143,5 +159,102 @@ describe('DiaryEventService - Ocorrências', () => {
 
     await expect(service.create(dto as any, mockUser)).rejects.toThrow(BadRequestException);
     await expect(service.create(dto as any, mockUser)).rejects.toThrow(/cancelado/i);
+  });
+
+  describe('uploadMedia', () => {
+    const file = {
+      size: 1024,
+      mimetype: 'image/png',
+      buffer: Buffer.from('img'),
+    } as Express.Multer.File;
+
+    it('deve permitir upload para professor da própria turma', async () => {
+      const professor = {
+        sub: 'teacher-1',
+        mantenedoraId: 'mant-1',
+        roles: [{ level: RoleLevel.PROFESSOR }],
+      } as any;
+
+      mockPrismaService.diaryEvent.findUnique.mockResolvedValue({
+        id: 'event-1',
+        classroomId: 'class-1',
+        unitId: 'unit-1',
+        mantenedoraId: 'mant-1',
+        mediaUrls: ['data:image/png;base64,old'],
+        createdBy: 'other-user',
+        classroom: {
+          id: 'class-1',
+          unitId: 'unit-1',
+          unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
+        },
+      });
+
+      const result = await service.uploadMedia('event-1', file, professor);
+
+      expect(mockPrismaService.classroomTeacher.findFirst).toHaveBeenCalledWith({
+        where: {
+          classroomId: 'class-1',
+          teacherId: 'teacher-1',
+          isActive: true,
+        },
+      });
+      expect(mockPrismaService.diaryEvent.update).toHaveBeenCalledTimes(1);
+      expect(result.mediaUrls).toHaveLength(2);
+    });
+
+    it('deve bloquear upload para professor que não pertence à turma do evento', async () => {
+      const professor = {
+        sub: 'teacher-2',
+        mantenedoraId: 'mant-1',
+        roles: [{ level: RoleLevel.PROFESSOR }],
+      } as any;
+
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue(null);
+      mockPrismaService.diaryEvent.findUnique.mockResolvedValue({
+        id: 'event-1',
+        classroomId: 'class-1',
+        unitId: 'unit-1',
+        mantenedoraId: 'mant-1',
+        mediaUrls: [],
+        createdBy: 'teacher-2',
+        classroom: {
+          id: 'class-1',
+          unitId: 'unit-1',
+          unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
+        },
+      });
+
+      await expect(service.uploadMedia('event-1', file, professor)).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.diaryEvent.update).not.toHaveBeenCalled();
+    });
+
+    it('deve fazer staff central respeitar unitScopes', async () => {
+      const staff = {
+        sub: 'staff-1',
+        unitId: 'unit-1',
+        mantenedoraId: 'mant-1',
+        roles: [{ level: RoleLevel.STAFF_CENTRAL, unitScopes: ['unit-2'] }],
+      } as any;
+
+      await expect(service.uploadMedia('event-1', file, staff)).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.diaryEvent.update).not.toHaveBeenCalled();
+    });
+
+    it('deve bloquear upload de mantenedora fora da própria rede', async () => {
+      const mantenedora = {
+        sub: 'mant-user',
+        mantenedoraId: 'mant-2',
+        roles: [{ level: RoleLevel.MANTENEDORA }],
+      } as any;
+
+      await expect(service.uploadMedia('event-1', file, mantenedora)).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.diaryEvent.update).not.toHaveBeenCalled();
+    });
+
+    it('deve lançar not found quando o evento não existir', async () => {
+      mockPrismaService.diaryEvent.findUnique.mockResolvedValue(null);
+
+      await expect(service.uploadMedia('event-404', file, mockUser)).rejects.toThrow(NotFoundException);
+    });
   });
 });
