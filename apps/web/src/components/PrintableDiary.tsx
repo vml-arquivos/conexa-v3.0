@@ -51,6 +51,8 @@ export interface DiaryPrintData {
   avaliacaoPlanoAula?: string;
   momentoDestaque?: string;
   reflexaoPedagogica?: string;
+  /** Encaminhamentos pedagógicos (campo observations no backend) */
+  encaminhamentos?: string;
 
   // Presença e Rotina
   presencas: number;
@@ -207,7 +209,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
   // ── Bloco: Avaliação da Prática ──
   let avaliacaoHTML = '';
-  const temAvaliacao = d.avaliacaoPlanoAula || d.momentoDestaque || d.reflexaoPedagogica;
+  const temAvaliacao = d.avaliacaoPlanoAula || d.momentoDestaque || d.reflexaoPedagogica || d.encaminhamentos;
   if (temAvaliacao) {
     avaliacaoHTML = `
       <div class="block">
@@ -226,6 +228,11 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
           <div class="section">
             <div class="section-title">Reflexão Pedagógica</div>
             <div class="field-value">${esc(d.reflexaoPedagogica).replace(/\n/g, '<br>')}</div>
+          </div>` : ''}
+        ${d.encaminhamentos ? `
+          <div class="section">
+            <div class="section-title">Encaminhamentos Pedagógicos</div>
+            <div class="field-value">${esc(d.encaminhamentos).replace(/\n/g, '<br>')}</div>
           </div>` : ''}
       </div>`;
   }
