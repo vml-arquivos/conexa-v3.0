@@ -307,6 +307,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [planExpandido, setPlanExpandido] = useState<string|null>(null);
   const [turmaExpandida, setTurmaExpandida] = useState<string | null>(null);
   const [erroPainel, setErroPainel] = useState<string | null>(null);
+  // FIX P4-3: filtros operacionais para a aba de diários da coordenação
+  const [filtroDiarioTurma, setFiltroDiarioTurma] = useState<string>('');
+  const [filtroDiarioStatus, setFiltroDiarioStatus] = useState<string>('TODOS');
+  const [filtroDiarioDataInicio, setFiltroDiarioDataInicio] = useState<string>('');
+  const [filtroDiarioDataFim, setFiltroDiarioDataFim] = useState<string>('');
+  const [filtroDiarioProfessor, setFiltroDiarioProfessor] = useState<string>('');
 
   // FIX P1: recarregar quando unitIdParam mudar (troca de unidade pelo seletor)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1331,15 +1337,103 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             })()}
           </div>
 
+          {/* FIX P4-3: Filtros operacionais por turma, status, data e professor */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtrar diários</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Turma</label>
+                <input
+                  type="text"
+                  placeholder="Buscar turma..."
+                  value={filtroDiarioTurma}
+                  onChange={e => setFiltroDiarioTurma(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select
+                  value={filtroDiarioStatus}
+                  onChange={e => setFiltroDiarioStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                >
+                  <option value="TODOS">Todos</option>
+                  <option value="PUBLICADO">Publicado</option>
+                  <option value="RASCUNHO">Rascunho</option>
+                  <option value="REVISADO">Revisado</option>
+                  <option value="ARQUIVADO">Arquivado</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data início</label>
+                <input
+                  type="date"
+                  value={filtroDiarioDataInicio}
+                  onChange={e => setFiltroDiarioDataInicio(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data fim</label>
+                <input
+                  type="date"
+                  value={filtroDiarioDataFim}
+                  onChange={e => setFiltroDiarioDataFim(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Professor</label>
+                <input
+                  type="text"
+                  placeholder="Buscar professor..."
+                  value={filtroDiarioProfessor}
+                  onChange={e => setFiltroDiarioProfessor(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <button
+                onClick={() => { setFiltroDiarioTurma(''); setFiltroDiarioStatus('TODOS'); setFiltroDiarioDataInicio(''); setFiltroDiarioDataFim(''); setFiltroDiarioProfessor(''); }}
+                className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          </div>
+
           {/* Lista de diários */}
-          {(diarios as any[]).length === 0 ? (
+          {(() => {
+            const diariosFiltrados = (diarios as any[]).filter((d: any) => {
+              const turma = d.classroom?.name || d.turmaNome || '';
+              const professor = d.createdByUser
+                ? `${d.createdByUser.firstName ?? ''} ${d.createdByUser.lastName ?? ''}`.trim()
+                : d.professorNome || '';
+              const dataRaw = (d.eventDate || d.data || d.createdAt || '').substring(0, 10);
+              const status = (d.status || '').toUpperCase();
+              if (filtroDiarioTurma && !turma.toLowerCase().includes(filtroDiarioTurma.toLowerCase())) return false;
+              if (filtroDiarioProfessor && !professor.toLowerCase().includes(filtroDiarioProfessor.toLowerCase())) return false;
+              if (filtroDiarioStatus !== 'TODOS') {
+                const isPublicado = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
+                if (filtroDiarioStatus === 'PUBLICADO' && !isPublicado) return false;
+                if (filtroDiarioStatus === 'RASCUNHO' && status !== 'RASCUNHO') return false;
+                if (filtroDiarioStatus === 'REVISADO' && status !== 'REVISADO') return false;
+                if (filtroDiarioStatus === 'ARQUIVADO' && status !== 'ARQUIVADO') return false;
+              }
+              if (filtroDiarioDataInicio && dataRaw < filtroDiarioDataInicio) return false;
+              if (filtroDiarioDataFim && dataRaw > filtroDiarioDataFim) return false;
+              return true;
+            });
+            return diariosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
               <ClipboardList className="h-10 w-10 text-gray-200" />
-              <p className="text-sm text-gray-400">Nenhum diário registrado neste período.</p>
+              <p className="text-sm text-gray-400">{diarios.length === 0 ? 'Nenhum diário registrado neste período.' : 'Nenhum diário encontrado com os filtros aplicados.'}</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {(diarios as any[]).map((diario: any) => {
+              {diariosFiltrados.map((diario: any) => {
                 const turma = diario.classroom?.name || diario.turmaNome || '—';
                 const professor = diario.createdByUser
                   ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
@@ -1486,7 +1580,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 );
               })}
             </div>
-          )}
+          );
+          })()
+          }
         </div>
       )}
       {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}

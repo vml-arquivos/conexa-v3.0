@@ -1268,6 +1268,8 @@ export default function DiarioBordoPage() {
           climaEmocional: item.climaEmocional ?? ctx.climaEmocional ?? '',
           momentoDestaque: item.momentoDestaque ?? ctx.momentoDestaque ?? item.description ?? '',
           reflexaoPedagogica: item.reflexaoPedagogica ?? ctx.reflexaoPedagogica ?? item.developmentNotes ?? '',
+          // FIX P4-2: mapear observations (campo do backend) para encaminhamentos (campo do frontend)
+          encaminhamentos: item.encaminhamentos ?? ctx.encaminhamentos ?? item.observations ?? '',
           rotina: item.rotina ?? ctx.rotina ?? [],
           microgestos: item.microgestos ?? ctx.microgestos ?? [],
         };
@@ -1618,6 +1620,8 @@ export default function DiarioBordoPage() {
         avaliacaoPlanoAula: form.avaliacaoPlanoAula || undefined,
         momentoDestaque: form.momentoDestaque || undefined,
         reflexaoPedagogica: form.reflexaoPedagogica || undefined,
+        // FIX P4-2: incluir encaminhamentos no payload do PDF (campo observations no backend)
+        encaminhamentos: form.encaminhamentos || undefined,
         presencas: presencasReais,
         ausencias: ausenciasReais,
         totalAlunos: criancas.length || undefined,
@@ -1708,6 +1712,14 @@ export default function DiarioBordoPage() {
       .filter((item): item is string => Boolean(item && item.trim())),
     ...(planejamentoHoje?.intencionalidadeGeral?.trim() ? [planejamentoHoje.intencionalidadeGeral.trim()] : []),
   ]));
+
+  // FIX P4-1: Detectar se já existe diário PUBLICADO para a data do formulário.
+  // Quando verdadeiro, o formulário de novo diário deve ocultar as ações de rascunho/guardar
+  // e exibir apenas o modo leitura/edição segura, evitando duplicação ou sobrescrita acidental.
+  const diarioPublicadoParaData = diarios.find(d => {
+    const dataD = (d.date || d.createdAt || '').substring(0, 10);
+    return dataD === form.date && ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((d.status || '').toUpperCase());
+  }) ?? null;
 
   return (
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
@@ -2095,42 +2107,44 @@ export default function DiarioBordoPage() {
                                 execucaoPlanejamento: ctx.execucaoPlanejamento,
                                 avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
                                 momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque,
-                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica,
-                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
-                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
-                                rotina: (() => {
-                                  const r = ctx.rotina;
-                                  if (!r) return undefined;
-                                  if (Array.isArray(r)) {
-                                    return Object.fromEntries(
-                                      (r as Array<{ momento: string; concluido: boolean }>)
-                                        .map(item => [item.momento, item.concluido])
-                                    );
-                                  }
-                                  return r as Record<string, boolean>;
-                                })(),
-                                observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: (ctx.criancas as any[])?.length > 0
-                                  ? ctx.criancas as any[]
-                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
-                                planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
-                                  ?? (ctx as any).objetivosMatriz)
-                                  || undefined,
-                                planejamentoAtividade: (ctx as any).planejamentoAtividade
-                                  || (ctx as any).activities || undefined,
-                                planejamentoRecursos: (ctx as any).planejamentoRecursos
-                                  || (ctx as any).recursos || undefined,
-                              });
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
-                          >
-                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
+                                 reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                 // FIX P4-2: incluir encaminhamentos no PDF do painel lateral
+                                 encaminhamentos: (painelDiario as any).encaminhamentos || ctx.encaminhamentos || (painelDiario as any).observations || undefined,
+                                 presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
+                                 ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
+                                 climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
+                                 rotina: (() => {
+                                   const r = ctx.rotina;
+                                   if (!r) return undefined;
+                                   if (Array.isArray(r)) {
+                                     return Object.fromEntries(
+                                       (r as Array<{ momento: string; concluido: boolean }>)
+                                         .map(item => [item.momento, item.concluido])
+                                     );
+                                   }
+                                   return r as Record<string, boolean>;
+                                 })(),
+                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                 criancas: (ctx.criancas as any[])?.length > 0
+                                   ? ctx.criancas as any[]
+                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                   ?? (ctx as any).objetivosMatriz)
+                                   || undefined,
+                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                   || (ctx as any).activities || undefined,
+                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                   || (ctx as any).recursos || undefined,
+                               });
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                           >
+                             <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                           </button>
+                         </div>
+                       </div>
+                     </div>
+                   ) : (
                     <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/40 text-gray-400 gap-3">
                       <Calendar className="h-10 w-10 text-gray-300" />
                       <div className="text-center">
@@ -2405,37 +2419,39 @@ export default function DiarioBordoPage() {
                                 execucaoPlanejamento: ctx.execucaoPlanejamento,
                                 avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
                                 momentoDestaque: diario.momentoDestaque || ctx.momentoDestaque,
-                                reflexaoPedagogica: diario.reflexaoPedagogica || ctx.reflexaoPedagogica,
-                                presencas: diario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
-                                climaEmocional: diario.climaEmocional || ctx.climaEmocional,
-                                rotina: (() => {
-                                  const r = ctx.rotina;
-                                  if (!r) return undefined;
-                                  // Se já é Record<string,boolean> (novo formato)
-                                  if (!Array.isArray(r)) return r as Record<string, boolean>;
-                                  // Se é RotinaItem[] (formato antigo: {momento, concluido})
-                                  return (r as any[]).reduce((acc: Record<string, boolean>, item: any) => {
-                                    if (item?.momento) acc[item.momento] = Boolean(item.concluido);
-                                    return acc;
-                                  }, {});
-                                })(),
-                                observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: (ctx.criancas as any[])?.length > 0
-                                  ? ctx.criancas as any[]
-                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
-                                planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
-                                  ?? (ctx as any).objetivosMatriz)
-                                  || undefined,
-                                planejamentoAtividade: (ctx as any).planejamentoAtividade
-                                  || (ctx as any).activities || undefined,
-                                planejamentoRecursos: (ctx as any).planejamentoRecursos
-                                  || (ctx as any).recursos || undefined,
-                              });
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
-                          >
-                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                                 reflexaoPedagogica: diario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                 // FIX P4-2: incluir encaminhamentos no PDF da lista histórica
+                                 encaminhamentos: diario.encaminhamentos || ctx.encaminhamentos || (diario as any).observations || undefined,
+                                 presencas: diario.presencas ?? ctx.presencas ?? 0,
+                                 ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
+                                 climaEmocional: diario.climaEmocional || ctx.climaEmocional,
+                                 rotina: (() => {
+                                   const r = ctx.rotina;
+                                   if (!r) return undefined;
+                                   // Se já é Record<string,boolean> (novo formato)
+                                   if (!Array.isArray(r)) return r as Record<string, boolean>;
+                                   // Se é RotinaItem[] (formato antigo: {momento, concluido})
+                                   return (r as any[]).reduce((acc: Record<string, boolean>, item: any) => {
+                                     if (item?.momento) acc[item.momento] = Boolean(item.concluido);
+                                     return acc;
+                                   }, {});
+                                 })(),
+                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                 criancas: (ctx.criancas as any[])?.length > 0
+                                   ? ctx.criancas as any[]
+                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                   ?? (ctx as any).objetivosMatriz)
+                                   || undefined,
+                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                   || (ctx as any).activities || undefined,
+                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                   || (ctx as any).recursos || undefined,
+                               });
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                           >
+                             <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
                           </button>
                         </div>
                       </div>
@@ -3331,16 +3347,27 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
-              <Save className="mr-2 h-4 w-4" /> Salvar rascunho
-            </Button>
-            <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
-              {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Guardar Diário do Dia
-            </Button>
-            <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
-          </div>
+          {/* FIX P4-1: Quando o diário da data já está PUBLICADO, ocultar ações incompatíveis */}
+          {diarioPublicadoParaData ? (
+            <div className="flex flex-col gap-3 sm:flex-row items-center p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-emerald-800">Diário já publicado para esta data</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Para editar, use o botão ✏️ Editar no painel do diário na aba Meus Diários.</p>
+              </div>
+              <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1 border-emerald-300 text-emerald-800 hover:bg-emerald-100">Ver diários</Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
+                <Save className="mr-2 h-4 w-4" /> Salvar rascunho
+              </Button>
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
+                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Guardar Diário do Dia
+              </Button>
+              <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
+            </div>
+          )}
         </div>
       )}
 
