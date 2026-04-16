@@ -646,6 +646,8 @@ export default function DiarioBordoPage() {
   const [calAno, setCalAno] = useState<number>(() => new Date().getFullYear());
   // Painel lateral: diário selecionado ao clicar em dia com diário
   const [painelDiario, setPainelDiario] = useState<DiaryEntry | null>(null);
+  // PR 140: ID do diário existente sendo editado (null = novo registro)
+  const [diarioEditandoId, setDiarioEditandoId] = useState<string | null>(null);
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -1535,7 +1537,8 @@ export default function DiarioBordoPage() {
         saved.unshift(localEntry);
         localStorage.setItem('diarios_bordo', JSON.stringify(saved.slice(0, 100)));
       } else {
-        await http.post('/diary-events', {
+        // PR 140: payload compartilhado entre POST (novo) e PATCH (atualização)
+        const diarioPayload = {
           type: 'ATIVIDADE_PEDAGOGICA',
           title: form.momentoDestaque.substring(0, 100) || 'Diário de Bordo',
           description: form.reflexaoPedagogica || form.momentoDestaque || 'Diário de Bordo',
@@ -1594,7 +1597,13 @@ export default function DiarioBordoPage() {
               lastName: c.lastName,
             })),
           },
-        });
+        };
+        // PR 140: PATCH quando editando diário existente, POST quando criando novo
+        if (diarioEditandoId) {
+          await http.patch(`/diary-events/${diarioEditandoId}`, diarioPayload);
+        } else {
+          await http.post('/diary-events', diarioPayload);
+        }
       }
       toast.success('Diário de Bordo salvo! Abrindo versão para impressão...');
       // Gerar PDF imediatamente após salvar
@@ -1639,6 +1648,8 @@ export default function DiarioBordoPage() {
       setForm(getInitialDiaryForm(dateFromQuery));
       setMicrogestoForm({ tipos: ['ESCUTA'], descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
       setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
+      // PR 140: Limpar o ID de edição após salvar com sucesso
+      setDiarioEditandoId(null);
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
@@ -1773,6 +1784,8 @@ export default function DiarioBordoPage() {
               setAba('lista');
             } else {
               setPainelDiario(null);
+              // PR 140: Garantir que não há ID residual de edição ao criar novo diário
+              setDiarioEditandoId(null);
               setAba('novo');
             }
           }},
@@ -1822,6 +1835,8 @@ export default function DiarioBordoPage() {
             // Dia SEM diário (passado/hoje): navegar para formulário de criação
             setPainelDiario(null);
             setForm(f => ({ ...f, date: data }));
+            // PR 140: Garantir que não há ID residual de edição ao criar novo diário
+            setDiarioEditandoId(null);
             setAba('novo');
           }
         }
@@ -2066,33 +2081,35 @@ export default function DiarioBordoPage() {
 
                         {/* Botões: Editar e Imprimir */}
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                          <button
-                            onClick={() => {
-                              // Editar: carregar os dados do diário no formulário
-                              const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object'
-                                ? painelDiario.aiContext as any : {};
-                              setForm((f: any) => ({
-                                ...f,
-                                date: (painelDiario.date || painelDiario.createdAt || '').substring(0, 10) || f.date,
-                                momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque || '',
-                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
-                                encaminhamentos: painelDiario.encaminhamentos || ctx.encaminhamentos || '',
-                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional || '',
-                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
-                                avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
-                                statusExecucaoPlano: ctx.statusExecucaoPlano || '',
-                                execucaoPlanejamento: ctx.execucaoPlanejamento || '',
-                                observacoesIndividuais: ctx.observacoesIndividuais || [],
-                                microgestos: painelDiario.microgestos || ctx.microgestos || [],
-                              }));
-                              setPainelDiario(null);
-                              setAba('novo');
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
-                          >
-                            ✏️ Editar
-                          </button>
+                           <button
+                             onClick={() => {
+                               // PR 140: Editar diário existente — carregar dados e registrar ID para PATCH
+                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object'
+                                 ? painelDiario.aiContext as any : {};
+                               setForm((f: any) => ({
+                                 ...f,
+                                 date: (painelDiario.date || painelDiario.createdAt || '').substring(0, 10) || f.date,
+                                 momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque || '',
+                                 reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
+                                 encaminhamentos: painelDiario.encaminhamentos || ctx.encaminhamentos || '',
+                                 climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional || '',
+                                 presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
+                                 ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
+                                 avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
+                                 statusExecucaoPlano: ctx.statusExecucaoPlano || '',
+                                 execucaoPlanejamento: ctx.execucaoPlanejamento || '',
+                                 observacoesIndividuais: ctx.observacoesIndividuais || [],
+                                 microgestos: painelDiario.microgestos || ctx.microgestos || [],
+                               }));
+                               // PR 140: Registrar o ID do diário sendo editado
+                               setDiarioEditandoId(painelDiario.id);
+                               setPainelDiario(null);
+                               setAba('novo');
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+                           >
+                             ✏️ Editar
+                           </button>
                           <button
                             onClick={() => {
                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
@@ -3347,16 +3364,40 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* FIX P4-1: Quando o diário da data já está PUBLICADO, ocultar ações incompatíveis */}
-          {diarioPublicadoParaData ? (
+          {/* PR 140: Bloco de ações do formulário com 3 cenários:
+               1. Modo edição explícita (diarioEditandoId preenchido): botão Único de Atualizar Diário
+               2. Diário publicado para a data sem modo edição: aviso + redirect para lista
+               3. Novo diário (sem publicado na data): botões normais de rascunho e guardar */}
+          {diarioEditandoId ? (
+            // Modo edição explícita: exibe botão de atualização e cancelar
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                onClick={salvarDiario}
+                disabled={saving}
+                className="sm:flex-[1.4] bg-amber-600 hover:bg-amber-700"
+              >
+                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Atualizar Diário
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => { setDiarioEditandoId(null); setAba('lista'); }}
+                className="sm:flex-1"
+              >
+                Cancelar
+              </Button>
+            </div>
+          ) : diarioPublicadoParaData ? (
+            // Diário já publicado para esta data sem modo edição: bloquear ações indevidas
             <div className="flex flex-col gap-3 sm:flex-row items-center p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-emerald-800">Diário já publicado para esta data</p>
-                <p className="text-xs text-emerald-600 mt-0.5">Para editar, use o botão ✏️ Editar no painel do diário na aba Meus Diários.</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Para editar, selecione o dia no calendário e use o botão ✏️ Editar no painel lateral.</p>
               </div>
               <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1 border-emerald-300 text-emerald-800 hover:bg-emerald-100">Ver diários</Button>
             </div>
           ) : (
+            // Novo diário: exibe botões normais de rascunho e guardar
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
                 <Save className="mr-2 h-4 w-4" /> Salvar rascunho
