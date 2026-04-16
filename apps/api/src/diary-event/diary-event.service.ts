@@ -398,6 +398,13 @@ export class DiaryEventService {
         ...(updateDto.tags && { tags: updateDto.tags }),
         ...(updateDto.aiContext && { aiContext: updateDto.aiContext }),
         ...(updateDto.mediaUrls && { mediaUrls: updateDto.mediaUrls }),
+        // PR 141: campos críticos do diário oficial ausentes no PATCH anterior
+        ...(updateDto.observations !== undefined && { observations: updateDto.observations }),
+        ...(updateDto.developmentNotes !== undefined && { developmentNotes: updateDto.developmentNotes }),
+        ...(updateDto.behaviorNotes !== undefined && { behaviorNotes: updateDto.behaviorNotes }),
+        ...(updateDto.presencas !== undefined && { presencas: updateDto.presencas }),
+        ...(updateDto.ausencias !== undefined && { ausencias: updateDto.ausencias }),
+        ...(updateDto.status && { status: updateDto.status }),
       },
       include: {
         child: { select: { id: true, firstName: true, lastName: true } },

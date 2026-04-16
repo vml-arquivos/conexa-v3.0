@@ -574,6 +574,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     { id: 'planejamentos', label: 'Planejamentos',  icon: <BookOpen className="h-4 w-4" />,
       badge: dashboard?.planejamentosParaRevisar },
     { id: 'relatorios',    label: 'Relatórios',     icon: <TrendingUp className="h-4 w-4" /> },
+    // PR 141: aba de ocorrências para a coordenação pedagógica
+    { id: 'ocorrencias',   label: 'Ocorrências',    icon: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
@@ -1665,6 +1667,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* PR 141: ABA OCORRÊNCIAS — painel de ocorrências da unidade para a coordenação pedagógica */}
+      {abaAtiva === 'ocorrencias' && (
+        <OcorrenciasPanel
+          titulo="Ocorrências da Unidade"
+          unitId={unitIdParam ?? user?.unitId ?? undefined}
+        />
       )}
     </PageShell>
   );

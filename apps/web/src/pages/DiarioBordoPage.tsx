@@ -646,6 +646,8 @@ export default function DiarioBordoPage() {
   const [calAno, setCalAno] = useState<number>(() => new Date().getFullYear());
   // Painel lateral: diário selecionado ao clicar em dia com diário
   const [painelDiario, setPainelDiario] = useState<DiaryEntry | null>(null);
+  // PR 141: ID do diário sendo editado — quando preenchido, salvarDiario usa PATCH em vez de POST
+  const [diarioEditandoId, setDiarioEditandoId] = useState<string | null>(null);
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -1535,27 +1537,23 @@ export default function DiarioBordoPage() {
         saved.unshift(localEntry);
         localStorage.setItem('diarios_bordo', JSON.stringify(saved.slice(0, 100)));
       } else {
-        await http.post('/diary-events', {
+        // PR 141: payload compartilhado entre POST (novo) e PATCH (edição)
+        const diarioPayload = {
           type: 'ATIVIDADE_PEDAGOGICA',
           title: form.momentoDestaque.substring(0, 100) || 'Diário de Bordo',
           description: form.reflexaoPedagogica || form.momentoDestaque || 'Diário de Bordo',
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
-          // PR 2: sinaliza ao backend que este save é uma publicação
           status: 'PUBLICADO',
-          // FIX: planningId undefined (não null) para evitar falha de validação CUID no DTO
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
           microgestos: form.microgestos,
           tags: [form.climaEmocional],
-          // BUG B FIX: Enviar presencas/ausencias como campos raiz do DTO
-          // O service usa createDto.presencas ?? 0 (campo raiz), não aiContext.presencas
           presencas: presencasReais,
           ausencias: ausenciasReais,
           aiContext: {
-            // BUG B FIX: Persistir totais exatos da chamada no aiContext (campo JSONB)
             presencas: presencasReais,
             ausencias: ausenciasReais,
             climaEmocional: form.climaEmocional,
@@ -1564,7 +1562,6 @@ export default function DiarioBordoPage() {
             reflexaoPedagogica: form.reflexaoPedagogica,
             rotina: form.rotina,
             criancasPresentes: form.criancasPresentes,
-            // BUG C FIX: Registrar execução do planejamento no diário
             planejamentoId: planejamentoHoje?.id ?? null,
             planejamentoTitulo: planejamentoHoje?.title ?? null,
             execucaoPlanejamento: form.execucaoPlanejamento,
@@ -1581,20 +1578,23 @@ export default function DiarioBordoPage() {
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
             observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
-            // Persistir dados do planejamento para PDF futuro
             planejamentoObjetivos: planejamentoHoje?.objetivosMatriz ?? null,
             planejamentoAtividade: planejamentoHoje?.activities ?? null,
             planejamentoRecursos: planejamentoHoje?.recursos ?? null,
-            // Persistir nome da turma para PDF futuro
             turmaNome: turmaNomeAtual || null,
-            // Salvar lista de crianças para uso no PDF
             criancas: criancas.map(c => ({
               id: c.id,
               firstName: c.firstName,
               lastName: c.lastName,
             })),
           },
-        });
+        };
+        // PR 141: se há um ID de diário sendo editado, usar PATCH; caso contrário, POST
+        if (diarioEditandoId) {
+          await http.patch(`/diary-events/${diarioEditandoId}`, diarioPayload);
+        } else {
+          await http.post('/diary-events', diarioPayload);
+        }
       }
       toast.success('Diário de Bordo salvo! Abrindo versão para impressão...');
       // Gerar PDF imediatamente após salvar
@@ -1639,6 +1639,8 @@ export default function DiarioBordoPage() {
       setForm(getInitialDiaryForm(dateFromQuery));
       setMicrogestoForm({ tipos: ['ESCUTA'], descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
       setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
+      // PR 141: limpar o ID de edição após salvar com sucesso
+      setDiarioEditandoId(null);
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
@@ -1773,6 +1775,8 @@ export default function DiarioBordoPage() {
               setAba('lista');
             } else {
               setPainelDiario(null);
+              // PR 141: garantir que não há ID de edição residual ao criar novo
+              setDiarioEditandoId(null);
               setAba('novo');
             }
           }},
@@ -1821,6 +1825,8 @@ export default function DiarioBordoPage() {
           } else {
             // Dia SEM diário (passado/hoje): navegar para formulário de criação
             setPainelDiario(null);
+            // PR 141: garantir que não há ID de edição residual ao criar novo
+            setDiarioEditandoId(null);
             setForm(f => ({ ...f, date: data }));
             setAba('novo');
           }
@@ -2086,12 +2092,14 @@ export default function DiarioBordoPage() {
                                 observacoesIndividuais: ctx.observacoesIndividuais || [],
                                 microgestos: painelDiario.microgestos || ctx.microgestos || [],
                               }));
-                              setPainelDiario(null);
-                              setAba('novo');
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
-                          >
-                            ✏️ Editar
+                               // PR 141: registrar o ID do diário sendo editado para usar PATCH
+                               setDiarioEditandoId(painelDiario.id);
+                               setPainelDiario(null);
+                               setAba('novo');
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+                           >
+                             ✏️ Editar
                           </button>
                           <button
                             onClick={() => {
@@ -3347,8 +3355,20 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          {/* FIX P4-1: Quando o diário da data já está PUBLICADO, ocultar ações incompatíveis */}
-          {diarioPublicadoParaData ? (
+          {/* PR 141: 3 modos de ação:
+              1) Editando diário existente (diarioEditandoId preenchido) → só Atualizar + Cancelar
+              2) Diário publicado para a data (sem ID de edição) → banner bloqueio
+              3) Novo diário (nenhum dos anteriores) → Rascunho + Guardar + Cancelar
+          */}
+          {diarioEditandoId ? (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
+                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Atualizar Diário
+              </Button>
+              <Button variant="outline" onClick={() => { setDiarioEditandoId(null); setAba('lista'); }} className="sm:flex-1">Cancelar</Button>
+            </div>
+          ) : diarioPublicadoParaData ? (
             <div className="flex flex-col gap-3 sm:flex-row items-center p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
               <div className="flex-1">
                 <p className="text-sm font-semibold text-emerald-800">Diário já publicado para esta data</p>
