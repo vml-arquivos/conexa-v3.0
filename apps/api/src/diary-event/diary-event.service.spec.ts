@@ -35,6 +35,8 @@ describe('DiaryEventService - Ocorrências', () => {
     diaryEvent: {
       create: jest.fn().mockResolvedValue({ id: 'event-1' }),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn(),
     },
     classroomTeacher: { findFirst: jest.fn().mockResolvedValue({ id: 'ct-1' }) },
@@ -87,6 +89,19 @@ describe('DiaryEventService - Ocorrências', () => {
         unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
       },
     });
+    mockPrismaService.diaryEvent.findFirst.mockResolvedValue({
+      id: 'event-1',
+      classroomId: 'class-1',
+      unitId: 'unit-1',
+      mantenedoraId: 'mant-1',
+      createdBy: 'user-1',
+      eventDate: new Date('2026-04-13T12:00:00.000Z'),
+      classroom: {
+        id: 'class-1',
+        unitId: 'unit-1',
+      },
+    });
+    mockPrismaService.diaryEvent.findMany.mockResolvedValue([]);
     mockPrismaService.diaryEvent.update.mockResolvedValue({ id: 'event-1' });
     mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
     mockPrismaService.enrollment.findFirst.mockResolvedValue({ classroomId: 'class-1' });
@@ -255,6 +270,48 @@ describe('DiaryEventService - Ocorrências', () => {
       mockPrismaService.diaryEvent.findUnique.mockResolvedValue(null);
 
       await expect(service.uploadMedia('event-404', file, mockUser)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('filtros pedagógicos e update de data', () => {
+    it('deve ocultar sábado/domingo em findAll quando pedagogicalOnly=true no fluxo ATIVIDADE_PEDAGOGICA', async () => {
+      mockPrismaService.diaryEvent.findMany.mockResolvedValue([
+        { id: 'dom-1', eventDate: new Date('2026-04-12T12:00:00.000Z') }, // domingo
+        { id: 'seg-1', eventDate: new Date('2026-04-13T12:00:00.000Z') }, // segunda
+      ]);
+
+      const result = await service.findAll(
+        { type: DiaryEventType.ATIVIDADE_PEDAGOGICA, pedagogicalOnly: 'true' } as any,
+        mockUser,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('seg-1');
+    });
+
+    it('não deve filtrar fins de semana quando pedagogicalOnly não é enviado', async () => {
+      mockPrismaService.diaryEvent.findMany.mockResolvedValue([
+        { id: 'dom-1', eventDate: new Date('2026-04-12T12:00:00.000Z') },
+        { id: 'seg-1', eventDate: new Date('2026-04-13T12:00:00.000Z') },
+      ]);
+
+      const result = await service.findAll(
+        { type: DiaryEventType.ATIVIDADE_PEDAGOGICA } as any,
+        mockUser,
+      );
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('deve bloquear PATCH com eventDate em domingo', async () => {
+      await expect(
+        service.update(
+          'event-1',
+          { eventDate: '2026-04-12T12:00:00.000Z' } as any,
+          mockUser,
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockPrismaService.diaryEvent.update).not.toHaveBeenCalled();
     });
   });
 });
