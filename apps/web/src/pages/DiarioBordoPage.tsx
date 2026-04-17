@@ -56,6 +56,14 @@ interface DiaryEntry {
   aiContext?: Record<string, any> | null;
 }
 
+function getDiaryEntryDate(diary: Pick<DiaryEntry, 'date' | 'createdAt'>) {
+  return (diary.date || diary.createdAt || '').substring(0, 10);
+}
+
+function isPublishedDiaryStatus(status?: string | null) {
+  return ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((status || '').toUpperCase());
+}
+
 interface Microgesto {
   id: string;
   tipo: string;
@@ -304,6 +312,40 @@ function getInitialDiaryForm(dateFromQuery?: string) {
     oQueNaoFuncionou: '',
     avaliacaoPlanoAula: '',
     observacoesIndividuais: [] as ObsIndividualDiario[],
+  };
+}
+
+function getDiaryFormFromEntry(entry: DiaryEntry) {
+  const ctx = entry.aiContext && typeof entry.aiContext === 'object' ? entry.aiContext as Record<string, any> : {};
+  const date = getDiaryEntryDate(entry) || getPedagogicalToday();
+
+  return {
+    ...getInitialDiaryForm(date),
+    date,
+    acolhidaInicial: ctx.acolhidaInicial || '',
+    climaEmocional: entry.climaEmocional || ctx.climaEmocional || 'BOM',
+    momentoDestaque: entry.momentoDestaque || ctx.momentoDestaque || '',
+    reflexaoPedagogica: entry.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
+    encaminhamentos: entry.encaminhamentos || ctx.encaminhamentos || '',
+    presencas: entry.presencas ?? ctx.presencas ?? 0,
+    ausencias: entry.ausencias ?? ctx.ausencias ?? 0,
+    rotina: Array.isArray(ctx.rotina) && ctx.rotina.length > 0 ? ctx.rotina : ROTINA_PADRAO.map(r => ({ ...r })),
+    microgestos: Array.isArray(entry.microgestos) && entry.microgestos.length > 0 ? entry.microgestos : (Array.isArray(ctx.microgestos) ? ctx.microgestos : []),
+    criancasPresentes: Array.isArray(ctx.criancasPresentes) ? ctx.criancasPresentes : [],
+    execucaoPlanejamento: ctx.execucaoPlanejamento || '',
+    reacaoCriancas: ctx.reacaoCriancas || '',
+    fatoresInfluenciaram: Array.isArray(ctx.fatoresInfluenciaram) ? ctx.fatoresInfluenciaram : [],
+    avaliacoesObjetivos: Array.isArray(ctx.avaliacoesObjetivos) ? ctx.avaliacoesObjetivos : [],
+    adaptacoesRealizadas: ctx.adaptacoesRealizadas || '',
+    ocorrencias: ctx.ocorrencias || '',
+    statusExecucaoPlano: ctx.statusExecucaoPlano || '',
+    materiaisUtilizados: ctx.materiaisUtilizados || '',
+    textoComplementarProfessor: ctx.textoComplementarProfessor || '',
+    objetivoAtingido: ctx.objetivoAtingido || '',
+    oQueFuncionou: ctx.oQueFuncionou || '',
+    oQueNaoFuncionou: ctx.oQueNaoFuncionou || '',
+    avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
+    observacoesIndividuais: Array.isArray(ctx.observacoesIndividuais) ? ctx.observacoesIndividuais : [],
   };
 }
 
@@ -1719,9 +1761,14 @@ export default function DiarioBordoPage() {
   // Quando verdadeiro, o formulário de novo diário deve ocultar as ações de rascunho/guardar
   // e exibir apenas o modo leitura/edição segura, evitando duplicação ou sobrescrita acidental.
   const diarioPublicadoParaData = diarios.find(d => {
-    const dataD = (d.date || d.createdAt || '').substring(0, 10);
-    return dataD === form.date && ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((d.status || '').toUpperCase());
+    return getDiaryEntryDate(d) === form.date && isPublishedDiaryStatus(d.status);
   }) ?? null;
+
+  useEffect(() => {
+    if (aba !== 'novo' || diarioEditandoId || !diarioPublicadoParaData) return;
+    setPainelDiario(diarioPublicadoParaData);
+    setAba('lista');
+  }, [aba, diarioEditandoId, diarioPublicadoParaData]);
 
   return (
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
@@ -1926,7 +1973,11 @@ export default function DiarioBordoPage() {
                     )}
                   </div>
                 </div>
-                <Button onClick={() => setAba('novo')} size="sm" className="flex items-center gap-2">
+                <Button onClick={() => {
+                  setDiarioEditandoId(null);
+                  setForm(getInitialDiaryForm(getPedagogicalToday()));
+                  setAba('novo');
+                }} size="sm" className="flex items-center gap-2">
                   <Plus className="h-4 w-4" /> Novo Diário
                 </Button>
               </div>
@@ -2075,27 +2126,11 @@ export default function DiarioBordoPage() {
                           <button
                             onClick={() => {
                               // Editar: carregar os dados do diário no formulário
-                              const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object'
-                                ? painelDiario.aiContext as any : {};
-                              setForm((f: any) => ({
-                                ...f,
-                                date: (painelDiario.date || painelDiario.createdAt || '').substring(0, 10) || f.date,
-                                momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque || '',
-                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
-                                encaminhamentos: painelDiario.encaminhamentos || ctx.encaminhamentos || '',
-                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional || '',
-                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
-                                avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
-                                statusExecucaoPlano: ctx.statusExecucaoPlano || '',
-                                execucaoPlanejamento: ctx.execucaoPlanejamento || '',
-                                observacoesIndividuais: ctx.observacoesIndividuais || [],
-                                microgestos: painelDiario.microgestos || ctx.microgestos || [],
-                              }));
-                               // PR 141: registrar o ID do diário sendo editado para usar PATCH
-                               setDiarioEditandoId(painelDiario.id);
-                               setPainelDiario(null);
-                               setAba('novo');
+                              setForm(getDiaryFormFromEntry(painelDiario));
+                              // PR 143: preservar o mesmo registro ao entrar em edição segura
+                              setDiarioEditandoId(painelDiario.id);
+                              setPainelDiario(null);
+                              setAba('novo');
                              }}
                              className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
                            >
