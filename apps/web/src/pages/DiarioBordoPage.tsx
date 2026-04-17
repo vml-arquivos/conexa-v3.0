@@ -1334,13 +1334,25 @@ export default function DiarioBordoPage() {
   async function loadDiarios() {
     setLoading(true);
     try {
-      const res = await http.get('/diary-events?limit=50&type=ATIVIDADE_PEDAGOGICA');
+      const res = await http.get('/diary-events', {
+        params: {
+          limit: '50',
+          type: 'ATIVIDADE_PEDAGOGICA',
+          pedagogicalOnly: 'true',
+        },
+      });
       const d = res.data;
       const raw: any[] = Array.isArray(d) ? d : d?.data ?? [];
+      const semFimDeSemana = raw.filter((item: any) => {
+        const dataStr = (item.eventDate || item.date || item.createdAt || '').substring(0, 10);
+        if (!dataStr) return false;
+        const diaSemana = new Date(`${dataStr}T12:00:00`).getDay();
+        return diaSemana !== 0 && diaSemana !== 6;
+      });
       // BUG B FIX: O modelo DiaryEvent não possui campos raiz presencas/ausencias.
       // Esses valores são persistidos dentro do campo JSONB aiContext.
       // Mapear aiContext para campos raiz para exibição consistente na lista.
-      const mapped = raw.map((item: any) => {
+      const mapped = semFimDeSemana.map((item: any) => {
         const ctx = item.aiContext && typeof item.aiContext === 'object' ? item.aiContext : {};
         return {
           ...item,

@@ -15,6 +15,7 @@ import {
   getPedagogicalDay,
   formatPedagogicalDate,
   assertSchoolDay,
+  isSchoolDay,
 } from '../common/utils/date.utils';
 import { getScopedWhereForDiaryEvent } from './diary-event-scope.helper';
 
@@ -246,6 +247,9 @@ export class DiaryEventService {
    */
   async findAll(query: QueryDiaryEventDto, user: JwtPayload) {
     const andConditions: any[] = [];
+    const pedagogicalOnly = query.pedagogicalOnly === 'true';
+    const shouldHideNonSchoolDays =
+      pedagogicalOnly && query.type === 'ATIVIDADE_PEDAGOGICA';
 
     // ── 1. ESCOPO DE ACESSO ──────────────────────────────────────────────────
     if (!user.roles.some((r) => r.level === RoleLevel.DEVELOPER)) {
@@ -332,7 +336,9 @@ export class DiaryEventService {
       take: takeVal,
       skip: skipVal,
     });
-    return events;
+    if (!shouldHideNonSchoolDays) return events;
+
+    return events.filter((event) => isSchoolDay(new Date(event.eventDate), []));
   }
 
   /**
@@ -387,13 +393,33 @@ export class DiaryEventService {
       throw new ForbiddenException('Você não tem permissão para editar este evento');
     }
 
+    let nextEventDate: Date | undefined;
+    if (updateDto.eventDate) {
+      nextEventDate = new Date(updateDto.eventDate);
+      const todayPed = getPedagogicalDay(new Date());
+      const eventPed = getPedagogicalDay(nextEventDate);
+      if (eventPed > todayPed) {
+        throw new BadRequestException(
+          `Não é permitido registrar eventos em datas futuras (${formatPedagogicalDate(nextEventDate)}).`,
+        );
+      }
+
+      if (event.unitId) {
+        const unit = await this.prisma.unit.findUnique({
+          where: { id: event.unitId },
+          select: { nonSchoolDays: true },
+        });
+        assertSchoolDay(nextEventDate, unit?.nonSchoolDays ?? [], BadRequestException);
+      }
+    }
+
     const updatedEvent = await this.prisma.diaryEvent.update({
       where: { id },
       data: {
         ...(updateDto.type && { type: updateDto.type }),
         ...(updateDto.title && { title: updateDto.title }),
         ...(updateDto.description && { description: updateDto.description }),
-        ...(updateDto.eventDate && { eventDate: new Date(updateDto.eventDate) }),
+        ...(nextEventDate && { eventDate: nextEventDate }),
         ...(updateDto.planningId !== undefined && { planningId: updateDto.planningId }),
         ...(updateDto.tags && { tags: updateDto.tags }),
         ...(updateDto.aiContext && { aiContext: updateDto.aiContext }),

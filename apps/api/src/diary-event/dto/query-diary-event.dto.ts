@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString, IsEnum, IsNumberString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsEnum, IsNumberString, IsBooleanString } from 'class-validator';
 import { DiaryEventType } from '@prisma/client';
 
 export class QueryDiaryEventDto {
@@ -52,4 +52,14 @@ export class QueryDiaryEventDto {
   @IsNumberString()
   @IsOptional()
   skip?: string;
+
+  /**
+   * Quando true, oculta eventos de dias não letivos do fluxo pedagógico
+   * (atualmente: sábados e domingos).
+   *
+   * Mantém comportamento retrocompatível por default (false/ausente).
+   */
+  @IsBooleanString()
+  @IsOptional()
+  pedagogicalOnly?: string;
 }
