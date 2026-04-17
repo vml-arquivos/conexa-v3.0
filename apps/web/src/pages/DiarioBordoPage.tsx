@@ -259,6 +259,43 @@ function normalizePlanningObjectives(raw: unknown) {
   return [] as any[];
 }
 
+function pickDiaryPdfValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (normalized && !['undefined', 'null'].includes(normalized.toLowerCase())) {
+        return normalized;
+      }
+    }
+  }
+  return undefined;
+}
+
+function resolveDiaryProfessorName(entry: Record<string, any>, ctx: Record<string, any>, fallback: string) {
+  return pickDiaryPdfValue(
+    entry?.professorNome,
+    entry?.teacherName,
+    entry?.createdByUser?.nome,
+    entry?.createdByUser?.name,
+    ctx?.professorNome,
+    ctx?.teacherName,
+    ctx?.teacher,
+    fallback,
+  ) ?? fallback;
+}
+
+function resolveDiaryTurmaNome(entry: Record<string, any>, ctx: Record<string, any>, fallback?: string) {
+  return pickDiaryPdfValue(
+    entry?.turmaNome,
+    entry?.classroomName,
+    entry?.classroom?.name,
+    ctx?.turmaNome,
+    ctx?.classroomName,
+    fallback,
+    'Turma',
+  ) ?? 'Turma';
+}
+
 function summarizePlanningObservation(planningTitle: string | undefined, observation: string) {
   const texto = observation.trim();
   if (!texto) return '';
@@ -1624,6 +1661,7 @@ export default function DiarioBordoPage() {
             planejamentoAtividade: planejamentoHoje?.activities ?? null,
             planejamentoRecursos: planejamentoHoje?.recursos ?? null,
             turmaNome: turmaNomeAtual || null,
+            professorNome: (user as any)?.nome ?? (user as any)?.firstName ?? null,
             criancas: criancas.map(c => ({
               id: c.id,
               firstName: c.firstName,
@@ -2139,11 +2177,12 @@ export default function DiarioBordoPage() {
                           <button
                             onClick={() => {
                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
-                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const nomeProfessor = resolveDiaryProfessorName(painelDiario as any, ctx as Record<string, any>, (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)');
+                              const turmaNomePdf = resolveDiaryTurmaNome(painelDiario as any, ctx as Record<string, any>, turmaNomeAtual);
                               const dataStr = (painelDiario.date || painelDiario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: turmaNomeAtual || (ctx as any).turmaNome || 'Turma',
+                                turmaNome: turmaNomePdf,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -2451,11 +2490,12 @@ export default function DiarioBordoPage() {
                           <button
                             onClick={() => {
                               const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext : {};
-                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const nomeProfessor = resolveDiaryProfessorName(diario as any, ctx as Record<string, any>, (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)');
+                              const turmaNomePdf = resolveDiaryTurmaNome(diario as any, ctx as Record<string, any>, turmaNomeAtual);
                               const dataStr = (diario.date || diario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: turmaNomeAtual,
+                                turmaNome: turmaNomePdf,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
