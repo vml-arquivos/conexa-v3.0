@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { login as apiLogin, loadMe } from '../api/auth';
 import type { User } from '../api/auth';
+import { isAuthExpiredError } from '../api/http';
 
 interface AuthContextType {
   user: User | null;
@@ -34,23 +35,51 @@ const ROLE_PRIORITY: Record<string, number> = {
  * Estratégia: decodificar o payload do JWT sem verificar assinatura e checar
  * se roles[0] é string ou objeto com .level.
  */
-function hasLegacyToken(): boolean {
+function decodeAccessTokenPayload(): Record<string, unknown> | null {
   try {
     const token = localStorage.getItem('accessToken');
-    if (!token) return false;
+    if (!token) return null;
     const parts = token.split('.');
-    if (parts.length !== 3) return false;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const roles = payload?.roles;
-    if (!Array.isArray(roles) || roles.length === 0) return false;
-    // Token novo: roles[0] é objeto com .level
-    // Token antigo: roles[0] é string OU objeto sem .level
-    if (typeof roles[0] === 'string') return true;
-    if (typeof roles[0] === 'object' && roles[0] !== null && !roles[0].level) return true;
-    return false;
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
   } catch {
-    return false;
+    return null;
   }
+}
+
+function hasLegacyToken(): boolean {
+  const payload = decodeAccessTokenPayload();
+  const roles = payload?.roles;
+  if (!Array.isArray(roles) || roles.length === 0) return false;
+  // Token novo: roles[0] é objeto com .level
+  // Token antigo: roles[0] é string OU objeto sem .level
+  if (typeof roles[0] === 'string') return true;
+  if (typeof roles[0] === 'object' && roles[0] !== null && !roles[0].level) return true;
+  return false;
+}
+
+function buildUserFromToken(): User | null {
+  const payload = decodeAccessTokenPayload();
+  if (!payload) return null;
+
+  const firstName = typeof payload.firstName === 'string' ? payload.firstName : '';
+  const lastName = typeof payload.lastName === 'string' ? payload.lastName : '';
+  const nomeFromPayload = typeof payload.nome === 'string' ? payload.nome : undefined;
+  const nome = [firstName, lastName].filter(Boolean).join(' ').trim() || nomeFromPayload;
+
+  return {
+    id: typeof payload.sub === 'string'
+      ? payload.sub
+      : typeof payload.userId === 'string'
+        ? payload.userId
+        : '',
+    email: typeof payload.email === 'string' ? payload.email : '',
+    nome,
+    status: typeof payload.status === 'string' ? payload.status : undefined,
+    mantenedoraId: typeof payload.mantenedoraId === 'string' ? payload.mantenedoraId : undefined,
+    unitId: typeof payload.unitId === 'string' ? payload.unitId : undefined,
+    roles: Array.isArray(payload.roles) ? payload.roles as User['roles'] : [],
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -78,8 +107,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((response) => {
         setUser(response.user);
       })
-      .catch(() => {
-        // Token inválido ou expirado, limpar
+      .catch((error) => {
+        if (isAuthExpiredError(error)) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          return;
+        }
+
+        const fallbackUser = buildUserFromToken();
+        if (fallbackUser) {
+          console.warn('[AuthProvider] Falha transitória ao carregar /auth/me; preservando sessão a partir do token local.');
+          setUser(fallbackUser);
+          return;
+        }
+
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
       })

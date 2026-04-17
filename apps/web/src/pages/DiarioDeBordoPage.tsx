@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../app/AuthProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -8,7 +7,8 @@ import { Label } from '../components/ui/label';
 import { PageShell } from '../components/ui/PageShell';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
-import { BookOpen, Plus, Save } from 'lucide-react';
+import { BookOpen, Save } from 'lucide-react';
+import http from '../api/http';
 
 interface Aluno {
   id: string;
@@ -26,7 +26,6 @@ interface DiarioForm {
 }
 
 export default function DiarioDeBordoPage() {
-  const { user } = useAuth() as any;
   const [loading, setLoading] = useState(true);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [form, setForm] = useState<DiarioForm>({
@@ -46,15 +45,8 @@ export default function DiarioDeBordoPage() {
     try {
       setLoading(true);
       
-      const response = await fetch('/api/teachers/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!response.ok) throw new Error('Erro ao carregar alunos');
-
-      const data = await response.json();
+      const response = await http.get('/teachers/dashboard');
+      const data = response.data;
       
       if (data.hasClassroom && data.alunos) {
         setAlunos(data.alunos);
@@ -84,26 +76,17 @@ export default function DiarioDeBordoPage() {
     }
 
     try {
-      const response = await fetch('/api/diary-event', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      await http.post('/diary-event', {
+        childId: form.alunoId,
+        date: new Date().toISOString(),
+        activities: form.atividade,
+        observations: form.observacoes,
+        microgestures: {
+          alimentacao: form.alimentacao,
+          sono: form.sono ? parseInt(form.sono) : null,
+          higiene: form.higiene,
         },
-        body: JSON.stringify({
-          childId: form.alunoId,
-          date: new Date().toISOString(),
-          activities: form.atividade,
-          observations: form.observacoes,
-          microgestures: {
-            alimentacao: form.alimentacao,
-            sono: form.sono ? parseInt(form.sono) : null,
-            higiene: form.higiene,
-          },
-        }),
       });
-
-      if (!response.ok) throw new Error('Erro ao salvar registro');
 
       toast.success('Registro salvo com sucesso!');
       
@@ -116,9 +99,10 @@ export default function DiarioDeBordoPage() {
         sono: '',
         higiene: '',
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Erro ao salvar:', err);
-      toast.error(err.message || 'Erro ao salvar registro');
+      const message = err instanceof Error ? err.message : 'Erro ao salvar registro';
+      toast.error(message);
     }
   }
 
