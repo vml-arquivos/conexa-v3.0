@@ -314,10 +314,32 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [filtroDiarioDataFim, setFiltroDiarioDataFim] = useState<string>('');
   const [filtroDiarioProfessor, setFiltroDiarioProfessor] = useState<string>('');
 
+  async function carregarDiarios() {
+    try {
+      const params: Record<string, string> = unitIdParam ? { unitId: unitIdParam } : {};
+      if (filtroDiarioDataInicio) params.startDate = `${filtroDiarioDataInicio}T00:00:00.000Z`;
+      if (filtroDiarioDataFim) params.endDate = `${filtroDiarioDataFim}T23:59:59.999Z`;
+      const res = await http.get('/coordenacao/diarios', { params });
+      const payload = res.data;
+      const listaDiarios = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.diarios) ? payload.diarios : []);
+      setDiarios(listaDiarios);
+      if (payload?.metricas) setMetricasExecucao(payload.metricas);
+    } catch {
+      setDiarios([]);
+      setMetricasExecucao({});
+    }
+  }
+
   // FIX P1: recarregar quando unitIdParam mudar (troca de unidade pelo seletor)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const loadDashboardCb = useCallback(loadDashboard, [unitIdParam]);
   useEffect(() => { loadDashboardCb(); }, [loadDashboardCb]);
+
+  useEffect(() => {
+    carregarDiarios();
+  }, [unitIdParam, filtroDiarioDataInicio, filtroDiarioDataFim]);
 
   useEffect(() => {
     if (abaAtiva === 'cobertura' && !cobertura) {
@@ -349,11 +371,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function loadDashboard() {
     try {
       setLoading(true);
+      const diarioParams: Record<string, string> = unitIdParam ? { unitId: unitIdParam } : {};
+      if (filtroDiarioDataInicio) diarioParams.startDate = `${filtroDiarioDataInicio}T00:00:00.000Z`;
+      if (filtroDiarioDataFim) diarioParams.endDate = `${filtroDiarioDataFim}T23:59:59.999Z`;
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
         http.get('/coordenacao/dashboard/unidade', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/requisicoes', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/planejamentos', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
-        http.get('/coordenacao/diarios', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/coordenacao/diarios', { params: diarioParams }),
       ]);
       // Carregar alertas e resumo em paralelo (não bloqueante)
       const mes = new Date().toISOString().slice(0, 7);
@@ -981,15 +1006,24 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {/* Ações rápidas */}
                 <div className="grid grid-cols-5 gap-0 border-t border-gray-50">
                   {[
-                    { label: 'Diários',    path: `/app/diario-de-bordo?classroomId=${turma.id}`, color: 'text-blue-600',   bg: 'hover:bg-blue-50'   },
-                    { label: 'Planos',     path: `/app/planejamentos?classroomId=${turma.id}`,   color: 'text-amber-600',  bg: 'hover:bg-amber-50'  },
-                    { label: 'RDIC',       path: `/app/rdic-coord?classroomId=${turma.id}`,      color: 'text-violet-600', bg: 'hover:bg-violet-50' },
-                    { label: 'Painel',     path: `/app/turma/${turma.id}/painel`,                color: 'text-teal-600',   bg: 'hover:bg-teal-50'   },
-                    { label: 'Obs.',       path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-pink-600', bg: 'hover:bg-pink-50' },
+                    {
+                      label: 'Diários',
+                      color: 'text-blue-600',
+                      bg: 'hover:bg-blue-50',
+                      onClick: () => {
+                        setAbaAtiva('diarios' as any);
+                        setFiltroDiarioTurma(turma.nome);
+                        setFiltroDiarioProfessor(turma.professor || '');
+                      },
+                    },
+                    { label: 'Planos', path: `/app/planejamentos?classroomId=${turma.id}`, color: 'text-amber-600', bg: 'hover:bg-amber-50' },
+                    { label: 'RDIC', path: `/app/rdic-coord?classroomId=${turma.id}`, color: 'text-violet-600', bg: 'hover:bg-violet-50' },
+                    { label: 'Painel', path: `/app/turma/${turma.id}/painel`, color: 'text-teal-600', bg: 'hover:bg-teal-50' },
+                    { label: 'Obs.', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-pink-600', bg: 'hover:bg-pink-50' },
                   ].map(item => (
                     <button
                       key={item.label}
-                      onClick={() => navigate(item.path)}
+                      onClick={() => ('onClick' in item ? item.onClick() : navigate(item.path))}
                       className={`py-2.5 text-[11px] font-semibold ${item.color} ${item.bg} transition-colors text-center border-r border-gray-50 last:border-0`}
                     >
                       {item.label}

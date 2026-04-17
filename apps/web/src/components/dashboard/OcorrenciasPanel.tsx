@@ -81,6 +81,7 @@ export function OcorrenciasPanel({
   const [busca, setBusca] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroTurma, setFiltroTurma] = useState('');
+  const [filtroProfessor, setFiltroProfessor] = useState('');
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | '7d' | '30d' | 'todos'>('todos');
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -137,16 +138,21 @@ export function OcorrenciasPanel({
     const nomeCompleto = `${o.child?.firstName ?? ''} ${o.child?.lastName ?? ''}`.toLowerCase();
     const turma = (o.classroom?.name ?? '').toLowerCase();
     const desc = (o.description ?? '').toLowerCase();
+    const professor = o.createdByUser
+      ? `${o.createdByUser.firstName ?? ''} ${o.createdByUser.lastName ?? ''}`.trim().toLowerCase()
+      : '';
     const matchBusca = !busca ||
       nomeCompleto.includes(busca.toLowerCase()) ||
       turma.includes(busca.toLowerCase()) ||
+      professor.includes(busca.toLowerCase()) ||
       desc.includes(busca.toLowerCase());
     const cat = getCategoriaTag(o);
     const matchCat = !filtroCategoria || cat === filtroCategoria;
     // Filtro por turma: se classroomId foi passado como prop, o backend já filtrou.
     // O filtroTurma local é para a coordenadora que vê todas as turmas.
     const matchTurma = !filtroTurma || o.classroom?.id === filtroTurma;
-    return matchBusca && matchCat && matchTurma;
+    const matchProfessor = !filtroProfessor || professor.includes(filtroProfessor.toLowerCase());
+    return matchBusca && matchCat && matchTurma && matchProfessor;
   });
 
   // ─── Impressão / PDF ────────────────────────────────────────────────────────
@@ -296,12 +302,21 @@ export function OcorrenciasPanel({
           ))}
         </select>
 
+        {/* Professor */}
+        <input
+          type="text"
+          placeholder="Professor..."
+          value={filtroProfessor}
+          onChange={e => setFiltroProfessor(e.target.value)}
+          className="min-w-[160px] border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+        />
+
         {/* Busca */}
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar criança, turma ou descrição..."
+            placeholder="Buscar criança, turma, professor ou descrição..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300"
