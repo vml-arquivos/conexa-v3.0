@@ -313,6 +313,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [filtroDiarioDataInicio, setFiltroDiarioDataInicio] = useState<string>('');
   const [filtroDiarioDataFim, setFiltroDiarioDataFim] = useState<string>('');
   const [filtroDiarioProfessor, setFiltroDiarioProfessor] = useState<string>('');
+  const ITENS_POR_PAGINA = 10;
+  const [paginaDiarios, setPaginaDiarios] = useState(1);
 
   async function carregarDiarios() {
     try {
@@ -1425,7 +1427,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {diariosFiltrados.map((diario: any) => {
+              {diariosFiltrados.slice(0, paginaDiarios * ITENS_POR_PAGINA).map((diario: any) => {
                 const turma = diario.classroom?.name || diario.turmaNome || '—';
                 const professor = diario.createdByUser
                   ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
@@ -1567,10 +1569,31 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comPlano}/${metricasTurma.total}` : '—'}</p>
                         </div>
                       </div>
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/app/diario-de-bordo?classroomId=${diario.classroomId}`);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                          Ver diário completo
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
+
+              {diariosFiltrados.length > paginaDiarios * ITENS_POR_PAGINA && (
+                <button
+                  onClick={() => setPaginaDiarios(p => p + 1)}
+                  className="w-full py-3 text-sm text-blue-600 hover:bg-blue-50 rounded-2xl border border-blue-100 font-medium transition-colors mt-2"
+                >
+                  Carregar mais ({diariosFiltrados.length - paginaDiarios * ITENS_POR_PAGINA} restantes)
+                </button>
+              )}
             </div>
           );
           })()
