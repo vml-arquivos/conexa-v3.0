@@ -322,6 +322,18 @@ export default function PlanejamentosPage() {
     return true;
   });
 
+  // Agrupamento por turma para coordenadores (quando não há filtro de turma ativo)
+  const planningsPorTurma: Record<string, { turmaNome: string; itens: Planning[] }> = {};
+  if ((ehCoordenador || ehCentral) && !filtroClassroomId) {
+    planningsFiltrados.forEach(p => {
+      const chave = p.classroomId || '__sem_turma__';
+      const nome = p.classroom?.name || 'Sem turma';
+      if (!planningsPorTurma[chave]) planningsPorTurma[chave] = { turmaNome: nome, itens: [] };
+      planningsPorTurma[chave].itens.push(p);
+    });
+  }
+  const usarAgrupamento = (ehCoordenador || ehCentral) && !filtroClassroomId && Object.keys(planningsPorTurma).length > 1;
+
   const matrizFiltrada = matrizEntries.filter(e => {
     if (filtroSegmento && e.segmento !== filtroSegmento) return false;
     if (busca && !e.objetivo_bncc.toLowerCase().includes(busca.toLowerCase()) && !e.codigo_bncc.toLowerCase().includes(busca.toLowerCase())) return false;
@@ -390,7 +402,78 @@ export default function PlanejamentosPage() {
             />
           )}
 
-          <div className="space-y-3">
+          {/* Agrupamento por turma para coordenadores — quando não há filtro de turma ativo */}
+          {usarAgrupamento && Object.entries(planningsPorTurma).map(([chave, grupo]) => (
+            <div key={chave} className="space-y-2">
+              <div className="flex items-center gap-2 pt-2">
+                <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <h3 className="text-sm font-semibold text-blue-700">{grupo.turmaNome}</h3>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{grupo.itens.length} plano(s)</span>
+                <button
+                  onClick={() => setFiltroClassroomId(chave === '__sem_turma__' ? '' : chave)}
+                  className="ml-auto text-xs text-blue-500 hover:text-blue-700 underline"
+                >
+                  Ver só esta turma
+                </button>
+              </div>
+              <div className="space-y-3 pl-2 border-l-2 border-blue-100">
+                {grupo.itens.map(p => {
+                  const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.RASCUNHO;
+                  const isExpanded = expandedPlanning === p.id;
+                  const endDateStr = p.endDate ?? p.weekEnd;
+                  const isPeriodoPasado = endDateStr ? new Date(endDateStr + 'T23:59:59') < new Date() : false;
+                  return (
+                    <Card key={p.id} className="border-2 hover:border-blue-200 transition-all">
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sc.cor}`}>{sc.icon} {sc.label}</span>
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{{ SEMANAL: 'Semanal', QUINZENAL: 'Quinzenal', MENSAL: 'Mensal', TRIMESTRAL: 'Trimestral', SEMESTRAL: 'Semestral', ANUAL: 'Anual' }[p.type] ?? p.type}</span>
+                            </div>
+                            <h3 className="font-semibold text-gray-800 truncate">{p.title}</h3>
+                            {(p.startDate || p.weekStart) && <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(p.startDate ?? p.weekStart!).toLocaleDateString('pt-BR')}{(p.endDate || p.weekEnd) && ` — ${new Date(p.endDate ?? p.weekEnd!).toLocaleDateString('pt-BR')}`}</p>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {ehCoordenador && p.status === 'EM_REVISAO' && (
+                              <>
+                                <button onClick={() => aprovarPlanejamento(p.id)} className="flex items-center gap-1 text-xs bg-teal-600 text-white px-2 py-1 rounded-lg hover:bg-teal-700 transition-colors"><ThumbsUp className="h-3 w-3" /> Aprovar</button>
+                                <button onClick={() => setRevisaoModal({ planningId: p.id, tipo: 'devolver' })} className="flex items-center gap-1 text-xs bg-orange-500 text-white px-2 py-1 rounded-lg hover:bg-orange-600 transition-colors"><ThumbsDown className="h-3 w-3" /> Devolver</button>
+                              </>
+                            )}
+                            <button onClick={() => setExpandedPlanning(isExpanded ? null : p.id)} className="text-gray-400 hover:text-gray-600 p-1">
+                              {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                            </button>
+                          </div>
+                        </div>
+                        {p.status === 'DEVOLVIDO' && p.reviewComment && (
+                          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                            <p className="text-xs font-semibold text-orange-700 uppercase mb-1 flex items-center gap-1"><ThumbsDown className="h-3 w-3" /> Motivo da Devolução</p>
+                            <p className="text-sm text-orange-800">{p.reviewComment}</p>
+                          </div>
+                        )}
+                        {isExpanded && p.pedagogicalContent && (() => {
+                          const pc: any = typeof p.pedagogicalContent === 'string' ? (() => { try { return JSON.parse(p.pedagogicalContent); } catch { return {}; } })() : p.pedagogicalContent;
+                          return (
+                            <div className="mt-4 pt-4 border-t space-y-3">
+                              {pc.camposSelecionados?.length > 0 && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Campos de Experiência</p><div className="flex flex-wrap gap-2">{pc.camposSelecionados.map((c: string) => { const campo = CAMPOS.find(x => x.id === c); return campo ? <span key={c} className={`text-xs px-2 py-1 rounded-full border ${campo.cor}`}>{campo.emoji} {campo.label.split(',')[0]}</span> : null; })}</div></div>}
+                              {pc.codigosBNCC?.length > 0 && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Objetivos BNCC</p><div className="flex flex-wrap gap-2">{pc.codigosBNCC.map((c: string) => <span key={c} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-mono">{c}</span>)}</div></div>}
+                              {pc.objetivos?.length > 0 && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-2">Objetivos de Aprendizagem</p><ul className="space-y-1">{pc.objetivos.map((o: string, i: number) => <li key={i} className="text-sm text-gray-700 flex items-start gap-2"><Target className="h-3.5 w-3.5 text-blue-500 mt-0.5 flex-shrink-0" />{o}</li>)}</ul></div>}
+                              {pc.materiais && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Materiais</p><p className="text-sm text-gray-700">{pc.materiais}</p></div>}
+                              {pc.observacoes && <div><p className="text-xs font-semibold text-gray-500 uppercase mb-1">Observações</p><p className="text-sm text-gray-700">{pc.observacoes}</p></div>}
+                            </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Lista plana: professor ou coordenador com filtro de turma ativo */}
+          {!usarAgrupamento && <div className="space-y-3">
             {planningsFiltrados.map(p => {
               const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.RASCUNHO;
               const isExpanded = expandedPlanning === p.id;
@@ -544,8 +627,8 @@ export default function PlanejamentosPage() {
                   </CardContent>
                 </Card>
               );
-            })}
-          </div>
+             })}
+          </div>}
         </div>
       )}
 

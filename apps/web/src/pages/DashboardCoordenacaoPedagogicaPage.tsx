@@ -648,28 +648,48 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {abaAtiva === 'inicio' && (
         <div className="space-y-5">
 
-          {/* Indicadores do dia — bloco compacto e operacional */}
+          {/* Indicadores do dia — bloco compacto e operacional com drill-down */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white">
+            {/* Pendências → aba planejamentos (principal pendência acionável) */}
+            <button
+              onClick={() => setAbaAtiva('planejamentos')}
+              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Pendências</p>
-              <p className="mt-1.5 text-3xl font-bold">{totalPendencias}</p>
+              <p className="mt-1.5 text-3xl font-bold group-hover:text-blue-300 transition-colors">{totalPendencias}</p>
               <p className="mt-1 text-xs text-slate-400">{(dashboard?.planejamentosParaRevisar ?? 0)} planos · {(dashboard?.requisicoesParaAnalisar ?? 0)} pedidos</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white">
+              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver planejamentos →</p>
+            </button>
+            {/* Chamadas hoje → aba turmas */}
+            <button
+              onClick={() => setAbaAtiva('turmas')}
+              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Chamadas hoje</p>
-              <p className="mt-1.5 text-3xl font-bold">{totalTurmasHoje > 0 ? `${Math.round((turmasComChamadaHoje / totalTurmasHoje) * 100)}%` : '—'}</p>
+              <p className="mt-1.5 text-3xl font-bold group-hover:text-emerald-300 transition-colors">{totalTurmasHoje > 0 ? `${Math.round((turmasComChamadaHoje / totalTurmasHoje) * 100)}%` : '—'}</p>
               <p className="mt-1 text-xs text-slate-400">{turmasComChamadaHoje} de {totalTurmasHoje} turmas</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white">
+              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver status das turmas →</p>
+            </button>
+            {/* Diários → aba pedagógico (sub-aba diários) */}
+            <button
+              onClick={() => setAbaAtiva('pedagogico')}
+              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Diários</p>
-              <p className="mt-1.5 text-3xl font-bold">{dashboard?.diariosEstaSemana ?? 0}</p>
+              <p className="mt-1.5 text-3xl font-bold group-hover:text-amber-300 transition-colors">{dashboard?.diariosEstaSemana ?? 0}</p>
               <p className="mt-1 text-xs text-slate-400">{diariosPublicados} publicados · {diariosRascunho} rascunho(s)</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white">
+              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver diários →</p>
+            </button>
+            {/* Turmas → aba turmas */}
+            <button
+              onClick={() => setAbaAtiva('turmas')}
+              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Turmas</p>
-              <p className="mt-1.5 text-3xl font-bold">{dashboard?.turmas ?? 0}</p>
+              <p className="mt-1.5 text-3xl font-bold group-hover:text-violet-300 transition-colors">{dashboard?.turmas ?? 0}</p>
               <p className="mt-1 text-xs text-slate-400">{dashboard?.alunosTotal ?? 0} alunos · {dashboard?.professores ?? 0} professores</p>
-            </div>
+              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver todas as turmas →</p>
+            </button>
           </div>
 
           {/* Atalhos rápidos */}
