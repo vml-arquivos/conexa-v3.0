@@ -123,6 +123,33 @@ export class DiaryEventService {
     const resolvedCurriculumEntryId = createDto.curriculumEntryId && CUID_RE.test(createDto.curriculumEntryId)
       ? createDto.curriculumEntryId : undefined;
 
+    // REGRA DE OURO: Diário de Bordo exige planejamento APROVADO ou EM_EXECUCAO ativo
+    // Ocorrências são isentas pois podem ocorrer fora do planejamento pedagógico.
+    const isDiarioBordo = !isOcorrencia && (createDto.type as string) === 'DIARIO_BORDO';
+    if (isDiarioBordo && !resolvedPlanningId) {
+      // Buscar planejamento ativo da turma para a data do evento
+      const activePlanning = await this.prisma.planning.findFirst({
+        where: {
+          classroomId: resolvedClassroomId,
+          mantenedoraId: classroom.unit.mantenedoraId,
+          unitId: classroom.unitId,
+          status: { in: [PlanningStatus.APROVADO, PlanningStatus.EM_EXECUCAO] },
+          startDate: { lte: eventDate },
+          endDate: { gte: eventDate },
+        },
+        orderBy: { startDate: 'desc' },
+        select: { id: true },
+      });
+      if (!activePlanning) {
+        throw new BadRequestException(
+          `Não há planejamento aprovado ou em execução para esta turma na data ${formatPedagogicalDate(eventDate)}. ` +
+          `O Diário de Bordo exige um planejamento ativo. Verifique com a coordenação.`,
+        );
+      }
+      // Vincular automaticamente ao planejamento ativo encontrado
+      (createDto as any).planningId = activePlanning.id;
+    }
+
     // VALIDAÇÃO OPCIONAL: Planning (somente se planningId fornecido e válido)
     if (resolvedPlanningId) {
       const planning = await this.prisma.planning.findUnique({

@@ -75,7 +75,17 @@ export interface AtualizarStatusPedidoDto {
  * Idempotente: se já existir RASCUNHO para unidade+mês, retorna o existente.
  */
 export async function criarPedido(dto: CriarPedidoDto): Promise<PedidoCompra> {
-  const response = await http.post('/pedidos-compra', dto);
+  const response = await http.post('/material-requests', {
+    titulo: `Pedido ${dto.mesReferencia}`,
+    justificativa: dto.observacoes ?? '',
+    urgencia: 'MEDIA',
+    categoria: 'PEDAGOGICO',
+    itens: dto.itens.map(i => ({
+      item: i.descricao,
+      quantidade: i.quantidade,
+      unidade: i.unidadeMedida ?? 'un',
+    })),
+  });
   return response.data;
 }
 
@@ -113,8 +123,16 @@ export async function listarPedidosCompra(filtros?: {
   unitId?: string;
   status?: StatusPedidoCompra;
 }): Promise<PedidoCompra[]> {
-  const response = await http.get('/pedidos-compra', { params: filtros });
-  return response.data;
+  try {
+    const params: Record<string, string | undefined> = {};
+    if (filtros?.status) params.status = filtros.status;
+    if (filtros?.unitId) params.unitId = filtros.unitId;
+    const response = await http.get('/material-requests', { params });
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
