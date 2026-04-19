@@ -695,6 +695,12 @@ export default function DiarioBordoPage() {
   const navigate = useNavigate();
   const roles = normalizeRoles(user);
   const isDeveloper = roles.includes('DEVELOPER');
+  // Coordenação e gestão: acesso somente leitura ao diário (audita, não preenche)
+  const isApenasLeitura = !isDeveloper && (
+    roles.includes('UNIDADE') ||
+    roles.includes('STAFF_CENTRAL') ||
+    roles.includes('MANTENEDORA')
+  );
   const currentUserId = (user as any)?.id ?? (user as any)?.sub ?? '';
   const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
   const childIdFromQuery = searchParams.get('childId') ?? undefined;
@@ -1871,7 +1877,11 @@ export default function DiarioBordoPage() {
           { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
-        ].map(tab => (
+        ].filter(tab => {
+          if (!isApenasLeitura) return true;
+          // Coordenação/Gestão: apenas leitura — ocultar abas de criação
+          return tab.id === 'lista';
+        }).map(tab => (
           <button key={tab.id} onClick={() => (tab as any).onClickOverride ? (tab as any).onClickOverride() : setAba(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
             {tab.icon} {tab.label}
