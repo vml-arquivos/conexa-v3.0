@@ -111,7 +111,7 @@ export const router = createBrowserRouter([
       {
         path: 'teacher-dashboard',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'COORDENADOR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <TeacherDashboardPage />
           </RoleProtectedRoute>
         ),
@@ -232,7 +232,7 @@ export const router = createBrowserRouter([
       {
         path: 'diario-calendario',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'DEVELOPER']}>
             <DiarioCalendarioPage />
           </RoleProtectedRoute>
         ),
@@ -516,7 +516,7 @@ export const router = createBrowserRouter([
       {
         path: 'planejamento/:planningId/conferir',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <ConferenciaPlanejamentoPage />
           </RoleProtectedRoute>
         ),
