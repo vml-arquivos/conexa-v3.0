@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import http from '../api/http';
 import { createMaterialRequest } from '../api/material-request';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 const TAMANHOS_FRALDA = ['RN', 'P', 'M', 'G', 'GG', 'XG', 'XXG'];
@@ -102,6 +103,7 @@ function StatusBadge({ status }: { status: string }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function RequisicaoMateriaisPage() {
   const { user } = useAuth() as any;
+  const isDeveloper = normalizeRoles(user).includes('DEVELOPER');
 
   // Estado: catálogo e carrinho
   const [loading, setLoading] = useState(true);
@@ -505,6 +507,26 @@ export default function RequisicaoMateriaisPage() {
                           </span>
                         )}
                       </div>
+                      {isDeveloper && (
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Apagar requisição "${req.title || req.code}"? Esta ação não pode ser desfeita.`)) return;
+                              try {
+                                await http.delete(`/material-requests/${req.id}`);
+                                toast.success('Requisição apagada.');
+                                setHistorico(prev => prev.filter(r => r.id !== req.id));
+                              } catch (err: any) {
+                                toast.error(err?.response?.data?.message || 'Erro ao apagar requisição.');
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Apagar (Dev)
+                          </button>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );

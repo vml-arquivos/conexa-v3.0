@@ -2174,11 +2174,10 @@ export default function DiarioBordoPage() {
 
                         {/* Botões: Editar e Imprimir */}
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
-                              // Editar: carregar os dados do diário no formulário
                               setForm(getDiaryFormFromEntry(painelDiario));
-                              // PR 143: preservar o mesmo registro ao entrar em edição segura
                               setDiarioEditandoId(painelDiario.id);
                               setPainelDiario(null);
                               setAba('novo');
@@ -2187,6 +2186,25 @@ export default function DiarioBordoPage() {
                            >
                              ✏️ Editar
                           </button>
+                          {isDeveloper && (
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Apagar este diário permanentemente? Esta ação não pode ser desfeita.')) return;
+                                try {
+                                  await http.delete(`/diary-events/${painelDiario.id}`);
+                                  toast.success('Diário apagado.');
+                                  setPainelDiario(null);
+                                  loadDiarios();
+                                } catch (err: any) {
+                                  toast.error(err?.response?.data?.message || 'Erro ao apagar diário.');
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100"
+                            >
+                              🗑️ Apagar
+                            </button>
+                          )}
+                          </div>
                           <button
                             onClick={() => {
                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
