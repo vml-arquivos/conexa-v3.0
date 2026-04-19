@@ -263,10 +263,6 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [metricasExecucao, setMetricasExecucao] = useState<Record<string, {
     total: number; publicados: number; comMatriz: number; comPlano: number;
   }>>({});
-  const [abaAtiva, setAbaAtiva] = useState<
-    'inicio'|'turmas'|'planejamentos'|'relatorios'|
-    'requisicoes'|'diarios'|'observacoes'|'sala'|'cobertura'|'ocorrencias'|'pedagogico'
-  >('inicio');
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -290,7 +286,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [loadingCobertura, setLoadingCobertura] = useState(false);
   const apiCache = useApiCache(60_000);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const abaAtiva = (searchParams.get('aba') as any) ?? 'inicio';
+  function setAbaAtiva(novaAba: string) {
+    const novosParams = new URLSearchParams(searchParams.toString());
+    novosParams.set('aba', novaAba);
+    setSearchParams(novosParams, { replace: false });
+  }
   // FIX P1: usar selectedUnitId do contexto global como fallback para unitIdParam
   // Isso resolve o erro 403 quando STAFF_CENTRAL acessa sem unitId no token
   const { selectedUnitId: ctxUnitId } = useUnitScope();
@@ -344,6 +346,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   }, [unitIdParam, filtroDiarioDataInicio, filtroDiarioDataFim]);
 
   useEffect(() => {
+    setPaginaDiarios(1);
     if (abaAtiva === 'cobertura' && !cobertura) {
       carregarCobertura();
     }
@@ -597,6 +600,36 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           </div>
         </div>
       )}
+
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4 flex-wrap">
+        <button
+          onClick={() => navigate('/app/teacher-dashboard')}
+          className="hover:text-gray-700 transition-colors"
+        >
+          Início
+        </button>
+        <ChevronRight className="h-3 w-3 flex-shrink-0" />
+        <button
+          onClick={() => setAbaAtiva('inicio')}
+          className="hover:text-gray-700 transition-colors"
+        >
+          Coordenação Pedagógica
+        </button>
+        {abaAtiva !== 'inicio' && (
+          <>
+            <ChevronRight className="h-3 w-3 flex-shrink-0" />
+            <span className="text-gray-600 font-medium capitalize">
+              {abaAtiva === 'turmas' ? 'Turmas' :
+               abaAtiva === 'planejamentos' ? 'Planejamentos' :
+               abaAtiva === 'relatorios' ? 'Relatórios' :
+               abaAtiva === 'ocorrencias' ? 'Ocorrências' :
+               abaAtiva === 'pedagogico' ? 'Pedagógico' :
+               abaAtiva === 'diarios' ? 'Diários' : abaAtiva}
+            </span>
+          </>
+        )}
+      </nav>
 
       {/* Alerta de pendências */}
       {totalPendencias > 0 && (
