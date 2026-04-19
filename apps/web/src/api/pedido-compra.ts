@@ -129,7 +129,35 @@ export async function listarPedidosCompra(filtros?: {
     if (filtros?.unitId) params.unitId = filtros.unitId;
     const response = await http.get('/material-requests', { params });
     const data = response.data;
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data)) return [];
+    return data.map((r: any): PedidoCompra => ({
+      id: r.id ?? '',
+      mesReferencia: r.code ?? r.title ?? '',
+      status: (r.status as StatusPedidoCompra) ?? 'RASCUNHO',
+      observacoes: r.description ?? undefined,
+      criadoEm: r.requestedDate ?? r.createdAt ?? new Date().toISOString(),
+      atualizadoEm: r.updatedAt ?? r.createdAt ?? new Date().toISOString(),
+      unit: r.unit ?? { id: '', name: '' },
+      itens: Array.isArray(r.items) && r.items.length > 0
+        ? r.items.map((it: any): ItemPedidoCompra => ({
+            id: it.id ?? '',
+            categoria: r.type ?? 'OUTRO',
+            descricao: it.productName ?? it.materialName ?? it.item ?? '',
+            quantidade: Number(it.quantity ?? it.quantidade ?? 1),
+            unidadeMedida: it.unit ?? it.unidade ?? undefined,
+            custoEstimado: it.unitPrice ?? it.unit_price ?? undefined,
+          }))
+        : Array.isArray(r.originalItens) && r.originalItens.length > 0
+        ? r.originalItens.map((it: any, idx: number): ItemPedidoCompra => ({
+            id: `legacy-${idx}`,
+            categoria: r.type ?? 'OUTRO',
+            descricao: it.item ?? '',
+            quantidade: Number(it.quantidade ?? 1),
+            unidadeMedida: it.unidade ?? undefined,
+            custoEstimado: undefined,
+          }))
+        : [],
+    }));
   } catch {
     return [];
   }
