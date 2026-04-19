@@ -666,20 +666,24 @@ export default function DiarioCalendarioPage() {
       )}
 
       {/* ── CTA Diário de Hoje ── */}
-      {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <button
-            onClick={() => abrirDiario(hoje)}
-            className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm py-3.5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-150"
-          >
-            <BookOpen className="h-4 w-4" />
-            Abrir Diário de Hoje
-            <span className="hidden sm:inline text-blue-200 font-normal">
-              · {new Date(hoje + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-            </span>
-          </button>
-        </div>
-      )}
+      {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (() => {
+        const diaSemana = new Date(hoje + 'T12:00:00').getDay();
+        if (diaSemana === 0 || diaSemana === 6) return null;
+        return (
+          <div className="mt-6 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => abrirDiario(hoje)}
+              className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm py-3.5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-150"
+            >
+              <BookOpen className="h-4 w-4" />
+              Abrir Diário de Hoje
+              <span className="hidden sm:inline text-blue-200 font-normal">
+                · {new Date(hoje + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+              </span>
+            </button>
+          </div>
+        );
+      })()}
     </PageShell>
   );
 }
