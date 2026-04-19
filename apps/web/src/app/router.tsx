@@ -355,7 +355,7 @@ export const router = createBrowserRouter([
       {
         path: 'chamada',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <ControleFaltasPage />
           </RoleProtectedRoute>
         ),

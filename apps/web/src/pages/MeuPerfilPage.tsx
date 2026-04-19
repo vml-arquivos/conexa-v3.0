@@ -66,15 +66,14 @@ export default function MeuPerfilPage() {
       setPerfil(d);
       setFormDados({ firstName: d.firstName, lastName: d.lastName, phone: d.phone || '' });
       setFormEmail({ email: d.email, senha: '' });
-    } catch {
-      const demo: Perfil = {
-        id: '1', firstName: 'Maria', lastName: 'Professora', email: 'professor1@unidade1.com',
-        phone: '(62) 99999-0001', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01',
-        roles: [{ roleType: 'PROFESSOR' }], unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' },
-      };
-      setPerfil(demo);
-      setFormDados({ firstName: demo.firstName, lastName: demo.lastName, phone: demo.phone || '' });
-      setFormEmail({ email: demo.email, senha: '' });
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        setTimeout(() => { window.location.replace('/login'); }, 1500);
+      } else {
+        toast.error('Não foi possível carregar seu perfil. Verifique sua conexão.');
+      }
     } finally { setLoading(false); }
   }
 
