@@ -1609,24 +1609,9 @@ export default function DiarioBordoPage() {
         : (criancas.length > 0 ? criancas.length - presencasReais : form.ausencias);
 
       if (!classroomId || !childId) {
-        // Modo offline/demo: salva localmente
-        const localEntry = {
-          id: Date.now().toString(),
-          date: form.date,
-          climaEmocional: form.climaEmocional,
-          momentoDestaque: form.momentoDestaque,
-          reflexaoPedagogica: form.reflexaoPedagogica,
-          encaminhamentos: form.encaminhamentos,
-          presencas: presencasReais,
-          ausencias: ausenciasReais,
-          rotina: form.rotina,
-          microgestos: form.microgestos,
-          status: 'LOCAL',
-          createdAt: new Date().toISOString(),
-        };
-        const saved = JSON.parse(localStorage.getItem('diarios_bordo') || '[]');
-        saved.unshift(localEntry);
-        localStorage.setItem('diarios_bordo', JSON.stringify(saved.slice(0, 100)));
+        toast.error('Turma ou aluno não identificado. Não é possível salvar o diário sem vínculo com uma turma ativa. Recarregue a página ou contate a coordenação.');
+        setSaving(false);
+        return;
       } else {
         // PR 141: payload compartilhado entre POST (novo) e PATCH (edição)
         const diarioPayload = {
@@ -1683,9 +1668,15 @@ export default function DiarioBordoPage() {
         };
         // PR 141: se há um ID de diário sendo editado, usar PATCH; caso contrário, POST
         if (diarioEditandoId) {
-          await http.patch(`/diary-events/${diarioEditandoId}`, diarioPayload);
+          const resPatch = await http.patch(`/diary-events/${diarioEditandoId}`, diarioPayload);
+          if (!resPatch.data?.id) {
+            throw new Error('O servidor não confirmou a atualização do diário. Tente novamente.');
+          }
         } else {
-          await http.post('/diary-events', diarioPayload);
+          const resPost = await http.post('/diary-events', diarioPayload);
+          if (!resPost.data?.id) {
+            throw new Error('O servidor não confirmou o registro do diário. Tente novamente.');
+          }
         }
       }
       toast.success('Diário de Bordo salvo! Abrindo versão para impressão...');
