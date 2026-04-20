@@ -221,6 +221,26 @@ export class DiaryEventService {
     // Validação de segmento etário removida: qualquer criança pode ter ocorrências registradas
     // independente da faixa etária da turma (chegada/saída, saúde, material, comportamento, etc.)
 
+    // GATE RETROATIVO (segurança produção): edição de data anterior exige planning aprovado no alvo
+    if (createDto.retroactiveEdit) {
+      const activePlanRetro = await this.prisma.planning.findFirst({
+        where: {
+          classroomId: resolvedClassroomId,
+          mantenedoraId: classroom.unit.mantenedoraId,
+          unitId: classroom.unitId,
+          status: { in: [PlanningStatus.APROVADO, PlanningStatus.EM_EXECUCAO] },
+          startDate: { lte: eventDate },
+          endDate: { gte: eventDate },
+        },
+        select: { id: true },
+      });
+      if (!activePlanRetro) {
+        throw new BadRequestException(
+          `Edição retroativa bloqueada: não há planejamento aprovado para ${formatPedagogicalDate(eventDate)}. ` +
+          `Solicite à coordenação aprovar o planejamento do dia alvo.`,
+        );
+      }
+    }
     // Criar o evento
     const eventData = {
       type: createDto.type,
@@ -251,6 +271,7 @@ export class DiaryEventService {
       // PR 2: status explícito — default PUBLICADO (professor salva = publica)
       // Se o cliente enviar RASCUNHO explicitamente, respeita.
       status: createDto.status ?? 'PUBLICADO',
+      // GATE RETROATIVO (segurança produção): edição de data anterior exige planning aprovado no alvo
       ...(createDto.retroactiveEdit ? {
         retroactiveEdit: true,
         retroactiveNote: createDto.retroactiveNote ?? null,

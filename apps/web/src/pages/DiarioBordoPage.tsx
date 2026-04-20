@@ -733,6 +733,11 @@ export default function DiarioBordoPage() {
   const [painelDiario, setPainelDiario] = useState<DiaryEntry | null>(null);
   // PR 141: ID do diário sendo editado — quando preenchido, salvarDiario usa PATCH em vez de POST
   const [diarioEditandoId, setDiarioEditandoId] = useState<string | null>(null);
+  // AUDITORIA RETROATIVA: modal de justificativa obrigatória
+  const [modalJustificativaAberto, setModalJustificativaAberto] = useState(false);
+  const [justificativaRetroativa, setJustificativaRetroativa] = useState('');
+  const [modalJustificativaTipo, setModalJustificativaTipo] = useState<'ocorrencia' | 'registro' | ''>('');
+  const [pendingRetroativoAction, setPendingRetroativoAction] = useState<(() => void) | null>(null);
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -937,6 +942,14 @@ export default function DiarioBordoPage() {
   async function salvarOcorrencia() {
     if (!criancaSelecionadaOcorr) { toast.error('Selecione uma criança'); return; }
     if (!ocorrForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
+    // AUDITORIA: ocorrência retroativa exige justificativa
+    if (isDataRetroativa(ocorrForm.eventDate)) {
+      solicitarJustificativa('ocorrencia', () => executarSalvarOcorrencia());
+      return;
+    }
+    await executarSalvarOcorrencia();
+  }
+  async function executarSalvarOcorrencia() {
     setSavingOcorr(true);
     try {
       // Resolver classroomId: usar o do estado ou buscar a primeira turma acessível
@@ -1570,6 +1583,29 @@ export default function DiarioBordoPage() {
     toast.success('Rascunho descartado.');
   }
 
+  function isDataRetroativa(data: string): boolean {
+    return data < getPedagogicalToday();
+  }
+  function solicitarJustificativa(
+    tipo: 'ocorrencia' | 'registro',
+    acao: () => void,
+  ) {
+    setModalJustificativaTipo(tipo);
+    setJustificativaRetroativa('');
+    setPendingRetroativoAction(() => acao);
+    setModalJustificativaAberto(true);
+  }
+  async function confirmarJustificativa() {
+    if (!justificativaRetroativa.trim()) {
+      toast.error('A justificativa é obrigatória para esta edição auditada.');
+      return;
+    }
+    pendingRetroativoAction?.();
+    setModalJustificativaAberto(false);
+    setJustificativaRetroativa('');
+    setPendingRetroativoAction(null);
+  }
+
   async function salvarDiario() {
     if (!chamadaCarregada) {
       toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
@@ -1831,6 +1867,43 @@ export default function DiarioBordoPage() {
   }, [aba, diarioEditandoId, diarioPublicadoParaData]);
 
   return (
+    <>
+    {modalJustificativaAberto && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <TriangleAlert className="h-5 w-5 text-amber-500" />
+            <h2 className="text-base font-semibold text-gray-800">
+              Justificativa Obrigatória
+            </h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            {modalJustificativaTipo === 'ocorrencia'
+              ? 'Alterar ocorrências retroativamente exige justificativa registrada em auditoria.'
+              : 'Alterar registros importantes retroativamente exige justificativa registrada.'}
+          </p>
+          <Textarea
+            value={justificativaRetroativa}
+            onChange={e => setJustificativaRetroativa(e.target.value)}
+            placeholder="Descreva o motivo da alteração retroativa..."
+            className="min-h-24 text-sm"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm"
+              onClick={() => {
+                setModalJustificativaAberto(false);
+                setPendingRetroativoAction(null);
+              }}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={confirmarJustificativa}
+              className="bg-amber-600 hover:bg-amber-700 text-white">
+              Confirmar e Salvar
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
       {/* PR 1: Breadcrumb e navegação de volta ao calendário */}
       <nav className="flex items-center gap-2 text-sm text-gray-500 -mt-4 mb-4">
@@ -4163,5 +4236,6 @@ export default function DiarioBordoPage() {
         </div>
       )}
     </PageShell>
+    </>
   );
 }

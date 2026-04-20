@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -10,7 +11,10 @@ import { RdxService } from './rdx.service';
 @Controller('rdx')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RdxController {
-  constructor(private readonly svc: RdxService) {}
+  constructor(
+    private readonly svc: RdxService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * POST /rdx
@@ -64,5 +68,37 @@ export class RdxController {
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   adicionarFotos(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.adicionarFotos(id, dto, user);
+  }
+
+  /**
+   * POST /rdx/enviar-semanal
+   * Marcar todas as fotos da semana como enviadas ao Regional de Ensino
+   */
+  @Post('enviar-semanal')
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
+  async enviarSemanal(
+    @Body() body: { classroomId: string; semana: string },
+    @CurrentUser() user: JwtPayload,
+  ) {
+    if (!body.classroomId || !body.semana) {
+      throw new BadRequestException('classroomId e semana são obrigatórios');
+    }
+    // Marcar todas as fotos do mês/semana como enviadas ao Regional
+    await this.prisma.relatorioFoto.updateMany({
+      where: {
+        classroomId: body.classroomId,
+        weeklyReportSent: false,
+        createdAt: {
+          gte: new Date(`${body.semana}-01T00:00:00`),
+          lte: new Date(`${body.semana}-31T23:59:59`),
+        },
+      },
+      data: {
+        weeklyReportSent: true,
+        weeklyReportSentAt: new Date(),
+        weeklyReportRecipient: `Regional — enviado por ${user.sub}`,
+      },
+    });
+    return { success: true, message: 'Fotos da semana marcadas como enviadas ao Regional.' };
   }
 }
