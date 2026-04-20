@@ -95,8 +95,8 @@ function getLocalDateStr(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Máximo de dias retroativos permitidos (G4 FIX: 5 dias conforme regra de negócio) */
-const MAX_RETROATIVO = 5;
+/** Máximo de dias retroativos permitidos — 30 dias para permitir registro de chamadas em atraso */
+const MAX_RETROATIVO = 30;
 
 // ─── Visão da Coordenação (UNIDADE / STAFF_CENTRAL) ──────────────────────────
 function ChamadaCoordenacaoView() {
@@ -560,7 +560,28 @@ function ControleFaltasProfessorView() {
         </button>
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-blue-500" />
-          <span className="font-semibold text-gray-700 text-sm">{formatarData(selectedDate)}</span>
+          <input
+            type="date"
+            value={selectedDate}
+            max={hoje}
+            min={(() => {
+              const m = new Date(hoje + 'T12:00:00');
+              m.setDate(m.getDate() - MAX_RETROATIVO);
+              return getLocalDateStr(m);
+            })()}
+            onChange={e => {
+              const val = e.target.value;
+              if (!val) return;
+              const d = new Date(val + 'T12:00:00').getDay();
+              if (d === 0 || d === 6) {
+                toast.error('Fins de semana não são dias letivos.');
+                return;
+              }
+              setSelectedDate(val);
+            }}
+            className="border-0 bg-transparent font-semibold text-gray-700 text-sm focus:outline-none cursor-pointer"
+            title="Clique para escolher a data"
+          />
           {isHoje && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Hoje</span>
           )}
