@@ -842,6 +842,13 @@ export default function PlanoDeAulaNovoPage() {
                   disabled={bloqueado}
                   className={occupiedDates.length > 0 ? 'border-amber-400' : ''}
                 />
+                {startDate && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR', {
+                      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+                    })}
+                  </p>
+                )}
               </div>
               <div>
                 <Label>

@@ -1259,7 +1259,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                       </>
                                     )}
                                     <button
-                                      onClick={() => navigate(`/app/planejamentos/${plan.id}`)}
+                                      onClick={() => navigate(`/app/planejamento/${plan.id}/conferir`)}
                                       className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
                                     >
                                       Ver →

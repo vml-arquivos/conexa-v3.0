@@ -665,6 +665,28 @@ export default function DiarioCalendarioPage() {
         </div>
       )}
 
+      {/* ── Legenda ── */}
+      {!loading && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 pb-2 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            Publicado
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+            Rascunho
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full border-2 border-blue-400 flex-shrink-0" />
+            Hoje
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-gray-200 flex-shrink-0" />
+            Fins de semana (não letívo)
+          </span>
+        </div>
+      )}
+
       {/* ── CTA Diário de Hoje ── */}
       {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (() => {
         const diaSemana = new Date(hoje + 'T12:00:00').getDay();

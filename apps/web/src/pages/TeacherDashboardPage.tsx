@@ -460,8 +460,8 @@ export default function TeacherDashboardPage() {
       )}
 
       {data?.hasClassroom && (
-        <div className="space-y-6">
-          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+        <div className="space-y-6 overflow-x-hidden">
+          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr] max-w-full">
             <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-5 text-white shadow-xl shadow-slate-200/70">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-4">
