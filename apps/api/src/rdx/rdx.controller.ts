@@ -72,7 +72,8 @@ export class RdxController {
 
   /**
    * POST /rdx/enviar-semanal
-   * Marcar todas as fotos da semana como enviadas ao Regional de Ensino
+   * Marcar todas as fotos do mês como enviadas ao Regional de Ensino.
+   * body.semana: string no formato "YYYY-MM" (ex: "2026-04")
    */
   @Post('enviar-semanal')
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
@@ -83,14 +84,22 @@ export class RdxController {
     if (!body.classroomId || !body.semana) {
       throw new BadRequestException('classroomId e semana são obrigatórios');
     }
-    // Marcar todas as fotos do mês/semana como enviadas ao Regional
+
+    // Calcular início e fim do mês a partir de "YYYY-MM"
+    const [ano, mes] = body.semana.split('-').map(Number);
+    if (!ano || !mes || mes < 1 || mes > 12) {
+      throw new BadRequestException('semana deve estar no formato YYYY-MM (ex: 2026-04)');
+    }
+    const inicio = new Date(ano, mes - 1, 1, 0, 0, 0);
+    const fim    = new Date(ano, mes, 0, 23, 59, 59); // último dia do mês
+
     await this.prisma.relatorioFoto.updateMany({
       where: {
         classroomId: body.classroomId,
         weeklyReportSent: false,
-        createdAt: {
-          gte: new Date(`${body.semana}-01T00:00:00`),
-          lte: new Date(`${body.semana}-31T23:59:59`),
+        dataAtividade: {
+          gte: inicio,
+          lte: fim,
         },
       },
       data: {
@@ -99,6 +108,7 @@ export class RdxController {
         weeklyReportRecipient: `Regional — enviado por ${user.sub}`,
       },
     });
+
     return { success: true, message: 'Fotos da semana marcadas como enviadas ao Regional.' };
   }
 }
