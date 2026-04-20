@@ -84,7 +84,6 @@ export class RdxController {
     if (!body.classroomId || !body.semana) {
       throw new BadRequestException('classroomId e semana são obrigatórios');
     }
-
     // Calcular início e fim do mês a partir de "YYYY-MM"
     const [ano, mes] = body.semana.split('-').map(Number);
     if (!ano || !mes || mes < 1 || mes > 12) {
@@ -92,7 +91,6 @@ export class RdxController {
     }
     const inicio = new Date(ano, mes - 1, 1, 0, 0, 0);
     const fim    = new Date(ano, mes, 0, 23, 59, 59); // último dia do mês
-
     await this.prisma.relatorioFoto.updateMany({
       where: {
         classroomId: body.classroomId,
@@ -108,7 +106,6 @@ export class RdxController {
         weeklyReportRecipient: `Regional — enviado por ${user.sub}`,
       },
     });
-
     return { success: true, message: 'Fotos da semana marcadas como enviadas ao Regional.' };
   }
 }
