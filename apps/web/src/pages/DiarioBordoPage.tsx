@@ -1575,6 +1575,14 @@ export default function DiarioBordoPage() {
       toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
       return;
     }
+    // GATE 2 (segurança produção): plano de aula aprovado obrigatório para publicação
+    if (!planejamentoHoje) {
+      toast.error(
+        'Publicação bloqueada: nenhum plano de aula aprovado vinculado a hoje. ' +
+        'Solicite à coordenação aprovar o planejamento antes de publicar o diário.',
+      );
+      return;
+    }
     if (!form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Avaliação do Plano de Aula.');
       return;
@@ -1591,8 +1599,12 @@ export default function DiarioBordoPage() {
       toast.error('Seleccione o status de execução do plano do dia: CUMPRIDO, PARCIAL ou NÃO REALIZADO.');
       return;
     }
-    if (!form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
-      toast.error('Preencha a Avaliação do Plano de Aula antes de salvar. Use o botão "Gerar com IA" ou escreva diretamente.');
+    // GATE 3 (segurança produção): avaliação da execução obrigatória para publicação
+    if (!form.avaliacaoPlanoAula.trim()) {
+      toast.error(
+        'Preencha a Avaliação do Plano de Aula antes de publicar. ' +
+        'Use o botão "Gerar com IA" ou escreva diretamente no campo.',
+      );
       return;
     }
     // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)

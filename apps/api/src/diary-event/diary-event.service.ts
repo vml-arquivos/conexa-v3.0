@@ -123,9 +123,16 @@ export class DiaryEventService {
     const resolvedCurriculumEntryId = createDto.curriculumEntryId && CUID_RE.test(createDto.curriculumEntryId)
       ? createDto.curriculumEntryId : undefined;
 
-    // REGRA DE OURO: Diário de Bordo exige planejamento APROVADO ou EM_EXECUCAO ativo
-    // Ocorrências são isentas pois podem ocorrer fora do planejamento pedagógico.
-    const isDiarioBordo = !isOcorrencia && (createDto.type as string) === 'DIARIO_BORDO';
+    // REGRA DE OURO (segurança produção): Diário publicado exige planejamento APROVADO ou EM_EXECUCAO ativo.
+    // Cobre o tipo atual ATIVIDADE_PEDAGOGICA (frontend) e o legado DIARIO_BORDO.
+    // Ocorrências são isentas — podem ocorrer fora do planejamento pedagógico.
+    const isPublicacao =
+      createDto.status === 'PUBLICADO' || createDto.status == null;
+    const isDiarioBordo =
+      !isOcorrencia &&
+      isPublicacao &&
+      ((createDto.type as string) === 'DIARIO_BORDO' ||
+        (createDto.type as string) === 'ATIVIDADE_PEDAGOGICA');
     if (isDiarioBordo && !resolvedPlanningId) {
       // Buscar planejamento ativo da turma para a data do evento
       const activePlanning = await this.prisma.planning.findFirst({
@@ -148,6 +155,24 @@ export class DiaryEventService {
       }
       // Vincular automaticamente ao planejamento ativo encontrado
       (createDto as any).planningId = activePlanning.id;
+    }
+
+    // GATE AVALIAÇÃO (segurança produção): ATIVIDADE_PEDAGOGICA publicada exige avaliação da execução.
+    // Verifica aiContext.avaliacaoPlanoAula (campo principal) ou aiContext.statusExecucaoPlano (fallback).
+    if (
+      !isOcorrencia &&
+      isPublicacao &&
+      (createDto.type as string) === 'ATIVIDADE_PEDAGOGICA'
+    ) {
+      const avaliacaoPreenchida =
+        (createDto.aiContext as any)?.avaliacaoPlanoAula?.toString().trim() ||
+        (createDto.aiContext as any)?.statusExecucaoPlano?.toString().trim();
+      if (!avaliacaoPreenchida) {
+        throw new BadRequestException(
+          'A publicação do Diário do Dia exige a Avaliação do Plano de Aula preenchida. ' +
+          'Preencha o campo "Avaliação do Plano de Aula" antes de publicar.',
+        );
+      }
     }
 
     // VALIDAÇÃO OPCIONAL: Planning (somente se planningId fornecido e válido)
@@ -437,6 +462,31 @@ export class DiaryEventService {
           select: { nonSchoolDays: true },
         });
         assertSchoolDay(nextEventDate, unit?.nonSchoolDays ?? [], BadRequestException);
+      }
+    }
+
+    // GATES DE PUBLICAÇÃO NO UPDATE (segurança produção):
+    // Se o PATCH está promovendo o diário para PUBLICADO, aplicar os mesmos gates do create.
+    const isBeingPublished =
+      updateDto.status === 'PUBLICADO' &&
+      (event.status as string) !== 'PUBLICADO';
+    if (isBeingPublished) {
+      // Gate: plano aprovado obrigatório
+      const planId = updateDto.planningId ?? event.planningId;
+      if (!planId) {
+        throw new BadRequestException(
+          'A publicação do Diário do Dia exige um plano de aula aprovado vinculado ao dia.',
+        );
+      }
+      // Gate: avaliação da execução obrigatória
+      const ctxUpdate = (updateDto.aiContext ?? event.aiContext) as Record<string, any> | null;
+      const avaliacaoPreenchida =
+        ctxUpdate?.avaliacaoPlanoAula?.toString().trim() ||
+        ctxUpdate?.statusExecucaoPlano?.toString().trim();
+      if (!avaliacaoPreenchida) {
+        throw new BadRequestException(
+          'A publicação do Diário do Dia exige a Avaliação do Plano de Aula preenchida.',
+        );
       }
     }
 
