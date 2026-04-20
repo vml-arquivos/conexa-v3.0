@@ -767,6 +767,8 @@ export default function DiarioBordoPage() {
   // Chamada do dia pré-carregada para preencher presenças automaticamente
   const [chamadaCarregada, setChamadaCarregada] = useState(false);
   const [chamadaInfo, setChamadaInfo] = useState<{ presentes: number; ausentes: number; total: number } | null>(null);
+  // Controla visibilidade do banner de rascunho após clicar em "Continuar"
+  const [rascunhoJaCarregado, setRascunhoJaCarregado] = useState(false);
   // Planejamento aprovado do dia
   const [planejamentoHoje, setPlanejamentoHoje] = useState<{
     id: string;
@@ -1567,6 +1569,7 @@ export default function DiarioBordoPage() {
     setForm({ ...getInitialDiaryForm(dateFromQuery), ...currentDraft.form, date: currentDraft.form?.date || form.date });
     setMicrogestoForm({ ...currentDraft.microgestoForm });
     setAvaliacaoIndividualForm({ ...getInitialAvaliacaoIndividualForm(), ...currentDraft.avaliacaoIndividualForm });
+    setRascunhoJaCarregado(true);
     setAba('novo');
     toast.success('Rascunho carregado para continuar a edição.');
   }
@@ -1607,7 +1610,7 @@ export default function DiarioBordoPage() {
   }
 
   async function salvarDiario() {
-    if (!chamadaCarregada) {
+    if (!chamadaCarregada && !isDataRetroativa(form.date)) {
       toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
       return;
     }
@@ -2668,7 +2671,7 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-5 max-w-4xl">
-          {currentDraft && (
+          {currentDraft && !rascunhoJaCarregado && (
             <Card className="border border-emerald-200 bg-emerald-50/70 shadow-sm">
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
