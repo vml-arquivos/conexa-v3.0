@@ -929,6 +929,10 @@ model DiaryEvent {
   // Mídia (JSONB)
   mediaUrls Json? // array de URLs de mídia
 
+  // Edição retroativa
+  retroactiveEdit Boolean @default(false)
+  retroactiveNote String? @db.Text
+
   // Status
   status DiaryEventStatus @default(RASCUNHO)
 
@@ -1619,6 +1623,13 @@ model RelatorioFoto {
   criadoPorId   String      @db.VarChar(255)
   publicado     Boolean     @default(false)
   publicadoEm   DateTime?
+  // Vínculo com diário e metadados pedagógicos
+  diaryEventId            String?  // vincula foto ao diário do dia
+  activityDescription     String?  @db.VarChar(500) // descrição da atividade fotografada
+  campoExperiencia        String?  @db.VarChar(100) // campo da BNCC
+  weeklyReportSent        Boolean  @default(false)
+  weeklyReportSentAt      DateTime?
+  weeklyReportRecipient   String?  @db.VarChar(255)
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
   mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)

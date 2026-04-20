@@ -710,7 +710,7 @@ export default function DiarioBordoPage() {
   // Se vier com ?aba=novo (via calendário) ou com ?date= (via chamada), abrir direto no formulário
   const abaInicial: 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' =
     (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
-  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>(abaInicial);
+  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | 'fotos'>(abaInicial);
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
@@ -1640,6 +1640,7 @@ export default function DiarioBordoPage() {
           childId,
           classroomId,
           status: 'PUBLICADO',
+          ...(form.date < getPedagogicalToday() ? { retroactiveEdit: true, retroactiveNote: `Registro retroativo criado em ${new Date().toLocaleDateString('pt-BR')}` } : {}),
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
@@ -1889,6 +1890,7 @@ export default function DiarioBordoPage() {
           { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
+          { id: 'fotos', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
         ].filter(tab => {
           if (!isApenasLeitura) return true;
           // Coordenação/Gestão: apenas leitura — ocultar abas de criação
@@ -2649,11 +2651,22 @@ export default function DiarioBordoPage() {
                   <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                   {(() => {
                     const d = new Date(form.date + 'T12:00:00').getDay();
-                    return (d === 0 || d === 6) ? (
-                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> Fim de semana — dia não letivo. Altere a data.
-                      </p>
-                    ) : null;
+                    const hoje = getPedagogicalToday();
+                    const isRetroativo = form.date < hoje;
+                    return (
+                      <>
+                        {(d === 0 || d === 6) && (
+                          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> Fim de semana — dia não letivo. Altere a data.
+                          </p>
+                        )}
+                        {isRetroativo && d !== 0 && d !== 6 && (
+                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> Edição retroativa — este diário será marcado como editado após a data original.
+                          </p>
+                        )}
+                      </>
+                    );
                   })()}
                 </div>
                 {criancas.length === 0 && (
@@ -3994,6 +4007,102 @@ export default function DiarioBordoPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── FOTOS DA TURMA — REGISTRO OBRIGATÓRIO DE ATIVIDADES ─── */}
+      {aba === 'fotos' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            📸 As fotos da turma são registros obrigatórios das atividades pedagógicas executadas.
+            Devem ser enviadas semanalmente ao Regional de Ensino.
+            Vincule cada foto ao campo de experiência da BNCC e à atividade realizada.
+          </div>
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Camera className="h-4 w-4" /> Registrar Foto de Atividade
+              </h3>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Descrição da Atividade *</Label>
+                <Input placeholder="Ex: Brincadeira de roda — eu, o outro e o nós" className="text-sm" id="foto-desc" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Campo de Experiência (BNCC)</Label>
+                <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" id="foto-campo">
+                  <option value="">Selecione...</option>
+                  {[
+                    { id: 'eu-outro-nos', label: 'O eu, o outro e o nós' },
+                    { id: 'corpo-gestos', label: 'Corpo, gestos e movimentos' },
+                    { id: 'tracos-sons', label: 'Traços, sons, cores e formas' },
+                    { id: 'escuta-fala', label: 'Escuta, fala, pensamento e imaginação' },
+                    { id: 'espacos-tempos', label: 'Espaços, tempos, quantidades e relações' },
+                  ].map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Foto</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-700"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem máx. 5 MB'); return; }
+                    try {
+                      const desc = (document.getElementById('foto-desc') as HTMLInputElement)?.value?.trim();
+                      const campo = (document.getElementById('foto-campo') as HTMLSelectElement)?.value;
+                      if (!desc) { toast.error('Descreva a atividade antes de enviar a foto'); return; }
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      fd.append('description', desc);
+                      fd.append('campoExperiencia', campo || '');
+                      fd.append('classroomId', classroomId || '');
+                      fd.append('date', form.date);
+                      await http.post('/rdx/upload', fd, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                      });
+                      toast.success('Foto registrada com sucesso!');
+                      e.target.value = '';
+                    } catch (err: any) {
+                      toast.error(extractErrorMessage(err, 'Erro ao enviar foto'));
+                    }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-200 bg-amber-50/30">
+            <CardContent className="pt-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-700">Envio Semanal ao Regional</p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    As fotos da semana atual devem ser enviadas até sexta-feira.
+                    O envio gera registro de auditoria automático.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0 flex items-center gap-1"
+                  onClick={async () => {
+                    try {
+                      await http.post('/rdx/enviar-semanal', {
+                        classroomId,
+                        semana: form.date.substring(0, 7),
+                      });
+                      toast.success('Fotos marcadas como enviadas ao Regional!');
+                    } catch (err: any) {
+                      toast.error(extractErrorMessage(err, 'Erro ao registrar envio'));
+                    }
+                  }}
+                >
+                  <UploadCloud className="h-3.5 w-3.5" /> Marcar como Enviado
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 

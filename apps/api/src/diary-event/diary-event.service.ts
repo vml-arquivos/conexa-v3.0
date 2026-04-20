@@ -251,6 +251,10 @@ export class DiaryEventService {
       // PR 2: status explícito — default PUBLICADO (professor salva = publica)
       // Se o cliente enviar RASCUNHO explicitamente, respeita.
       status: createDto.status ?? 'PUBLICADO',
+      ...(createDto.retroactiveEdit ? {
+        retroactiveEdit: true,
+        retroactiveNote: createDto.retroactiveNote ?? null,
+      } : {}),
       createdBy: user.sub,
       mantenedoraId: classroom.unit.mantenedoraId,
       unitId: classroom.unitId,

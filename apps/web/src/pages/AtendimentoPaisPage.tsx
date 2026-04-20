@@ -18,6 +18,7 @@ import {
   UserCheck,
   ChevronDown,
   ChevronUp,
+  Printer,
 } from 'lucide-react';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -216,6 +217,52 @@ export function AtendimentoPaisPage() {
     } catch (e) {
       setErro(getErrorMessage(e));
     }
+  };
+
+  const imprimirAtendimento = (at: Atendimento) => {
+    const crianca = at.child ? `${at.child.firstName} ${at.child.lastName}`.trim() : '—';
+    const professor = at.child?.enrollments?.[0]?.classroom?.teachers?.[0]?.teacher
+      ? `${at.child.enrollments[0].classroom.teachers[0].teacher.firstName} ${at.child.enrollments[0].classroom.teachers[0].teacher.lastName}`.trim()
+      : '—';
+    const data = new Date(at.dataAtendimento).toLocaleDateString('pt-BR', {
+      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+    });
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`
+      <!DOCTYPE html><html><head>
+      <meta charset="UTF-8">
+      <title>Atendimento aos Pais — Conexa V3</title>
+      <style>
+        @media print { body { margin: 2cm; } .no-print { display: none; } }
+        body { font-family: Arial, sans-serif; font-size: 13px; color: #111; }
+        h1 { font-size: 16px; text-align: center; margin-bottom: 4px; }
+        h2 { font-size: 13px; text-align: center; margin-bottom: 20px; color: #555; }
+        .section { margin-bottom: 16px; }
+        .label { font-weight: bold; font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 4px; }
+        .value { border: 1px solid #ccc; border-radius: 4px; padding: 8px; min-height: 40px; background: #fafafa; white-space: pre-wrap; }
+        .assinaturas { display: flex; gap: 40px; margin-top: 40px; }
+        .ass-box { flex: 1; border-top: 2px solid #333; padding-top: 8px; text-align: center; font-size: 12px; }
+        .rodape { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
+      </style>
+      </head><body>
+      <h1>Registro de Atendimento aos Pais / Responsáveis</h1>
+      <h2>Conexa V3 — Sistema Pedagógico</h2>
+      <div class="section"><div class="label">Data do Atendimento</div><div class="value">${data}</div></div>
+      <div class="section"><div class="label">Criança</div><div class="value">${crianca}</div></div>
+      <div class="section"><div class="label">Responsável</div><div class="value">${at.responsavelNome}${at.responsavelRelacao ? ' (' + at.responsavelRelacao + ')' : ''}</div></div>
+      <div class="section"><div class="label">Professor(a)</div><div class="value">${professor}</div></div>
+      <div class="section"><div class="label">Assunto</div><div class="value">${at.assunto}</div></div>
+      ${at.descricao ? '<div class="section"><div class="label">Descrição</div><div class="value">' + at.descricao + '</div></div>' : ''}
+      ${at.encaminhamento ? '<div class="section"><div class="label">Encaminhamentos</div><div class="value">' + at.encaminhamento + '</div></div>' : ''}
+      <div class="assinaturas">
+        <div class="ass-box">Assinatura do(s) Responsável(is)<br><br><br><br>Nome: ___________________________</div>
+        <div class="ass-box">Assinatura do(a) Professor(a)<br><br><br><br>Nome: ${professor}</div>
+      </div>
+      <div class="rodape">Documento gerado pelo Conexa V3 em ${new Date().toLocaleDateString('pt-BR')} — Uso interno</div>
+      </body></html>`);
+    w.document.close();
+    w.print();
   };
 
   return (
@@ -551,6 +598,13 @@ export function AtendimentoPaisPage() {
                     {STATUS_ICONES[at.status]}
                     {STATUS_LABELS[at.status]}
                   </span>
+                  <button
+                    onClick={e => { e.stopPropagation(); imprimirAtendimento(at); }}
+                    className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 flex-shrink-0"
+                    title="Gerar PDF para assinatura"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </button>
                   {expandido === at.id ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
                 </div>
               </div>
