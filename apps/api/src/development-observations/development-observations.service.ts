@@ -21,6 +21,7 @@ export class DevelopmentObservationsService {
       learningProgress, planningParticipation, interests, challenges,
       psychologicalNotes, developmentAlerts,
       recommendations, nextSteps,
+      atividadeArquivoUrl, atividadeArquivoNome,
     } = dto;
 
     return this.prisma.developmentObservation.create({
@@ -35,6 +36,8 @@ export class DevelopmentObservationsService {
         learningProgress, planningParticipation, interests, challenges,
         psychologicalNotes, developmentAlerts,
         recommendations, nextSteps,
+        ...(atividadeArquivoUrl ? { atividadeArquivoUrl } : {}),
+        ...(atividadeArquivoNome ? { atividadeArquivoNome } : {}),
         createdBy: user.sub,
       },
       include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
