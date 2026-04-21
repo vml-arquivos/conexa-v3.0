@@ -27,6 +27,8 @@ export interface DiaryObservacaoIndividual {
   label?: string;
   /** Grupo: desempenho | comportamento | alerta */
   grupo?: string;
+  /** Tipo de observação: DESCRITIVA | MICROGESTO | ALERTA | NARRATIVA */
+  tipo?: string;
   /** IDs das crianças que se enquadram */
   criancaIds?: string[];
   /** Formato narrativo salvo em alguns registros */
@@ -127,6 +129,13 @@ const ROTINA_LABELS: Record<string, string> = {
   repouso: 'Repouso',
   atividadeComplementar: 'Atividade Complementar',
   rodaEncerramento: 'Roda de Encerramento',
+};
+
+const TIPO_OBS_LABELS: Record<string, { label: string; cor: string }> = {
+  DESCRITIVA:  { label: 'Descritiva',  cor: '#4f46e5' },
+  MICROGESTO:  { label: 'Microgesto', cor: '#0891b2' },
+  ALERTA:      { label: 'Alerta',     cor: '#dc2626' },
+  NARRATIVA:   { label: 'Narrativa',  cor: '#7c3aed' },
 };
 
 const GRUPO_LABELS: Record<string, string> = {
@@ -360,6 +369,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
         <div class="obs-grupo-title">${esc(GRUPO_LABELS[grupo] ?? grupo)}</div>
         ${items.map(item => `
           <div class="obs-item">
+            ${item.tipo && TIPO_OBS_LABELS[item.tipo] ? `<span style="display:inline-block;padding:1px 7px;border-radius:9px;font-size:7.5pt;font-weight:700;color:#fff;background:${TIPO_OBS_LABELS[item.tipo].cor};margin-bottom:3px">${TIPO_OBS_LABELS[item.tipo].label}</span>` : ''}
             <div class="obs-comportamento">${esc(item.label) || 'Observação registrada'}</div>
             <div class="obs-criancas">
               ${(item.criancaIds ?? [])

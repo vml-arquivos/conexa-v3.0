@@ -400,6 +400,7 @@ model User {
   materialRequestsCreated MaterialRequest[]  @relation("CreatedBy")
    auditLogs               AuditLog[]         @relation("User")
   developmentReports      DevelopmentReport[]
+  microgestosRegistrados  MicrogestoRegistro[] @relation("MicrogestosRegistrados")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([email])
@@ -587,7 +588,9 @@ model Child {
   developmentObs              DevelopmentObservation[]
   developmentReports          DevelopmentReport[]
   acompanhamentosNutricionais AcompanhamentoNutricional[]
-
+  microgestosRegistros        MicrogestoRegistro[]
+  childProfileStats           ChildProfileStats?
+  alertasAluno                AlertaAluno[]
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([isActive])
@@ -662,6 +665,8 @@ model Classroom {
   reportBases      ReportBase[]
    classroomPosts       ClassroomPost[]
   developmentReports   DevelopmentReport[]
+  microgestosRegistros MicrogestoRegistro[]
+  alertasAluno         AlertaAluno[]
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -2323,4 +2328,120 @@ model DevelopmentReport {
   @@index([childId, createdAt(sort: Desc)])
   @@index([classroomId, period])
   @@map("development_report")
+}
+
+// ============================================================================
+// MICROGESTOS, CHILD STATS E ALERTAS — feat/diario-zero-digitacao
+// ============================================================================
+
+enum MicrogestoCategoria {
+  DESENVOLVIMENTO_MOTOR
+  LINGUAGEM_COMUNICACAO
+  INTERACAO_SOCIAL
+  REGULACAO_EMOCIONAL
+  COGNICAO_EXPLORACAO
+  CUIDADO_SAUDE
+  ALIMENTACAO
+  AUTONOMIA
+}
+
+enum MicrogestoNivel {
+  ALCANCADO
+  EM_DESENVOLVIMENTO
+  REQUER_ATENCAO
+}
+
+enum AlertaTipo {
+  EVASAO_RISCO
+  FALTAS_CONSECUTIVAS
+  FALTAS_FREQUENTES
+  PADRAO_COMPORTAMENTO_NEGATIVO
+  PADRAO_ALIMENTACAO_NEGATIVO
+  PADRAO_SAUDE_NEGATIVO
+}
+
+enum AlertaStatus {
+  ATIVO
+  LIDO
+  RESOLVIDO
+}
+
+model MicrogestoRegistro {
+  id              String              @id @default(cuid())
+  childId         String
+  classroomId     String
+  diaryEventId    String?
+  professorId     String
+  unitId          String
+  mantenedoraId   String
+  data            DateTime
+  categoria       MicrogestoCategoria
+  nivel           MicrogestoNivel
+  tags            Json                @default("[]")
+  descricao       String?             @db.VarChar(500)
+  campoExperiencia String?            @db.VarChar(100)
+  horario         String?             @db.VarChar(10)
+  createdAt       DateTime            @default(now())
+
+  child      Child      @relation(fields: [childId], references: [id])
+  classroom  Classroom  @relation(fields: [classroomId], references: [id])
+  professor  User       @relation("MicrogestosRegistrados", fields: [professorId], references: [id])
+
+  @@index([childId])
+  @@index([classroomId])
+  @@index([unitId])
+  @@index([mantenedoraId])
+  @@index([data])
+  @@map("microgesto_registro")
+}
+
+model ChildProfileStats {
+  id                      String   @id @default(cuid())
+  childId                 String   @unique
+  unitId                  String
+  mantenedoraId           String
+  totalDiasRegistrados    Int      @default(0)
+  totalFaltas             Int      @default(0)
+  faltasUltimos30Dias     Int      @default(0)
+  faltasConsecutivas      Int      @default(0)
+  ultimaPresenca          DateTime?
+  totalMicrogestos        Int      @default(0)
+  microgestosCategoria    Json     @default("{}")
+  microgestosNivel        Json     @default("{}")
+  totalObservacoes        Int      @default(0)
+  observacoesPorCategoria Json     @default("{}")
+  alertasAtivos           Int      @default(0)
+  ultimaAtualizacao       DateTime @default(now()) @updatedAt
+
+  child Child @relation(fields: [childId], references: [id])
+
+  @@index([unitId])
+  @@index([mantenedoraId])
+  @@map("child_profile_stats")
+}
+
+model AlertaAluno {
+  id            String       @id @default(cuid())
+  childId       String
+  classroomId   String
+  unitId        String
+  mantenedoraId String
+  tipo          AlertaTipo
+  status        AlertaStatus @default(ATIVO)
+  titulo        String       @db.VarChar(255)
+  descricao     String       @db.Text
+  dados         Json         @default("{}")
+  geradoEm      DateTime     @default(now())
+  lidoEm        DateTime?
+  resolvidoEm   DateTime?
+  resolvidoPor  String?
+
+  child     Child     @relation(fields: [childId], references: [id])
+  classroom Classroom @relation(fields: [classroomId], references: [id])
+
+  @@index([childId])
+  @@index([classroomId])
+  @@index([unitId])
+  @@index([status])
+  @@map("alerta_aluno")
 }

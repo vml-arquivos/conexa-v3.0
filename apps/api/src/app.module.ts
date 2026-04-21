@@ -45,6 +45,8 @@ import { AlimentosModule } from './alimentos/alimentos.module';
 import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
 import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/acompanhamento-nutricional.module';
 import { PlanningConferenciaModule } from './planning-conferencia/planning-conferencia.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { AlertasModule } from './alertas/alertas.module';
 
 @Module({
   imports: [
@@ -93,6 +95,8 @@ import { PlanningConferenciaModule } from './planning-conferencia/planning-confe
     ConfiguracaoRefeicaoModule,
     AcompanhamentoNutricionalModule,
     PlanningConferenciaModule,
+    ScheduleModule.forRoot(),
+    AlertasModule,
   ],
   controllers: [AppController],
   providers: [

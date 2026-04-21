@@ -58,7 +58,9 @@ function calcularIdade(dob: string | null | undefined): string {
 export default function PainelAnaliticoCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
-  const [aba, setAba] = useState<'bncc'|'diario'>('bncc');
+  const [aba, setAba] = useState<'bncc'|'diario'|'microgestos'>('bncc');
+  const [microgestos, setMicrogestos] = useState<any[]>([]);
+  const [loadingMg, setLoadingMg] = useState(false);
   const [loadingC, setLoadingC] = useState(true);
   const [loadingD, setLoadingD] = useState(false);
   const [central, setCentral] = useState<any>(null);
@@ -84,6 +86,15 @@ export default function PainelAnaliticoCriancaPage() {
 
   useEffect(() => { carregarCentral(); }, [carregarCentral]);
   useEffect(() => { if (aba === 'diario' && eventos.length === 0) carregarDiario(); }, [aba, carregarDiario, eventos.length]);
+
+  useEffect(() => {
+    if (aba !== 'microgestos' || microgestos.length > 0) return;
+    setLoadingMg(true);
+    http.get(`/microgesto/child/${childId}`)
+      .then(r => setMicrogestos(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => {})
+      .finally(() => setLoadingMg(false));
+  }, [aba, childId, microgestos.length]);
 
   const { radarData, evolData, distData, resumo } = useMemo(() => {
     const rdics = central?.rdics ?? [];
@@ -169,10 +180,10 @@ export default function PainelAnaliticoCriancaPage() {
           ))}
         </div>
 
-        <div className="flex gap-1 border-b border-gray-200">
-          {(['bncc','diario'] as const).map(a=>(
+        <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+          {(['bncc','diario','microgestos'] as const).map(a=>(
             <button key={a} onClick={()=>setAba(a)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${aba===a?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {a==='bncc'?<><Brain className="h-4 w-4"/>Indicadores BNCC</>:<><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</>}
+              {a==='bncc' ? <><Brain className="h-4 w-4"/>Indicadores BNCC</> : a==='diario' ? <><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</> : <><Activity className="h-4 w-4"/>Microgestos{microgestos.length>0&&<span className="bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full">{microgestos.length}</span>}</>}
             </button>
           ))}
         </div>
@@ -305,6 +316,85 @@ export default function PainelAnaliticoCriancaPage() {
           </div>
         )}
 
+        {aba === 'microgestos' && (
+          <div className="space-y-4">
+            {loadingMg ? (
+              <LoadingState message="Carregando microgestos..." />
+            ) : microgestos.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum microgesto registrado ainda.</p>
+                <p className="text-xs mt-1">Registre microgestos no Diário de Bordo para visualizar o portfólio.</p>
+              </div>
+            ) : (
+              <>
+                {/* Resumo por categoria */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Distribuição por Área de Desenvolvimento</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(
+                        microgestos.reduce((acc: Record<string, number>, m: any) => {
+                          const cat = m.categoria ?? 'OUTRO';
+                          acc[cat] = (acc[cat] ?? 0) + 1;
+                          return acc;
+                        }, {})
+                      ).sort((a,b) => b[1]-a[1]).map(([cat, count]) => (
+                        <div key={cat} className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 w-44 truncate">{cat.replace(/_/g,' ')}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2">
+                            <div className="bg-cyan-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count as number)/microgestos.length*100)}%` }} />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 w-8 text-right">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Distribuição por nível */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Distribuição por Nível</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex gap-3 flex-wrap">
+                      {(['ALCANCADO','EM_DESENVOLVIMENTO','REQUER_ATENCAO'] as const).map(nivel => {
+                        const count = microgestos.filter((m:any) => m.nivel === nivel).length;
+                        const pct = Math.round(count/microgestos.length*100);
+                        const cor = nivel === 'ALCANCADO' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : nivel === 'EM_DESENVOLVIMENTO' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-rose-100 text-rose-700 border-rose-200';
+                        return (
+                          <div key={nivel} className={`flex-1 min-w-[120px] rounded-xl border p-3 text-center ${cor}`}>
+                            <p className="text-2xl font-bold">{count}</p>
+                            <p className="text-xs font-medium mt-0.5">{nivel === 'ALCANCADO' ? '✅ Alcançado' : nivel === 'EM_DESENVOLVIMENTO' ? '🟡 Em Desenvolvimento' : '🔴 Requer Atenção'}</p>
+                            <p className="text-xs opacity-70">{pct}%</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Timeline dos últimos 20 registros */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Últimos Registros</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {microgestos.slice(0,20).map((m: any, i: number) => (
+                        <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${m.nivel === 'ALCANCADO' ? 'bg-emerald-500' : m.nivel === 'EM_DESENVOLVIMENTO' ? 'bg-amber-400' : 'bg-rose-500'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{(m.tags?.[0] ?? m.categoria ?? '').replace(/_/g,' ')}</p>
+                            <p className="text-xs text-gray-400">{m.data ? new Date(m.data).toLocaleDateString('pt-BR') : '—'}</p>
+                            {m.descricao && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{m.descricao}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </PageShell>
   );
