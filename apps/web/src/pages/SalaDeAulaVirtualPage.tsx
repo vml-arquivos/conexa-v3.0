@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isCentral, isMantenedora, isUnidade } from '../api/auth';
@@ -127,6 +127,9 @@ export default function SalaDeAulaVirtualPage() {
   const modoLeitura = isCentral(user) || isMantenedora(user) || isUnidade(user);
   const [aba, setAba] = useState<'feed' | 'novo' | 'desempenho' | 'alunos'>('feed');
   const [posts, setPosts] = useState<ClassroomPost[]>([]);
+  const [feedUnificado, setFeedUnificado] = useState<any[]>([]);
+  const [loadingFeedUnificado, setLoadingFeedUnificado] = useState(false);
+  const [filtroFeedTipo, setFiltroFeedTipo] = useState<'' | 'TURMA' | 'INDIVIDUAL' | 'COM_FOTO'>('');
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState<string>('');
@@ -230,6 +233,25 @@ export default function SalaDeAulaVirtualPage() {
     }
   }
 
+  async function montarFeedUnificado(postsData: any[], observacoesData: any[]) {
+    const itensPosts = postsData.map((p: any) => ({
+      _feedTipo: 'TURMA' as const,
+      _data: p.createdAt,
+      _id: `post-${p.id}`,
+      ...p,
+    }));
+    const itensObs = observacoesData.map((o: any) => ({
+      _feedTipo: 'INDIVIDUAL' as const,
+      _data: o.date ?? o.createdAt,
+      _id: `obs-${o.id}`,
+      ...o,
+    }));
+    const tudo = [...itensPosts, ...itensObs].sort(
+      (a, b) => new Date(b._data).getTime() - new Date(a._data).getTime()
+    );
+    setFeedUnificado(tudo);
+  }
+
   async function loadPosts() {
     setLoading(true);
     try {
@@ -238,9 +260,21 @@ export default function SalaDeAulaVirtualPage() {
       if (turmaId) params.classroomId = turmaId;
       if (filterType) params.type = filterType;
       const res = await http.get('/classroom-posts', { params });
-      setPosts(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+      const postsCarregados = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      setPosts(postsCarregados);
+      // Buscar observações individuais da turma para mesclar no feed
+      try {
+        const obsRes = await http.get('/development-observations', {
+          params: { classroomId: turmaId, limit: 100 },
+        });
+        const obsData = Array.isArray(obsRes.data) ? obsRes.data : obsRes.data?.data ?? [];
+        montarFeedUnificado(postsCarregados, obsData);
+      } catch {
+        montarFeedUnificado(postsCarregados, []);
+      }
     } catch {
       setPosts([]);
+      montarFeedUnificado([], []);
     } finally {
       setLoading(false);
     }
@@ -573,14 +607,100 @@ export default function SalaDeAulaVirtualPage() {
             />
           )}
 
-          {posts.map(post => {
+          {/* Filtros do feed unificado */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {[
+              { id: '', label: '📋 Tudo' },
+              { id: 'TURMA', label: '👥 Da Turma' },
+              { id: 'INDIVIDUAL', label: '👤 Individual' },
+              { id: 'COM_FOTO', label: '📸 Com Foto' },
+            ].map(f => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFiltroFeedTipo(f.id as any)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                  filtroFeedTipo === f.id
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {feedUnificado
+            .filter(item => {
+              if (filtroFeedTipo === 'TURMA') return item._feedTipo === 'TURMA';
+              if (filtroFeedTipo === 'INDIVIDUAL') return item._feedTipo === 'INDIVIDUAL';
+              if (filtroFeedTipo === 'COM_FOTO')
+                return !!(item.atividadeArquivoUrl ?? item.mediaUrls?.[0]);
+              return true;
+            })
+            .map(item => {
+            if (item._feedTipo === 'INDIVIDUAL') {
+              return (
+                <div key={item._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
+                      {(item.child?.firstName?.[0] ?? '?').toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {item.child?.firstName ?? ''} {item.child?.lastName ?? ''}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {item._data
+                          ? new Date(item._data).toLocaleDateString('pt-BR', {
+                              weekday: 'short', day: '2-digit', month: 'short',
+                            })
+                          : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+                      👤 Individual
+                    </span>
+                  </div>
+                  {item.atividadeArquivoUrl?.startsWith('data:image') && (
+                    <img
+                      src={item.atividadeArquivoUrl}
+                      alt={item.atividadeArquivoNome ?? 'Registro'}
+                      className="w-full max-h-64 object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div className="px-4 py-3 space-y-1.5">
+                    {item.atividadeTitulo && (
+                      <p className="text-sm font-semibold text-gray-800">{item.atividadeTitulo}</p>
+                    )}
+                    {item.behaviorDescription && (
+                      <p className="text-sm text-gray-600">{item.behaviorDescription}</p>
+                    )}
+                    {item.developmentAlerts && (
+                      <div className="bg-amber-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-amber-700">⚠️ {item.developmentAlerts}</p>
+                      </div>
+                    )}
+                    {item.psychologicalNotes && (
+                      <div className="bg-purple-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-purple-700">🧠 {item.psychologicalNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            // Card de post da turma — lógica original preservada
+            const post = item;
             const tipoInfo = getTipoInfo(post.type);
             const isExpanded = expandedPost === post.id;
             const totalAlunos = criancas.length;
-            const avaliados = post.performances?.filter(p => p.performance !== 'NAO_AVALIADO').length ?? 0;
+            const avaliados = post.performances?.filter((p: any) => p.performance !== 'NAO_AVALIADO').length ?? 0;
 
             return (
-              <Card key={post.id} className="border-2 hover:border-indigo-100 transition-all">
+              <Card key={item._id} className="border-2 hover:border-indigo-100 transition-all">
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -847,8 +967,6 @@ export default function SalaDeAulaVirtualPage() {
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {[
                   { id: 'registro', label: 'Registrar', icon: <Plus className="h-3.5 w-3.5" /> },
-                  { id: 'hoje', label: 'Hoje', icon: <Clock className="h-3.5 w-3.5" /> },
-                  { id: 'mes', label: 'Este Mês', icon: <BarChart2 className="h-3.5 w-3.5" /> },
                   { id: 'historico', label: 'Histórico', icon: <History className="h-3.5 w-3.5" /> },
                   { id: 'desenvolvimento', label: 'Evolução', icon: <TrendingUp className="h-3.5 w-3.5" /> },
                   { id: 'rdic', label: 'RDIC', icon: <FileText className="h-3.5 w-3.5" /> },
@@ -1054,14 +1172,39 @@ export default function SalaDeAulaVirtualPage() {
               )}
 
               {/* ─── ABA: HISTÓRICO ─── */}
-              {abaAluno === 'historico' && (
+              {abaAluno === 'historico' && (() => {
+                const [filtroHistPeriodo, setFiltroHistPeriodo] = React.useState<'tudo' | 'hoje' | 'mes'>('tudo');
+                const agora = new Date();
+                const obsFiltradas = historicoAluno.filter(h => {
+                  const d = new Date(h.date);
+                  if (filtroHistPeriodo === 'hoje') return d.toDateString() === agora.toDateString();
+                  if (filtroHistPeriodo === 'mes') return d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear();
+                  return true;
+                });
+                return (
                 <div className="space-y-3">
+                  <div className="flex gap-2">
+                    {[
+                      { id: 'tudo', label: 'Tudo' },
+                      { id: 'hoje', label: 'Hoje' },
+                      { id: 'mes', label: 'Este Mês' },
+                    ].map(f => (
+                      <button key={f.id} type="button"
+                        onClick={() => setFiltroHistPeriodo(f.id as any)}
+                        className={`px-3 py-1 rounded-xl border text-xs font-medium transition-all ${
+                          filtroHistPeriodo === f.id
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-indigo-300'
+                        }`}
+                      >{f.label}</button>
+                    ))}
+                  </div>
                   {loadingHistorico ? (
                     <LoadingState message="Carregando histórico..." />
-                  ) : historicoAluno.length === 0 ? (
+                  ) : obsFiltradas.length === 0 ? (
                     <EmptyState title="Nenhum registro ainda" description="Os registros de atividades e observações aparecerão aqui." />
                   ) : (
-                    historicoAluno.map(obs => (
+                    obsFiltradas.map(obs => (
                       <Card key={obs.id} className="border hover:border-indigo-200 transition-all">
                         <CardContent className="pt-4">
                           <div className="flex items-start justify-between mb-2">
@@ -1113,9 +1256,9 @@ export default function SalaDeAulaVirtualPage() {
                       </Card>
                     ))
                   )}
-                </div>
-              )}
-
+                 </div>
+                );
+              })()}
               {/* ─── ABA: DESENVOLVIMENTO ─── */}
               {/* ─── ABA: HOJE ─── */}
               {abaAluno === 'hoje' && (
