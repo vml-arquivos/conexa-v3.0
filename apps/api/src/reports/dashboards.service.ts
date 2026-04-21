@@ -575,11 +575,27 @@ export class DashboardsService {
       },
     });
 
+    // Indicadores de tags das observações dos últimos 30 dias
+    let tagIndicadores: Record<string, number> = {};
+    try {
+      const obsRecentes = await this.prisma.developmentObservation.findMany({
+        where: { classroomId, date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+        select: { tags: true },
+      });
+      for (const obs of obsRecentes) {
+        const tags = Array.isArray(obs.tags) ? obs.tags as string[] : [];
+        for (const tag of tags) {
+          tagIndicadores[tag] = (tagIndicadores[tag] || 0) + 1;
+        }
+      }
+    } catch { /* tabela pode não existir ainda */ }
+
     return {
       totalDiaryEvents,
       unplannedEvents,
       microGesturesFilled,
       activePlanningStatus: activePlanning?.status || null,
+      tagIndicadores,
     };
   }
 

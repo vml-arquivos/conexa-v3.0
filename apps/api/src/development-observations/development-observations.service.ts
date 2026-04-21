@@ -22,6 +22,7 @@ export class DevelopmentObservationsService {
       psychologicalNotes, developmentAlerts,
       recommendations, nextSteps,
       atividadeArquivoUrl, atividadeArquivoNome,
+      tags, indicadores,
     } = dto;
 
     return this.prisma.developmentObservation.create({
@@ -38,6 +39,8 @@ export class DevelopmentObservationsService {
         recommendations, nextSteps,
         ...(atividadeArquivoUrl ? { atividadeArquivoUrl } : {}),
         ...(atividadeArquivoNome ? { atividadeArquivoNome } : {}),
+        ...(tags !== undefined ? { tags } : {}),
+        ...(indicadores !== undefined ? { indicadores } : {}),
         createdBy: user.sub,
       },
       include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },

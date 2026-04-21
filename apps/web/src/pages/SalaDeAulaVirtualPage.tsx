@@ -92,6 +92,24 @@ const TIPOS_POST = [
   { id: 'PLANEJAMENTO', label: 'Planejamento', emoji: '🎯', cor: 'bg-indigo-100 text-indigo-700' },
 ];
 
+const QUICK_TAGS = [
+  { id: 'PARTICIPOU_ATIVAMENTE', label: 'Participou ativamente', categoria: 'participacao', cor: 'bg-green-100 text-green-700 border-green-300' },
+  { id: 'PRECISOU_ESTIMULO', label: 'Precisou de estímulo', categoria: 'participacao', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  { id: 'NAO_PARTICIPOU', label: 'Não participou', categoria: 'participacao', cor: 'bg-red-100 text-red-700 border-red-300' },
+  { id: 'ALEGRE', label: 'Alegre', categoria: 'emocional', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  { id: 'TRANQUILO', label: 'Tranquilo', categoria: 'emocional', cor: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { id: 'AGITADO', label: 'Agitado', categoria: 'emocional', cor: 'bg-orange-100 text-orange-700 border-orange-300' },
+  { id: 'TRISTE', label: 'Triste', categoria: 'emocional', cor: 'bg-gray-100 text-gray-600 border-gray-300' },
+  { id: 'CHOROSO', label: 'Choroso', categoria: 'emocional', cor: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { id: 'SOCIALIZOU_BEM', label: 'Socializou bem', categoria: 'social', cor: 'bg-teal-100 text-teal-700 border-teal-300' },
+  { id: 'ISOLADO', label: 'Isolado', categoria: 'social', cor: 'bg-slate-100 text-slate-700 border-slate-300' },
+  { id: 'CONFLITO_COM_COLEGA', label: 'Conflito com colega', categoria: 'social', cor: 'bg-red-100 text-red-700 border-red-300' },
+  { id: 'COMEU_BEM', label: 'Comeu bem', categoria: 'saude', cor: 'bg-lime-100 text-lime-700 border-lime-300' },
+  { id: 'RECUSOU_REFEICAO', label: 'Recusou refeição', categoria: 'saude', cor: 'bg-amber-100 text-amber-700 border-amber-300' },
+  { id: 'DORMIU_BEM', label: 'Dormiu bem', categoria: 'saude', cor: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+  { id: 'DIFICULDADE_SONO', label: 'Dificuldade no sono', categoria: 'saude', cor: 'bg-violet-100 text-violet-700 border-violet-300' },
+];
+
 const DESEMPENHOS = [
   { id: 'EXCELENTE', label: 'Excelente', emoji: '⭐', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
   { id: 'BOM', label: 'Bom', emoji: '😊', cor: 'bg-green-100 text-green-700 border-green-300' },
@@ -124,6 +142,7 @@ export default function SalaDeAulaVirtualPage() {
   const [estadoEmocional, setEstadoEmocional] = useState('');
   const [notasPsicologicas, setNotasPsicologicas] = useState('');
   const [alertasDesenvolvimento, setAlertasDesenvolvimento] = useState('');
+  const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
   const [recomendacoes, setRecomendacoes] = useState('');
   const [arquivoAtividade, setArquivoAtividade] = useState<File | null>(null);
   const [arquivoPreview, setArquivoPreview] = useState<string>('');
@@ -275,6 +294,7 @@ export default function SalaDeAulaVirtualPage() {
     setEstadoEmocional('');
     setNotasPsicologicas('');
     setAlertasDesenvolvimento('');
+    setTagsSelecionadas([]);
     setRecomendacoes('');
     setArquivoAtividade(null);
     setArquivoPreview('');
@@ -415,6 +435,7 @@ export default function SalaDeAulaVirtualPage() {
         emotionalState: estadoEmocional || undefined,
         psychologicalNotes: notasPsicologicas || undefined,
         developmentAlerts: alertasDesenvolvimento || undefined,
+        tags: tagsSelecionadas.length > 0 ? tagsSelecionadas : undefined,
         recommendations: recomendacoes || undefined,
         // Campos extras para atividade
         atividadeTitulo: atividadeTitulo || undefined,
@@ -433,6 +454,7 @@ export default function SalaDeAulaVirtualPage() {
       setEstadoEmocional('');
       setNotasPsicologicas('');
       setAlertasDesenvolvimento('');
+      setTagsSelecionadas([]);
       setRecomendacoes('');
       setArquivoAtividade(null);
       setArquivoPreview('');
@@ -801,9 +823,17 @@ export default function SalaDeAulaVirtualPage() {
                   <h2 className="font-bold text-gray-900">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</h2>
                   <p className="text-xs text-gray-500">{turmas[0]?.name} · {historicoAluno.length} registro(s)</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => navigate('/app/diario-de-bordo')}>
-                  <FileText className="h-3 w-3 mr-1" /> Diário
-                </Button>
+                <div className="flex gap-1.5">
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/diario-de-bordo')}>
+                    <FileText className="h-3 w-3 mr-1" /> Diário
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/app/painel-analitico-crianca/${alunoSelecionado.id}`)}>
+                    <TrendingUp className="h-3 w-3 mr-1" /> Painel
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/atendimentos-pais')}>
+                    <Users className="h-3 w-3 mr-1" /> Atend.
+                  </Button>
+                </div>
               </div>
 
               {/* ─── Alerta de Alergia ─── */}
@@ -869,6 +899,28 @@ export default function SalaDeAulaVirtualPage() {
                       </div>
                     </div>
 
+                    {/* Quick Tags — zero digitação */}
+                    <div>
+                      <Label className="mb-2 block font-semibold text-sm">Tags Rápidas <span className="text-xs font-normal text-gray-500">(clique para selecionar)</span></Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {QUICK_TAGS.map(tag => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => setTagsSelecionadas(prev =>
+                              prev.includes(tag.id) ? prev.filter(t => t !== tag.id) : [...prev, tag.id]
+                            )}
+                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                              tagsSelecionadas.includes(tag.id)
+                                ? tag.cor + ' ring-2 ring-offset-1 ring-current'
+                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                            }`}
+                          >
+                            {tag.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     {/* Participação e comportamento */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>

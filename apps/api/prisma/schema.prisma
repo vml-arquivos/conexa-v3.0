@@ -2027,7 +2027,10 @@ model DevelopmentObservation {
   developmentAlerts     String? @map("development_alerts") @db.Text
   recommendations       String? @db.Text
   nextSteps             String? @map("next_steps") @db.Text
-
+  atividadeArquivoUrl  String? @map("atividade_arquivo_url") @db.Text
+  atividadeArquivoNome String? @map("atividade_arquivo_nome") @db.VarChar(255)
+  tags                 Json    @default("[]")
+  indicadores          Json    @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
