@@ -167,9 +167,19 @@ function PedagogicoSubNav({
                         <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
                       )}
                     </div>
-                    <p className="text-xs font-semibold text-gray-400 flex-shrink-0">
-                      {dataFmt}
-                    </p>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <p className="text-xs font-semibold text-gray-400">{dataFmt}</p>
+                      <button
+                        onClick={() => navigate(
+                          `/app/diario-calendario?classroomId=${
+                            diario.classroomId ?? diario.classroom?.id ?? ''
+                          }`
+                        )}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+                      >
+                        Ver →
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -561,6 +571,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       className: 'from-emerald-500 via-teal-500 to-cyan-600',
       action: () => setAbaAtiva('relatorios'),
     },
+    {
+      label: 'Atendimentos Pais',
+      desc: 'Registrar reuniões e gerar PDF de comprovante',
+      icon: <Users className="h-5 w-5" />,
+      className: 'from-violet-500 via-purple-500 to-fuchsia-600',
+      action: () => navigate('/app/atendimentos-pais'),
+    },
   ] as const;
 
   const abas = [
@@ -889,31 +906,17 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               </button>
             )}
             <button
-              onClick={() => setAbaAtiva('pedagogico')}
-              className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all"
+              onClick={() => navigate('/app/atendimentos-pais')}
+              className="flex items-center gap-3 p-4 bg-violet-50 border-2 border-violet-200 rounded-2xl text-left hover:bg-violet-100 transition-all"
             >
-              <span className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
-                <ClipboardList className="h-5 w-5" />
+              <span className="w-10 h-10 bg-violet-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
+                <Users className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-blue-800">Diários e cobertura</p>
-                <p className="text-xs text-blue-600">{dashboard?.diariosEstaSemana ?? 0} diários esta semana</p>
-                {resumoDiarios && (
-                  <div className="flex gap-2 mt-1.5 flex-wrap">
-                    {resumoDiarios.climaEmocional?.BOM > 0 && (
-                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                        Clima bom: {resumoDiarios.climaEmocional.BOM}
-                      </span>
-                    )}
-                    {resumoDiarios.execucaoPlano?.CUMPRIDO > 0 && (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
-                        Plano cumprido: {resumoDiarios.execucaoPlano.CUMPRIDO}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <p className="text-sm font-bold text-violet-800">Atendimentos Pais</p>
+                <p className="text-xs text-violet-600">Registrar reunião e gerar PDF</p>
               </div>
-              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
+              <ChevronRight className="h-4 w-4 text-violet-500 ml-auto flex-shrink-0" />
             </button>
           </div>
 
@@ -1001,11 +1004,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       label: 'Diários',
                       color: 'text-blue-600',
                       bg: 'hover:bg-blue-50',
-                      onClick: () => {
-                        setAbaAtiva('diarios' as any);
-                        setFiltroDiarioTurma(turma.nome);
-                        setFiltroDiarioProfessor(turma.professor || '');
-                      },
+                      onClick: () => navigate(
+                        `/app/diario-calendario?classroomId=${turma.id}`
+                      ),
                     },
                     { label: 'Planos', path: `/app/planejamentos?classroomId=${turma.id}`, color: 'text-amber-600', bg: 'hover:bg-amber-50' },
                     { label: 'RDIC', path: `/app/rdic-coord?classroomId=${turma.id}`, color: 'text-violet-600', bg: 'hover:bg-violet-50' },
@@ -1606,7 +1607,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/app/diario-de-bordo?classroomId=${diario.classroomId}`);
+                            navigate(`/app/diario-calendario?classroomId=${diario.classroomId ?? diario.classroom?.id ?? ''}`);
                           }}
                           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
                         >
