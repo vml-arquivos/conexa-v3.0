@@ -1942,6 +1942,16 @@ export default function DiarioBordoPage() {
           </Button>
         </div>
       )}
+      {/* Banner modo leitura para coordenação/gestão */}
+      {isApenasLeitura && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl">
+          <span className="text-blue-500 text-lg">👁️</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-800">Visualização da Coordenação</p>
+            <p className="text-xs text-blue-600">Este diário foi registrado pelo professor. Coordenadores podem visualizar mas não editar.</p>
+          </div>
+        </div>
+      )}
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
@@ -3567,7 +3577,11 @@ export default function DiarioBordoPage() {
               2) Diário publicado para a data (sem ID de edição) → banner bloqueio
               3) Novo diário (nenhum dos anteriores) → Rascunho + Guardar + Cancelar
           */}
-          {diarioEditandoId ? (
+          {isApenasLeitura ? (
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+              <span className="text-xs text-blue-600 font-medium">👁️ Modo visualização — coordenação</span>
+            </div>
+          ) : diarioEditandoId ? (
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
                 {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
