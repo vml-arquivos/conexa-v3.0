@@ -44,7 +44,9 @@ const COORD_GESTAO: MenuItem[] = [
   { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',        icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/rdic-coord',      label: 'RDIC — Revisão',      icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/diario-calendario', label: 'Diário',             icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',  icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',        label: 'RDIC — Revisão',     icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
   { path: '/app/rdic-crianca',    label: 'RDIC por Criança',    icon: <Brain className="h-4 w-4" /> },
   { path: '/app/inteligencia',    label: 'Inteligência',        icon: <Sparkles className="h-4 w-4" /> },
   { path: '/app/reports',         label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },

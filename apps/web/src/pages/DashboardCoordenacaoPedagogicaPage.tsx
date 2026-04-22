@@ -621,7 +621,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4 flex-wrap">
         <button
-          onClick={() => navigate('/app/teacher-dashboard')}
+          onClick={() => navigate('/app/coordenacao-pedagogica')}
           className="hover:text-gray-700 transition-colors"
         >
           Início

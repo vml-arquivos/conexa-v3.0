@@ -232,7 +232,7 @@ export const router = createBrowserRouter([
       {
         path: 'diario-calendario',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <DiarioCalendarioPage />
           </RoleProtectedRoute>
         ),
