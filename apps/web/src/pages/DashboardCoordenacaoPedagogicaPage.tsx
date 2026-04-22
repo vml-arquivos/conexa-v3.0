@@ -10,7 +10,7 @@ import http from '../api/http';
 import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
-  Eye, ThumbsUp, MessageSquare, TrendingUp,
+  Eye, ThumbsUp, MessageSquare, MessageCircle, TrendingUp,
   Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText, ArrowRight,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
@@ -544,39 +544,46 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const diariosRascunho = diarios.filter(d => (d.status || '').toUpperCase() === 'RASCUNHO').length;
   const atalhosExecutivos = [
     {
-      label: 'Diário da Turma',
-      desc: 'Ver calendário de diários e registros do mês',
+      label: 'Diários da Turma',
+      desc: `${diariosPublicados} publicados · ${diariosRascunho} rascunho(s) este mês`,
       icon: <ClipboardList className="h-5 w-5" />,
       className: 'from-sky-600 via-blue-600 to-indigo-700',
       action: () => navigate('/app/diario-calendario'),
     },
     {
+      label: 'Turmas',
+      desc: `${dashboard?.turmas ?? 0} turmas · ${dashboard?.alunosTotal ?? 0} alunos`,
+      icon: <Users className="h-5 w-5" />,
+      className: 'from-violet-500 via-purple-500 to-fuchsia-600',
+      action: () => setAbaAtiva('turmas'),
+    },
+    {
       label: 'Planejamentos',
-      desc: `${dashboard?.planejamentosParaRevisar ?? 0} planejamento(s) aguardando revisão`,
+      desc: `${dashboard?.planejamentosParaRevisar ?? 0} aguardando revisão`,
       icon: <BookOpen className="h-5 w-5" />,
       className: 'from-amber-500 via-orange-500 to-rose-500',
       action: () => setAbaAtiva('planejamentos'),
     },
     {
-      label: 'Pedidos de material',
-      desc: canApprove ? 'Aprovar, devolver ou acompanhar pedidos pendentes' : 'Acompanhar pedidos e itens urgentes',
+      label: 'Atendimentos Pais',
+      desc: 'Registrar reuniões e gerar PDF',
+      icon: <MessageCircle className="h-5 w-5" />,
+      className: 'from-teal-500 via-emerald-500 to-green-600',
+      action: () => navigate('/app/atendimentos-pais'),
+    },
+    {
+      label: 'Pedidos de Material',
+      desc: canApprove ? `${dashboard?.requisicoesParaAnalisar ?? 0} aguardando aprovação` : 'Acompanhar pedidos',
       icon: <ShoppingCart className="h-5 w-5" />,
       className: 'from-rose-500 via-red-500 to-pink-600',
       action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
     },
     {
       label: 'Relatórios',
-      desc: 'Indicadores e registros da unidade',
+      desc: 'Indicadores e análises da unidade',
       icon: <FileText className="h-5 w-5" />,
-      className: 'from-emerald-500 via-teal-500 to-cyan-600',
+      className: 'from-emerald-600 via-teal-600 to-cyan-700',
       action: () => setAbaAtiva('relatorios'),
-    },
-    {
-      label: 'Atendimentos Pais',
-      desc: 'Registrar reuniões e gerar PDF de comprovante',
-      icon: <Users className="h-5 w-5" />,
-      className: 'from-violet-500 via-purple-500 to-fuchsia-600',
-      action: () => navigate('/app/atendimentos-pais'),
     },
   ] as const;
 
@@ -724,7 +731,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             </button>
             {/* Diários → diario-calendario (leitura para coordenador) */}
             <button
-              onClick={() => setAbaAtiva('pedagogico')}
+              onClick={() => navigate('/app/diario-calendario')}
               className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
             >
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Diários</p>
@@ -745,7 +752,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           </div>
 
           {/* Atalhos rápidos */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {atalhosExecutivos.map(item => (
               <button
                 key={item.label}
