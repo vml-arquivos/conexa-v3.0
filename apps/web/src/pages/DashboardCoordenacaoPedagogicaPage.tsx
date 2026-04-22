@@ -722,7 +722,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <p className="mt-1 text-xs text-slate-400">{turmasComChamadaHoje} de {totalTurmasHoje} turmas</p>
               <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver status das turmas →</p>
             </button>
-            {/* Diários → aba pedagógico (sub-aba diários) */}
+            {/* Diários → diario-calendario (leitura para coordenador) */}
             <button
               onClick={() => setAbaAtiva('pedagogico')}
               className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
@@ -730,7 +730,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Diários</p>
               <p className="mt-1.5 text-3xl font-bold group-hover:text-amber-300 transition-colors">{dashboard?.diariosEstaSemana ?? 0}</p>
               <p className="mt-1 text-xs text-slate-400">{diariosPublicados} publicados · {diariosRascunho} rascunho(s)</p>
-              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver diários →</p>
+              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Analisar diários →</p>
             </button>
             {/* Turmas → aba turmas */}
             <button

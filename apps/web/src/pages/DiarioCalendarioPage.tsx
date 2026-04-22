@@ -17,6 +17,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
+import { isUnidade } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -141,6 +142,7 @@ function StatusBadge({ status }: { status: StatusDia }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DiarioCalendarioPage() {
   const { user } = useAuth();
+  const isCoord = isUnidade(user);
   const navigate = useNavigate();
   const hoje = getPedagogicalToday();
 
@@ -553,8 +555,8 @@ export default function DiarioCalendarioPage() {
               return (
                 <div
                   key={data}
-                  onClick={() => abrirDiario(data)}
-                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all duration-150 ${
+                  onClick={() => { if (!isCoord || dia.status !== 'SEM_DIARIO') abrirDiario(data); }}
+                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 ${isCoord && dia.status === 'SEM_DIARIO' ? 'cursor-default' : 'cursor-pointer'} ${
                     isHoje
                       ? 'border-2 border-blue-400 bg-blue-50 shadow-md hover:shadow-lg'
                       : dia.status === 'PUBLICADO'
@@ -598,7 +600,7 @@ export default function DiarioCalendarioPage() {
                       </p>
                     ) : !isHoje && dia.status === 'SEM_DIARIO' ? (
                       <p className="text-xs text-red-400 mt-1 font-medium">Diário não registrado</p>
-                    ) : isHoje && dia.status === 'SEM_DIARIO' ? (
+                    ) : isHoje && dia.status === 'SEM_DIARIO' && !isCoord ? (
                       <p className="text-xs text-blue-500 mt-1 font-medium">Toque para registrar o diário de hoje</p>
                     ) : null}
                   </div>
@@ -614,6 +616,11 @@ export default function DiarioCalendarioPage() {
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg group-hover:bg-amber-200 transition-colors">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Continuar</span>
+                      </span>
+                    ) : isCoord ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Pendente</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
@@ -688,7 +695,7 @@ export default function DiarioCalendarioPage() {
       )}
 
       {/* ── CTA Diário de Hoje ── */}
-      {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (() => {
+      {!loading && !isCoord && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (() => {
         const diaSemana = new Date(hoje + 'T12:00:00').getDay();
         if (diaSemana === 0 || diaSemana === 6) return null;
         return (
