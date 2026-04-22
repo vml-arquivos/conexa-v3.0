@@ -482,9 +482,12 @@ export class CoordenacaoService {
     if (startDate && endDate) {
       where.eventDate = { gte: new Date(startDate), lte: new Date(endDate) };
     } else {
+      // Janela padrão: 30 dias atrás até fim do dia de hoje (timezone-safe)
       const end = new Date();
+      end.setHours(23, 59, 59, 999);
       const start = new Date();
-      start.setDate(start.getDate() - 7);
+      start.setDate(start.getDate() - 30);
+      start.setHours(0, 0, 0, 0);
       where.eventDate = { gte: start, lte: end };
     }
     const eventos = await this.prisma.diaryEvent.findMany({
