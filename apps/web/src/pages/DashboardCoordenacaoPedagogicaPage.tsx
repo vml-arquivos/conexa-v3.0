@@ -544,11 +544,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const diariosRascunho = diarios.filter(d => (d.status || '').toUpperCase() === 'RASCUNHO').length;
   const atalhosExecutivos = [
     {
-      label: 'Diários e turmas',
-      desc: 'Registros de diários, cobertura e acompanhamento de turmas',
-      icon: <Brain className="h-5 w-5" />,
+      label: 'Diário da Turma',
+      desc: 'Ver calendário de diários e registros do mês',
+      icon: <ClipboardList className="h-5 w-5" />,
       className: 'from-sky-600 via-blue-600 to-indigo-700',
-      action: () => setAbaAtiva('pedagogico'),
+      action: () => navigate('/app/diario-calendario'),
     },
     {
       label: 'Planejamentos',
@@ -621,7 +621,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4 flex-wrap">
         <button
-          onClick={() => navigate('/app/coordenacao-pedagogica')}
+          onClick={() => navigate('/app/teacher-dashboard')}
           className="hover:text-gray-700 transition-colors"
         >
           Início
@@ -905,19 +905,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
               </button>
             )}
-            <button
-              onClick={() => navigate('/app/atendimentos-pais')}
-              className="flex items-center gap-3 p-4 bg-violet-50 border-2 border-violet-200 rounded-2xl text-left hover:bg-violet-100 transition-all"
-            >
-              <span className="w-10 h-10 bg-violet-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
-                <Users className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-violet-800">Atendimentos Pais</p>
-                <p className="text-xs text-violet-600">Registrar reunião e gerar PDF</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-violet-500 ml-auto flex-shrink-0" />
-            </button>
+
           </div>
 
           {/* Recados */}
@@ -1726,3 +1714,6 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     </PageShell>
   );
 }
+</file>
+
+</files>
