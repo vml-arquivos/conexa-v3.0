@@ -1714,6 +1714,3 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     </PageShell>
   );
 }
-</file>
-
-</files>
