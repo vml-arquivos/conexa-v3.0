@@ -29,6 +29,11 @@ import { PendenciasAlert } from '../components/dashboard/PendenciasAlert';
 import { ModuloAvaliacaoPlano } from '../components/dashboard/ModuloAvaliacaoPlano';
 import { ModuloVisao360Turma } from '../components/dashboard/ModuloVisao360Turma';
 import { ModuloOcorrenciasEvidencias } from '../components/dashboard/ModuloOcorrenciasEvidencias';
+import { ActionRequiredBlock } from '../components/dashboard/ActionRequiredBlock';
+import { KPIExecutiveBlock } from '../components/dashboard/KPIExecutiveBlock';
+import { PedagogicalSupervisionBlock } from '../components/dashboard/PedagogicalSupervisionBlock';
+import { VitalSignsAlertsBlock } from '../components/dashboard/VitalSignsAlertsBlock';
+import { WorkQueueBlock } from '../components/dashboard/WorkQueueBlock';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -716,6 +721,193 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
         <div className="space-y-8">
+
+          {/* BLOCO 1: AÇÃO EXIGIDA */}
+          <ActionRequiredBlock
+            items={[
+              {
+                id: 'requisicoes',
+                type: 'requisicao',
+                title: 'Requisições Pendentes',
+                count: dashboard?.requisicoesParaAnalisar ?? 0,
+                subtitle: 'Aguardando análise',
+                color: 'bg-pink-600',
+                bgColor: 'bg-pink-50',
+                icon: <ShoppingCart className="h-5 w-5 text-pink-600" />,
+                action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+                actionLabel: 'Analisar',
+              },
+              {
+                id: 'planejamentos',
+                type: 'planejamento',
+                title: 'Planejamentos',
+                count: dashboard?.planejamentosParaRevisar ?? 0,
+                subtitle: 'Aguardando revisão',
+                color: 'bg-blue-600',
+                bgColor: 'bg-blue-50',
+                icon: <ClipboardList className="h-5 w-5 text-blue-600" />,
+                action: () => setAbaAtiva('planejamentos'),
+                actionLabel: 'Revisar',
+              },
+              {
+                id: 'atendimentos',
+                type: 'atendimento',
+                title: 'Atendimentos',
+                count: 0,
+                subtitle: 'Agendados para hoje',
+                color: 'bg-green-600',
+                bgColor: 'bg-green-50',
+                icon: <Users className="h-5 w-5 text-green-600" />,
+                action: () => {},
+                actionLabel: 'Ver agenda',
+              },
+              {
+                id: 'faltas',
+                type: 'faltas',
+                title: 'Alunos com Faltas',
+                count: 0,
+                subtitle: 'Faltas recorrentes',
+                color: 'bg-red-600',
+                bgColor: 'bg-red-50',
+                icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+                action: () => {},
+                actionLabel: 'Acompanhar',
+              },
+            ]}
+          />
+
+          {/* BLOCO 2: KPIs EXECUTIVOS */}
+          <KPIExecutiveBlock
+            items={[
+              {
+                id: 'diarios',
+                label: 'Diários Publicados',
+                value: diariosPublicados,
+                unit: `de ${dashboard?.turmas ?? 0}`,
+                trend: { value: 8, direction: 'up', label: 'vs ontem' },
+                color: 'text-blue-600',
+                icon: <BookOpen className="h-5 w-5 text-blue-600" />,
+                onClick: () => navigate('/app/diario-calendario'),
+              },
+              {
+                id: 'planejamentos-aprovados',
+                label: 'Planejamentos Aprovados',
+                value: `${Math.round(((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1) * 100)}%`,
+                trend: { value: 10, direction: 'up', label: 'vs semana' },
+                color: 'text-emerald-600',
+                icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,
+              },
+              {
+                id: 'frequencia',
+                label: 'Frequência Média',
+                value: '92%',
+                trend: { value: 4, direction: 'up', label: 'vs semana' },
+                color: 'text-purple-600',
+                icon: <BarChart2 className="h-5 w-5 text-purple-600" />,
+              },
+              {
+                id: 'alertas',
+                label: 'Alertas Críticos',
+                value: alertasReais?.length ?? 0,
+                trend: { value: 2, direction: 'down', label: 'vs ontem' },
+                color: 'text-red-600',
+                icon: <Bell className="h-5 w-5 text-red-600" />,
+              },
+            ]}
+          />
+
+          {/* BLOCO 3: FISCALIZAÇÃO PEDAGÓGICA */}
+          <PedagogicalSupervisionBlock
+            planningMetrics={[
+              { label: 'Aguardando Revisão', value: dashboard?.planejamentosParaRevisar ?? 0, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round(((dashboard?.planejamentosParaRevisar ?? 0) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0), color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Devolvidos', value: 0, color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Rascunho', value: 0, color: 'text-gray-600', bgColor: 'bg-gray-50' },
+            ]}
+            diaryMetrics={[
+              { label: 'Publicados', value: diariosPublicados, color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((diariosPublicados / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Rascunho', value: diariosRascunho, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round((diariosRascunho / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Sem Registro', value: (dashboard?.turmas ?? 0) - diariosPublicados - diariosRascunho, color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Total', value: dashboard?.turmas ?? 0, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+            ]}
+            classrooms={[
+              ...((dashboard?.turmasLista ?? []).map((turma: any) => ({
+                id: turma.id,
+                name: turma.nome,
+                professor: turma.professor || '—',
+                status: turma.chamadaFeita ? 'on-time' : 'pending',
+                planningStatus: 'approved' as const,
+                diaryStatus: 'published' as const,
+                frequency: 92,
+                onClick: () => navigate(`/app/turma/${turma.id}`),
+              })) ?? []
+            ]}
+          />
+
+          {/* BLOCO 4: SINAIS VITAIS E ALERTAS */}
+          <VitalSignsAlertsBlock
+            alerts={[
+              {
+                id: 'faltas-recorrentes',
+                type: 'critical',
+                title: 'Alunos com Faltas Recorrentes',
+                count: 0,
+                description: 'Alunos com 5+ faltas no mês',
+                color: 'text-red-600',
+                bgColor: 'bg-red-100',
+                icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+                onClick: () => {},
+              },
+              {
+                id: 'ocorrencias',
+                type: 'warning',
+                title: 'Aumento de Ocorrências',
+                count: alertasReais?.length ?? 0,
+                description: 'Comparado com período anterior',
+                color: 'text-amber-600',
+                bgColor: 'bg-amber-100',
+                icon: <TriangleAlert className="h-5 w-5 text-amber-600" />,
+                onClick: () => setAbaAtiva('ocorrencias'),
+              },
+              {
+                id: 'desenvolvimento',
+                type: 'warning',
+                title: 'Desenvolvimento Baixo',
+                count: 0,
+                description: 'Alunos com desenvolvimento < 50%',
+                color: 'text-amber-600',
+                bgColor: 'bg-amber-100',
+                icon: <Brain className="h-5 w-5 text-amber-600" />,
+                onClick: () => {},
+              },
+            ]}
+          />
+
+          {/* BLOCO 5: FILA DE TRABALHO */}
+          <WorkQueueBlock
+            items={[
+              ...(dashboard?.planejamentosParaRevisar ?? 0 > 0 ? [{
+                id: 'planejamento-1',
+                type: 'planejamento' as const,
+                title: 'Planejamento - Turma A',
+                subtitle: 'Aguardando revisão',
+                status: 'pending' as const,
+                priority: 'high' as const,
+                date: new Date().toLocaleDateString('pt-BR'),
+                onClick: () => setAbaAtiva('planejamentos'),
+              }] : []),
+              ...(dashboard?.requisicoesParaAnalisar ?? 0 > 0 ? [{
+                id: 'requisicao-1',
+                type: 'requisicao' as const,
+                title: 'Requisição de Material',
+                subtitle: 'Papel A4 - Turma B',
+                status: 'pending' as const,
+                priority: 'medium' as const,
+                date: new Date().toLocaleDateString('pt-BR'),
+                onClick: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+              }] : []),
+            ]}
+          />
 
           {/* MÓDULO 1: AVALIAÇÃO DO PLANO */}
           <ModuloAvaliacaoPlano
