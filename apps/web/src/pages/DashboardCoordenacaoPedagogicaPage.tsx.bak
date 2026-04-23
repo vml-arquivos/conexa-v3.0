@@ -715,55 +715,79 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
       {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
-        <div className="space-y-8">
+        <div className="space-y-5">
 
-          {/* MÓDULO 1: AVALIAÇÃO DO PLANO */}
-          <ModuloAvaliacaoPlano
+          {/* Indicadores do dia — bloco compacto e operacional com drill-down */}
+          <KPIGrid
             totalPendencias={totalPendencias}
+            turmasComChamadaHoje={turmasComChamadaHoje}
+            totalTurmasHoje={totalTurmasHoje}
             diariosEstaSemana={dashboard?.diariosEstaSemana ?? 0}
             diariosPublicados={diariosPublicados}
             diariosRascunho={diariosRascunho}
-            atalhosAvaliacao={atalhosAvaliacao as any[]}
-            planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
-            diariosEmRascunho={diariosRascunho}
-            onPendenciasClick={() => setAbaAtiva('planejamentos')}
-            onDiariosClick={() => navigate('/app/diario-calendario')}
-            onAtalhoClick={(atalho) => atalho.action()}
-            onPlanejamentosClick={() => setAbaAtiva('planejamentos')}
-            onDiariosRascunhoClick={() => navigate('/app/diario-calendario')}
-          />
-
-          {/* MÓDULO 2: VISÃO 360° DA TURMA */}
-          <ModuloVisao360Turma
-            turmasComChamadaHoje={turmasComChamadaHoje}
-            totalTurmasHoje={totalTurmasHoje}
             totalTurmas={dashboard?.turmas ?? 0}
             totalAlunos={dashboard?.alunosTotal ?? 0}
             totalProfessores={dashboard?.professores ?? 0}
-            turmasLista={dashboard?.turmasLista ?? []}
-            atalhosVisao360={atalhosVisao360 as any[]}
-            requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
+            onPendenciasClick={() => setAbaAtiva('planejamentos')}
             onChamadasClick={() => setAbaAtiva('turmas')}
+            onDiariosClick={() => navigate('/app/diario-calendario')}
             onTurmasClick={() => setAbaAtiva('turmas')}
-            onViewAllTurmasClick={() => setAbaAtiva('turmas')}
-            onAtalhoClick={(atalho) => atalho.action()}
-            onRequisicoesClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
           />
 
-          {/* MÓDULO 3: OCORRÊNCIAS E EVIDÊNCIAS */}
-          <ModuloOcorrenciasEvidencias
-            planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
-            requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
+          {/* Atalhos rápidos */}
+          <AtalhosExecutivos items={atalhosExecutivos} />
+
+          {/* Alertas Section - com loading, fallback e alertas reais */}
+          <AlertasSection
             loading={loadingAlertas}
             alertasReais={alertasReais}
             alertasFallback={dashboard?.alertas as any[] ?? []}
-            atalhosOcorrencias={atalhosOcorrencias as any[]}
           />
+
+          {/* Status das turmas hoje */}
+          <TurmasStatusToday
+            turmas={dashboard?.turmasLista ?? []}
+            onViewAllClick={() => setAbaAtiva('turmas')}
+          />
+
+          {/* Ações pendentes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
+              <button
+                onClick={() => setAbaAtiva('planejamentos')}
+                className="flex items-center gap-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-left hover:bg-amber-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.planejamentosParaRevisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-amber-800">Planejamentos</p>
+                  <p className="text-xs text-amber-600">aguardando revisão</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-amber-500 ml-auto" />
+              </button>
+            )}
+            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
+              <button
+                onClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
+                className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all"
+              >
+                <span className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
+                  {dashboard?.requisicoesParaAnalisar}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-red-800">Pedidos de material</p>
+                  <p className="text-xs text-red-600">{canApprove ? 'aguardando aprovação' : 'para visualizar e analisar'}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
+              </button>
+            )}
+
+          </div>
 
           {/* Recados */}
           <RecadosWidget unitId={unitIdParam} />
         </div>
-      )}
       )}
 
       {/* ABA: TURMAS — visão consolidada de todas as turmas da unidade */}
