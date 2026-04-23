@@ -1278,4 +1278,30 @@ export class PlanningService {
     }
     return { occupied, nextFreeDate };
   }
+
+  /** Remove um planejamento - apenas autor (em rascunho) ou DEVELOPER */
+  async deletar(id: string, user: JwtPayload) {
+    const plan = await this.prisma.planning.findUnique({ where: { id } });
+    if (!plan) throw new NotFoundException('Planejamento nao encontrado');
+
+    const roles = Array.isArray(user.roles)
+      ? user.roles.map((r: any) => r?.level ?? r)
+      : [];
+    const isDeveloper = roles.includes('DEVELOPER');
+
+    // Apenas DEVELOPER pode deletar qualquer planejamento
+    // Professor so pode deletar proprio rascunho
+    if (!isDeveloper) {
+      const isAutor = plan.createdBy === user.sub;
+      const isRascunho = ['RASCUNHO', 'DEVOLVIDO'].includes(plan.status ?? '');
+      if (!isAutor || !isRascunho) {
+        throw new ForbiddenException(
+          'Apenas o autor pode excluir seus rascunhos. DEVELOPERs podem excluir qualquer planejamento.'
+        );
+      }
+    }
+
+    await this.prisma.planning.delete({ where: { id } });
+    return { success: true, id };
+  }
 }
