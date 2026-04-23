@@ -840,7 +840,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 diaryStatus: 'published' as const,
                 frequency: 92,
                 onClick: () => navigate(`/app/turma/${turma.id}`),
-              })) ?? []
+              })) ?? [])
             ]}
           />
 
