@@ -764,8 +764,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           <RecadosWidget unitId={unitIdParam} />
         </div>
       )}
-      )}
-
+      
       {/* ABA: TURMAS — visão consolidada de todas as turmas da unidade */}
       {abaAtiva === 'turmas' && (
         <div className="space-y-4">
