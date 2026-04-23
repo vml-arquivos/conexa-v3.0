@@ -41,6 +41,26 @@ export class DevelopmentObservationsController {
   }
 
   /**
+   * GET /development-observations/evolucao/:childId
+   * Evolução detalhada por período para dashboard analítico da coordenação
+   */
+  @Get('evolucao/:childId')
+  @RequireRoles(
+    RoleLevel.PROFESSOR,
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  evolucaoAluno(
+    @Param('childId') childId: string,
+    @Query('meses') meses: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.svc.evolucaoAluno(childId, Number(meses) || 3);
+  }
+
+  /**
    * GET /development-observations/resumo/:childId
    * Resumo de desenvolvimento de um aluno (para coordenadora)
    */

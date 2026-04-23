@@ -126,6 +126,63 @@ export class DevelopmentObservationsService {
     return { success: true };
   }
 
+  /**
+   * Evolução detalhada de um aluno por período — base para dashboard analítico
+   * Retorna série histórica de observações agrupadas por semana
+   */
+  async evolucaoAluno(childId: string, periodoMeses = 3) {
+    const dataInicio = new Date();
+    dataInicio.setMonth(dataInicio.getMonth() - periodoMeses);
+
+    const obs = await this.prisma.developmentObservation.findMany({
+      where: { childId, date: { gte: dataInicio } },
+      orderBy: { date: 'asc' },
+      select: {
+        id: true, date: true, category: true, tags: true, indicadores: true,
+        emotionalState: true, developmentAlerts: true, recommendations: true,
+        behaviorDescription: true, learningProgress: true,
+        atividadeArquivoUrl: true,
+      },
+    }).catch(() => []);
+
+    // Agrupar por semana
+    const porSemana: Record<string, { semana: string; total: number; alertas: number; categorias: Record<string, number> }> = {};
+    for (const o of obs) {
+      const d = new Date(o.date);
+      const semana = `${d.getFullYear()}-S${Math.ceil((d.getDate() + new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7).toString().padStart(2, '0')}`;
+      if (!porSemana[semana]) porSemana[semana] = { semana, total: 0, alertas: 0, categorias: {} };
+      porSemana[semana].total++;
+      if (o.developmentAlerts) porSemana[semana].alertas++;
+      const cat = o.category ?? 'GERAL';
+      porSemana[semana].categorias[cat] = (porSemana[semana].categorias[cat] ?? 0) + 1;
+    }
+
+    // Tags mais frequentes
+    const tagContagem: Record<string, number> = {};
+    for (const o of obs) {
+      const tags: string[] = Array.isArray(o.tags) ? o.tags as string[] : [];
+      for (const tag of tags) tagContagem[tag] = (tagContagem[tag] ?? 0) + 1;
+    }
+    const topTags = Object.entries(tagContagem)
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([tag, count]) => ({ tag, count }));
+
+    const totalAlertas = obs.filter(o => o.developmentAlerts).length;
+    const tendencia = totalAlertas > obs.length * 0.3 ? 'ATENCAO'
+      : totalAlertas === 0 ? 'ESTAVEL' : 'MONITORAR';
+
+    return {
+      childId,
+      periodoMeses,
+      totalObs: obs.length,
+      totalAlertas,
+      tendencia,
+      topTags,
+      serieSemanal: Object.values(porSemana),
+      ultimasObs: obs.slice(-5).reverse(),
+    };
+  }
+
   /** Resumo de desenvolvimento de um aluno (para relatório da coordenadora) */
   async resumoAluno(childId: string) {
     const [obs, total] = await Promise.all([

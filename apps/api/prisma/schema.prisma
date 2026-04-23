@@ -2414,6 +2414,14 @@ model ChildProfileStats {
   totalObservacoes        Int      @default(0)
   observacoesPorCategoria Json     @default("{}")
   alertasAtivos           Int      @default(0)
+  
+  // Campos de evolução pedagógica — série histórica
+  obsUltimos7dias       Int     @default(0) @map("obs_ultimos_7_dias")
+  obsUltimos30dias      Int     @default(0) @map("obs_ultimos_30_dias")
+  participacaoMedia     Float?  @map("participacao_media")
+  ultimaObservacao      DateTime? @map("ultima_observacao")
+  tendenciaComportamento String? @map("tendencia_comportamento") // ESTAVEL, MELHORA, ATENCAO
+  
   ultimaAtualizacao       DateTime @default(now()) @updatedAt
 
   child Child @relation(fields: [childId], references: [id])
