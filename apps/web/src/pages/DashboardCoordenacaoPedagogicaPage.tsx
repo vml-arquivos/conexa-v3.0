@@ -21,6 +21,11 @@ import { useUnitScope } from '../contexts/UnitScopeContext';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { TriangleAlert } from 'lucide-react';
+import { KPIGrid } from '../components/dashboard/KPIGrid';
+import { AtalhosExecutivos } from '../components/dashboard/AtalhosExecutivos';
+import { AlertasSection } from '../components/dashboard/AlertasSection';
+import { TurmasStatusToday } from '../components/dashboard/TurmasStatusToday';
+import { PendenciasAlert } from '../components/dashboard/PendenciasAlert';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -649,18 +654,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       </nav>
 
       {/* Alerta de pendências */}
-      {totalPendencias > 0 && (
-        <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-center gap-3">
-          <Bell className="h-6 w-6 text-orange-500 flex-shrink-0" />
-          <div>
-            <p className="font-bold text-orange-800">{totalPendencias} {totalPendencias === 1 ? 'item precisa' : 'itens precisam'} da sua atenção</p>
-            <p className="text-sm text-orange-600">
-              {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 ? `${dashboard?.requisicoesParaAnalisar} pedido(s) de material · ` : ''}
-              {(dashboard?.planejamentosParaRevisar ?? 0) > 0 ? `${dashboard?.planejamentosParaRevisar} planejamento(s) para revisar` : ''}
-            </p>
-          </div>
-        </div>
-      )}
+      <PendenciasAlert
+        totalPendencias={totalPendencias}
+        planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
+        requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
+      />
 
       {/* Banner modo leitura para Coordenação Geral */}
       {isCentralUser && (
@@ -701,177 +699,37 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         <div className="space-y-5">
 
           {/* Indicadores do dia — bloco compacto e operacional com drill-down */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* Pendências → aba planejamentos (principal pendência acionável) */}
-            <button
-              onClick={() => setAbaAtiva('planejamentos')}
-              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Pendências</p>
-              <p className="mt-1.5 text-3xl font-bold group-hover:text-blue-300 transition-colors">{totalPendencias}</p>
-              <p className="mt-1 text-xs text-slate-400">{(dashboard?.planejamentosParaRevisar ?? 0)} planos · {(dashboard?.requisicoesParaAnalisar ?? 0)} pedidos</p>
-              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver planejamentos →</p>
-            </button>
-            {/* Chamadas hoje → aba turmas */}
-            <button
-              onClick={() => setAbaAtiva('turmas')}
-              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Chamadas hoje</p>
-              <p className="mt-1.5 text-3xl font-bold group-hover:text-emerald-300 transition-colors">{totalTurmasHoje > 0 ? `${Math.round((turmasComChamadaHoje / totalTurmasHoje) * 100)}%` : '—'}</p>
-              <p className="mt-1 text-xs text-slate-400">{turmasComChamadaHoje} de {totalTurmasHoje} turmas</p>
-              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver status das turmas →</p>
-            </button>
-            {/* Diários → diario-calendario (leitura para coordenador) */}
-            <button
-              onClick={() => navigate('/app/diario-calendario')}
-              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Diários</p>
-              <p className="mt-1.5 text-3xl font-bold group-hover:text-amber-300 transition-colors">{dashboard?.diariosEstaSemana ?? 0}</p>
-              <p className="mt-1 text-xs text-slate-400">{diariosPublicados} publicados · {diariosRascunho} rascunho(s)</p>
-              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Analisar diários →</p>
-            </button>
-            {/* Turmas → aba turmas */}
-            <button
-              onClick={() => setAbaAtiva('turmas')}
-              className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white text-left hover:bg-slate-800 transition-colors group"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">Turmas</p>
-              <p className="mt-1.5 text-3xl font-bold group-hover:text-violet-300 transition-colors">{dashboard?.turmas ?? 0}</p>
-              <p className="mt-1 text-xs text-slate-400">{dashboard?.alunosTotal ?? 0} alunos · {dashboard?.professores ?? 0} professores</p>
-              <p className="mt-2 text-[10px] text-slate-500 group-hover:text-slate-300">Ver todas as turmas →</p>
-            </button>
-          </div>
+          <KPIGrid
+            totalPendencias={totalPendencias}
+            turmasComChamadaHoje={turmasComChamadaHoje}
+            totalTurmasHoje={totalTurmasHoje}
+            diariosEstaSemana={dashboard?.diariosEstaSemana ?? 0}
+            diariosPublicados={diariosPublicados}
+            diariosRascunho={diariosRascunho}
+            totalTurmas={dashboard?.turmas ?? 0}
+            totalAlunos={dashboard?.alunosTotal ?? 0}
+            totalProfessores={dashboard?.professores ?? 0}
+            onPendenciasClick={() => setAbaAtiva('planejamentos')}
+            onChamadasClick={() => setAbaAtiva('turmas')}
+            onDiariosClick={() => navigate('/app/diario-calendario')}
+            onTurmasClick={() => setAbaAtiva('turmas')}
+          />
 
           {/* Atalhos rápidos */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {atalhosExecutivos.map(item => (
-              <button
-                key={item.label}
-                onClick={item.action}
-                className={`group rounded-2xl bg-gradient-to-br ${item.className} p-[1px] text-left shadow-sm transition-transform duration-200 hover:-translate-y-0.5`}
-              >
-                <div className="h-full rounded-2xl bg-slate-950/80 px-4 py-4 backdrop-blur-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
-                      {item.icon}
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-white/60 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                  <p className="mt-3 text-sm font-semibold text-white">{item.label}</p>
-                  <p className="mt-0.5 text-xs leading-5 text-blue-100/75">{item.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
+          <AtalhosExecutivos items={atalhosExecutivos} />
 
-          {/* Alertas automáticos calculados no dashboard (fallback) */}
-          {!loadingAlertas && (!alertasReais || alertasReais.total === 0) && dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" /> Atenção hoje
-              </p>
-              <ul className="space-y-1">
-                {(dashboard.alertas as any[]).map((a: any, i: number) => (
-                  <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
-                    {typeof a === 'string' ? a : (a.mensagem ?? JSON.stringify(a))}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {loadingAlertas && (
-            <Card className="rounded-2xl border-2 border-blue-200 bg-blue-50">
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-blue-800"><AlertCircle className="h-5 w-5"/>Atualizando alertas</CardTitle></CardHeader>
-              <CardContent>
-                <p className="text-sm text-blue-700">Carregando alertas da unidade e resumo de diários...</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Alertas reais do banco */}
-          {alertasReais && alertasReais.total > 0 && (
-            <div className="space-y-2">
-              {alertasReais.criticos.length > 0 && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                  <p className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {alertasReais.criticos.length} alerta{alertasReais.criticos.length > 1 ? 's' : ''} crítico{alertasReais.criticos.length > 1 ? 's' : ''}
-                  </p>
-                  <ul className="space-y-1">
-                    {alertasReais.criticos.map((a: any) => (
-                      <li key={a.id} className="text-sm text-red-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
-                        <span><strong>{a.titulo}</strong> — {a.descricao}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {alertasReais.atencao.length > 0 && (
-                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-                  <p className="text-sm font-bold text-orange-800 mb-2 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {alertasReais.atencao.length} atenção
-                  </p>
-                  <ul className="space-y-1">
-                    {alertasReais.atencao.map((a: any) => (
-                      <li key={a.id} className="text-sm text-orange-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />
-                        {a.titulo}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Alertas Section - com loading, fallback e alertas reais */}
+          <AlertasSection
+            loading={loadingAlertas}
+            alertasReais={alertasReais}
+            alertasFallback={dashboard?.alertas as any[] ?? []}
+          />
 
           {/* Status das turmas hoje */}
-          {(dashboard?.turmasLista ?? []).length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-800">Status das Turmas — Hoje</p>
-                <button
-                  onClick={() => setAbaAtiva('turmas')}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Ver todas as turmas →
-                </button>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {(dashboard.turmasLista ?? []).map(turma => (
-                  <div key={turma.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Users className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{turma.nome}</p>
-                        <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                        turma.chamadaFeita ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
-                      </span>
-                      <button
-                        onClick={() => navigate(`/app/turma/${turma.id}/painel`)}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        Painel →
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <TurmasStatusToday
+            turmas={dashboard?.turmasLista ?? []}
+            onViewAllClick={() => setAbaAtiva('turmas')}
+          />
 
           {/* Ações pendentes */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
