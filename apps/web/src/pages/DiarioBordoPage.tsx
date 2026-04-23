@@ -709,7 +709,9 @@ export default function DiarioBordoPage() {
   const abaFromQuery = searchParams.get('aba') as 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | null;
   // Se vier com ?aba=novo (via calendário) ou com ?date= (via chamada), abrir direto no formulário
   const abaInicial: 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' =
-    (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
+    isApenasLeitura
+      ? 'lista'
+      : (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
   const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | 'fotos'>(abaInicial);
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
