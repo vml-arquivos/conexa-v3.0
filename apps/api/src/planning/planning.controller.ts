@@ -5,6 +5,7 @@ import {
   Body,
   Put,
   Patch,
+  Delete,
   Param,
   Query,
   UseGuards,
@@ -259,5 +260,22 @@ export class PlanningController {
     @CurrentUser() user: JwtPayload
   ) {
     return this.planningService.returnForCorrections(id, dto, user);
+  }
+
+  /**
+   * DELETE /plannings/:id
+   * Remove um planejamento (apenas DEVELOPER e autor em RASCUNHO)
+   */
+  @Delete(':id')
+  @RequireRoles(
+    RoleLevel.PROFESSOR,
+    RoleLevel.UNIDADE,
+    RoleLevel.DEVELOPER,
+  )
+  async deletar(
+    @Param('id') id: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.planningService.deletar(id, user);
   }
 }

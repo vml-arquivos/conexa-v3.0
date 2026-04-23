@@ -551,13 +551,6 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       action: () => navigate('/app/diario-calendario'),
     },
     {
-      label: 'Turmas',
-      desc: `${dashboard?.turmas ?? 0} turmas · ${dashboard?.alunosTotal ?? 0} alunos`,
-      icon: <Users className="h-5 w-5" />,
-      className: 'from-violet-500 via-purple-500 to-fuchsia-600',
-      action: () => setAbaAtiva('turmas'),
-    },
-    {
       label: 'Planejamentos',
       desc: `${dashboard?.planejamentosParaRevisar ?? 0} aguardando revisão`,
       icon: <BookOpen className="h-5 w-5" />,
