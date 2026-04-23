@@ -26,9 +26,7 @@ import { AtalhosExecutivos } from '../components/dashboard/AtalhosExecutivos';
 import { AlertasSection } from '../components/dashboard/AlertasSection';
 import { TurmasStatusToday } from '../components/dashboard/TurmasStatusToday';
 import { PendenciasAlert } from '../components/dashboard/PendenciasAlert';
-import { ModuloAvaliacaoPlano } from '../components/dashboard/ModuloAvaliacaoPlano';
-import { ModuloVisao360Turma } from '../components/dashboard/ModuloVisao360Turma';
-import { ModuloOcorrenciasEvidencias } from '../components/dashboard/ModuloOcorrenciasEvidencias';
+// Módulos legados removidos - consolidados na home premium
 import { ActionRequiredBlock } from '../components/dashboard/ActionRequiredBlock';
 import { KPIExecutiveBlock } from '../components/dashboard/KPIExecutiveBlock';
 import { PedagogicalSupervisionBlock } from '../components/dashboard/PedagogicalSupervisionBlock';
@@ -909,48 +907,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             ]}
           />
 
-          {/* MÓDULO 1: AVALIAÇÃO DO PLANO */}
-          <ModuloAvaliacaoPlano
-            totalPendencias={totalPendencias}
-            diariosEstaSemana={dashboard?.diariosEstaSemana ?? 0}
-            diariosPublicados={diariosPublicados}
-            diariosRascunho={diariosRascunho}
-            atalhosAvaliacao={atalhosAvaliacao as any[]}
-            planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
-            diariosEmRascunho={diariosRascunho}
-            onPendenciasClick={() => setAbaAtiva('planejamentos')}
-            onDiariosClick={() => navigate('/app/diario-calendario')}
-            onAtalhoClick={(atalho) => atalho.action()}
-            onPlanejamentosClick={() => setAbaAtiva('planejamentos')}
-            onDiariosRascunhoClick={() => navigate('/app/diario-calendario')}
-          />
-
-          {/* MÓDULO 2: VISÃO 360° DA TURMA */}
-          <ModuloVisao360Turma
-            turmasComChamadaHoje={turmasComChamadaHoje}
-            totalTurmasHoje={totalTurmasHoje}
-            totalTurmas={dashboard?.turmas ?? 0}
-            totalAlunos={dashboard?.alunosTotal ?? 0}
-            totalProfessores={dashboard?.professores ?? 0}
-            turmasLista={dashboard?.turmasLista ?? []}
-            atalhosVisao360={atalhosVisao360 as any[]}
-            requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
-            onChamadasClick={() => setAbaAtiva('turmas')}
-            onTurmasClick={() => setAbaAtiva('turmas')}
-            onViewAllTurmasClick={() => setAbaAtiva('turmas')}
-            onAtalhoClick={(atalho) => atalho.action()}
-            onRequisicoesClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
-          />
-
-          {/* MÓDULO 3: OCORRÊNCIAS E EVIDÊNCIAS */}
-          <ModuloOcorrenciasEvidencias
-            planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
-            requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
-            loading={loadingAlertas}
-            alertasReais={alertasReais}
-            alertasFallback={dashboard?.alertas as any[] ?? []}
-            atalhosOcorrencias={atalhosOcorrencias as any[]}
-          />
+          {/* MÓDULOS LEGADOS REMOVIDOS - Agora consolidados na home premium acima */}
 
           {/* Recados */}
           <RecadosWidget unitId={unitIdParam} />
