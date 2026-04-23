@@ -143,7 +143,7 @@ export class DevelopmentObservationsService {
         behaviorDescription: true, learningProgress: true,
         atividadeArquivoUrl: true,
       },
-    }).catch(() => []);
+    }).catch(() => [] as any);
 
     // Agrupar por semana
     const porSemana: Record<string, { semana: string; total: number; alertas: number; categorias: Record<string, number> }> = {};
