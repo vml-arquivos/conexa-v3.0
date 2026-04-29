@@ -1,8 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { login as apiLogin, loadMe } from '../api/auth';
 import type { User } from '../api/auth';
 import { isAuthExpiredError } from '../api/http';
+import { useIdleTimeout } from '../hooks/useIdleTimeout';
 
 interface AuthContextType {
   user: User | null;
@@ -141,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(response.user);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     // Limpar todos os tokens e estado de sessão
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
@@ -150,7 +151,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.cookie = 'access_token=; Max-Age=0; path=/';
     setUser(null);
     window.location.replace('/login');
-  };
+  }, []);
+
+  // Logout automático após 15 minutos de inatividade (sem movimentação do usuário)
+  useIdleTimeout(
+    useCallback(() => {
+      if (user) {
+        console.info('[AuthProvider] Sessão encerrada por inatividade (15 min).');
+        logout();
+      }
+    }, [user, logout]),
+    15 * 60 * 1000,
+  );
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

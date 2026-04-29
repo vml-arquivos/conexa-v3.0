@@ -781,7 +781,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 id: 'diarios',
                 label: 'Diários Publicados',
                 value: diariosPublicados,
-                unit: `de ${dashboard?.turmas ?? 0}`,
+                unit: `de ${Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho)}`,
                 trend: { value: 8, direction: 'up', label: 'vs ontem' },
                 color: 'text-blue-600',
                 icon: <BookOpen className="h-5 w-5 text-blue-600" />,
@@ -825,8 +825,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             diaryMetrics={[
               { label: 'Publicados', value: diariosPublicados, color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((diariosPublicados / (dashboard?.turmas ?? 1)) * 100) },
               { label: 'Rascunho', value: diariosRascunho, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round((diariosRascunho / (dashboard?.turmas ?? 1)) * 100) },
-              { label: 'Sem Registro', value: (dashboard?.turmas ?? 0) - diariosPublicados - diariosRascunho, color: 'text-red-600', bgColor: 'bg-red-50' },
-              { label: 'Total', value: dashboard?.turmas ?? 0, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+              { label: 'Sem Registro', value: Math.max(0, (dashboard?.turmas ?? 0) - diariosPublicados - diariosRascunho), color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Total', value: Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho), color: 'text-blue-600', bgColor: 'bg-blue-50' },
             ]}
             classrooms={[
               ...((dashboard?.turmasLista ?? []).map((turma: any) => ({
@@ -1249,10 +1249,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                       </>
                                     )}
                                     <button
-                                      onClick={() => navigate(`/app/planejamento/${plan.id}/conferir`)}
+                                      onClick={() => navigate(`/app/planejamento/${plan.id}/editar`)}
                                       className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
                                     >
-                                      Ver →
+                                      Abrir revisão →
                                     </button>
                                   </div>
                                 </div>

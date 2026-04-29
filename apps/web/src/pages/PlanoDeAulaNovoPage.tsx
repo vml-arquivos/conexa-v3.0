@@ -41,6 +41,8 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
+import { useAuth } from '../app/AuthProvider';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { toPedagogicalISODate } from '../lib/formatDate';
 import { extractErrorMessage } from '../lib/utils';
 // Fallback local: usado SOMENTE quando o backend retornar objectives vazio
@@ -332,6 +334,13 @@ export default function PlanoDeAulaNovoPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
   const isEditing = Boolean(id);
+  const { user } = useAuth();
+  const userRoles = normalizeRoles(user);
+  // Coordenadores podem aprovar/devolver planejamentos em revisão
+  const canApprove = ['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].some(r => userRoles.includes(r));
+  const [aprovando, setAprovando] = useState(false);
+  const [modalDevolver, setModalDevolver] = useState(false);
+  const [motivoDevolver, setMotivoDevolver] = useState('');
 
   // ─── Estado principal ─────────────────────────────────────────────────────
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -789,6 +798,80 @@ export default function PlanoDeAulaNovoPage() {
               {status === 'PUBLICADO' && 'Planejamento publicado. Edição bloqueada.'}
               {status === 'CANCELADO' && 'Planejamento cancelado.'}
             </span>
+          </div>
+        )}
+
+        {/* ─── Ações de revisão para coordenação ─── */}
+        {canApprove && status === 'EM_REVISAO' && planningId && (
+          <div className="flex flex-col gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-sm font-semibold text-blue-800">Ações da Coordenação</p>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={aprovando}
+                onClick={async () => {
+                  try {
+                    setAprovando(true);
+                    await http.patch(`/plannings/${planningId}/approve`);
+                    setStatus('APROVADO');
+                    toast.success('Planejamento aprovado!');
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.message ?? 'Erro ao aprovar');
+                  } finally {
+                    setAprovando(false);
+                  }
+                }}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" /> Aprovar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-50"
+                onClick={() => setModalDevolver(true)}
+              >
+                Devolver para Correção
+              </Button>
+            </div>
+            {/* Modal devolução inline */}
+            {modalDevolver && (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none"
+                  rows={3}
+                  placeholder="Descreva o motivo da devolução..."
+                  value={motivoDevolver}
+                  onChange={e => setMotivoDevolver(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                    disabled={aprovando || motivoDevolver.trim().length < 5}
+                    onClick={async () => {
+                      try {
+                        setAprovando(true);
+                        await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
+                        setStatus('DEVOLVIDO');
+                        setModalDevolver(false);
+                        setMotivoDevolver('');
+                        toast.success('Planejamento devolvido para correção.');
+                      } catch (err: any) {
+                        toast.error(err?.response?.data?.message ?? 'Erro ao devolver');
+                      } finally {
+                        setAprovando(false);
+                      }
+                    }}
+                  >
+                    Confirmar Devolução
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setModalDevolver(false); setMotivoDevolver(''); }}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
