@@ -339,11 +339,11 @@ export default function PainelAnaliticoCriancaPage() {
                           acc[cat] = (acc[cat] ?? 0) + 1;
                           return acc;
                         }, {})
-                      ).sort((a,b) => b[1]-a[1]).map(([cat, count]) => (
+                      ).sort((a,b) => (b[1] as number)-(a[1] as number)).map(([cat, count]) => (
                         <div key={cat} className="flex items-center gap-3">
                           <span className="text-xs text-gray-500 w-44 truncate">{cat.replace(/_/g,' ')}</span>
                           <div className="flex-1 bg-gray-100 rounded-full h-2">
-                            <div className="bg-cyan-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count as number)/microgestos.length*100)}%` }} />
+                            <div className="bg-cyan-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count as number) / (microgestos.length as number) * 100)}%` }} />
                           </div>
                           <span className="text-xs font-semibold text-gray-700 w-8 text-right">{count as number}</span>
                         </div>

@@ -104,7 +104,7 @@ export function AlertasSection({
           {alertasFallback.map((a, i) => (
             <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
-              {typeof a === 'string' ? a : (a?.mensagem ?? JSON.stringify(a))}
+              {String(a)}
             </li>
           ))}
         </ul>

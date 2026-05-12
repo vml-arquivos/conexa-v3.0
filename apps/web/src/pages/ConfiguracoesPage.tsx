@@ -569,7 +569,7 @@ export default function ConfiguracoesPage() {
                   </div>
 
                   {[
-                    { label: 'Versão do Sistema', value: 'Conexa V3.0' },
+                    { label: 'Versão do Sistema', value: import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico' },
                     { label: 'Ambiente', value: 'Produção' },
                     { label: 'Banco de Dados', value: 'PostgreSQL (Prisma)' },
                     { label: 'Framework', value: 'React + Vite + TypeScript' },

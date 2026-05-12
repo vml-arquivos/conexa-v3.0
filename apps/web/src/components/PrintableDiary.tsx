@@ -698,7 +698,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   <div class="page">
     <!-- Cabeçalho -->
     <div class="header">
-      <div class="header-logo">Conexa — Sistema de Gestão Pedagógica</div>
+      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
       <div class="header-title">Diário da Turma</div>
       <div class="header-subtitle">${esc(dataFormatada)}</div>
     </div>
@@ -733,7 +733,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
     <!-- Rodapé -->
     <div class="footer">
-      <span>Conexa V3 — Sistema de Gestão Pedagógica</span>
+      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
       <span>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>

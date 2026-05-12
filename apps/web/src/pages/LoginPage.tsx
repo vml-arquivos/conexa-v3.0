@@ -54,14 +54,27 @@ export function LoginPage() {
         <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #93c5fd, transparent)', transform: 'translate(30%, 30%)' }} />
 
         <div className="relative z-10 max-w-md text-center">
-          {/* Logo */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
-              <span className="text-blue-700 font-black text-3xl">C</span>
-            </div>
-            <div className="text-left">
-              <h1 className="text-4xl font-black tracking-tight">Conexa</h1>
-              <p className="text-blue-200 text-sm font-medium tracking-widest uppercase">V3.0 Sistema Pedagógico</p>
+          {/* Logo desktop — COCRIS institucional */}
+          <div className="flex items-center justify-center mb-8">
+            <img
+              src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+              alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+              className="h-24 w-auto object-contain drop-shadow-2xl"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                if (fb) fb.style.display = 'flex';
+              }}
+            />
+            {/* Fallback texto (oculto por padrão) */}
+            <div className="hidden items-center gap-3" aria-hidden="true">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
+                <span className="text-blue-700 font-black text-3xl">C</span>
+              </div>
+              <div className="text-left">
+                <h1 className="text-4xl font-black tracking-tight">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                <p className="text-blue-200 text-sm font-medium tracking-widest uppercase">Sistema Pedagógico</p>
+              </div>
             </div>
           </div>
 
@@ -93,14 +106,27 @@ export function LoginPage() {
       {/* Painel direito — formulário */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12">
         <div className="w-full max-w-md">
-          {/* Logo mobile */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-blue-700 font-black text-2xl">C</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-white">Conexa V3.0</h1>
-              <p className="text-blue-200 text-xs">Sistema Pedagógico</p>
+          {/* Logo mobile — COCRIS institucional */}
+          <div className="lg:hidden flex items-center justify-center mb-8">
+            <img
+              src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+              alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+              className="h-16 w-auto object-contain drop-shadow-lg"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                if (fb) fb.style.display = 'flex';
+              }}
+            />
+            {/* Fallback texto mobile (oculto por padrão) */}
+            <div className="hidden items-center gap-3" aria-hidden="true">
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-blue-700 font-black text-2xl">C</span>
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-white">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                <p className="text-blue-200 text-xs">Sistema Pedagógico</p>
+              </div>
             </div>
           </div>
 
@@ -186,7 +212,7 @@ export function LoginPage() {
 
             <div className="mt-8 pt-6 border-t border-gray-100 text-center">
               <p className="text-xs text-gray-400">
-                Conexa V3.0 © 2026 — Sistema Pedagógico Inteligente
+                {import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026 — Sistema Pedagógico Inteligente
               </p>
             </div>
           </div>

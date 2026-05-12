@@ -279,12 +279,26 @@ export function Sidebar({ onClose }: SidebarProps) {
       <div className="p-5 border-b border-gray-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-none">Conexa V3</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
+            {/* Logo institucional COCRIS — fallback para texto se imagem não carregar */}
+            <img
+              src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+              alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+              className="h-10 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                if (fb) fb.style.display = 'flex';
+              }}
+            />
+            {/* Fallback: ícone + texto (oculto por padrão) */}
+            <div className="hidden items-center gap-2" aria-hidden="true">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">C</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-none">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
+              </div>
             </div>
           </div>
           {/* Botão fechar — só aparece em mobile */}
@@ -396,7 +410,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
           <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
         </div>
-        <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
+        <p className="text-xs text-gray-600 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>
   );

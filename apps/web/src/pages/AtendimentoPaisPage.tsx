@@ -232,7 +232,7 @@ export function AtendimentoPaisPage() {
     w.document.write(`
       <!DOCTYPE html><html><head>
       <meta charset="UTF-8">
-      <title>Atendimento aos Pais — Conexa V3</title>
+      <title>Atendimento aos Pais — COCRIS Pedagógico</title>
       <style>
         @media print { body { margin: 2cm; } .no-print { display: none; } }
         body { font-family: Arial, sans-serif; font-size: 13px; color: #111; }
@@ -247,7 +247,7 @@ export function AtendimentoPaisPage() {
       </style>
       </head><body>
       <h1>Registro de Atendimento aos Pais / Responsáveis</h1>
-      <h2>Conexa V3 — Sistema Pedagógico</h2>
+      <h2>COCRIS Pedagógico — Sistema Pedagógico</h2>
       <div class="section"><div class="label">Data do Atendimento</div><div class="value">${data}</div></div>
       <div class="section"><div class="label">Criança</div><div class="value">${crianca}</div></div>
       <div class="section"><div class="label">Responsável</div><div class="value">${at.responsavelNome}${at.responsavelRelacao ? ' (' + at.responsavelRelacao + ')' : ''}</div></div>
@@ -259,7 +259,7 @@ export function AtendimentoPaisPage() {
         <div class="ass-box">Assinatura do(s) Responsável(is)<br><br><br><br>Nome: ___________________________</div>
         <div class="ass-box">Assinatura do(a) Professor(a)<br><br><br><br>Nome: ${professor}</div>
       </div>
-      <div class="rodape">Documento gerado pelo Conexa V3 em ${new Date().toLocaleDateString('pt-BR')} — Uso interno</div>
+      <div class="rodape">Documento gerado pelo COCRIS Pedagógico em ${new Date().toLocaleDateString('pt-BR')} — Uso interno</div>
       </body></html>`);
     w.document.close();
     w.print();
