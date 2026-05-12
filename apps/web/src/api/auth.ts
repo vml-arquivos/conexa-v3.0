@@ -12,6 +12,8 @@ export interface User {
   status?: string;
   mantenedoraId?: string;
   unitId?: string;
+  /** Dados da unidade retornados pelo /auth/me (id, name, unitCode) */
+  unit?: { id: string; name: string; unitCode?: string } | null;
   roles?: string[];
   [key: string]: unknown;
 }

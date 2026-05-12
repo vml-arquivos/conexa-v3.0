@@ -5,7 +5,7 @@ import { getPedagogicalToday } from '../../utils/pedagogicalDate';
 import http from '../../api/http';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Calendar, LogOut, User, Users, Menu } from 'lucide-react';
+import { Calendar, LogOut, User, Users, Building2, Menu } from 'lucide-react';
 
 interface TopbarProps {
   onMenuToggle?: () => void;
@@ -16,6 +16,21 @@ type AccessibleClassroom = {
   name: string;
 };
 
+/**
+ * Roles que representam coordenação/direção/unidade — não devem ver turma fixa.
+ * Para esses roles, exibe contexto de unidade em vez de turma.
+ */
+const COORD_ROLES = [
+  'UNIDADE',
+  'UNIDADE_DIRETOR',
+  'UNIDADE_COORDENADOR_PEDAGOGICO',
+  'UNIDADE_NUTRICIONISTA',
+  'UNIDADE_ADMINISTRATIVO',
+  'STAFF_CENTRAL',
+  'MANTENEDORA',
+  'DEVELOPER',
+];
+
 export function Topbar({ onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuth() as any;
   const [resolvedClassroom, setResolvedClassroom] = useState<AccessibleClassroom | null>(null);
@@ -24,6 +39,28 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   // Garante que STAFF_CENTRAL apareça mesmo quando o array de roles tem outra ordem
   const userRoles = normalizeRoles(user);
   const primaryRole = getPrimaryRole(userRoles) || 'Usuário';
+
+  // ─── Determinar se o usuário é coordenação/unidade ou professor ────────────
+  // Importar normalizeRoleTypes para verificar types específicos (UNIDADE_DIRETOR etc.)
+  const userRoleTypes: string[] = (() => {
+    if (!user || typeof user !== 'object') return [];
+    const u = user as Record<string, unknown>;
+    const roles = (u.roles ?? (u.user as Record<string, unknown> | undefined)?.roles) as unknown[] | undefined;
+    if (!Array.isArray(roles)) return [];
+    return roles
+      .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null)
+      .map((r) => (typeof r.type === 'string' ? r.type : null))
+      .filter((t): t is string => t !== null);
+  })();
+
+  const allRoles = [...new Set([...userRoles, ...userRoleTypes])];
+  const isCoordRole = allRoles.some((r) => COORD_ROLES.includes(r));
+
+  // ─── Dados de unidade (disponíveis no payload do /auth/me) ────────────────
+  // O /auth/me retorna: user.unit = { id, name, unitCode } | null
+  // O tipo User já declara o campo unit — acesso direto sem cast
+  const unitData = user?.unit;
+  const unitName = unitData?.name ?? null;
 
   // Informações pedagógicas para a Topbar
   const today = getPedagogicalToday();
@@ -37,6 +74,9 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   const hasClassroom = Boolean(directClassroom?.id || resolvedClassroom?.id);
 
   useEffect(() => {
+    // Coordenação não precisa resolver turma — evita chamada desnecessária
+    if (isCoordRole) return;
+
     let active = true;
 
     if (directClassroom?.id) {
@@ -65,7 +105,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
     return () => {
       active = false;
     };
-  }, [directClassroom?.id]);
+  }, [directClassroom?.id, isCoordRole]);
 
   return (
     <header className="bg-background border-b border-border px-3 sm:px-6 py-3 sticky top-0 z-30">
@@ -90,17 +130,32 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
             <Badge variant="outline" className="font-mono">{today}</Badge>
           </div>
 
-          {/* Turma */}
-          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground min-w-0">
-            <Users className="h-4 w-4 flex-shrink-0" />
-            <span className="hidden sm:inline whitespace-nowrap">Turma:</span>
-            <Badge
-              variant={hasClassroom ? 'secondary' : 'destructive'}
-              className="truncate max-w-[120px] sm:max-w-[200px]"
-            >
-              {classroomName}
-            </Badge>
-          </div>
+          {/* Contexto: Turma (professor) ou Unidade (coordenação/direção) */}
+          {isCoordRole ? (
+            /* ── Coordenação/Direção: exibe unidade, nunca turma fixa ── */
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground min-w-0">
+              <Building2 className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline whitespace-nowrap">Unidade:</span>
+              <Badge
+                variant="secondary"
+                className="truncate max-w-[140px] sm:max-w-[220px]"
+              >
+                {unitName ?? 'Unidade'}
+              </Badge>
+            </div>
+          ) : (
+            /* ── Professor/Auxiliar: exibe turma atribuída ── */
+            <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground min-w-0">
+              <Users className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline whitespace-nowrap">Turma:</span>
+              <Badge
+                variant={hasClassroom ? 'secondary' : 'destructive'}
+                className="truncate max-w-[120px] sm:max-w-[200px]"
+              >
+                {classroomName}
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* Direita: nome do usuário + avatar + logout */}

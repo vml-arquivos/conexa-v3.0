@@ -336,6 +336,28 @@ export default function PlanoDeAulaNovoPage() {
   const isEditing = Boolean(id);
   const { user } = useAuth();
   const userRoles = normalizeRoles(user);
+
+  // ─── Roles de coordenação/direção — não criam nem enviam planejamento ────────
+  // Coordenação acessa o planejamento para revisar (aprovar/devolver), não para criar.
+  const userRoleTypes: string[] = (() => {
+    if (!user || typeof user !== 'object') return [];
+    const u = user as Record<string, unknown>;
+    const roles = (u.roles ?? (u.user as Record<string, unknown> | undefined)?.roles) as unknown[] | undefined;
+    if (!Array.isArray(roles)) return [];
+    return roles
+      .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null)
+      .map((r) => (typeof r.type === 'string' ? r.type : null))
+      .filter((t): t is string => t !== null);
+  })();
+  const COORD_ROLES_PLAN = [
+    'UNIDADE', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO',
+    'UNIDADE_NUTRICIONISTA', 'UNIDADE_ADMINISTRATIVO',
+    'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER',
+  ];
+  const allRolesPlan = [...new Set([...userRoles, ...userRoleTypes])];
+  // isCoordRole: true quando o usuário é coordenação/direção/central — não deve criar/enviar
+  const isCoordRole = allRolesPlan.some((r) => COORD_ROLES_PLAN.includes(r));
+
   // Coordenadores podem aprovar/devolver planejamentos em revisão
   const canApprove = ['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].some(r => userRoles.includes(r));
   const [aprovando, setAprovando] = useState(false);
@@ -755,11 +777,12 @@ export default function PlanoDeAulaNovoPage() {
   };
   const statusInfo = statusConfig[status] ?? statusConfig.RASCUNHO;
   // Bloqueado: não pode editar quando em revisão, aprovado, em execução ou concluído
-  const bloqueado = ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
+  // Coordenação também é sempre bloqueada para edição — acessa apenas para revisão
+  const bloqueado = isCoordRole || ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
 
   if (loading) {
     return (
-      <PageShell title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
+      <PageShell title={isCoordRole ? 'Visualizar Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
@@ -769,8 +792,8 @@ export default function PlanoDeAulaNovoPage() {
 
   return (
     <PageShell
-      title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
-      subtitle="Planejamento por data com Matriz Pedagógica 2026 automática"
+      title={isCoordRole ? 'Visualizar Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
+      subtitle={isCoordRole ? 'Modo de revisão — coordenação' : 'Planejamento por data com Matriz Pedagógica 2026 automática'}
     >
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ─── Cabeçalho com status ─── */}
@@ -1130,7 +1153,8 @@ export default function PlanoDeAulaNovoPage() {
         )}
 
         {/* ─── Ações ─── */}
-        {!bloqueado && (
+        {/* Professor: pode salvar rascunho e enviar para revisão */}
+        {!bloqueado && !isCoordRole && (
           <div className="flex flex-col sm:flex-row gap-3 pb-8">
             <Button
               variant="outline"
@@ -1154,6 +1178,18 @@ export default function PlanoDeAulaNovoPage() {
               ) : (
                 <><Send className="h-4 w-4 mr-2" /> Enviar para Revisão</>
               )}
+            </Button>
+          </div>
+        )}
+        {/* Coordenação: apenas botão Voltar na área de ações (aprovação/devolução já está acima) */}
+        {isCoordRole && (
+          <div className="flex pb-8">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/app/planejamentos')}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" /> Voltar para Planejamentos
             </Button>
           </div>
         )}

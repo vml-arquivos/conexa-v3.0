@@ -352,7 +352,8 @@ export default function PlanejamentosPage() {
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
           { id: 'meus', label: 'Planos de Aula', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Novo Plano de Aula', icon: <Plus className="h-4 w-4" /> },
+          // Aba 'Novo' oculta para coordenação/direção
+          ...(!ehCoordenador && !ehCentral ? [{ id: 'novo', label: 'Novo Plano de Aula', icon: <Plus className="h-4 w-4" /> }] : []),
           { id: 'matriz', label: 'Matriz Curricular 2026', icon: <Layers className="h-4 w-4" /> },
           { id: 'templates', label: 'Templates', icon: <BookMarked className="h-4 w-4" /> },
         ].map(tab => (
@@ -386,9 +387,12 @@ export default function PlanejamentosPage() {
                 {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             )}
-            <Button onClick={() => setAba('novo')} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" /> Novo
-            </Button>
+            {/* Botão Novo: oculto para coordenação/direção — eles revisam, não criam */}
+            {!ehCoordenador && !ehCentral && (
+              <Button onClick={() => setAba('novo')} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" /> Novo
+              </Button>
+            )}
           </div>
 
           {loading && <LoadingState message="Carregando planejamentos..." />}
@@ -398,7 +402,7 @@ export default function PlanejamentosPage() {
               icon={<BookOpen className="h-12 w-12 text-gray-300" />}
               title="Nenhum planejamento encontrado"
               description="Crie seu primeiro planejamento usando a Matriz Curricular 2026"
-              action={<Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" />Criar Planejamento</Button>}
+              action={!ehCoordenador && !ehCentral ? <Button onClick={() => setAba('novo')}><Plus className="h-4 w-4 mr-2" />Criar Planejamento</Button> : undefined}
             />
           )}
 
