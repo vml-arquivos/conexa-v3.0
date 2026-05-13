@@ -10,9 +10,9 @@ import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
  * - PROFESSOR / PROFESSOR_AUXILIAR → /app/teacher-dashboard
  * - UNIDADE_NUTRICIONISTA          → /app/nutricionista
  * - UNIDADE_DIRETOR                → /app/diretor
- * - STAFF_CENTRAL                  → /app/central
+ * - STAFF_CENTRAL                  → /app/coordenacao-pedagogica
  * - MANTENEDORA / DEVELOPER        → /app/dashboard
- * - UNIDADE (outros)               → /app/dashboard
+ * - UNIDADE (outros)               → /app/coordenacao-pedagogica
  */
 export function useRedirectByRole() {
   const { user } = useAuth();
@@ -44,12 +44,12 @@ export function getRedirectPathByRoles(levels: string[], types: string[] = []): 
   }
   // Coordenação Central
   if (levels.includes('STAFF_CENTRAL')) {
-    return '/app/central';
+    return '/app/coordenacao-pedagogica';
   }
   // Mantenedora / Developer
   if (levels.includes('MANTENEDORA') || levels.includes('DEVELOPER')) {
     return '/app/dashboard';
   }
   // Unidade (Coordenadora Pedagógica, Administrativo, etc.)
-  return '/app/dashboard';
+  return '/app/coordenacao-pedagogica';
 }

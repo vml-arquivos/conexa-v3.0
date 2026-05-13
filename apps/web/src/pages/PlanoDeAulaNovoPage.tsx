@@ -839,6 +839,7 @@ export default function PlanoDeAulaNovoPage() {
                     await http.patch(`/plannings/${planningId}/approve`);
                     setStatus('APROVADO');
                     toast.success('Planejamento aprovado!');
+                    navigate('/app/planejamentos');
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Erro ao aprovar');
                   } finally {
@@ -873,6 +874,10 @@ export default function PlanoDeAulaNovoPage() {
                     className="bg-red-600 hover:bg-red-700 text-white"
                     disabled={aprovando || motivoDevolver.trim().length < 5}
                     onClick={async () => {
+                      if (motivoDevolver.trim().length < 5) {
+                        toast.error('O comentário deve ter pelo menos 5 caracteres.');
+                        return;
+                      }
                       try {
                         setAprovando(true);
                         await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
@@ -880,6 +885,7 @@ export default function PlanoDeAulaNovoPage() {
                         setModalDevolver(false);
                         setMotivoDevolver('');
                         toast.success('Planejamento devolvido para correção.');
+                        navigate('/app/planejamentos');
                       } catch (err: any) {
                         toast.error(err?.response?.data?.message ?? 'Erro ao devolver');
                       } finally {
