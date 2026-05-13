@@ -1753,6 +1753,7 @@ export default function DiarioBordoPage() {
       const pdfData: DiaryPrintData = {
         data: form.date,
         turmaNome: turmaNomeResolvido || turmaNomeAtual,
+        unitInfo: (user as any)?.unit ?? null,
         professorNome: nomeProfessor,
         planejamentoTitulo: planejamentoHoje?.title,
         planejamentoAtividade: planejamentoHoje?.activities,
@@ -2316,6 +2317,7 @@ export default function DiarioBordoPage() {
                               abrirDiarioImprimivel({
                                 data: dataStr,
                                 turmaNome: turmaNomePdf,
+                                unitInfo: (user as any)?.unit ?? null,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -2629,6 +2631,7 @@ export default function DiarioBordoPage() {
                               abrirDiarioImprimivel({
                                 data: dataStr,
                                 turmaNome: turmaNomePdf,
+                                unitInfo: (user as any)?.unit ?? null,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,

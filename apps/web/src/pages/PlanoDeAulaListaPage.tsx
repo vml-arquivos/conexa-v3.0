@@ -853,7 +853,7 @@ export default function PlanoDeAulaListaPage() {
                 <Button
                   variant="outline"
                   className="flex-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                  onClick={() => gerarPDF(selectedPlanning)}
+                  onClick={() => gerarPDF(selectedPlanning, (user as any)?.unit ?? null)}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Gerar PDF
@@ -861,7 +861,7 @@ export default function PlanoDeAulaListaPage() {
                 <Button
                   variant="outline"
                   className="flex-1 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                  onClick={() => imprimirPlanejamento(selectedPlanning)}
+                  onClick={() => imprimirPlanejamento(selectedPlanning, (user as any)?.unit ?? null)}
                 >
                   <Printer className="h-4 w-4 mr-2" />
                   Imprimir

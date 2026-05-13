@@ -25,6 +25,8 @@ import { getErrorMessage } from '../utils/errorMessage';
 import { getAccessibleClassrooms } from '../api/lookup';
 import type { AccessibleClassroom } from '../types/lookup';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
+import { useAuth } from '../app/AuthProvider';
+import { buildPrintHeader } from '../lib/printUnitHeader';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 type TipoAtendimento = 'PRESENCIAL' | 'REMOTO' | 'TELEFONEMA' | 'MENSAGEM';
@@ -126,6 +128,7 @@ const FORM_INICIAL: NovoAtendimento = {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export function AtendimentoPaisPage() {
+  const { user } = useAuth();
   const [atendimentos, setAtendimentos] = useState<Atendimento[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -220,6 +223,7 @@ export function AtendimentoPaisPage() {
   };
 
   const imprimirAtendimento = (at: Atendimento) => {
+    const unitInfo = (user as any)?.unit ?? null;
     const crianca = at.child ? `${at.child.firstName} ${at.child.lastName}`.trim() : '—';
     const professor = at.child?.enrollments?.[0]?.classroom?.teachers?.[0]?.teacher
       ? `${at.child.enrollments[0].classroom.teachers[0].teacher.firstName} ${at.child.enrollments[0].classroom.teachers[0].teacher.lastName}`.trim()
@@ -227,6 +231,8 @@ export function AtendimentoPaisPage() {
     const data = new Date(at.dataAtendimento).toLocaleDateString('pt-BR', {
       weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
     });
+    const unitNameLabel = unitInfo?.name ? ` · ${unitInfo.name}` : '';
+    const headerHTML = buildPrintHeader(unitInfo, window.location.origin);
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`
@@ -236,8 +242,11 @@ export function AtendimentoPaisPage() {
       <style>
         @media print { body { margin: 2cm; } .no-print { display: none; } }
         body { font-family: Arial, sans-serif; font-size: 13px; color: #111; }
-        h1 { font-size: 16px; text-align: center; margin-bottom: 4px; }
-        h2 { font-size: 13px; text-align: center; margin-bottom: 20px; color: #555; }
+        .header-logo { font-size: 10px; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+        .header-unit { font-size: 11px; font-weight: 700; color: #1e1b4b; margin-top: 3px; }
+        .print-header { border-bottom: 2px solid #4f46e5; padding-bottom: 10px; margin-bottom: 16px; }
+        h1 { font-size: 16px; margin: 8px 0 4px; }
+        h2 { font-size: 12px; color: #555; margin: 0 0 16px; }
         .section { margin-bottom: 16px; }
         .label { font-weight: bold; font-size: 11px; text-transform: uppercase; color: #666; margin-bottom: 4px; }
         .value { border: 1px solid #ccc; border-radius: 4px; padding: 8px; min-height: 40px; background: #fafafa; white-space: pre-wrap; }
@@ -246,8 +255,9 @@ export function AtendimentoPaisPage() {
         .rodape { text-align: center; font-size: 10px; color: #999; margin-top: 30px; }
       </style>
       </head><body>
+      <div class="print-header">${headerHTML}</div>
       <h1>Registro de Atendimento aos Pais / Responsáveis</h1>
-      <h2>COCRIS Pedagógico — Sistema Pedagógico</h2>
+      <h2>COCRIS Pedagógico${unitNameLabel} — Sistema Pedagógico</h2>
       <div class="section"><div class="label">Data do Atendimento</div><div class="value">${data}</div></div>
       <div class="section"><div class="label">Criança</div><div class="value">${crianca}</div></div>
       <div class="section"><div class="label">Responsável</div><div class="value">${at.responsavelNome}${at.responsavelRelacao ? ' (' + at.responsavelRelacao + ')' : ''}</div></div>
@@ -259,7 +269,7 @@ export function AtendimentoPaisPage() {
         <div class="ass-box">Assinatura do(s) Responsável(is)<br><br><br><br>Nome: ___________________________</div>
         <div class="ass-box">Assinatura do(a) Professor(a)<br><br><br><br>Nome: ${professor}</div>
       </div>
-      <div class="rodape">Documento gerado pelo COCRIS Pedagógico em ${new Date().toLocaleDateString('pt-BR')} — Uso interno</div>
+      <div class="rodape">Documento gerado pelo COCRIS Pedagógico${unitNameLabel} em ${new Date().toLocaleDateString('pt-BR')} — Uso interno</div>
       </body></html>`);
     w.document.close();
     w.print();
