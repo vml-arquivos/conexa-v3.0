@@ -10,6 +10,7 @@ interface WorkItem {
   priority: 'high' | 'medium' | 'low';
   date: string;
   onClick: () => void;
+  actions?: Array<{ label: string; onClick: () => void; variant?: 'primary' | 'outline' | 'danger' }>;
 }
 
 interface WorkQueueBlockProps {
@@ -152,27 +153,51 @@ export function WorkQueueBlock({ items, loading = false, onFilterChange }: WorkQ
           </div>
         ) : (
           filteredItems.map((item) => (
-            <button
+            <div
               key={item.id}
-              onClick={item.onClick}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+              className="w-full p-4 hover:bg-gray-50 transition-colors"
             >
-              <div className="flex-1 text-left">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">{getStatusIcon(item.status)}</span>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getTypeColor(item.type)}`}>
-                    {getTypeLabel(item.type)}
-                  </span>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getPriorityColor(item.priority)}`}>
-                    {item.priority === 'high' ? 'Alta' : item.priority === 'medium' ? 'Média' : 'Baixa'}
-                  </span>
+              <button onClick={item.onClick} className="w-full flex items-center justify-between text-left">
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm">{getStatusIcon(item.status)}</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getTypeColor(item.type)}`}>
+                      {getTypeLabel(item.type)}
+                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${getPriorityColor(item.priority)}`}>
+                      {item.priority === 'high' ? 'Alta' : item.priority === 'medium' ? 'Média' : 'Baixa'}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{item.subtitle}</p>
+                  <p className="text-xs text-gray-400 mt-1">{item.date}</p>
                 </div>
-                <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{item.subtitle}</p>
-                <p className="text-xs text-gray-400 mt-1">{item.date}</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
-            </button>
+                <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0" />
+              </button>
+              {item.actions && item.actions.length > 0 && (
+                <div className="mt-3 flex gap-2">
+                  {item.actions.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        action.onClick();
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                        action.variant === 'danger'
+                          ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                          : action.variant === 'outline'
+                            ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))
         )}
       </div>

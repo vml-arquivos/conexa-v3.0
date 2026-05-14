@@ -1611,20 +1611,19 @@ export default function DiarioBordoPage() {
     setPendingRetroativoAction(null);
   }
 
-  async function salvarDiario() {
+  async function salvarDiario(publicar: boolean = true) {
     if (!chamadaCarregada && !isDataRetroativa(form.date)) {
-      toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
-      return;
+      toast.warning('A chamada ainda não foi realizada. Os números de presenças/ausências serão estimados.');
     }
     // GATE 2 (segurança produção): plano de aula aprovado obrigatório para publicação
-    if (!planejamentoHoje) {
+    if (publicar && !planejamentoHoje) {
       toast.error(
         'Publicação bloqueada: nenhum plano de aula aprovado vinculado a hoje. ' +
         'Solicite à coordenação aprovar o planejamento antes de publicar o diário.',
       );
       return;
     }
-    if (!form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
+    if (publicar && !form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Avaliação do Plano de Aula.');
       return;
     }
@@ -1632,16 +1631,16 @@ export default function DiarioBordoPage() {
     // Quando há planejamento aprovado/em execução vinculado ao dia,
     // o campo "O que foi executado?" é obrigatório.
     // Regra de negócio: o diário é o registro de execução do planejamento.
-    if (planejamentoHoje && (form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && !form.execucaoPlanejamento.trim()) {
+    if (publicar && planejamentoHoje && (form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && !form.execucaoPlanejamento.trim()) {
       toast.error('Existe um planejamento aprovado para hoje. Descreva o que foi executado parcialmente ou o motivo de não realização.');
       return;
     }
-    if (planejamentoHoje && !form.statusExecucaoPlano) {
+    if (publicar && planejamentoHoje && !form.statusExecucaoPlano) {
       toast.error('Seleccione o status de execução do plano do dia: CUMPRIDO, PARCIAL ou NÃO REALIZADO.');
       return;
     }
     // GATE 3 (segurança produção): avaliação da execução obrigatória para publicação
-    if (!form.avaliacaoPlanoAula.trim()) {
+    if (publicar && !form.avaliacaoPlanoAula.trim()) {
       toast.error(
         'Preencha a Avaliação do Plano de Aula antes de publicar. ' +
         'Use o botão "Gerar com IA" ou escreva diretamente no campo.',
@@ -1660,12 +1659,16 @@ export default function DiarioBordoPage() {
       // BUG B FIX: Usar totais exatos da chamada consolidada (fonte única de verdade).
       // Se a chamada foi carregada do backend, usar chamadaInfo (valores exatos do servidor).
       // Só recalcular localmente se a chamada não foi feita ainda.
-      const presencasReais = chamadaCarregada && chamadaInfo
+      const presencasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
         ? chamadaInfo.presentes
-        : (form.criancasPresentes.length > 0 ? form.criancasPresentes.length : form.presencas);
-      const ausenciasReais = chamadaCarregada && chamadaInfo
+        : form.criancasPresentes.length > 0
+          ? form.criancasPresentes.length
+          : form.presencas;
+      const ausenciasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
         ? chamadaInfo.ausentes
-        : (criancas.length > 0 ? criancas.length - presencasReais : form.ausencias);
+        : criancas.length > 0
+          ? Math.max(0, criancas.length - presencasReais)
+          : form.ausencias;
 
       if (!classroomId || !childId) {
         toast.error('Turma ou aluno não identificado. Não é possível salvar o diário sem vínculo com uma turma ativa. Recarregue a página ou contate a coordenação.');
@@ -1680,7 +1683,8 @@ export default function DiarioBordoPage() {
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
-          status: 'PUBLICADO',
+          status: publicar ? 'PUBLICADO' : 'RASCUNHO',
+          draft: !publicar,
           ...(form.date < getPedagogicalToday() ? { retroactiveEdit: true, retroactiveNote: `Registro retroativo criado em ${new Date().toLocaleDateString('pt-BR')}` } : {}),
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
@@ -3588,7 +3592,7 @@ export default function DiarioBordoPage() {
             </div>
           ) : diarioEditandoId ? (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => salvarDiario(true)} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
                 {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Atualizar Diário
               </Button>
@@ -3604,12 +3608,12 @@ export default function DiarioBordoPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
-                <Save className="mr-2 h-4 w-4" /> Salvar rascunho
+              <Button type="button" variant="outline" onClick={() => salvarDiario(false)} className="sm:flex-1">
+                <Save className="mr-2 h-4 w-4" /> Salvar Rascunho
               </Button>
-              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
+              <Button onClick={() => salvarDiario(true)} disabled={saving} className="sm:flex-[1.4]">
                 {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Guardar Diário do Dia
+                Publicar Diário
               </Button>
               <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
             </div>

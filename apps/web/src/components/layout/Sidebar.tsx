@@ -399,17 +399,21 @@ export function Sidebar({ onClose }: SidebarProps) {
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 
+        {/* Administração e configurações em seção dedicada para todos os perfis */}
+        <NavSection
+          titulo="Administração"
+          items={[
+            ...(isUnidade || isCentral || isMantenedora || isDeveloper ? adminItems : []),
+            perfilItem,
+            configItem,
+          ]}
+          location={location}
+          onItemClick={onClose}
+        />
       </nav>
 
       {/* Rodapé */}
       <div className="p-3 border-t border-gray-800 space-y-1">
-        {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
-          <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
-        )}
-        <div className="pt-1 space-y-1">
-          <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
-          <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
-        </div>
         <p className="text-xs text-gray-600 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>

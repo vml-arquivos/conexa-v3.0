@@ -546,7 +546,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
     </PageShell>
   );
 
-  const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
+  const planejamentosEmRevisao = planejamentos.filter((p) => (p.status || '').toUpperCase() === 'EM_REVISAO').length;
+  const planejamentosDevolvidos = planejamentos.filter((p) => (p.status || '').toUpperCase() === 'DEVOLVIDO').length;
+  const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + planejamentosEmRevisao;
   const primeiroNome = (((user?.nome as string) || 'Coordenação').trim().split(' ')[0]) || 'Coordenação';
   const totalTurmasHoje = dashboard?.turmasLista?.length ?? dashboard?.turmas ?? 0;
   const turmasComChamadaHoje = (dashboard?.turmasLista ?? []).filter(t => t.chamadaFeita).length;
@@ -557,7 +559,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const atalhosAvaliacao = [
     {
       label: 'Planejamentos',
-      desc: `${dashboard?.planejamentosParaRevisar ?? 0} aguardando revisão`,
+      desc: `${planejamentosEmRevisao} aguardando revisão`,
       icon: <BookOpen className="h-5 w-5" />,
       className: 'from-amber-500 via-orange-500 to-rose-500',
       action: () => setAbaAtiva('planejamentos'),
@@ -609,10 +611,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
   const abas = [
     { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,
-      badge: (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0) || undefined },
+      badge: (dashboard?.requisicoesParaAnalisar ?? 0) + planejamentosEmRevisao || undefined },
     { id: 'turmas',        label: 'Turmas',         icon: <Users className="h-4 w-4" /> },
     { id: 'planejamentos', label: 'Planejamentos',  icon: <BookOpen className="h-4 w-4" />,
-      badge: dashboard?.planejamentosParaRevisar },
+      badge: planejamentosEmRevisao },
     { id: 'relatorios',    label: 'Relatórios',     icon: <TrendingUp className="h-4 w-4" /> },
     // PR 141: aba de ocorrências para a coordenação pedagógica
     { id: 'ocorrencias',   label: 'Ocorrências',    icon: <TriangleAlert className="h-4 w-4" /> },
@@ -678,7 +680,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Alerta de pendências */}
       <PendenciasAlert
         totalPendencias={totalPendencias}
-        planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
+        planejamentosParaRevisar={planejamentosEmRevisao}
         requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
       />
 
@@ -739,12 +741,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 id: 'planejamentos',
                 type: 'planejamento',
                 title: 'Planejamentos',
-                count: dashboard?.planejamentosParaRevisar ?? 0,
+                count: planejamentosEmRevisao,
                 subtitle: 'Aguardando revisão',
                 color: 'bg-blue-600',
                 bgColor: 'bg-blue-50',
                 icon: <ClipboardList className="h-5 w-5 text-blue-600" />,
-                action: () => setAbaAtiva('planejamentos'),
+                action: () => navigate('/app/planejamentos?status=EM_REVISAO'),
                 actionLabel: 'Revisar',
               },
               {
@@ -756,7 +758,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 color: 'bg-green-600',
                 bgColor: 'bg-green-50',
                 icon: <Users className="h-5 w-5 text-green-600" />,
-                action: () => {},
+                action: () => navigate('/app/atendimentos-pais'),
                 actionLabel: 'Ver agenda',
               },
               {
@@ -768,7 +770,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 color: 'bg-red-600',
                 bgColor: 'bg-red-50',
                 icon: <AlertCircle className="h-5 w-5 text-red-600" />,
-                action: () => {},
+                action: () => navigate('/app/controle-faltas'),
                 actionLabel: 'Acompanhar',
               },
             ]}
@@ -817,9 +819,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           {/* BLOCO 3: FISCALIZAÇÃO PEDAGÓGICA */}
           <PedagogicalSupervisionBlock
             planningMetrics={[
-              { label: 'Aguardando Revisão', value: dashboard?.planejamentosParaRevisar ?? 0, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round(((dashboard?.planejamentosParaRevisar ?? 0) / (dashboard?.turmas ?? 1)) * 100) },
-              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0), color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1)) * 100) },
-              { label: 'Devolvidos', value: 0, color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Aguardando Revisão', value: planejamentosEmRevisao, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round((planejamentosEmRevisao / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - planejamentosEmRevisao, color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((((dashboard?.turmas ?? 0) - planejamentosEmRevisao) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Devolvidos', value: planejamentosDevolvidos, color: 'text-red-600', bgColor: 'bg-red-50' },
               { label: 'Rascunho', value: 0, color: 'text-gray-600', bgColor: 'bg-gray-50' },
             ]}
             diaryMetrics={[
@@ -884,16 +886,23 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           {/* BLOCO 5: FILA DE TRABALHO */}
           <WorkQueueBlock
             items={[
-              ...(dashboard?.planejamentosParaRevisar ?? 0 > 0 ? [{
-                id: 'planejamento-1',
+              ...planejamentos
+                .filter((p) => ['EM_REVISAO', 'DEVOLVIDO'].includes((p.status || '').toUpperCase()))
+                .slice(0, 6)
+                .map((p) => ({
+                id: p.id,
                 type: 'planejamento' as const,
-                title: 'Planejamento - Turma A',
-                subtitle: 'Aguardando revisão',
+                title: p.title || 'Planejamento',
+                subtitle: `${p.turmaNome || p.classroom?.name || 'Turma'} · ${p.professorNome || 'Professor'}`,
                 status: 'pending' as const,
                 priority: 'high' as const,
                 date: new Date().toLocaleDateString('pt-BR'),
-                onClick: () => setAbaAtiva('planejamentos'),
-              }] : []),
+                onClick: () => navigate(`/app/planejamento/${p.id}/editar`),
+                actions: canApprove && (p.status || '').toUpperCase() === 'EM_REVISAO' ? [
+                  { label: 'Aprovar', onClick: () => aprovarPlanejamento(p.id), variant: 'primary' as const },
+                  { label: 'Devolver', onClick: () => setItemParaRejeitar({ id: p.id, tipo: 'plan' }), variant: 'danger' as const },
+                ] : [{ label: 'Revisar', onClick: () => navigate(`/app/planejamento/${p.id}/editar`), variant: 'outline' as const }],
+              })),
               ...(dashboard?.requisicoesParaAnalisar ?? 0 > 0 ? [{
                 id: 'requisicao-1',
                 type: 'requisicao' as const,
@@ -1128,9 +1137,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         const grupos = Object.entries(porTurma);
 
         // Contadores globais
-        const pendentes = planejamentos.filter(p =>
-          p.status === 'EM_REVISAO' || p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO'
-        ).length;
+        const pendentes = planejamentos.filter(p => p.status === 'EM_REVISAO').length;
 
         return (
           <div className="space-y-3">
@@ -1165,11 +1172,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               <div className="space-y-2">
                 {grupos.map(([chave, grupo]) => {
                   const aberto = turmaExpandida === chave;
-                  const temPendente = grupo.itens.some(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
-                  );
+                  const temPendente = grupo.itens.some(p => ['EM_REVISAO'].includes(p.status || ''));
                   const countPendente = grupo.itens.filter(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
+                    ['EM_REVISAO'].includes(p.status || '')
                   ).length;
 
                   return (
@@ -1231,7 +1236,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`} />
                                       {cfg.label}
                                     </span>
-                                    {canApprove && ['EM_REVISAO','RASCUNHO'].includes(plan.status || '') && (
+                                    {canApprove && ['EM_REVISAO'].includes(plan.status || '') && (
                                       <>
                                         <button
                                           onClick={() => aprovarPlanejamento(plan.id)}

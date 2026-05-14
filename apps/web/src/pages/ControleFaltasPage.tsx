@@ -390,6 +390,15 @@ function ControleFaltasProfessorView() {
   })();
 
   function marcar(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
+    if (registros[alunoId]?.status === status) {
+      setRegistros((prev) => {
+        const next = { ...prev };
+        delete next[alunoId];
+        return next;
+      });
+      setAlunoSelecionado(null);
+      return;
+    }
     setRegistros((prev) => ({
       ...prev,
       [alunoId]: { status, motivo: status !== 'AUSENTE' && status !== 'JUSTIFICADO' ? undefined : prev[alunoId]?.motivo },
@@ -431,8 +440,12 @@ function ControleFaltasProfessorView() {
       }));
 
     if (lista.length === 0) {
-      toast.error('Marque pelo menos um aluno antes de salvar');
+      toast.error('Marque pelo menos um aluno antes de salvar.');
       return;
+    }
+    const pendentes = chamada.alunos.length - lista.length;
+    if (pendentes > 0) {
+      toast.warning(`Existem ${pendentes} aluno(s) sem marcação. Apenas os marcados serão salvos.`);
     }
 
     try {
@@ -443,7 +456,8 @@ function ControleFaltasProfessorView() {
         registros: lista,
       });
       toast.success('Chamada salva com sucesso! ✅');
-      navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`);
+      setEtapa('resumo');
+      await loadChamada(selectedDate);
     } catch {
       toast.error('Erro ao salvar a chamada. Tente novamente.');
     } finally {
@@ -587,6 +601,15 @@ function ControleFaltasProfessorView() {
           )}
           {!isHoje && (
             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Retroativo</span>
+          )}
+          {!isHoje && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(hoje)}
+              className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium hover:bg-gray-200"
+            >
+              Hoje
+            </button>
           )}
         </div>
         <button
@@ -774,10 +797,17 @@ function ControleFaltasProfessorView() {
                       </button>
                     ))}
                     <button
-                      onClick={() => setAlunoSelecionado(null)}
+                      onClick={() => {
+                        setRegistros((prev) => {
+                          const next = { ...prev };
+                          delete next[aluno.id];
+                          return next;
+                        });
+                        setAlunoSelecionado(null);
+                      }}
                       className="w-full text-center px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600"
                     >
-                      Fechar
+                      Cancelar
                     </button>
                   </div>
                 </div>
