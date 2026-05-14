@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from '../pages/LoginPage';
-import { DashboardPage } from '../pages/DashboardPage';
 import { PlanningsPage } from '../pages/PlanningsPage';
 import { DiaryPage } from '../pages/DiaryPage';
 import { MatricesPage } from '../pages/MatricesPage';
@@ -13,6 +12,7 @@ import { DashboardCentralPage } from '../pages/DashboardCentralPage';
 import { DashboardUnidadePage } from '../pages/DashboardUnidadePage';
 import { AtendimentoPaisPage } from '../pages/AtendimentoPaisPage';
 import DashboardCoordenacaoPedagogicaPage from '../pages/DashboardCoordenacaoPedagogicaPage';
+import DashboardRedirectPage from '../pages/DashboardRedirectPage';
 import DashboardCoordenacaoGeralPage from '../pages/DashboardCoordenacaoGeralPage';
 import ControleFaltasPage from '../pages/ControleFaltasPage';
 import RdxPage from '../pages/RdxPage';
@@ -77,7 +77,7 @@ export const router = createBrowserRouter([
     children: [
       {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: <DashboardRedirectPage />,
         errorElement: <RouteErrorBoundary />,
       },
       // ─── Rotas legadas (mantidas para compatibilidade, sem exposição no menu) ─

@@ -744,7 +744,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 color: 'bg-blue-600',
                 bgColor: 'bg-blue-50',
                 icon: <ClipboardList className="h-5 w-5 text-blue-600" />,
-                action: () => setAbaAtiva('planejamentos'),
+                action: () => navigate('/app/planejamentos?status=EM_REVISAO'),
                 actionLabel: 'Revisar',
               },
               {
@@ -756,7 +756,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 color: 'bg-green-600',
                 bgColor: 'bg-green-50',
                 icon: <Users className="h-5 w-5 text-green-600" />,
-                action: () => {},
+                action: () => navigate('/app/atendimentos-pais'),
                 actionLabel: 'Ver agenda',
               },
               {
@@ -768,7 +768,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 color: 'bg-red-600',
                 bgColor: 'bg-red-50',
                 icon: <AlertCircle className="h-5 w-5 text-red-600" />,
-                action: () => {},
+                action: () => navigate('/app/controle-faltas'),
                 actionLabel: 'Acompanhar',
               },
             ]}
@@ -884,16 +884,23 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           {/* BLOCO 5: FILA DE TRABALHO */}
           <WorkQueueBlock
             items={[
-              ...(dashboard?.planejamentosParaRevisar ?? 0 > 0 ? [{
-                id: 'planejamento-1',
+              ...planejamentos
+                .filter((p) => ['EM_REVISAO', 'RASCUNHO', 'DEVOLVIDO'].includes((p.status || '').toUpperCase()))
+                .slice(0, 6)
+                .map((p) => ({
+                id: p.id,
                 type: 'planejamento' as const,
-                title: 'Planejamento - Turma A',
-                subtitle: 'Aguardando revisão',
+                title: p.title || 'Planejamento',
+                subtitle: `${p.turmaNome || p.classroom?.name || 'Turma'} · ${p.professorNome || 'Professor'}`,
                 status: 'pending' as const,
                 priority: 'high' as const,
                 date: new Date().toLocaleDateString('pt-BR'),
-                onClick: () => setAbaAtiva('planejamentos'),
-              }] : []),
+                onClick: () => navigate(`/app/planejamento/${p.id}/editar`),
+                actions: canApprove ? [
+                  { label: 'Aprovar', onClick: () => aprovarPlanejamento(p.id), variant: 'primary' as const },
+                  { label: 'Devolver', onClick: () => setItemParaRejeitar({ id: p.id, tipo: 'plan' }), variant: 'danger' as const },
+                ] : [{ label: 'Revisar', onClick: () => navigate(`/app/planejamento/${p.id}/editar`), variant: 'outline' as const }],
+              })),
               ...(dashboard?.requisicoesParaAnalisar ?? 0 > 0 ? [{
                 id: 'requisicao-1',
                 type: 'requisicao' as const,
