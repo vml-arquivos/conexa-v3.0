@@ -394,7 +394,13 @@ export default function ConfiguracoesPage() {
 
           {/* ─── UNIDADE ─── */}
           {abaAtiva === 'unidade' && (
-            <UnitSettings unidade={unidade} setUnidade={(updater) => setUnidade(updater)} canEdit={isAdmin} saving={saving} onSave={isAdmin ? salvarUnidade : undefined} />
+            <UnitSettings
+              unidade={unidade}
+              setUnidade={(updater) => setUnidade(updater)}
+              canEdit={isAdmin}
+              saving={saving}
+              onSave={isAdmin ? salvarUnidade : undefined}
+            />
           )}
 
           {/* ─── USUÁRIOS ─── */}

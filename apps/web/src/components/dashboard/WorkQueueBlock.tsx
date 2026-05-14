@@ -101,7 +101,6 @@ export function WorkQueueBlock({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      {/* Header */}
       <div className="px-6 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <Search className="h-5 w-5 text-blue-600" />
@@ -113,9 +112,7 @@ export function WorkQueueBlock({
         </p>
       </div>
 
-      {/* Filters */}
       <div className="px-6 py-4 border-b border-gray-100 space-y-3">
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 
@@ -128,7 +125,6 @@ export function WorkQueueBlock({
           />
         </div>
 
-        {/* Type Filter */}
         <div className="flex gap-2 flex-wrap">
           <button
             type="button"
@@ -166,7 +162,6 @@ export function WorkQueueBlock({
         </div>
       </div>
 
-      {/* Items */}
       <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
         {filteredItems.length === 0 ? (
           <div className="px-6 py-8 text-center">
