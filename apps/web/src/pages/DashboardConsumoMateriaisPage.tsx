@@ -96,12 +96,36 @@ export default function DashboardConsumoMateriaisPage() {
   const [dataFim, setDataFim] = useState(hoje);
   const [classroomId, setClassroomId] = useState('');
   const [teacherId, setTeacherId] = useState('');
+  const [tipoItem, setTipoItem] = useState(''); // filtro por categoria/tipo de item
   const [turmas, setTurmas] = useState<{ id: string; name: string }[]>([]);
   const [professores, setProfessores] = useState<{ id: string; name: string }[]>([]);
   const [relatorio, setRelatorio] = useState<RelatorioConsumo | null>(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const [filtrosAbertos, setFiltrosAbertos] = useState(true);
+
+  // Detectar se há dados de fraldas nos detalhes (busca por P/M/G/XG no nome dos itens)
+  const dadosFraldas = (() => {
+    const detalhes: any[] = (relatorio as any)?.detalhes ?? [];
+    const fraldaMap: Record<string, number> = { 'P': 0, 'M': 0, 'G': 0, 'XG': 0 };
+    for (const req of detalhes) {
+      const items: any[] = req.items ?? req.originalItens ?? [];
+      for (const item of items) {
+        const desc: string = (item.item ?? item.descricao ?? item.productName ?? '').toUpperCase();
+        if (/FRALDA/i.test(desc)) {
+          if (/\bXG\b/.test(desc)) fraldaMap['XG'] += Number(item.quantidade ?? item.quantity ?? 1);
+          else if (/\bG\b/.test(desc)) fraldaMap['G'] += Number(item.quantidade ?? item.quantity ?? 1);
+          else if (/\bM\b/.test(desc)) fraldaMap['M'] += Number(item.quantidade ?? item.quantity ?? 1);
+          else if (/\bP\b/.test(desc)) fraldaMap['P'] += Number(item.quantidade ?? item.quantity ?? 1);
+        }
+      }
+    }
+    const total = Object.values(fraldaMap).reduce((a, b) => a + b, 0);
+    if (total === 0) return [];
+    return Object.entries(fraldaMap)
+      .filter(([, v]) => v > 0)
+      .map(([k, v], i) => ({ name: `Fralda ${k}`, value: v, fill: CAT_COLORS[i] }));
+  })();
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro('');
@@ -112,11 +136,12 @@ export default function DashboardConsumoMateriaisPage() {
       if (classroomId) params.classroomId = classroomId;
       if (teacherId) params.teacherId = teacherId;
       if (ctxUnitId) params.unitId = ctxUnitId;
+      if (tipoItem) params.type = tipoItem;
       const { data } = await http.get('/material-requests/relatorio-consumo', { params });
       setRelatorio(data);
     } catch { setErro('Não foi possível carregar o relatório de consumo.'); }
     finally { setLoading(false); }
-  }, [dataInicio, dataFim, classroomId, teacherId, ctxUnitId]);
+  }, [dataInicio, dataFim, classroomId, teacherId, ctxUnitId, tipoItem]);
 
   const carregarFiltros = useCallback(async () => {
     try {
@@ -200,6 +225,21 @@ export default function DashboardConsumoMateriaisPage() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50">
                   <option value="">Todas as turmas</option>
                   {turmas.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              {/* Filtro por tipo de item */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Tipo de item</label>
+                <select value={tipoItem} onChange={(e) => setTipoItem(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50">
+                  <option value="">Todos os tipos</option>
+                  <option value="PEDAGOGICO">Pedagógico</option>
+                  <option value="HIGIENE_PESSOAL">Higiene Pessoal</option>
+                  <option value="CONSUMIVEL">Consumível</option>
+                  <option value="LIMPEZA">Limpeza</option>
+                  <option value="ALIMENTACAO">Alimentação</option>
+                  <option value="PERMANENTE">Permanente</option>
+                  <option value="OUTROS">Outros</option>
                 </select>
               </div>
               {professores.length > 0 && (
@@ -387,6 +427,33 @@ export default function DashboardConsumoMateriaisPage() {
               </div>
             )}
           </div>
+
+          {/* Gráfico de fraldas por tamanho (exibido apenas quando há dados) */}
+          {dadosFraldas.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-5">
+              <h3 className="font-bold text-gray-800 mb-0.5 text-sm">Fraldas por Tamanho</h3>
+              <p className="text-xs text-gray-400 mb-3">Distribuição de fraldas P/M/G/XG requisitadas no período</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {dadosFraldas.map((d) => (
+                  <div key={d.name} className="rounded-xl p-3 text-center" style={{ background: d.fill + '18', border: `1px solid ${d.fill}40` }}>
+                    <p className="text-2xl font-black" style={{ color: d.fill }}>{d.value}</p>
+                    <p className="text-xs font-semibold text-gray-500 mt-0.5">{d.name}</p>
+                  </div>
+                ))}
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={dadosFraldas} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<TooltipPremium />} cursor={{ fill: '#f8fafc' }} />
+                  <Bar dataKey="value" name="Quantidade" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                    {dadosFraldas.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {relatorio.total === 0 && (
             <div className="bg-gray-50 rounded-2xl border border-gray-200 p-12 text-center">

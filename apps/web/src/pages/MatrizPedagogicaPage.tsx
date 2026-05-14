@@ -11,7 +11,7 @@ import { MATRIZ_2026, type ExemploAtividade } from '../data/matrizCompleta2026';
 import {
   Search, ChevronDown, ChevronUp, BookOpen,
   Layers, Target, Calendar, Tag, Star, Sparkles,
-  Grid, List, CheckCircle, RefreshCw, GraduationCap, Eye, EyeOff,
+  Grid, List, CheckCircle, RefreshCw, Printer, GraduationCap, Eye, EyeOff,
 } from 'lucide-react';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
@@ -221,6 +221,15 @@ export default function MatrizPedagogicaPage() {
   const [professorVerExemplos, setProfessorVerExemplos] = useState(false);
   const mostrarExemplo = ehProfessor ? professorVerExemplos : true;
 
+  // Seletor de ano (preparado para versões futuras)
+  const ANOS_DISPONIVEIS = [2026]; // 2027, 2028 podem ser adicionados aqui
+  const [anoSelecionado, setAnoSelecionado] = useState(2026);
+
+  // Impressão da matriz completa
+  const handleImprimir = () => {
+    window.print();
+  };
+
   const [busca, setBusca] = useState('');
   const [segmentoFiltro, setSegmentoFiltro] = useState<string>('');
   const [campoFiltro, setCampoFiltro] = useState<string>('');
@@ -392,9 +401,9 @@ export default function MatrizPedagogicaPage() {
       title="Matriz Pedagógica 2026"
       subtitle="Sequência Pedagógica Piloto — Objetivos de Aprendizagem e Desenvolvimento (BNCC)"
     >
-      {/* Badge de perfil + Toggle de exemplos para professor */}
+      {/* Badge de perfil + Toggle de exemplos + Seletor de ano + Botão imprimir */}
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {ehProfessor ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
               <GraduationCap className="h-3.5 w-3.5" />
@@ -406,25 +415,52 @@ export default function MatrizPedagogicaPage() {
               Visão da Coordenação — Objetivos + Exemplos de Atividades
             </span>
           )}
-        </div>
-        {/* Toggle de exemplos de atividades — apenas para professor */}
-        {ehProfessor && (
-          <button
-            onClick={() => setProfessorVerExemplos(v => !v)}
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-              professorVerExemplos
-                ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
-                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-            }`}
-            title={professorVerExemplos ? 'Ocultar exemplos de atividades' : 'Exibir exemplos de atividades'}
+
+          {/* Seletor de ano */}
+          <select
+            value={anoSelecionado}
+            onChange={e => setAnoSelecionado(Number(e.target.value))}
+            className="text-xs font-semibold border border-gray-200 rounded-lg px-2.5 py-1 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            title="Selecionar ano da matriz"
           >
-            {professorVerExemplos ? (
-              <><Eye className="h-3.5 w-3.5" /> Exemplos visíveis</>
-            ) : (
-              <><EyeOff className="h-3.5 w-3.5" /> Exemplos ocultos</>
-            )}
-          </button>
-        )}
+            {ANOS_DISPONIVEIS.map(ano => (
+              <option key={ano} value={ano}>Matriz {ano}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Toggle de exemplos de atividades — apenas para professor */}
+          {ehProfessor && (
+            <button
+              onClick={() => setProfessorVerExemplos(v => !v)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                professorVerExemplos
+                  ? 'bg-green-50 text-green-700 border-green-300 hover:bg-green-100'
+                  : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+              }`}
+              title={professorVerExemplos ? 'Ocultar exemplos de atividades' : 'Exibir exemplos de atividades'}
+            >
+              {professorVerExemplos ? (
+                <><Eye className="h-3.5 w-3.5" /> Exemplos visíveis</>
+              ) : (
+                <><EyeOff className="h-3.5 w-3.5" /> Exemplos ocultos</>
+              )}
+            </button>
+          )}
+
+          {/* Botão de impressão — visível para coordenação/mantenedora */}
+          {!ehProfessor && (
+            <button
+              onClick={handleImprimir}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all print:hidden"
+              title="Imprimir ou gerar PDF da matriz completa"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Imprimir / PDF
+            </button>
+          )}
+        </div>
       </div>
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6">

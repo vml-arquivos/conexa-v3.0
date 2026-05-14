@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, getPrimaryRole } from '../../app/AuthProvider';
 import { normalizeRoles } from '../../app/RoleProtectedRoute';
 import { getPedagogicalToday } from '../../utils/pedagogicalDate';
 import http from '../../api/http';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Calendar, LogOut, User, Users, Building2, Menu } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import {
+  Calendar, LogOut, User, Users, Building2, Menu,
+  Settings, UserCircle, ChevronDown,
+} from 'lucide-react';
 
 interface TopbarProps {
   onMenuToggle?: () => void;
@@ -31,17 +43,37 @@ const COORD_ROLES = [
   'DEVELOPER',
 ];
 
+/** Gera iniciais do nome do usuário para o avatar */
+function getInitials(user: any): string {
+  const firstName =
+    user?.firstName || user?.user?.firstName || (user?.nome as string)?.split(' ')[0] || '';
+  const lastName =
+    user?.lastName || user?.user?.lastName || (user?.nome as string)?.split(' ')[1] || '';
+  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  if (firstName) return firstName.slice(0, 2).toUpperCase();
+  const email: string = user?.email || user?.user?.email || '';
+  return email ? email.slice(0, 2).toUpperCase() : 'U';
+}
+
+/** Retorna o nome de exibição do usuário */
+function getDisplayName(user: any): string {
+  const full =
+    user?.nome ||
+    user?.user?.name ||
+    `${user?.firstName || user?.user?.firstName || ''} ${user?.lastName || user?.user?.lastName || ''}`.trim();
+  return full || user?.email || 'Usuário';
+}
+
 export function Topbar({ onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuth() as any;
+  const navigate = useNavigate();
   const [resolvedClassroom, setResolvedClassroom] = useState<AccessibleClassroom | null>(null);
 
   // FIX p0.1: usar normalizeRoles + getPrimaryRole para seleção determinística do role exibido
-  // Garante que STAFF_CENTRAL apareça mesmo quando o array de roles tem outra ordem
   const userRoles = normalizeRoles(user);
   const primaryRole = getPrimaryRole(userRoles) || 'Usuário';
 
-  // ─── Determinar se o usuário é coordenação/unidade ou professor ────────────
-  // Importar normalizeRoleTypes para verificar types específicos (UNIDADE_DIRETOR etc.)
+  // Determinar se o usuário é coordenação/unidade ou professor
   const userRoleTypes: string[] = (() => {
     if (!user || typeof user !== 'object') return [];
     const u = user as Record<string, unknown>;
@@ -56,9 +88,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   const allRoles = [...new Set([...userRoles, ...userRoleTypes])];
   const isCoordRole = allRoles.some((r) => COORD_ROLES.includes(r));
 
-  // ─── Dados de unidade (disponíveis no payload do /auth/me) ────────────────
-  // O /auth/me retorna: user.unit = { id, name, unitCode } | null
-  // O tipo User já declara o campo unit — acesso direto sem cast
+  // Dados de unidade (disponíveis no payload do /auth/me)
   const unitData = user?.unit;
   const unitName = unitData?.name ?? null;
 
@@ -74,18 +104,12 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   const hasClassroom = Boolean(directClassroom?.id || resolvedClassroom?.id);
 
   useEffect(() => {
-    // Coordenação não precisa resolver turma — evita chamada desnecessária
     if (isCoordRole) return;
-
     let active = true;
-
     if (directClassroom?.id) {
       setResolvedClassroom(null);
-      return () => {
-        active = false;
-      };
+      return () => { active = false; };
     }
-
     http.get('/lookup/classrooms/accessible')
       .then((response) => {
         if (!active) return;
@@ -97,15 +121,13 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
             : null,
         );
       })
-      .catch(() => {
-        if (!active) return;
-        setResolvedClassroom(null);
-      });
-
-    return () => {
-      active = false;
-    };
+      .catch(() => { if (!active) return; setResolvedClassroom(null); });
+    return () => { active = false; };
   }, [directClassroom?.id, isCoordRole]);
+
+  const displayName = getDisplayName(user);
+  const initials = getInitials(user);
+  const firstName = displayName.split(' ')[0];
 
   return (
     <header className="bg-background border-b border-border px-3 sm:px-6 py-3 sticky top-0 z-30">
@@ -132,19 +154,14 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
           {/* Contexto: Turma (professor) ou Unidade (coordenação/direção) */}
           {isCoordRole ? (
-            /* ── Coordenação/Direção: exibe unidade, nunca turma fixa ── */
             <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground min-w-0">
               <Building2 className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline whitespace-nowrap">Unidade:</span>
-              <Badge
-                variant="secondary"
-                className="truncate max-w-[140px] sm:max-w-[220px]"
-              >
+              <Badge variant="secondary" className="truncate max-w-[140px] sm:max-w-[220px]">
                 {unitName ?? 'Unidade'}
               </Badge>
             </div>
           ) : (
-            /* ── Professor/Auxiliar: exibe turma atribuída ── */
             <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground min-w-0">
               <Users className="h-4 w-4 flex-shrink-0" />
               <span className="hidden sm:inline whitespace-nowrap">Turma:</span>
@@ -158,28 +175,71 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
           )}
         </div>
 
-        {/* Direita: nome do usuário + avatar + logout */}
+        {/* Direita: dropdown de usuário */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-sm font-semibold truncate max-w-[140px]">
-              {user?.nome || user?.user?.name || user?.email}
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              {primaryRole}
-            </span>
-          </div>
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 flex-shrink-0">
-            <User className="h-4 w-4 text-primary" />
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={logout}
-            className="text-muted-foreground hover:text-destructive"
-            title="Sair"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center gap-2 sm:gap-3 rounded-xl px-2 py-1.5 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Menu do usuário"
+              >
+                {/* Avatar com iniciais */}
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 flex-shrink-0 text-xs font-bold text-primary select-none">
+                  {initials}
+                </div>
+                {/* Nome + role — ocultos em mobile */}
+                <div className="hidden sm:flex flex-col items-start leading-tight">
+                  <span className="text-sm font-semibold truncate max-w-[130px]">{firstName}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                    {primaryRole}
+                  </span>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+              {/* Cabeçalho do dropdown */}
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-sm truncate">{displayName}</span>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {user?.email || user?.user?.email || ''}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              {/* Meu Perfil */}
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/app/meu-perfil')}
+              >
+                <UserCircle className="h-4 w-4 mr-2 text-muted-foreground" />
+                Meu Perfil
+              </DropdownMenuItem>
+
+              {/* Configurações */}
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={() => navigate('/app/configuracoes')}
+              >
+                <Settings className="h-4 w-4 mr-2 text-muted-foreground" />
+                Configurações
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              {/* Sair */}
+              <DropdownMenuItem
+                className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+                onClick={logout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
