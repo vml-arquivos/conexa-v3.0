@@ -1661,10 +1661,14 @@ export default function DiarioBordoPage() {
       // Só recalcular localmente se a chamada não foi feita ainda.
       const presencasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
         ? chamadaInfo.presentes
-        : form.criancasPresentes.length;
+        : form.criancasPresentes.length > 0
+          ? form.criancasPresentes.length
+          : form.presencas;
       const ausenciasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
         ? chamadaInfo.ausentes
-        : Math.max(0, criancas.length - form.criancasPresentes.length);
+        : criancas.length > 0
+          ? Math.max(0, criancas.length - presencasReais)
+          : form.ausencias;
 
       if (!classroomId || !childId) {
         toast.error('Turma ou aluno não identificado. Não é possível salvar o diário sem vínculo com uma turma ativa. Recarregue a página ou contate a coordenação.');
@@ -3604,7 +3608,7 @@ export default function DiarioBordoPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
+              <Button type="button" variant="outline" onClick={() => salvarDiario(false)} className="sm:flex-1">
                 <Save className="mr-2 h-4 w-4" /> Salvar Rascunho
               </Button>
               <Button onClick={() => salvarDiario(true)} disabled={saving} className="sm:flex-[1.4]">

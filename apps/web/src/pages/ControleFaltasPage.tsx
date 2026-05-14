@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -312,7 +311,6 @@ export default function ControleFaltasPage() {
 
 // ─── Visão do Professor (extraída para componente separado) ───────────────────
 function ControleFaltasProfessorView() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);
@@ -439,9 +437,13 @@ function ControleFaltasProfessorView() {
         justification: registros[a.id].motivo ?? null,
       }));
 
-    if (lista.length === 0) toast.warning('Nenhum aluno marcado. A chamada será salva sem registros.');
-    if (chamada.alunos.length - lista.length > 0) {
-      toast.warning(`Existem ${chamada.alunos.length - lista.length} aluno(s) sem marcação. Apenas os marcados serão salvos.`);
+    if (lista.length === 0) {
+      toast.error('Marque pelo menos um aluno antes de salvar.');
+      return;
+    }
+    const pendentes = chamada.alunos.length - lista.length;
+    if (pendentes > 0) {
+      toast.warning(`Existem ${pendentes} aluno(s) sem marcação. Apenas os marcados serão salvos.`);
     }
 
     try {
