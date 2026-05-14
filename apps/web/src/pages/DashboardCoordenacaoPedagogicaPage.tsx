@@ -24,9 +24,9 @@ import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
   MessageCircle, TrendingUp, Bell, Brain,
-  Plus, RefreshCw, BarChart2, FileText, ArrowRight,
-  Shield, Zap, Activity, Eye, Clock, CheckCircle2,
-  XCircle, Search, Filter, ChevronDown, Star,
+  RefreshCw, BarChart2, FileText, ArrowRight,
+  Shield, Zap, Activity, Clock, CheckCircle2,
+  XCircle, Star,
   GraduationCap, MessageSquare,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
@@ -788,7 +788,18 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   // ── Valores computados ─────────────────────────────────────────────────────
   const planejamentosEmRevisao  = planejamentos.filter(p => (p.status || '').toUpperCase() === 'EM_REVISAO').length;
   const planejamentosDevolvidos = planejamentos.filter(p => (p.status || '').toUpperCase() === 'DEVOLVIDO').length;
+  const planejamentosAprovados  = planejamentos.filter(p => ['APROVADO','PUBLICADO','CONCLUIDO'].includes((p.status || '').toUpperCase())).length;
+  const planejamentosRascunho   = planejamentos.filter(p => (p.status || '').toUpperCase() === 'RASCUNHO').length;
   const totalPendencias         = (dashboard?.requisicoesParaAnalisar ?? 0) + planejamentosEmRevisao;
+
+  // Funil real de planejamentos (substitui MOCK_PLANNING_FUNNEL quando há dados)
+  const totalPlanejamentos = planejamentos.length;
+  const FUNIL_REAL = totalPlanejamentos > 0 ? [
+    { label: 'Aprovados',  value: planejamentosAprovados,  color: '#10b981', pct: Math.round((planejamentosAprovados / totalPlanejamentos) * 100) },
+    { label: 'Em Revisão', value: planejamentosEmRevisao,  color: '#f59e0b', pct: Math.round((planejamentosEmRevisao / totalPlanejamentos) * 100) },
+    { label: 'Devolvidos', value: planejamentosDevolvidos, color: '#ef4444', pct: Math.round((planejamentosDevolvidos / totalPlanejamentos) * 100) },
+    { label: 'Rascunho',   value: planejamentosRascunho,   color: '#94a3b8', pct: Math.round((planejamentosRascunho / totalPlanejamentos) * 100) },
+  ] : null;
   const primeiroNome            = (((user?.nome as string) || 'Coordenação').trim().split(' ')[0]) || 'Coordenação';
   const totalTurmasHoje         = dashboard?.turmasLista?.length ?? dashboard?.turmas ?? 0;
   const turmasComChamadaHoje    = (dashboard?.turmasLista ?? []).filter(t => t.chamadaFeita).length;
@@ -893,10 +904,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               {
-                label: 'Visão pedagógica',
-                sub: 'Diários, cobertura e turmas com navegação consolidada',
-                icon: <Eye className="h-4 w-4" />,
-                action: () => setAbaAtiva('pedagogico'),
+                label: 'Diários das turmas',
+                sub: 'Cobertura, registros e status das turmas',
+                icon: <ClipboardList className="h-4 w-4" />,
+                action: () => setAbaAtiva('diarios'),
                 cls: 'border-white/10 bg-white/5 hover:bg-white/10',
               },
               {
@@ -969,15 +980,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,          badge: totalPendencias || undefined },
           { id: 'turmas',        label: 'Turmas',         icon: <Users className="h-4 w-4" /> },
           { id: 'planejamentos', label: 'Planejamentos',  icon: <BookOpen className="h-4 w-4" />,      badge: planejamentosEmRevisao || undefined },
+          { id: 'diarios',       label: 'Diários',        icon: <ClipboardList className="h-4 w-4" /> },
           { id: 'relatorios',    label: 'Relatórios',     icon: <TrendingUp className="h-4 w-4" /> },
           { id: 'ocorrencias',   label: 'Ocorrências',    icon: <TriangleAlert className="h-4 w-4" />, badge: alertasReais?.total || undefined },
         ] as const).map(aba => (
           <button
             key={aba.id}
-            onClick={() => {
-              if (aba.id === 'relatorios') { setAbaAtiva('relatorios'); return; }
-              setAbaAtiva(aba.id);
-            }}
+            onClick={() => { setAbaAtiva(aba.id); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
               abaAtiva === aba.id
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -1203,41 +1212,43 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           {/* ── Coluna lateral (1/3) ────────────────────────────────────── */}
           <div className="space-y-5">
 
-            {/* PAINEL: Ações rápidas */}
+            {/* PAINEL: Ações rápidas — atalhos para funcionalidades não cobertas pelo cockpit */}
             <SectionCard
               title="Ações Rápidas"
               icon={<Zap className="h-4 w-4" />}
             >
               <div className="space-y-2">
-                <QuickAction
-                  label="Revisar planejamentos"
-                  icon={<BookOpen className="h-4 w-4 text-blue-500" />}
-                  badge={planejamentosEmRevisao}
-                  onClick={() => setAbaAtiva('planejamentos')}
-                  variant={planejamentosEmRevisao > 0 ? 'urgent' : 'default'}
-                />
-                <QuickAction
-                  label="Pedidos de material"
-                  icon={<ShoppingCart className="h-4 w-4 text-rose-500" />}
-                  badge={dashboard?.requisicoesParaAnalisar}
-                  onClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
-                  variant={(dashboard?.requisicoesParaAnalisar ?? 0) > 0 ? 'urgent' : 'default'}
-                />
+                {/* Diários: não está no cockpit estratégico */}
                 <QuickAction
                   label="Diários das turmas"
                   icon={<ClipboardList className="h-4 w-4 text-indigo-500" />}
                   onClick={() => navigate('/app/diario-calendario')}
                 />
+                {/* RDIC: não está no cockpit estratégico */}
                 <QuickAction
                   label="RDIC — Revisão"
                   icon={<Brain className="h-4 w-4 text-teal-500" />}
                   onClick={() => navigate('/app/rdic-coord')}
                 />
+                {/* Turmas & Reuniões */}
                 <QuickAction
                   label="Turmas & Reuniões"
                   icon={<Users className="h-4 w-4 text-violet-500" />}
-                  onClick={() => navigate('/app/turmas-reunioes')}
+                  onClick={() => navigate('/app/coordenacao')}
                 />
+                {/* Matriz Pedagógica 2026 */}
+                <QuickAction
+                  label="Matriz Pedagógica 2026"
+                  icon={<GraduationCap className="h-4 w-4 text-emerald-500" />}
+                  onClick={() => navigate('/app/matriz-pedagogica')}
+                />
+                {/* Atendimentos aos Pais */}
+                <QuickAction
+                  label="Atendimentos aos Pais"
+                  icon={<MessageCircle className="h-4 w-4 text-emerald-500" />}
+                  onClick={() => navigate('/app/atendimentos-pais')}
+                />
+                {/* Ocorrências: com badge de alertas */}
                 <QuickAction
                   label="Ocorrências"
                   icon={<TriangleAlert className="h-4 w-4 text-amber-500" />}
@@ -1245,41 +1256,45 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   onClick={() => setAbaAtiva('ocorrencias')}
                   variant={(alertasReais?.total ?? 0) > 0 ? 'urgent' : 'default'}
                 />
-                <QuickAction
-                  label="Atendimentos aos Pais"
-                  icon={<MessageCircle className="h-4 w-4 text-emerald-500" />}
-                  onClick={() => navigate('/app/atendimentos-pais')}
-                />
               </div>
             </SectionCard>
 
-            {/* PAINEL: Funil de planejamentos
-                TODO: Integrar com GET /insights/governance/funnel */}
+            {/* PAINEL: Funil de planejamentos — dados reais quando disponíveis */}
             <SectionCard
               title="Planejamentos"
-              subtitle="Distribuição por status"
+              subtitle={totalPlanejamentos > 0 ? `${totalPlanejamentos} plano(s) carregados` : 'Distribuição por status'}
               icon={<BarChart2 className="h-4 w-4" />}
+              action={totalPlanejamentos > 0 ? { label: 'Ver todos', onClick: () => setAbaAtiva('planejamentos') } : undefined}
             >
-              <div className="mb-3">
-                <MiniBarChart
-                  data={MOCK_PLANNING_FUNNEL.map(f => ({ label: f.label, value: f.value, color: f.color }))}
-                  height={40}
-                />
-              </div>
-              <div className="space-y-2">
-                {MOCK_PLANNING_FUNNEL.map(f => (
-                  <div key={f.label} className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
-                    <span className="text-xs text-gray-600 flex-1">{f.label}</span>
-                    <span className="text-xs font-bold text-gray-700">{f.value}</span>
-                    <span className="text-[10px] text-gray-400 w-8 text-right">{f.pct}%</span>
-                  </div>
-                ))}
-              </div>
-              {/* TODO: substituir MOCK_PLANNING_FUNNEL com dados reais */}
-              <p className="text-[10px] text-gray-400 mt-3 border-t border-gray-50 pt-2">
-                * Dados ilustrativos — integrar com GET /insights/governance/funnel
-              </p>
+              {(() => {
+                const funil = FUNIL_REAL ?? MOCK_PLANNING_FUNNEL;
+                const isMock = !FUNIL_REAL;
+                return (
+                  <>
+                    <div className="mb-3">
+                      <MiniBarChart
+                        data={funil.map(f => ({ label: f.label, value: f.value, color: f.color }))}
+                        height={40}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      {funil.map(f => (
+                        <div key={f.label} className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                          <span className="text-xs text-gray-600 flex-1">{f.label}</span>
+                          <span className="text-xs font-bold text-gray-700">{f.value}</span>
+                          <span className="text-[10px] text-gray-400 w-8 text-right">{f.pct}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    {isMock && (
+                      <p className="text-[10px] text-gray-400 mt-3 border-t border-gray-50 pt-2">
+                        * Dados ilustrativos — carregue planejamentos para ver dados reais
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </SectionCard>
 
             {/* PAINEL: Clima emocional da semana
@@ -1914,10 +1929,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               { label: 'Desenvolvimento',       path: unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil', icon: <Brain className="h-5 w-5 text-purple-600" />,         bg: 'bg-purple-50',  border: 'border-purple-100'  },
               { label: 'RDICs publicados',      path: '/app/rdic-geral',                                                                 icon: <FileText className="h-5 w-5 text-teal-600" />,         bg: 'bg-teal-50',    border: 'border-teal-100'    },
               { label: 'Requisições aprovadas', path: '/app/material-requests',                                                          icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,   bg: 'bg-emerald-50', border: 'border-emerald-100'  },
-              { label: 'Ocorrências',           path: '/app/ocorrencias',                                                                icon: <TriangleAlert className="h-5 w-5 text-rose-500" />,    bg: 'bg-rose-50',    border: 'border-rose-100'    },
+              { label: 'Ocorrências',           path: '/app/coordenacao-pedagogica?aba=ocorrencias',                                  icon: <TriangleAlert className="h-5 w-5 text-rose-500" />,    bg: 'bg-rose-50',    border: 'border-rose-100'    },
               { label: 'Inteligência',          path: '/app/inteligencia',                                                               icon: <Brain className="h-5 w-5 text-indigo-600" />,          bg: 'bg-indigo-50',  border: 'border-indigo-100'  },
               { label: 'Alergias e Dietas',     path: '/app/painel-alergias',                                                           icon: <AlertCircle className="h-5 w-5 text-amber-600" />,     bg: 'bg-amber-50',   border: 'border-amber-100'   },
               { label: 'Atendimentos Pais',     path: '/app/atendimentos-pais',                                                         icon: <MessageCircle className="h-5 w-5 text-sky-600" />,     bg: 'bg-sky-50',     border: 'border-sky-100'     },
+              { label: 'Matriz Pedagógica 2026', path: '/app/matriz-pedagogica',                                                          icon: <GraduationCap className="h-5 w-5 text-green-600" />,   bg: 'bg-green-50',   border: 'border-green-100'   },
             ].map(item => (
               <button key={item.label} onClick={() => navigate(item.path)}
                 className={`${item.bg} border ${item.border} rounded-2xl p-4 text-left hover:opacity-90 hover:shadow-sm transition-all group`}>

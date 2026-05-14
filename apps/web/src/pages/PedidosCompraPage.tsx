@@ -797,10 +797,22 @@ export function PedidosCompraPage() {
                     </span>
                     <span className="font-semibold text-gray-800">{pedido.unit?.name ?? '—'}</span>
                     <span className="text-sm text-gray-500">{pedido.mesReferencia}</span>
+                    {/* Data do pedido */}
+                    {pedido.criadoEm && (
+                      <span className="text-xs text-gray-400" title="Data do pedido">
+                        {new Date(pedido.criadoEm).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      </span>
+                    )}
+                    {/* Professor solicitante */}
+                    {pedido.createdByUser && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                        {(pedido.createdByUser.firstName ?? '') + ' ' + (pedido.createdByUser.lastName ?? '')}
+                      </span>
+                    )}
                     <span className="text-xs text-gray-400">{pedido.itens.length} {pedido.itens.length === 1 ? 'item' : 'itens'}</span>
                     {pedido.itens.length > 0 && (
-                      <span className="text-xs font-medium text-blue-700">
-                        Total: {fmtBRL(pedido.itens.reduce((s, i) => s + (i.custoEstimado ?? 0) * i.quantidade, 0))}
+                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                        {fmtBRL(pedido.itens.reduce((s, i) => s + (i.custoEstimado ?? 0) * i.quantidade, 0))}
                       </span>
                     )}
                   </div>
