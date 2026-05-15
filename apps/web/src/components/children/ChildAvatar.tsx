@@ -105,14 +105,23 @@ type ChildAvatarProps = {
   showInitials?: boolean;
 };
 
+/**
+ * ChildAvatar — avatar de criança com fallback de iniciais.
+ *
+ * Defaults refinados para visual mais acolhedor e humano:
+ * - tamanho padrão w-11 h-11 (ligeiramente maior)
+ * - gradiente suave azul-índigo no fallback
+ * - iniciais font-medium (sem bold pesado)
+ * - sombra leve para profundidade
+ */
 export function ChildAvatar({
   child,
   alt,
-  sizeClassName = 'w-10 h-10',
+  sizeClassName = 'w-11 h-11',
   imageClassName = 'rounded-full object-cover',
-  fallbackClassName = 'rounded-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center',
-  iconClassName = 'w-6 h-6 text-slate-400',
-  initialsClassName = 'text-sm font-bold text-slate-600',
+  fallbackClassName = 'rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-sm',
+  iconClassName = 'w-5 h-5 text-slate-400',
+  initialsClassName = 'text-sm font-medium text-indigo-600',
   showInitials = false,
 }: ChildAvatarProps) {
   const src = useMemo(() => resolveChildPhotoUrl(child), [child]);

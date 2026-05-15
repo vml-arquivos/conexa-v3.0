@@ -506,23 +506,23 @@ function ControleFaltasProfessorView() {
           {/* ─ Cards de contagem compactos ─ */}
           <div className="grid grid-cols-3 gap-3">
             <div className="text-center py-4 px-2 bg-green-50 rounded-xl border border-green-200">
-              <p className="text-3xl font-bold text-green-600">{totalPresentes}</p>
-              <p className="text-xs text-green-700 mt-1 font-semibold uppercase tracking-wide">Presentes</p>
+              <p className="text-2xl font-semibold text-green-600 tabular-nums">{totalPresentes}</p>
+              <p className="text-xs text-green-600 mt-1 font-medium">Presentes</p>
             </div>
             <div className="text-center py-4 px-2 bg-red-50 rounded-xl border border-red-200">
-              <p className="text-3xl font-bold text-red-600">{totalAusentes}</p>
-              <p className="text-xs text-red-700 mt-1 font-semibold uppercase tracking-wide">Ausentes</p>
+              <p className="text-2xl font-semibold text-red-500 tabular-nums">{totalAusentes}</p>
+              <p className="text-xs text-red-500 mt-1 font-medium">Ausentes</p>
             </div>
             <div className="text-center py-4 px-2 bg-amber-50 rounded-xl border border-amber-200">
-              <p className="text-3xl font-bold text-amber-600">{totalJustificados}</p>
-              <p className="text-xs text-amber-700 mt-1 font-semibold uppercase tracking-wide">Justificados</p>
+              <p className="text-2xl font-semibold text-amber-500 tabular-nums">{totalJustificados}</p>
+              <p className="text-xs text-amber-500 mt-1 font-medium">Justificados</p>
             </div>
           </div>
 
           {/* ─ Barra de taxa de presença ─ */}
           <div className="p-4 bg-white border border-gray-100 rounded-xl">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Taxa de presença</span>
+              <span className="text-xs font-medium text-slate-400">Taxa de presença</span>
               <span className="text-lg font-bold text-blue-700">{taxaPresenca}%</span>
             </div>
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -538,7 +538,7 @@ function ControleFaltasProfessorView() {
           {/* ─ Avatares dos presentes (grid compacto com ChildAvatar) ─ */}
           {presentesLista.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Presentes</p>
+              <p className="text-xs font-medium text-slate-400 mb-2 tracking-wide">Presentes</p>
               <div className="flex flex-wrap gap-2">
                 {presentesLista.map((a) => (
                   <div key={a.id} className="flex flex-col items-center gap-1" title={a.nome}>
@@ -548,7 +548,7 @@ function ControleFaltasProfessorView() {
                       imageClassName="rounded-full object-cover ring-2 ring-emerald-400"
                       fallbackClassName="rounded-full bg-emerald-50 ring-2 ring-emerald-300 flex items-center justify-center"
                       showInitials
-                      initialsClassName="text-xs font-bold text-emerald-700"
+                      initialsClassName="text-xs font-medium text-emerald-700"
                     />
                     <span className="text-[10px] text-gray-500 truncate max-w-[44px] text-center leading-tight">
                       {a.nome.split(' ')[0]}
@@ -562,7 +562,7 @@ function ControleFaltasProfessorView() {
           {/* ─ Lista de ausentes/justificados com ChildAvatar ─ */}
           {ausentesEJustificados.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Faltaram</p>
+              <p className="text-xs font-medium text-slate-400 mb-2 tracking-wide">Faltaram</p>
               <div className="space-y-2">
                 {ausentesEJustificados.map((a) => (
                   <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
@@ -572,7 +572,7 @@ function ControleFaltasProfessorView() {
                       imageClassName="rounded-full object-cover"
                       fallbackClassName="rounded-full bg-gray-100 flex items-center justify-center"
                       showInitials
-                      initialsClassName="text-xs font-bold text-gray-500"
+                      initialsClassName="text-xs font-medium text-slate-500"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{a.nome}</p>
@@ -580,10 +580,10 @@ function ControleFaltasProfessorView() {
                         <p className="text-xs text-gray-400 truncate">{registros[a.id].motivo}</p>
                       )}
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
                       registros[a.id]?.status === 'JUSTIFICADO'
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                        : 'bg-red-50 text-red-500 border border-red-200'
                     }`}>
                       {registros[a.id]?.status === 'JUSTIFICADO' ? 'Justificado' : 'Ausente'}
                     </span>
@@ -737,8 +737,8 @@ function ControleFaltasProfessorView() {
         Todos estão presentes hoje
       </Button>
 
-      {/* Cards dos alunos — grid compacto com ChildAvatar */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 mb-6">
+      {/* Cards dos alunos — grid responsivo mobile-first */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-2.5 mb-6">
         {chamada.alunos.map((aluno) => {
           const reg = registros[aluno.id];
           const status = reg?.status ?? null;
@@ -748,14 +748,14 @@ function ControleFaltasProfessorView() {
             <div key={aluno.id} className="flex flex-col gap-1.5">
               {/* Card compacto do aluno */}
               <div
-                className={`relative rounded-xl border-2 overflow-hidden transition-all ${
+                className={`relative rounded-2xl border overflow-hidden transition-all shadow-sm ${
                   status === 'PRESENTE'
-                    ? 'border-green-400 bg-green-50'
+                    ? 'border-emerald-300 bg-emerald-50/60'
                     : status === 'AUSENTE'
-                    ? 'border-red-400 bg-red-50'
+                    ? 'border-red-300 bg-red-50/60'
                     : status === 'JUSTIFICADO'
-                    ? 'border-yellow-400 bg-yellow-50'
-                    : 'border-gray-200 bg-white'
+                    ? 'border-amber-300 bg-amber-50/60'
+                    : 'border-slate-200 bg-white'
                 }`}
               >
                 {/* Avatar + badge de status */}
@@ -766,16 +766,16 @@ function ControleFaltasProfessorView() {
                       firstName: aluno.nome.split(' ')[0],
                       lastName: aluno.nome.split(' ').slice(1).join(' ') || undefined,
                     }}
-                    sizeClassName="w-12 h-12"
-                    imageClassName="rounded-full object-cover"
-                    fallbackClassName="rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center"
+                    sizeClassName="w-13 h-13"
+                    imageClassName="rounded-full object-cover ring-2 ring-white"
+                    fallbackClassName="rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-sm"
                     showInitials
-                    initialsClassName="text-sm font-bold text-slate-600"
+                    initialsClassName="text-xs font-medium text-indigo-600"
                   />
                   {status && (
-                    <div className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center ${
-                      status === 'PRESENTE' ? 'bg-green-500' :
-                      status === 'AUSENTE' ? 'bg-red-500' : 'bg-yellow-500'
+                    <div className={`absolute top-1 right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-sm ${
+                      status === 'PRESENTE' ? 'bg-emerald-500' :
+                      status === 'AUSENTE' ? 'bg-red-400' : 'bg-amber-400'
                     }`}>
                       {status === 'PRESENTE' && <CheckCircle className="h-3.5 w-3.5 text-white" />}
                       {status === 'AUSENTE' && <XCircle className="h-3.5 w-3.5 text-white" />}
@@ -785,8 +785,8 @@ function ControleFaltasProfessorView() {
                 </div>
 
                 {/* Nome truncado em 1 linha */}
-                <div className="px-1 pb-1 text-center">
-                  <p className="text-[11px] font-semibold text-gray-700 leading-tight truncate">
+                <div className="px-1 pb-1.5 text-center">
+                  <p className="text-[10px] font-medium text-slate-600 leading-tight truncate">
                     {aluno.nome.split(' ')[0]}
                   </p>
                 </div>

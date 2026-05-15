@@ -361,7 +361,7 @@ function WidgetCard({ widget }: { widget: Widget }) {
   return (
     <button
       onClick={() => navigate(widget.path)}
-      className="group relative w-full text-left bg-white border border-slate-200 rounded-xl p-4 hover:border-brand-300 hover:shadow-ds-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+      className="group relative w-full text-left bg-white border border-slate-100 rounded-2xl p-4 hover:border-brand-200 hover:shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
     >
       {/* Accent bar */}
       <div className={`absolute top-0 left-0 w-1 h-full ${widget.accent} rounded-l-xl opacity-80 group-hover:opacity-100 transition-opacity`} />
@@ -375,22 +375,22 @@ function WidgetCard({ widget }: { widget: Widget }) {
             </span>
           </div>
           {widget.badge && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200 flex-shrink-0">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-100 flex-shrink-0">
               {widget.badge}
             </span>
           )}
         </div>
 
         {/* Content */}
-        <h3 className="text-[13px] font-semibold text-slate-800 group-hover:text-brand-700 transition-colors leading-tight">
+        <h3 className="text-[13px] font-medium text-slate-700 group-hover:text-brand-700 transition-colors leading-snug">
           {widget.title}
         </h3>
-        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">
+        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2 font-normal">
           {widget.description}
         </p>
 
         {/* Footer */}
-        <div className="flex items-center gap-1 mt-3 text-[11px] font-semibold text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 mt-3 text-[11px] font-medium text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
           <span>Acessar</span>
           <ArrowRight className="h-3 w-3" />
         </div>
@@ -414,11 +414,11 @@ function WidgetRenderer({ widgets, title, subtitle }: WidgetRendererProps) {
     <div>
       {/* Section header */}
       <div className="mb-4">
-        <h2 className="text-base font-bold text-slate-800">{title}</h2>
-        {subtitle && <p className="text-[12px] text-slate-500 mt-0.5">{subtitle}</p>}
+        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        {subtitle && <p className="text-[11px] text-slate-400 mt-0.5 font-normal">{subtitle}</p>}
       </div>
 
-      {/* Grid responsivo */}
+      {/* Grid responsivo — 1 col mobile, 2 tablet, 3-4 desktop */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {sorted.map((widget) => (
           <WidgetCard key={widget.id} widget={widget} />
@@ -504,17 +504,17 @@ export function UnifiedDashboard() {
   return (
     <div className="min-h-full bg-surface-subtle">
       {/* ── Hero header ────────────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-r from-slate-950 to-brand-900 px-6 py-8">
+      <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-brand-950 px-5 sm:px-6 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto">
-          <p className="text-[11px] font-semibold text-brand-300 uppercase tracking-widest mb-1">
+          <p className="text-[10px] font-medium text-brand-400 tracking-widest mb-1.5 uppercase">
             {import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
           </p>
-          <h1 className="text-xl font-bold text-white">
+          <h1 className="text-lg sm:text-xl font-semibold text-white leading-snug">
             {greeting}, {userName.split(' ')[0]}
           </h1>
           {unitName && (
-            <p className="text-[12px] text-slate-400 mt-1 flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" />
+            <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1.5 font-normal">
+              <Building2 className="h-3 w-3" />
               {unitName}
             </p>
           )}
@@ -522,7 +522,7 @@ export function UnifiedDashboard() {
       </div>
 
       {/* ── Widgets ────────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 py-5 sm:py-6">
         <WidgetRenderer
           widgets={widgets}
           title={sectionTitle}
@@ -530,12 +530,12 @@ export function UnifiedDashboard() {
         />
 
         {/* ── Atalhos rápidos ─────────────────────────────────────────────── */}
-        <div className="mt-8 pt-6 border-t border-slate-200 flex flex-wrap gap-2">
+        <div className="mt-6 pt-5 border-t border-slate-100 flex flex-wrap gap-2">
           {quickLinks.map((link) => (
             <button
               key={link.path}
               onClick={() => navigate(link.path)}
-              className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-brand-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-brand-50"
+              className="flex items-center gap-1.5 text-[11px] font-normal text-slate-400 hover:text-brand-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-brand-50"
             >
               {link.icon}
               {link.label}
