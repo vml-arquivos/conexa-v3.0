@@ -74,7 +74,17 @@ const ROLES_COR: Record<string, string> = {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
   const { user } = useAuth() as any;
-  const [abaAtiva, setAbaAtiva] = useState<'unidade' | 'usuarios' | 'sistema' | 'notificacoes'>('unidade');
+  // Para professores e perfis sem isAdmin, a aba inicial é 'notificacoes'
+  // pois 'unidade' e 'usuarios' ficam ocultas. Calculado antes do isAdmin
+  // para evitar dependência circular — usa a mesma lógica de userRole abaixo.
+  const _initRole = (user?.role ||
+    (Array.isArray(user?.roles) && user.roles[0]
+      ? (typeof user.roles[0] === 'string' ? user.roles[0] : (user.roles[0] as any).level ?? '')
+      : '')) as string;
+  const _initAdmin = ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE'].includes(_initRole);
+  const [abaAtiva, setAbaAtiva] = useState<'unidade' | 'usuarios' | 'sistema' | 'notificacoes'>(
+    _initAdmin ? 'unidade' : 'notificacoes'
+  );
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);

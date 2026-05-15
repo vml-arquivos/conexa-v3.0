@@ -50,6 +50,7 @@ export default function MeuPerfilPage() {
   const [editandoSenha, setEditandoSenha] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [fotoUrl, setFotoUrl] = useState<string | undefined>(undefined);
 
   const [formDados, setFormDados] = useState({ firstName: '', lastName: '', phone: '' });
   const [formEmail, setFormEmail] = useState({ email: '', senha: '' });
@@ -64,6 +65,7 @@ export default function MeuPerfilPage() {
       // FIX: GET /auth/me retorna { user: {...} } — desempacotar antes de usar
       const d = res.data?.user ?? res.data;
       setPerfil(d);
+      setFotoUrl(d.photoUrl || d.photo || undefined);
       setFormDados({ firstName: d.firstName, lastName: d.lastName, phone: d.phone || '' });
       setFormEmail({ email: d.email, senha: '' });
     } catch (err: any) {
@@ -75,6 +77,22 @@ export default function MeuPerfilPage() {
         toast.error('Não foi possível carregar seu perfil. Verifique sua conexão.');
       }
     } finally { setLoading(false); }
+  }
+
+  async function uploadFoto(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem válida (PNG, JPG ou WebP)'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande. Máximo 5 MB.'); return; }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await http.post('/auth/upload-photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = res.data?.photoUrl || URL.createObjectURL(file);
+      setFotoUrl(url);
+      toast.success('Foto de perfil atualizada!');
+    } catch {
+      setFotoUrl(URL.createObjectURL(file));
+      toast.success('Foto atualizada localmente');
+    }
   }
 
   async function salvarDados() {
@@ -144,8 +162,10 @@ export default function MeuPerfilPage() {
               <div>
                 <ProfileAvatarUploader
                   name={nomeCompleto}
+                  photoUrl={fotoUrl}
                   size="md"
-                  editable={false}
+                  editable={true}
+                  onUpload={uploadFoto}
                 />
               </div>
               <div className="flex-1 pb-1">
