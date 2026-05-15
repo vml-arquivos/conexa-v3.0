@@ -1210,14 +1210,8 @@ export default function DiarioBordoPage() {
         // BUG B FIX: Usar os totais exatos retornados pelo backend (presentes, ausentes, justificados).
         // Não recalcular localmente — evita divergência entre chamada e diário.
         // Preencher mesmo quando não há presentes (ex: todos ausentes), desde que haja registros.
-        //
-        // PATCH 1 — guard Array.isArray:
-        // chamadaData.alunos pode chegar como null/undefined/objeto quando a chamada
-        // ainda não foi feita. Sem o guard, .filter() e .map() explodem com
-        // "a.map is not a function" — causa do ERRO 500 na página do diário.
-        const alunosArr: any[] = Array.isArray(chamadaData?.alunos) ? chamadaData.alunos : [];
-        if (alunosArr.length > 0 && chamadaData.registrados > 0) {
-          const presentesIds: string[] = alunosArr
+        if (chamadaData?.alunos && chamadaData.alunos.length > 0 && chamadaData.registrados > 0) {
+          const presentesIds: string[] = chamadaData.alunos
             .filter((a: any) => a.status === 'PRESENTE')
             .map((a: any) => a.id);
           setForm(f => ({ ...f, criancasPresentes: presentesIds }));
@@ -1230,7 +1224,7 @@ export default function DiarioBordoPage() {
           });
 
           // Sincronizar lista de crianças com a chamada importada (evita denominador incorreto na UI)
-          const criancasFromChamada: Crianca[] = alunosArr.map((a: any) => {
+          const criancasFromChamada: Crianca[] = chamadaData.alunos.map((a: any) => {
             const nome = String(a.nome ?? '').trim();
             const parts = nome.split(/\s+/).filter(Boolean);
             const firstName = parts[0] ?? nome ?? 'Criança';
@@ -1392,14 +1386,8 @@ export default function DiarioBordoPage() {
           reflexaoPedagogica: item.reflexaoPedagogica ?? ctx.reflexaoPedagogica ?? item.developmentNotes ?? '',
           // FIX P4-2: mapear observations (campo do backend) para encaminhamentos (campo do frontend)
           encaminhamentos: item.encaminhamentos ?? ctx.encaminhamentos ?? item.observations ?? '',
-          // PATCH 2 — o aiContext JSONB pode retornar rotina/microgestos como objeto
-          // em vez de array, causando "a.map is not a function" no render.
-          rotina: Array.isArray(item.rotina) ? item.rotina
-                : Array.isArray(ctx.rotina)  ? ctx.rotina
-                : [],
-          microgestos: Array.isArray(item.microgestos) ? item.microgestos
-                     : Array.isArray(ctx.microgestos)  ? ctx.microgestos
-                     : [],
+          rotina: item.rotina ?? ctx.rotina ?? [],
+          microgestos: item.microgestos ?? ctx.microgestos ?? [],
         };
       });
       setDiarios(mapped);
@@ -1623,19 +1611,20 @@ export default function DiarioBordoPage() {
     setPendingRetroativoAction(null);
   }
 
-  async function salvarDiario(publicar: boolean = true) {
+  async function salvarDiario() {
     if (!chamadaCarregada && !isDataRetroativa(form.date)) {
-      toast.warning('A chamada ainda não foi realizada. Os números de presenças/ausências serão estimados.');
+      toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
+      return;
     }
     // GATE 2 (segurança produção): plano de aula aprovado obrigatório para publicação
-    if (publicar && !planejamentoHoje) {
+    if (!planejamentoHoje) {
       toast.error(
         'Publicação bloqueada: nenhum plano de aula aprovado vinculado a hoje. ' +
         'Solicite à coordenação aprovar o planejamento antes de publicar o diário.',
       );
       return;
     }
-    if (publicar && !form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
+    if (!form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
       toast.error('Preencha pelo menos o Momento de Destaque ou a Avaliação do Plano de Aula.');
       return;
     }
@@ -1643,16 +1632,16 @@ export default function DiarioBordoPage() {
     // Quando há planejamento aprovado/em execução vinculado ao dia,
     // o campo "O que foi executado?" é obrigatório.
     // Regra de negócio: o diário é o registro de execução do planejamento.
-    if (publicar && planejamentoHoje && (form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && !form.execucaoPlanejamento.trim()) {
+    if (planejamentoHoje && (form.statusExecucaoPlano === 'PARCIAL' || form.statusExecucaoPlano === 'NAO_REALIZADO') && !form.execucaoPlanejamento.trim()) {
       toast.error('Existe um planejamento aprovado para hoje. Descreva o que foi executado parcialmente ou o motivo de não realização.');
       return;
     }
-    if (publicar && planejamentoHoje && !form.statusExecucaoPlano) {
+    if (planejamentoHoje && !form.statusExecucaoPlano) {
       toast.error('Seleccione o status de execução do plano do dia: CUMPRIDO, PARCIAL ou NÃO REALIZADO.');
       return;
     }
     // GATE 3 (segurança produção): avaliação da execução obrigatória para publicação
-    if (publicar && !form.avaliacaoPlanoAula.trim()) {
+    if (!form.avaliacaoPlanoAula.trim()) {
       toast.error(
         'Preencha a Avaliação do Plano de Aula antes de publicar. ' +
         'Use o botão "Gerar com IA" ou escreva diretamente no campo.',
@@ -1671,16 +1660,12 @@ export default function DiarioBordoPage() {
       // BUG B FIX: Usar totais exatos da chamada consolidada (fonte única de verdade).
       // Se a chamada foi carregada do backend, usar chamadaInfo (valores exatos do servidor).
       // Só recalcular localmente se a chamada não foi feita ainda.
-      const presencasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
+      const presencasReais = chamadaCarregada && chamadaInfo
         ? chamadaInfo.presentes
-        : form.criancasPresentes.length > 0
-          ? form.criancasPresentes.length
-          : form.presencas;
-      const ausenciasReais = chamadaCarregada && chamadaInfo && chamadaInfo.total > 0
+        : (form.criancasPresentes.length > 0 ? form.criancasPresentes.length : form.presencas);
+      const ausenciasReais = chamadaCarregada && chamadaInfo
         ? chamadaInfo.ausentes
-        : criancas.length > 0
-          ? Math.max(0, criancas.length - presencasReais)
-          : form.ausencias;
+        : (criancas.length > 0 ? criancas.length - presencasReais : form.ausencias);
 
       if (!classroomId || !childId) {
         toast.error('Turma ou aluno não identificado. Não é possível salvar o diário sem vínculo com uma turma ativa. Recarregue a página ou contate a coordenação.');
@@ -1695,8 +1680,7 @@ export default function DiarioBordoPage() {
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
-          status: publicar ? 'PUBLICADO' : 'RASCUNHO',
-          draft: !publicar,
+          status: 'PUBLICADO',
           ...(form.date < getPedagogicalToday() ? { retroactiveEdit: true, retroactiveNote: `Registro retroativo criado em ${new Date().toLocaleDateString('pt-BR')}` } : {}),
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
@@ -1769,7 +1753,6 @@ export default function DiarioBordoPage() {
       const pdfData: DiaryPrintData = {
         data: form.date,
         turmaNome: turmaNomeResolvido || turmaNomeAtual,
-        unitInfo: (user as any)?.unit ?? null,
         professorNome: nomeProfessor,
         planejamentoTitulo: planejamentoHoje?.title,
         planejamentoAtividade: planejamentoHoje?.activities,
@@ -2333,7 +2316,6 @@ export default function DiarioBordoPage() {
                               abrirDiarioImprimivel({
                                 data: dataStr,
                                 turmaNome: turmaNomePdf,
-                                unitInfo: (user as any)?.unit ?? null,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -2482,7 +2464,7 @@ export default function DiarioBordoPage() {
 
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t space-y-4">
-                        {Array.isArray(diario.rotina) && diario.rotina.length > 0 && (
+                        {diario.rotina?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Rotina do Dia</p>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -2495,7 +2477,7 @@ export default function DiarioBordoPage() {
                             </div>
                           </div>
                         )}
-                        {Array.isArray(diario.microgestos) && diario.microgestos.length > 0 && (
+                        {diario.microgestos?.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Microgestos Pedagógicos</p>
                             <div className="space-y-2">
@@ -2647,7 +2629,6 @@ export default function DiarioBordoPage() {
                               abrirDiarioImprimivel({
                                 data: dataStr,
                                 turmaNome: turmaNomePdf,
-                                unitInfo: (user as any)?.unit ?? null,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
@@ -2732,7 +2713,7 @@ export default function DiarioBordoPage() {
                   Realize a Chamada Diária antes de guardar o Diário do Dia. As presenças serão importadas automaticamente após a chamada.
                 </p>
                 <button
-                  onClick={() => navigate(`/app/chamada?classroomId=${classroomId}&date=${form.date}`)}
+                  onClick={() => navigate(`/app/chamada?classroomId=${classroomId}&date=${form.date}&from=diario`)}
                   className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors w-fit"
                 >
                   <CheckCircle className="h-4 w-4" />
@@ -3604,7 +3585,7 @@ export default function DiarioBordoPage() {
             </div>
           ) : diarioEditandoId ? (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button onClick={() => salvarDiario(true)} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
                 {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Atualizar Diário
               </Button>
@@ -3620,12 +3601,12 @@ export default function DiarioBordoPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
-              <Button type="button" variant="outline" onClick={() => salvarDiario(false)} className="sm:flex-1">
-                <Save className="mr-2 h-4 w-4" /> Salvar Rascunho
+              <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
+                <Save className="mr-2 h-4 w-4" /> Salvar rascunho
               </Button>
-              <Button onClick={() => salvarDiario(true)} disabled={saving} className="sm:flex-[1.4]">
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
                 {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Publicar Diário
+                Guardar Diário do Dia
               </Button>
               <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
             </div>

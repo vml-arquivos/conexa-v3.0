@@ -6,7 +6,6 @@
 
 import type { Planning } from '../api/plannings';
 import { safeJsonParse } from '../lib/safeJson';
-import { buildPrintHeader, PRINT_UNIT_HEADER_CSS, type PrintUnitInfo } from '../lib/printUnitHeader';
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 interface DayV2 {
@@ -73,7 +72,7 @@ function labelStatus(status: string): string {
 }
 
 // ─── HTML do documento imprimível ─────────────────────────────────────────────
-export function buildPrintableHTML(plan: Planning, unitInfo?: PrintUnitInfo | null): string {
+export function buildPrintableHTML(plan: Planning): string {
   const rawDesc = (plan as any).description as string | undefined;
   const v2 = safeJsonParse<PlanningV2>(rawDesc, {} as PlanningV2);
   const isV2 = v2?.version === 2 && Array.isArray(v2.days);
@@ -255,7 +254,6 @@ export function buildPrintableHTML(plan: Planning, unitInfo?: PrintUnitInfo | nu
       font-size: 9pt;
       color: #6b7280;
     }
-    ${PRINT_UNIT_HEADER_CSS}
 
     /* ── Metadados ── */
     .meta-grid {
@@ -463,7 +461,7 @@ export function buildPrintableHTML(plan: Planning, unitInfo?: PrintUnitInfo | nu
   <div class="page">
     <!-- Cabeçalho -->
     <div class="header">
-      ${buildPrintHeader(unitInfo, typeof window !== 'undefined' ? window.location.origin : '')}
+      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
       <div class="header-title">${plan.title}</div>
       <div class="header-subtitle">Planejamento de Aula — gerado em ${new Date().toLocaleDateString('pt-BR')}</div>
     </div>
@@ -511,7 +509,7 @@ export function buildPrintableHTML(plan: Planning, unitInfo?: PrintUnitInfo | nu
 
     <!-- Rodapé -->
     <div class="footer">
-      <span>COCRIS Pedagógico${unitInfo?.name ? ' · ' + unitInfo.name : ''}</span>
+      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
       <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>
@@ -529,8 +527,8 @@ export function buildPrintableHTML(plan: Planning, unitInfo?: PrintUnitInfo | nu
 /**
  * Abre uma nova janela com o planejamento formatado para impressão/PDF.
  */
-export function imprimirPlanejamento(plan: Planning, unitInfo?: PrintUnitInfo | null): void {
-  const html = buildPrintableHTML(plan, unitInfo);
+export function imprimirPlanejamento(plan: Planning): void {
+  const html = buildPrintableHTML(plan);
   const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
   if (!win) {
     alert('Permita pop-ups para este site para usar a impressão.');
@@ -543,8 +541,8 @@ export function imprimirPlanejamento(plan: Planning, unitInfo?: PrintUnitInfo | 
 /**
  * Abre o diálogo de impressão diretamente (atalho para "Salvar como PDF").
  */
-export function gerarPDF(plan: Planning, unitInfo?: PrintUnitInfo | null): void {
-  const html = buildPrintableHTML(plan, unitInfo);
+export function gerarPDF(plan: Planning): void {
+  const html = buildPrintableHTML(plan);
   const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
   if (!win) {
     alert('Permita pop-ups para este site para usar a geração de PDF.');

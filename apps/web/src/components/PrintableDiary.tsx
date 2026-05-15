@@ -6,7 +6,6 @@
  *
  * Não adiciona dependências nem altera o lockfile.
  */
-import { buildPrintHeader, PRINT_UNIT_HEADER_CSS, type PrintUnitInfo } from '../lib/printUnitHeader';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -46,8 +45,6 @@ export interface DiaryPrintData {
   data: string;               // YYYY-MM-DD
   turmaNome: string;
   unidadeNome?: string;
-  /** Dados da unidade do usuário autenticado (user.unit) — para logo e identidade */
-  unitInfo?: PrintUnitInfo | null;
   professorNome: string;
 
   // Planejamento
@@ -452,7 +449,6 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
       font-size: 9pt;
       color: #6b7280;
     }
-    ${PRINT_UNIT_HEADER_CSS}
 
     /* ── Meta ── */
     .meta-grid {
@@ -702,7 +698,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   <div class="page">
     <!-- Cabeçalho -->
     <div class="header">
-      ${buildPrintHeader(d.unitInfo ?? (d.unidadeNome ? { name: d.unidadeNome } : null), typeof window !== 'undefined' ? window.location.origin : '')}
+      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
       <div class="header-title">Diário da Turma</div>
       <div class="header-subtitle">${esc(dataFormatada)}</div>
     </div>
@@ -737,7 +733,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
     <!-- Rodapé -->
     <div class="footer">
-      <span>COCRIS Pedagógico${(d.unitInfo?.name ?? d.unidadeNome) ? ' · ' + (d.unitInfo?.name ?? d.unidadeNome) : ''}</span>
+      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
       <span>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>

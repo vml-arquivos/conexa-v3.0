@@ -491,20 +491,8 @@ export default function PlanoDeAulaNovoPage() {
             }]);
           }
         }
-      } catch (err: any) {
-        const httpStatus = err?.response?.status;
-        if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
-          toast.error(
-            'Servidor temporariamente indisponível. Seus dados estão seguros. Tente novamente em alguns instantes.',
-            { duration: 8000 }
-          );
-        } else if (httpStatus === 401 || httpStatus === 403) {
-          // Não redireciona aqui — o interceptor HTTP já cuida do refresh/logout
-          toast.error('Sessão expirada. Redirecionando para o login...');
-        } else {
-          const msg = extractErrorMessage(err, 'Erro ao carregar dados do planejamento.');
-          toast.error(msg);
-        }
+      } catch {
+        toast.error('Erro ao carregar dados');
       } finally {
         setLoading(false);
       }
@@ -851,7 +839,6 @@ export default function PlanoDeAulaNovoPage() {
                     await http.patch(`/plannings/${planningId}/approve`);
                     setStatus('APROVADO');
                     toast.success('Planejamento aprovado!');
-                    navigate('/app/planejamentos');
                   } catch (err: any) {
                     toast.error(err?.response?.data?.message ?? 'Erro ao aprovar');
                   } finally {
@@ -886,10 +873,6 @@ export default function PlanoDeAulaNovoPage() {
                     className="bg-red-600 hover:bg-red-700 text-white"
                     disabled={aprovando || motivoDevolver.trim().length < 5}
                     onClick={async () => {
-                      if (motivoDevolver.trim().length < 5) {
-                        toast.error('O comentário deve ter pelo menos 5 caracteres.');
-                        return;
-                      }
                       try {
                         setAprovando(true);
                         await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
@@ -897,7 +880,6 @@ export default function PlanoDeAulaNovoPage() {
                         setModalDevolver(false);
                         setMotivoDevolver('');
                         toast.success('Planejamento devolvido para correção.');
-                        navigate('/app/planejamentos');
                       } catch (err: any) {
                         toast.error(err?.response?.data?.message ?? 'Erro ao devolver');
                       } finally {

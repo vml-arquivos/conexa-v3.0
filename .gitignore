@@ -44,7 +44,7 @@ Thumbs.db
 *.sublime-workspace
 *.code-workspace
 
-# Prisma/local database
+# Prisma
 *.db
 *.db-journal
 
@@ -58,27 +58,6 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
-
-# Importações sensíveis / dados pessoais
-apps/api/tmp/
-apps/api/tmp/imports/
-apps/web/tmp/
-*.xlsx
-*.xls
-*.csv
-
-# Relatórios temporários de importação
-dry-run-report.json
-apply-report.json
-*-dry-run-report.json
-*-apply-report.json
-
-# Backups locais
-backups/
-backup/
-*.dump
-*.sql
-*.tar.gz
 
 # Docker
 .dockerignore

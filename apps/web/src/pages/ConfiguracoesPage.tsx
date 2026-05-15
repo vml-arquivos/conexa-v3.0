@@ -6,7 +6,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { LoadingState } from '../components/ui/LoadingState';
-import { UnitSettings } from '../components/settings/UnitSettings';
 import { toast } from 'sonner';
 import { useAuth } from '../app/AuthProvider';
 import http from '../api/http';
@@ -129,7 +128,7 @@ export default function ConfiguracoesPage() {
   useEffect(() => { loadPerfil(); }, []);
   useEffect(() => {
     if (abaAtiva === 'usuarios' && isAdmin) loadUsuarios();
-    if (abaAtiva === 'unidade') loadUnidade();
+    if (abaAtiva === 'unidade' && isAdmin) loadUnidade();
   }, [abaAtiva]);
 
   async function loadPerfil() {
@@ -267,7 +266,7 @@ export default function ConfiguracoesPage() {
 
   const ABAS = [
     { id: 'perfil', label: 'Meu Perfil', icon: <User className="h-4 w-4" /> },
-    { id: 'unidade', label: 'Unidade', icon: <Building2 className="h-4 w-4" /> },
+    ...(isAdmin ? [{ id: 'unidade', label: 'Unidade', icon: <Building2 className="h-4 w-4" /> }] : []),
     ...(isAdmin ? [{ id: 'usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> }] : []),
     { id: 'notificacoes', label: 'Notificações', icon: <Bell className="h-4 w-4" /> },
     ...(isDev ? [{ id: 'sistema', label: 'Sistema', icon: <Settings className="h-4 w-4" /> }] : []),
@@ -393,14 +392,46 @@ export default function ConfiguracoesPage() {
           )}
 
           {/* ─── UNIDADE ─── */}
-          {abaAtiva === 'unidade' && (
-            <UnitSettings
-              unidade={unidade}
-              setUnidade={(updater) => setUnidade(updater)}
-              canEdit={isAdmin}
-              saving={saving}
-              onSave={isAdmin ? salvarUnidade : undefined}
-            />
+          {abaAtiva === 'unidade' && isAdmin && (
+            <Card className="border-2 border-green-100">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-green-700"><Building2 className="h-5 w-5" /> Dados da Unidade</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Nome da Unidade</Label>
+                    <Input value={unidade.name || ''} onChange={e => setUnidade(u => ({ ...u, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Código da Unidade</Label>
+                    <Input value={unidade.unitCode || ''} disabled className="bg-gray-50 cursor-not-allowed" />
+                  </div>
+                  <div>
+                    <Label>Telefone</Label>
+                    <Input placeholder="(00) 0000-0000" value={unidade.telefone || ''} onChange={e => setUnidade(u => ({ ...u, telefone: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>E-mail da Unidade</Label>
+                    <Input type="email" value={unidade.email || ''} onChange={e => setUnidade(u => ({ ...u, email: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Coordenadora</Label>
+                    <Input placeholder="Nome da coordenadora" value={unidade.coordenadora || ''} onChange={e => setUnidade(u => ({ ...u, coordenadora: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label>Horário de Funcionamento</Label>
+                    <Input placeholder="Ex: 07h às 18h" value={unidade.horarioFuncionamento || ''} onChange={e => setUnidade(u => ({ ...u, horarioFuncionamento: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Endereço</Label>
+                  <Textarea rows={2} value={unidade.endereco || ''} onChange={e => setUnidade(u => ({ ...u, endereco: e.target.value }))} />
+                </div>
+                <Button onClick={salvarUnidade} disabled={saving} className="bg-green-600 hover:bg-green-700">
+                  {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Salvar Dados da Unidade
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* ─── USUÁRIOS ─── */}

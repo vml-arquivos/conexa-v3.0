@@ -4,7 +4,7 @@ import {
   ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
-  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle, LogOut,
+  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -44,14 +44,13 @@ const COORD_GESTAO: MenuItem[] = [
   { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',        icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/diario-calendario',  label: 'Diário',              icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/atendimentos-pais',  label: 'Atendimentos Pais',   icon: <MessageCircle className="h-4 w-4" /> },
-  { path: '/app/rdic-coord',         label: 'RDIC — Revisão',      icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
-  { path: '/app/rdic-crianca',       label: 'RDIC por Criança',    icon: <Brain className="h-4 w-4" /> },
-  { path: '/app/matriz-pedagogica',  label: 'Matriz 2026',          icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/inteligencia',       label: 'Inteligência',         icon: <Sparkles className="h-4 w-4" /> },
-  { path: '/app/reports',            label: 'Relatórios',           icon: <BarChart2 className="h-4 w-4" /> },
-  { path: '/app/painel-alergias',    label: 'Alergias e Dietas',   icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
+  { path: '/app/diario-calendario', label: 'Diário',             icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',  icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',        label: 'RDIC — Revisão',     icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/rdic-crianca',    label: 'RDIC por Criança',    icon: <Brain className="h-4 w-4" /> },
+  { path: '/app/inteligencia',    label: 'Inteligência',        icon: <Sparkles className="h-4 w-4" /> },
+  { path: '/app/reports',         label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/painel-alergias', label: 'Alergias e Dietas',   icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
 ];
 
 // UNIDADE — Diretor ────────────────────────────────────────────────────────────
@@ -225,7 +224,7 @@ interface SidebarProps {
 
 export function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const userLevels = normalizeRoles(user);
   const userTypes  = normalizeRoleTypes(user);
@@ -400,29 +399,17 @@ export function Sidebar({ onClose }: SidebarProps) {
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 
-        {/* Administração e configurações em seção dedicada para todos os perfis */}
-        <NavSection
-          titulo="Administração"
-          items={[
-            ...(isUnidade || isCentral || isMantenedora || isDeveloper ? adminItems : []),
-            perfilItem,
-            configItem,
-          ]}
-          location={location}
-          onItemClick={onClose}
-        />
       </nav>
 
-      {/* Rodapé com logout */}
-      <div className="p-3 border-t border-gray-800 space-y-2">
-        <button
-          onClick={() => { logout(); }}
-          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-gray-400 hover:bg-red-900/40 hover:text-red-300 transition-all"
-          title="Sair do sistema"
-        >
-          <LogOut className="h-4 w-4" />
-          Sair
-        </button>
+      {/* Rodapé */}
+      <div className="p-3 border-t border-gray-800 space-y-1">
+        {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
+          <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
+        )}
+        <div className="pt-1 space-y-1">
+          <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
+          <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
+        </div>
         <p className="text-xs text-gray-600 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>

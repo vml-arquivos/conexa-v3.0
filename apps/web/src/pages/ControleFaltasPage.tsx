@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,6 +8,7 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
 import { isUnidade, isCentral } from '../api/auth';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 import {
   CheckCircle,
   XCircle,
@@ -311,6 +313,8 @@ export default function ControleFaltasPage() {
 
 // ─── Visão do Professor (extraída para componente separado) ───────────────────
 function ControleFaltasProfessorView() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);
@@ -388,15 +392,6 @@ function ControleFaltasProfessorView() {
   })();
 
   function marcar(alunoId: string, status: 'PRESENTE' | 'AUSENTE' | 'JUSTIFICADO') {
-    if (registros[alunoId]?.status === status) {
-      setRegistros((prev) => {
-        const next = { ...prev };
-        delete next[alunoId];
-        return next;
-      });
-      setAlunoSelecionado(null);
-      return;
-    }
     setRegistros((prev) => ({
       ...prev,
       [alunoId]: { status, motivo: status !== 'AUSENTE' && status !== 'JUSTIFICADO' ? undefined : prev[alunoId]?.motivo },
@@ -438,12 +433,8 @@ function ControleFaltasProfessorView() {
       }));
 
     if (lista.length === 0) {
-      toast.error('Marque pelo menos um aluno antes de salvar.');
+      toast.error('Marque pelo menos um aluno antes de salvar');
       return;
-    }
-    const pendentes = chamada.alunos.length - lista.length;
-    if (pendentes > 0) {
-      toast.warning(`Existem ${pendentes} aluno(s) sem marcação. Apenas os marcados serão salvos.`);
     }
 
     try {
@@ -454,8 +445,12 @@ function ControleFaltasProfessorView() {
         registros: lista,
       });
       toast.success('Chamada salva com sucesso! ✅');
-      setEtapa('resumo');
-      await loadChamada(selectedDate);
+      // Correção 2: se veio do diário (?from=diario), retornar direto para o diário
+      if (searchParams.get('from') === 'diario') {
+        navigate(`/app/diario-de-bordo?date=${encodeURIComponent(selectedDate)}&aba=novo&classroomId=${encodeURIComponent(chamada.classroomId)}`);
+      } else {
+        navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`);
+      }
     } catch {
       toast.error('Erro ao salvar a chamada. Tente novamente.');
     } finally {
@@ -600,15 +595,6 @@ function ControleFaltasProfessorView() {
           {!isHoje && (
             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Retroativo</span>
           )}
-          {!isHoje && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(hoje)}
-              className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium hover:bg-gray-200"
-            >
-              Hoje
-            </button>
-          )}
         </div>
         <button
           onClick={() => navegarData(+1)}
@@ -687,18 +673,18 @@ function ControleFaltasProfessorView() {
         Todos estão presentes hoje
       </Button>
 
-      {/* Cards dos alunos */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+      {/* Cards dos alunos — grid compacto com ChildAvatar */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 mb-6">
         {chamada.alunos.map((aluno) => {
           const reg = registros[aluno.id];
           const status = reg?.status ?? null;
           const isExpanded = alunoSelecionado === aluno.id;
 
           return (
-            <div key={aluno.id} className="flex flex-col gap-2">
-              {/* Card do aluno */}
+            <div key={aluno.id} className="flex flex-col gap-1.5">
+              {/* Card compacto do aluno */}
               <div
-                className={`relative rounded-2xl border-2 overflow-hidden transition-all ${
+                className={`relative rounded-xl border-2 overflow-hidden transition-all ${
                   status === 'PRESENTE'
                     ? 'border-green-400 bg-green-50'
                     : status === 'AUSENTE'
@@ -708,70 +694,73 @@ function ControleFaltasProfessorView() {
                     : 'border-gray-200 bg-white'
                 }`}
               >
-                {/* Foto */}
-                <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-                  {aluno.photoUrl ? (
-                    <img src={aluno.photoUrl} alt={aluno.nome} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl font-bold text-gray-300">{aluno.nome[0]}</span>
-                  )}
-                  {/* Badge de status */}
+                {/* Avatar + badge de status */}
+                <div className="flex justify-center pt-2 pb-1 relative">
+                  <ChildAvatar
+                    child={{
+                      photoUrl: aluno.photoUrl,
+                      firstName: aluno.nome.split(' ')[0],
+                      lastName: aluno.nome.split(' ').slice(1).join(' ') || undefined,
+                    }}
+                    sizeClassName="w-12 h-12"
+                    imageClassName="rounded-full object-cover"
+                    fallbackClassName="rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center"
+                    showInitials
+                    initialsClassName="text-sm font-bold text-slate-600"
+                  />
                   {status && (
-                    <div className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center ${
+                    <div className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center ${
                       status === 'PRESENTE' ? 'bg-green-500' :
                       status === 'AUSENTE' ? 'bg-red-500' : 'bg-yellow-500'
                     }`}>
-                      {status === 'PRESENTE' && <CheckCircle className="h-5 w-5 text-white" />}
-                      {status === 'AUSENTE' && <XCircle className="h-5 w-5 text-white" />}
-                      {status === 'JUSTIFICADO' && <AlertCircle className="h-5 w-5 text-white" />}
+                      {status === 'PRESENTE' && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+                      {status === 'AUSENTE' && <XCircle className="h-3.5 w-3.5 text-white" />}
+                      {status === 'JUSTIFICADO' && <AlertCircle className="h-3.5 w-3.5 text-white" />}
                     </div>
                   )}
                 </div>
 
-                {/* Nome */}
-                <div className="p-2 text-center">
-                  <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">
+                {/* Nome truncado em 1 linha */}
+                <div className="px-1 pb-1 text-center">
+                  <p className="text-[11px] font-semibold text-gray-700 leading-tight truncate">
                     {aluno.nome.split(' ')[0]}
                   </p>
-                  {reg?.motivo && (
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{reg.motivo}</p>
-                  )}
                 </div>
 
-                {/* Botões de marcação */}
+                {/* Botões de marcação menores */}
                 <div className="flex border-t">
                   <button
                     onClick={() => marcar(aluno.id, 'PRESENTE')}
-                    className={`flex-1 py-2.5 flex items-center justify-center transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${
                       status === 'PRESENTE'
                         ? 'bg-green-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-green-50 hover:text-green-600'
                     }`}
                     title="Presente"
                   >
-                    <CheckCircle className="h-5 w-5" />
+                    <CheckCircle className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => marcar(aluno.id, 'AUSENTE')}
-                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center border-l transition-colors ${
                       status === 'AUSENTE'
                         ? 'bg-red-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-red-50 hover:text-red-600'
                     }`}
                     title="Ausente"
                   >
-                    <XCircle className="h-5 w-5" />
+                    <XCircle className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => marcar(aluno.id, 'JUSTIFICADO')}
-                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center border-l transition-colors ${
                       status === 'JUSTIFICADO'
                         ? 'bg-yellow-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-yellow-50 hover:text-yellow-600'
                     }`}
                     title="Falta justificada"
                   >
-                    <AlertCircle className="h-5 w-5" />
+                    <AlertCircle className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -795,17 +784,10 @@ function ControleFaltasProfessorView() {
                       </button>
                     ))}
                     <button
-                      onClick={() => {
-                        setRegistros((prev) => {
-                          const next = { ...prev };
-                          delete next[aluno.id];
-                          return next;
-                        });
-                        setAlunoSelecionado(null);
-                      }}
+                      onClick={() => setAlunoSelecionado(null)}
                       className="w-full text-center px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600"
                     >
-                      Cancelar
+                      Fechar
                     </button>
                   </div>
                 </div>

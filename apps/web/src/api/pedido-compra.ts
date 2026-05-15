@@ -33,8 +33,6 @@ export interface PedidoCompra {
   entregueEm?: string;
   unit: { id: string; name: string };
   itens: ItemPedidoCompra[];
-  /** Professor/usuário que criou o pedido (retornado pelo backend quando disponível) */
-  createdByUser?: { id: string; firstName?: string; lastName?: string; email?: string };
 }
 
 export interface ItemPedidoDto {
@@ -157,7 +155,6 @@ export async function listarPedidosCompra(filtros?: {
       criadoEm: r.requestedDate ?? r.createdAt ?? new Date().toISOString(),
       atualizadoEm: r.updatedAt ?? r.createdAt ?? new Date().toISOString(),
       unit: r.unit ?? { id: '', name: '' },
-      createdByUser: r.createdByUser ?? r.requestedBy ?? undefined,
       itens: Array.isArray(r.items) && r.items.length > 0
         ? r.items.map((it: any): ItemPedidoCompra => ({
             id: it.id ?? '',

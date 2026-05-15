@@ -15,10 +15,9 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isUnidade } from '../api/auth';
-import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -39,7 +38,6 @@ import {
   Filter,
   AlertCircle,
   ChevronDown,
-  Printer,
 } from 'lucide-react';
 
 // ─── Calendário letivo 2026 ───────────────────────────────────────────────────
@@ -144,13 +142,9 @@ function StatusBadge({ status }: { status: StatusDia }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DiarioCalendarioPage() {
   const { user } = useAuth();
-  const roles = normalizeRoles(user);
-  const isCoord = isUnidade(user) || roles.includes('COORD_PEDAGOGICO') || roles.includes('STAFF_CENTRAL') || roles.includes('MANTENEDORA') || roles.includes('DEVELOPER');
+  const isCoord = isUnidade(user);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const hoje = getPedagogicalToday();
-  // Coordenação pode receber classroomId via query string
-  const classroomIdParam = searchParams.get('classroomId') ?? undefined;
 
   // Mês exibido atualmente (navegar entre meses)
   const mesAtual = hoje.substring(0, 7); // YYYY-MM
@@ -164,46 +158,28 @@ export default function DiarioCalendarioPage() {
 
   const [diasMap, setDiasMap] = useState<Record<string, DiaDiario>>({});
   const [loading, setLoading] = useState(true);
-  const [classroomId, setClassroomId] = useState<string | undefined>(classroomIdParam);
+  const [classroomId, setClassroomId] = useState<string | undefined>();
   const [turmaNome, setTurmaNome] = useState<string>('');
-  const [turmasDisponiveis, setTurmasDisponiveis] = useState<{ id: string; name: string }[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO' | 'SEM_DIARIO'>('TODOS');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [futurosExpandidos, setFuturosExpandidos] = useState(false);
 
-  // ─── Carregar turma(s) acessíveis ─────────────────────────────────────────
+  // ─── Carregar turma do professor ────────────────────────────────────────────
   useEffect(() => {
     async function loadTurma() {
       try {
         const res = await http.get('/lookup/classrooms/accessible');
         const turmas: { id: string; name: string }[] = Array.isArray(res.data) ? res.data : [];
-        setTurmasDisponiveis(turmas);
         if (turmas.length > 0) {
-          // Se já tem classroomId do param, apenas atualiza o nome
-          if (classroomIdParam) {
-            const turmaParam = turmas.find(t => t.id === classroomIdParam);
-            if (turmaParam) {
-              setTurmaNome(turmaParam.name);
-            } else {
-              // classroomId param não encontrado — usa a primeira turma
-              setClassroomId(turmas[0].id);
-              setTurmaNome(turmas[0].name);
-            }
-          } else if (!classroomId) {
-            // Professor: seleciona automaticamente a primeira turma
-            // Coordenação: pode ficar sem turma selecionada (ver todas)
-            if (!isCoord) {
-              setClassroomId(turmas[0].id);
-              setTurmaNome(turmas[0].name);
-            }
-          }
+          setClassroomId(turmas[0].id);
+          setTurmaNome(turmas[0].name);
         }
       } catch {
         // silencioso — continua sem classroomId
       }
     }
     loadTurma();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ─── Carregar diários do ano letivo ─────────────────────────────────────────
   useEffect(() => {
@@ -359,75 +335,83 @@ export default function DiarioCalendarioPage() {
   // ─── Mês e ano do selecionado ────────────────────────────────────────────────
   const [anoSel, mesSel] = mesSelecionado.split('-').map(Number);
 
-  const voltarUrl = isCoord ? '/app/coordenacao-pedagogica' : '/app/teacher-dashboard';
-  const voltarLabel = isCoord ? 'Painel da Coordenação' : 'Central da Turma';
-
   return (
     <PageShell
-      title={isCoord ? 'Diários das Turmas' : 'Diário da Turma'}
-      subtitle={turmaNome ? `Turma: ${turmaNome}` : (isCoord ? 'Todas as turmas — Calendário 2026' : 'Calendário de dias letivos 2026')}
+      title="Diário da Turma"
+      subtitle={turmaNome ? `Turma: ${turmaNome}` : 'Calendário de dias letivos 2026'}
       headerActions={
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="flex items-center gap-2 print:hidden"
-            title="Imprimir diário do mês"
-          >
-            <Printer className="h-4 w-4" />
-            Imprimir
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(voltarUrl)}
-            className="flex items-center gap-2"
-          >
-            <Home className="h-4 w-4" />
-            {voltarLabel}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/app/teacher-dashboard')}
+          className="flex items-center gap-2"
+        >
+          <Home className="h-4 w-4" />
+          Central da Turma
+        </Button>
       }
     >
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm text-gray-500 -mt-4 mb-4">
-        <button onClick={() => navigate(voltarUrl)} className="hover:text-gray-800 transition-colors">
-          {voltarLabel}
+        <button onClick={() => navigate('/app/teacher-dashboard')} className="hover:text-gray-800 transition-colors">
+          Central da Turma
         </button>
         <ChevronRight className="h-3 w-3" />
         <span className="text-gray-800 font-medium">Diário da Turma</span>
       </nav>
 
-      {/* Seletor de turma para coordenação */}
-      {isCoord && turmasDisponiveis.length > 0 && (
-        <div className="mb-4 flex items-center gap-3 flex-wrap">
-          <label className="text-sm font-semibold text-gray-600">Turma:</label>
-          <select
-            value={classroomId ?? ''}
-            onChange={e => {
-              const id = e.target.value || undefined;
-              setClassroomId(id);
-              const turma = turmasDisponiveis.find(t => t.id === id);
-              setTurmaNome(turma?.name ?? '');
-            }}
-            className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+      {/* ── Card de destaque: Diário de Hoje ── */}
+      {mesSelecionado === mesAtual.substring(0, 7) && (() => {
+        const diaHoje = diasMap[hoje];
+        const statusHoje: StatusDia = diaHoje?.status ?? 'SEM_DIARIO';
+        const podeAbrir = !isCoord || statusHoje !== 'SEM_DIARIO';
+        return (
+          <div
+            onClick={() => podeAbrir && abrirDiario(hoje)}
+            className={`mb-5 flex items-center gap-4 p-4 rounded-2xl border-2 shadow-md transition-all ${
+              podeAbrir ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'
+            } ${
+              statusHoje === 'PUBLICADO'
+                ? 'border-emerald-400 bg-gradient-to-r from-emerald-50 to-white'
+                : statusHoje === 'RASCUNHO'
+                ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-white'
+                : 'border-blue-400 bg-gradient-to-r from-blue-50 to-white'
+            }`}
           >
-            <option value="">Todas as turmas</option>
-            {turmasDisponiveis.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          {classroomId && (
-            <button
-              onClick={() => { setClassroomId(undefined); setTurmaNome(''); }}
-              className="text-xs text-rose-500 hover:text-rose-700 font-medium"
-            >
-              ✕ Limpar
-            </button>
-          )}
-        </div>
-      )}
+            {/* Ícone de status */}
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+              statusHoje === 'PUBLICADO' ? 'bg-emerald-100' :
+              statusHoje === 'RASCUNHO' ? 'bg-amber-100' : 'bg-blue-100'
+            }`}>
+              {statusHoje === 'PUBLICADO' && <CheckCircle2 className="h-7 w-7 text-emerald-600" />}
+              {statusHoje === 'RASCUNHO' && <Clock className="h-7 w-7 text-amber-600" />}
+              {statusHoje === 'SEM_DIARIO' && <Plus className="h-7 w-7 text-blue-600" />}
+            </div>
+            {/* Texto */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Hoje</span>
+                <StatusBadge status={statusHoje} />
+              </div>
+              <p className="text-base font-bold text-gray-800 mt-0.5">
+                {statusHoje === 'PUBLICADO' ? 'Diário publicado' :
+                 statusHoje === 'RASCUNHO' ? 'Continuar rascunho' :
+                 isCoord ? 'Sem diário registrado' : 'Registrar diário de hoje'}
+              </p>
+              {diaHoje?.momentoDestaque && (
+                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-sm">{diaHoje.momentoDestaque}</p>
+              )}
+            </div>
+            {/* Seta */}
+            {podeAbrir && (
+              <ArrowRight className={`h-5 w-5 flex-shrink-0 ${
+                statusHoje === 'PUBLICADO' ? 'text-emerald-500' :
+                statusHoje === 'RASCUNHO' ? 'text-amber-500' : 'text-blue-500'
+              }`} />
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Resumo do mês ── */}
       <div className="grid grid-cols-3 gap-3 mb-5">

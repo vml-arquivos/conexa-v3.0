@@ -74,24 +74,6 @@ export function hasRole(user: User | null, role: string): boolean {
 }
 
 /**
- * Normaliza o array de roles para sempre retornar string[]
- * Suporta roles como string[] (legado) ou objeto[] com .level (formato atual do /auth/me).
- */
-export function normalizeRoles(roles: unknown[]): string[] {
-  if (!roles) return [];
-  return roles
-    .map((r) => {
-      if (typeof r === 'string') return r;
-      if (typeof r === 'object' && r !== null) {
-        const obj = r as Record<string, unknown>;
-        return (obj.level || obj.roleId || '') as string;
-      }
-      return '';
-    })
-    .filter(Boolean);
-}
-
-/**
  * Verifica se o usuário é da Central (STAFF_CENTRAL)
  */
 export function isCentral(user: User | null): boolean {

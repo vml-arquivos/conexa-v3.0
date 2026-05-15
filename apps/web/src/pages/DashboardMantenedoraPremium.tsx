@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import http from '../api/http';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,30 +53,20 @@ export default function DashboardMantenedoraPremium() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const [dadosMock, setDadosMock] = useState(true); // flag para indicar dados ilustrativos
-
   useEffect(() => {
-    // Tenta buscar dados reais da API; usa valores ilustrativos como fallback
-    http.get('/insights/mantenedora/overview')
-      .then(({ data }) => {
-        setStats(data);
-        setDadosMock(false);
-      })
-      .catch(() => {
-        // Fallback ilustrativo — exibe banner de aviso
-        setStats({
-          totalUnits: 7,
-          totalStudents: 450,
-          totalTeachers: 85,
-          activeEnrollments: 432,
-          monthlyRevenue: 125000,
-          pendingRequests: 12,
-          completedActivities: 1250,
-          avgAttendance: 94.5,
-        });
-        setDadosMock(true);
-      })
-      .finally(() => setLoading(false));
+    // TODO: Buscar dados reais da API
+    const mockData = {
+      totalUnits: 7,
+      totalStudents: 450,
+      totalTeachers: 85,
+      activeEnrollments: 432,
+      monthlyRevenue: 125000,
+      pendingRequests: 12,
+      completedActivities: 1250,
+      avgAttendance: 94.5,
+    };
+    setStats(mockData);
+    setLoading(false);
   }, []);
 
   // Dados para gráfico de evolução mensal
@@ -125,18 +114,6 @@ export default function DashboardMantenedoraPremium() {
         <h1 className="text-4xl font-bold text-white mb-2">Painel da Mantenedora</h1>
         <p className="text-gray-400">Visão geral de todas as unidades</p>
       </div>
-
-      {/* Banner de dados ilustrativos */}
-      {dadosMock && (
-        <div className="mb-6 flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
-          <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0" />
-          <p className="text-sm text-amber-300">
-            <strong>Dados ilustrativos</strong> — Os números abaixo são exemplos. O endpoint
-            <code className="mx-1 px-1 py-0.5 bg-amber-500/20 rounded text-xs">/insights/mantenedora/overview</code>
-            ainda não está disponível. Os dados reais serão exibidos assim que o endpoint for implementado.
-          </p>
-        </div>
-      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
