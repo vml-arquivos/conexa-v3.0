@@ -1210,8 +1210,14 @@ export default function DiarioBordoPage() {
         // BUG B FIX: Usar os totais exatos retornados pelo backend (presentes, ausentes, justificados).
         // Não recalcular localmente — evita divergência entre chamada e diário.
         // Preencher mesmo quando não há presentes (ex: todos ausentes), desde que haja registros.
-        if (chamadaData?.alunos && chamadaData.alunos.length > 0 && chamadaData.registrados > 0) {
-          const presentesIds: string[] = chamadaData.alunos
+        //
+        // PATCH 1 — guard Array.isArray:
+        // chamadaData.alunos pode chegar como null/undefined/objeto quando a chamada
+        // ainda não foi feita. Sem o guard, .filter() e .map() explodem com
+        // "a.map is not a function" — causa do ERRO 500 na página do diário.
+        const alunosArr: any[] = Array.isArray(chamadaData?.alunos) ? chamadaData.alunos : [];
+        if (alunosArr.length > 0 && chamadaData.registrados > 0) {
+          const presentesIds: string[] = alunosArr
             .filter((a: any) => a.status === 'PRESENTE')
             .map((a: any) => a.id);
           setForm(f => ({ ...f, criancasPresentes: presentesIds }));
@@ -1224,7 +1230,7 @@ export default function DiarioBordoPage() {
           });
 
           // Sincronizar lista de crianças com a chamada importada (evita denominador incorreto na UI)
-          const criancasFromChamada: Crianca[] = chamadaData.alunos.map((a: any) => {
+          const criancasFromChamada: Crianca[] = alunosArr.map((a: any) => {
             const nome = String(a.nome ?? '').trim();
             const parts = nome.split(/\s+/).filter(Boolean);
             const firstName = parts[0] ?? nome ?? 'Criança';
@@ -1386,8 +1392,14 @@ export default function DiarioBordoPage() {
           reflexaoPedagogica: item.reflexaoPedagogica ?? ctx.reflexaoPedagogica ?? item.developmentNotes ?? '',
           // FIX P4-2: mapear observations (campo do backend) para encaminhamentos (campo do frontend)
           encaminhamentos: item.encaminhamentos ?? ctx.encaminhamentos ?? item.observations ?? '',
-          rotina: item.rotina ?? ctx.rotina ?? [],
-          microgestos: item.microgestos ?? ctx.microgestos ?? [],
+          // PATCH 2 — o aiContext JSONB pode retornar rotina/microgestos como objeto
+          // em vez de array, causando "a.map is not a function" no render.
+          rotina: Array.isArray(item.rotina) ? item.rotina
+                : Array.isArray(ctx.rotina)  ? ctx.rotina
+                : [],
+          microgestos: Array.isArray(item.microgestos) ? item.microgestos
+                     : Array.isArray(ctx.microgestos)  ? ctx.microgestos
+                     : [],
         };
       });
       setDiarios(mapped);
@@ -2470,7 +2482,7 @@ export default function DiarioBordoPage() {
 
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t space-y-4">
-                        {diario.rotina?.length > 0 && (
+                        {Array.isArray(diario.rotina) && diario.rotina.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Rotina do Dia</p>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -2483,7 +2495,7 @@ export default function DiarioBordoPage() {
                             </div>
                           </div>
                         )}
-                        {diario.microgestos?.length > 0 && (
+                        {Array.isArray(diario.microgestos) && diario.microgestos.length > 0 && (
                           <div>
                             <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Microgestos Pedagógicos</p>
                             <div className="space-y-2">
