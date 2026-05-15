@@ -17,7 +17,8 @@ import {
   MessageCircle, Apple, BarChart2, Users, ShoppingCart,
   ShoppingBag, TrendingUp, Network, Sparkles, FileText,
   Home, Shield, Utensils, Layers, Building2, Settings,
-  ArrowRight,
+  ArrowRight, UserPlus, AlertTriangle, Bell, ClipboardCheck,
+  UserCog, Inbox, FileWarning,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -305,6 +306,110 @@ const W_CENTRAL: Widget[] = [
   },
 ];
 
+const W_ADMINISTRATIVO: Widget[] = [
+  {
+    id: 'secretaria-dashboard',
+    title: 'Painel da Secretaria',
+    description: 'Central operacional — matrículas, alunos e atendimentos.',
+    icon: <Home className="h-5 w-5" />,
+    path: '/app/secretaria',
+    accent: 'bg-brand-600',
+    priority: 1,
+  },
+  {
+    id: 'matriculas',
+    title: 'Matrículas',
+    description: 'Registre novas matrículas e gerencie alunos ativos.',
+    icon: <UserPlus className="h-5 w-5" />,
+    path: '/app/secretaria/matriculas',
+    accent: 'bg-emerald-600',
+    badge: 'Novo',
+    priority: 2,
+  },
+  {
+    id: 'cancelamentos',
+    title: 'Cancelamentos e Transferências',
+    description: 'Gerencie movimentações, transferências e histórico.',
+    icon: <ClipboardCheck className="h-5 w-5" />,
+    path: '/app/secretaria/movimentacoes',
+    accent: 'bg-amber-600',
+    priority: 3,
+  },
+  {
+    id: 'atendimentos-sec',
+    title: 'Atendimento aos Pais',
+    description: 'Histórico de contatos, ligações e encaminhamentos.',
+    icon: <MessageCircle className="h-5 w-5" />,
+    path: '/app/atendimentos-pais',
+    accent: 'bg-teal-600',
+    priority: 4,
+  },
+  {
+    id: 'comunicacao',
+    title: 'Comunicação',
+    description: 'Recados, avisos e comunicados institucionais.',
+    icon: <Bell className="h-5 w-5" />,
+    path: '/app/secretaria/comunicacao',
+    accent: 'bg-violet-600',
+    badge: 'Novo',
+    priority: 5,
+  },
+  {
+    id: 'faltas-sec',
+    title: 'Controle de Faltas',
+    description: 'Acompanhe faltas, alertas de reincidência e justificativas.',
+    icon: <AlertTriangle className="h-5 w-5" />,
+    path: '/app/secretaria/faltas',
+    accent: 'bg-red-600',
+    priority: 6,
+  },
+  {
+    id: 'ocorrencias',
+    title: 'Ocorrências',
+    description: 'Registre e acompanhe ocorrências administrativas e pedagógicas.',
+    icon: <FileWarning className="h-5 w-5" />,
+    path: '/app/secretaria/ocorrencias',
+    accent: 'bg-orange-600',
+    priority: 7,
+  },
+  {
+    id: 'funcionarios',
+    title: 'Funcionários',
+    description: 'Cadastro, status, vínculo e permissões da equipe.',
+    icon: <UserCog className="h-5 w-5" />,
+    path: '/app/secretaria/funcionarios',
+    accent: 'bg-indigo-600',
+    priority: 8,
+  },
+  {
+    id: 'pedidos-adm',
+    title: 'Pedidos Administrativos',
+    description: 'Limpeza, manutenção, suprimentos e apoio operacional.',
+    icon: <Inbox className="h-5 w-5" />,
+    path: '/app/secretaria/pedidos',
+    accent: 'bg-slate-600',
+    priority: 9,
+  },
+  {
+    id: 'turmas-sec',
+    title: 'Turmas',
+    description: 'Visualize e gerencie turmas e alunos matriculados.',
+    icon: <Users className="h-5 w-5" />,
+    path: '/app/coordenacao',
+    accent: 'bg-pink-600',
+    priority: 10,
+  },
+  {
+    id: 'relatorios-sec',
+    title: 'Relatórios',
+    description: 'Relatórios operacionais da secretaria.',
+    icon: <BarChart2 className="h-5 w-5" />,
+    path: '/app/reports',
+    accent: 'bg-slate-500',
+    priority: 11,
+  },
+];
+
 const W_MANTENEDORA: Widget[] = [
   {
     id: 'global-dashboard',
@@ -445,6 +550,7 @@ export function UnifiedDashboard() {
   const isDiretor         = userTypes.includes('UNIDADE_DIRETOR');
   const isNutricionista   = userTypes.includes('UNIDADE_NUTRICIONISTA');
   const isCoordPedagogico = userTypes.includes('UNIDADE_COORDENADOR_PEDAGOGICO');
+  const isAdministrativo  = userTypes.includes('UNIDADE_ADMINISTRATIVO');
 
   const userName = (user?.nome as string) || user?.email || 'Usuário';
   const unitName = user?.unit?.name;
@@ -482,6 +588,10 @@ export function UnifiedDashboard() {
     widgets = W_COORD_PEDAGOGICO;
     sectionTitle = 'Coordenação Pedagógica';
     sectionSubtitle = unitName ? `Unidade: ${unitName}` : undefined;
+  } else if (isAdministrativo) {
+    widgets = W_ADMINISTRATIVO;
+    sectionTitle = 'Secretaria';
+    sectionSubtitle = unitName ? `Unidade: ${unitName}` : 'Central operacional da instituição';
   } else if (isUnidade) {
     widgets = [...W_COORD_PEDAGOGICO, ...W_DIRETOR.slice(1)];
     sectionTitle = 'Painel da Unidade';

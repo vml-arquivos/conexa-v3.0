@@ -38,6 +38,10 @@ export function getRedirectPathByRoles(levels: string[], types: string[] = []): 
   if (types.includes('UNIDADE_NUTRICIONISTA')) {
     return '/app/nutricionista';
   }
+  // Administrativo (Secretaria)
+  if (types.includes('UNIDADE_ADMINISTRATIVO')) {
+    return '/app/secretaria';
+  }
   // Diretor
   if (types.includes('UNIDADE_DIRETOR')) {
     return '/app/diretor';

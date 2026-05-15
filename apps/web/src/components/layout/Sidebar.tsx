@@ -81,12 +81,17 @@ const NUTRI_ITEMS: MenuItem[] = [
   { path: '/app/nutricionista?s=configuracoes',      label: 'Configurações',           icon: <Settings className="h-4 w-4" /> },
 ];
 
-// UNIDADE — Administrativo ─────────────────────────────────────────────────────
+// UNIDADE — Administrativo (Secretaria) ─────────────────────────────────────
 const ADMIN_UNIDADE_ITEMS: MenuItem[] = [
-  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
-  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
-  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" /> },
+  { path: '/app/secretaria',                    label: 'Painel da Secretaria',   icon: <Home className="h-4 w-4" /> },
+  { path: '/app/secretaria/matriculas',         label: 'Matrículas',             icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/secretaria/movimentacoes',      label: 'Cancelamentos / Transf.', icon: <Users className="h-4 w-4" /> },
+  { path: '/app/secretaria/funcionarios',       label: 'Funcionários',           icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais',             label: 'Atendimentos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/secretaria/comunicacao',        label: 'Comunicação',            icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/secretaria/faltas',             label: 'Controle de Faltas',     icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/secretaria/ocorrencias',        label: 'Ocorrências',            icon: <AlertTriangle className="h-4 w-4" /> },
+  { path: '/app/secretaria/pedidos',            label: 'Pedidos Administrativos', icon: <ShoppingBag className="h-4 w-4" /> },
   { path: '/app/coordenacao',                   label: 'Turmas',                 icon: <Users className="h-4 w-4" /> },
 ];
 
