@@ -12,33 +12,46 @@ export function AppLayout() {
 
   return (
     <UnitScopeProvider>
-      <div className="flex min-h-screen bg-background">
-        {/* Overlay para mobile */}
+      {/* Wrapper raiz: sem scroll no body, layout fixo */}
+      <div className="flex h-screen overflow-hidden bg-background">
+
+        {/* ── Overlay mobile ── */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/60 md:hidden"
+            className="fixed inset-0 z-30 bg-black/60 md:hidden"
             onClick={closeSidebar}
             aria-hidden="true"
           />
         )}
 
-        {/* Sidebar — fixa no desktop, drawer no mobile */}
-        <div
+        {/* ── Sidebar ──
+            Desktop: fixed left-0 top-0 h-screen w-64 z-40
+            Mobile:  drawer deslizante, z-50, controlado por sidebarOpen
+        */}
+        <aside
           className={`
-            fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out
-            md:relative md:translate-x-0 md:z-auto md:flex-shrink-0
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            fixed left-0 top-0 h-screen w-64 z-40
+            transform transition-transform duration-300 ease-in-out
+            md:translate-x-0
+            ${sidebarOpen ? 'translate-x-0 z-50' : '-translate-x-full'}
           `}
         >
           <Sidebar onClose={closeSidebar} />
-        </div>
+        </aside>
 
-        {/* Conteúdo principal */}
-        <div className="flex-1 flex flex-col min-w-0">
+        {/* ── Área principal (direita da sidebar) ──
+            md:ml-64 garante que o conteúdo não fique sob a sidebar fixa
+        */}
+        <div className="flex flex-col flex-1 min-w-0 md:ml-64 h-screen overflow-hidden">
+
+          {/* Header sólido, sticky, z-50, sem transparência */}
           <Topbar onMenuToggle={toggleSidebar} />
-          <main className="flex-1 overflow-x-hidden">
+
+          {/* Conteúdo com scroll independente */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </main>
+
           <Toaster position="bottom-right" richColors closeButton />
         </div>
       </div>

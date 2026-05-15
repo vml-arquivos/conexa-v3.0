@@ -475,80 +475,144 @@ function ControleFaltasProfessorView() {
   const totalJustificados = chamada.alunos.filter((a) => registros[a.id]?.status === 'JUSTIFICADO').length;
   const chamadaCompleta = totalMarcados === chamada.totalAlunos;
 
-  // ─── Tela de Resumo ──────────────────────────────────────────────────────────
+  // ─── Tela de Resumo (Correção 7 — layout clean + ChildAvatar) ──────────────
   if (etapa === 'resumo') {
+    const taxaPresenca = chamada.totalAlunos > 0
+      ? Math.round((totalPresentes / chamada.totalAlunos) * 100)
+      : 0;
+    const ausentesEJustificados = chamada.alunos.filter(
+      (a) => registros[a.id]?.status === 'AUSENTE' || registros[a.id]?.status === 'JUSTIFICADO'
+    );
+    const presentesLista = chamada.alunos.filter((a) => registros[a.id]?.status === 'PRESENTE');
+
     return (
-      <PageShell title="Chamada Salva! ✅" description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}>
-        <div className="max-w-md mx-auto space-y-6">
-          {/* Resumo visual */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-6 bg-green-50 rounded-2xl border-2 border-green-200">
-              <p className="text-4xl font-bold text-green-600">{totalPresentes}</p>
-              <p className="text-sm text-green-700 mt-1 font-medium">Presentes</p>
+      <PageShell
+        title="Chamada registrada"
+        description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}
+      >
+        <div className="max-w-lg mx-auto space-y-4">
+
+          {/* ─ Confirmação visual ─ */}
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="h-6 w-6 text-emerald-600" />
             </div>
-            <div className="text-center p-6 bg-red-50 rounded-2xl border-2 border-red-200">
-              <p className="text-4xl font-bold text-red-600">{totalAusentes}</p>
-              <p className="text-sm text-red-700 mt-1 font-medium">Ausentes</p>
-            </div>
-            <div className="text-center p-6 bg-yellow-50 rounded-2xl border-2 border-yellow-200">
-              <p className="text-4xl font-bold text-yellow-600">{totalJustificados}</p>
-              <p className="text-sm text-yellow-700 mt-1 font-medium">Justificados</p>
+            <div>
+              <p className="font-semibold text-emerald-800 text-sm">Chamada salva com sucesso</p>
+              <p className="text-xs text-emerald-600 mt-0.5">{formatarData(selectedDate)} · {chamada.classroomName}</p>
             </div>
           </div>
 
-          {/* Taxa de presença */}
-          <div className="p-5 bg-blue-50 rounded-2xl text-center">
-            <p className="text-sm text-blue-600 font-medium mb-1">Taxa de presença</p>
-            <p className="text-5xl font-bold text-blue-700">
-              {chamada.totalAlunos > 0 ? Math.round((totalPresentes / chamada.totalAlunos) * 100) : 0}%
-            </p>
+          {/* ─ Cards de contagem compactos ─ */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center py-4 px-2 bg-green-50 rounded-xl border border-green-200">
+              <p className="text-3xl font-bold text-green-600">{totalPresentes}</p>
+              <p className="text-xs text-green-700 mt-1 font-semibold uppercase tracking-wide">Presentes</p>
+            </div>
+            <div className="text-center py-4 px-2 bg-red-50 rounded-xl border border-red-200">
+              <p className="text-3xl font-bold text-red-600">{totalAusentes}</p>
+              <p className="text-xs text-red-700 mt-1 font-semibold uppercase tracking-wide">Ausentes</p>
+            </div>
+            <div className="text-center py-4 px-2 bg-amber-50 rounded-xl border border-amber-200">
+              <p className="text-3xl font-bold text-amber-600">{totalJustificados}</p>
+              <p className="text-xs text-amber-700 mt-1 font-semibold uppercase tracking-wide">Justificados</p>
+            </div>
           </div>
 
-          {/* Lista de ausentes */}
-          {totalAusentes + totalJustificados > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-gray-600">Crianças que faltaram:</p>
-              {chamada.alunos
-                .filter((a) => registros[a.id]?.status === 'AUSENTE' || registros[a.id]?.status === 'JUSTIFICADO')
-                .map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {a.photoUrl ? (
-                        <img src={a.photoUrl} alt={a.nome} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold text-gray-400">{a.nome[0]}</span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{a.nome}</p>
+          {/* ─ Barra de taxa de presença ─ */}
+          <div className="p-4 bg-white border border-gray-100 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Taxa de presença</span>
+              <span className="text-lg font-bold text-blue-700">{taxaPresenca}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  taxaPresenca >= 80 ? 'bg-emerald-500' : taxaPresenca >= 60 ? 'bg-amber-400' : 'bg-red-500'
+                }`}
+                style={{ width: `${taxaPresenca}%` }}
+              />
+            </div>
+          </div>
+
+          {/* ─ Avatares dos presentes (grid compacto com ChildAvatar) ─ */}
+          {presentesLista.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Presentes</p>
+              <div className="flex flex-wrap gap-2">
+                {presentesLista.map((a) => (
+                  <div key={a.id} className="flex flex-col items-center gap-1" title={a.nome}>
+                    <ChildAvatar
+                      child={{ nome: a.nome, photoUrl: a.photoUrl }}
+                      sizeClassName="w-10 h-10"
+                      imageClassName="rounded-full object-cover ring-2 ring-emerald-400"
+                      fallbackClassName="rounded-full bg-emerald-50 ring-2 ring-emerald-300 flex items-center justify-center"
+                      showInitials
+                      initialsClassName="text-xs font-bold text-emerald-700"
+                    />
+                    <span className="text-[10px] text-gray-500 truncate max-w-[44px] text-center leading-tight">
+                      {a.nome.split(' ')[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─ Lista de ausentes/justificados com ChildAvatar ─ */}
+          {ausentesEJustificados.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Faltaram</p>
+              <div className="space-y-2">
+                {ausentesEJustificados.map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
+                    <ChildAvatar
+                      child={{ nome: a.nome, photoUrl: a.photoUrl }}
+                      sizeClassName="w-9 h-9"
+                      imageClassName="rounded-full object-cover"
+                      fallbackClassName="rounded-full bg-gray-100 flex items-center justify-center"
+                      showInitials
+                      initialsClassName="text-xs font-bold text-gray-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{a.nome}</p>
                       {registros[a.id]?.motivo && (
-                        <p className="text-xs text-gray-500">{registros[a.id].motivo}</p>
+                        <p className="text-xs text-gray-400 truncate">{registros[a.id].motivo}</p>
                       )}
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${
                       registros[a.id]?.status === 'JUSTIFICADO'
-                        ? 'bg-yellow-100 text-yellow-700'
+                        ? 'bg-amber-100 text-amber-700'
                         : 'bg-red-100 text-red-700'
                     }`}>
                       {registros[a.id]?.status === 'JUSTIFICADO' ? 'Justificado' : 'Ausente'}
                     </span>
                   </div>
                 ))}
+              </div>
             </div>
           )}
 
-          <Button
-            onClick={() => setEtapa('chamada')}
-            variant="outline"
-            className="w-full"
-          >
-            Editar Chamada
-          </Button>
+          {/* ─ Botões de ação ─ */}
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              onClick={() => setEtapa('chamada')}
+              variant="outline"
+              className="flex-1"
+            >
+              Editar chamada
+            </Button>
+            <Button
+              onClick={() => navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Voltar ao Diário
+            </Button>
+          </div>
         </div>
       </PageShell>
     );
   }
-
   // ─── Tela Principal de Chamada ────────────────────────────────────────────────
   return (
     <PageShell
