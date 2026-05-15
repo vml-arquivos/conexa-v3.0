@@ -390,6 +390,142 @@ interface PedagogicoSubNavProps {
   navigate: (path: string) => void;
 }
 
+// ─── DiarioFeedCard — subcomponente isolado para uso correto de hooks ─────────
+// CRÍTICO: nunca chamar useState() dentro de .map() — sempre extrair em componente.
+interface DiarioFeedCardProps {
+  diario: any;
+  metricasExecucao: Record<string, { total: number; publicados: number; comMatriz: number; comPlano: number }>;
+  navigate: (path: string) => void;
+}
+
+function DiarioFeedCard({ diario, metricasExecucao, navigate }: DiarioFeedCardProps) {
+  const [expandido, setExpandido] = useState(false);
+
+  const turma     = diario.classroom?.name || diario.turmaNome || '—';
+  const professor = diario.createdByUser
+    ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+    : diario.professorNome || '—';
+  const dataRaw   = diario.eventDate || diario.data || diario.createdAt || '';
+  const dataFmt   = dataRaw
+    ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
+        weekday: 'short', day: '2-digit', month: '2-digit',
+      })
+    : '—';
+  const status    = (diario.status || '').toUpperCase();
+  const ctx       = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
+  const publicado = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
+  const entrada   = diario.curriculumEntry;
+  const campo     = entrada?.campoDeExperiencia?.replace(/_/g, ' ') ?? null;
+  const bncc      = entrada?.objetivoBNCC ?? null;
+  const curricDF  = entrada?.objetivoCurriculo ?? null;
+  const intenc    = entrada?.intencionalidade ?? null;
+  const codigoBNCC = entrada?.objetivoBNCCCode ?? null;
+  const conferencia = diario.conferencia;
+  const plano     = diario.planning;
+  const execStatus = ctx.statusExecucaoPlano || conferencia?.status || null;
+  const EXEC_CFG: Record<string, { label: string; bg: string; text: string }> = {
+    CUMPRIDO:      { label: 'Cumprido',     bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    FEITO:         { label: 'Feito',         bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    PARCIAL:       { label: 'Parcial',       bg: 'bg-amber-50',   text: 'text-amber-700'   },
+    NAO_REALIZADO: { label: 'Não realizado', bg: 'bg-rose-50',    text: 'text-rose-700'    },
+  };
+  const execCfg = execStatus ? (EXEC_CFG[execStatus] ?? null) : null;
+  const metricasTurma = metricasExecucao[diario.classroomId] ?? null;
+
+  return (
+    <div className={`rounded-2xl border bg-white overflow-hidden ${publicado ? 'border-emerald-200' : 'border-amber-200'}`}>
+      <button
+        className="w-full flex items-start justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50/70 transition-colors"
+        onClick={() => setExpandido(v => !v)}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+              publicado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {publicado ? 'Publicado' : 'Rascunho'}
+            </span>
+            {execCfg && (
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCfg.bg} ${execCfg.text}`}>
+                {execCfg.label}
+              </span>
+            )}
+            {campo && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">
+                📚 {campo}
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-bold text-gray-900 truncate">{turma}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Prof. {professor}
+            {ctx.presencas != null && <span className="ml-2 text-emerald-600 font-medium">· {ctx.presencas} presentes</span>}
+            {ctx.ausencias != null && <span className="ml-1 text-rose-500 font-medium">· {ctx.ausencias} ausências</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-400">{dataFmt}</span>
+          <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${expandido ? 'rotate-90' : ''}`} />
+        </div>
+      </button>
+
+      {expandido && (
+        <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+          {ctx.momentoDestaque && (
+            <div className="bg-indigo-50 rounded-xl p-3">
+              <p className="text-[11px] font-semibold text-indigo-500 uppercase mb-1">Avaliação da prática docente</p>
+              <p className="text-sm text-indigo-800 italic">"{ctx.momentoDestaque}"</p>
+            </div>
+          )}
+          {(bncc || curricDF || intenc) && (
+            <div className="bg-violet-50 rounded-xl p-3 space-y-2">
+              <p className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-1.5">
+                📋 Matriz Curricular
+                {codigoBNCC && <span className="text-[11px] bg-violet-200 text-violet-800 px-1.5 py-0.5 rounded font-bold">{codigoBNCC}</span>}
+              </p>
+              {campo && <p className="text-xs font-semibold text-violet-700">🎯 Campo: {campo}</p>}
+              {bncc && <p className="text-xs text-violet-800"><span className="font-semibold">BNCC:</span> {bncc}</p>}
+              {curricDF && curricDF !== bncc && <p className="text-xs text-violet-800"><span className="font-semibold">Currículo DF:</span> {curricDF}</p>}
+              {intenc && <p className="text-xs text-violet-800 italic"><span className="font-semibold not-italic">Intencionalidade:</span> {intenc}</p>}
+            </div>
+          )}
+          {plano && (
+            <div className={`rounded-xl p-3 ${execCfg ? execCfg.bg : 'bg-gray-50'}`}>
+              <p className="text-[11px] font-semibold text-gray-500 uppercase mb-1">Conferência do Plano</p>
+              <p className="text-xs text-gray-700">
+                <span className="font-semibold">{plano.title}</span>
+                {execCfg && <span className={`ml-2 font-bold ${execCfg.text}`}>{execCfg.label}</span>}
+              </p>
+              {conferencia?.observacao && <p className="text-xs text-gray-500 mt-0.5">"{conferencia.observacao}"</p>}
+            </div>
+          )}
+          {metricasTurma && (
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Publicados', val: `${metricasTurma.publicados}/${metricasTurma.total}` },
+                { label: 'Com BNCC',   val: `${metricasTurma.comMatriz}/${metricasTurma.total}` },
+              ].map(m => (
+                <div key={m.label} className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 text-center">
+                  <p className="text-[10px] text-slate-400 uppercase font-semibold">{m.label}</p>
+                  <p className="text-sm font-bold text-slate-700 mt-0.5">{m.val}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end pt-1">
+            <button
+              onClick={() => navigate(`/app/diario-calendario?classroomId=${diario.classroomId ?? diario.classroom?.id ?? ''}`)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+            >
+              <BookOpen className="h-3.5 w-3.5" /> Ver diário completo
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PedagogicoSubNav({
   diarios, turmasLista, cobertura, loadingCobertura,
   carregarCobertura, setCobertura, setPendencias, navigate,
@@ -1802,131 +1938,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {diariosFiltrados.slice(0, paginaDiarios * ITENS_POR_PAGINA).map((diario: any) => {
-                  const turma = diario.classroom?.name || diario.turmaNome || '—';
-                  const professor = diario.createdByUser
-                    ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
-                    : diario.professorNome || '—';
-                  const dataRaw = diario.eventDate || diario.data || diario.createdAt || '';
-                  const dataFmt = dataRaw
-                    ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
-                        weekday: 'short', day: '2-digit', month: '2-digit',
-                      })
-                    : '—';
-                  const status = (diario.status || '').toUpperCase();
-                  const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
-                  const publicado = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
-                  const entrada = diario.curriculumEntry;
-                  const campo = entrada?.campoDeExperiencia?.replace(/_/g, ' ') ?? null;
-                  const bncc = entrada?.objetivoBNCC ?? null;
-                  const curricDF = entrada?.objetivoCurriculo ?? null;
-                  const intenc = entrada?.intencionalidade ?? null;
-                  const codigoBNCC = entrada?.objetivoBNCCCode ?? null;
-                  const conferencia = diario.conferencia;
-                  const plano = diario.planning;
-                  const execStatus = ctx.statusExecucaoPlano || conferencia?.status || null;
-                  const EXEC_CFG: Record<string, { label: string; bg: string; text: string }> = {
-                    CUMPRIDO:      { label: 'Cumprido',      bg: 'bg-emerald-50', text: 'text-emerald-700' },
-                    FEITO:         { label: 'Feito',          bg: 'bg-emerald-50', text: 'text-emerald-700' },
-                    PARCIAL:       { label: 'Parcial',        bg: 'bg-amber-50',   text: 'text-amber-700'   },
-                    NAO_REALIZADO: { label: 'Não realizado',  bg: 'bg-rose-50',    text: 'text-rose-700'    },
-                  };
-                  const execCfg = execStatus ? (EXEC_CFG[execStatus] ?? null) : null;
-                  const CLIMA: Record<string, string> = { OTIMO: 'Ótimo', BOM: 'Bom', REGULAR: 'Regular', AGITADO: 'Agitado', DIFICIL: 'Difícil' };
-                  const metricasTurma = metricasExecucao[diario.classroomId] ?? null;
-                  const [expandidoDiario, setExpandidoDiario] = React.useState(false);
-
-                  return (
-                    <div key={diario.id} className={`rounded-2xl border bg-white overflow-hidden ${publicado ? 'border-emerald-200' : 'border-amber-200'}`}>
-                      {/* Cabeçalho clicável */}
-                      <button
-                        className="w-full flex items-start justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50/70 transition-colors"
-                        onClick={() => setExpandidoDiario(v => !v)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <StatusBadge status={diario.status || 'RASCUNHO'} />
-                            {execCfg && (
-                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCfg.bg} ${execCfg.text}`}>
-                                {execCfg.label}
-                              </span>
-                            )}
-                            {campo && (
-                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 font-medium">
-                                📚 {campo}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm font-bold text-gray-900 truncate">{turma}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            Prof. {professor}
-                            {ctx.presencas != null && <span className="ml-2 text-emerald-600 font-medium">· {ctx.presencas} presentes</span>}
-                            {ctx.ausencias != null && <span className="ml-1 text-rose-500 font-medium">· {ctx.ausencias} ausências</span>}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-xs font-semibold text-gray-400">{dataFmt}</span>
-                          <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${expandidoDiario ? 'rotate-90' : ''}`} />
-                        </div>
-                      </button>
-
-                      {/* Detalhe expandido */}
-                      {expandidoDiario && (
-                        <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
-                          {ctx.momentoDestaque && (
-                            <div className="bg-indigo-50 rounded-xl p-3">
-                              <p className="text-[11px] font-semibold text-indigo-500 uppercase mb-1">Avaliação da prática docente</p>
-                              <p className="text-sm text-indigo-800 italic">"{ctx.momentoDestaque}"</p>
-                            </div>
-                          )}
-                          {(bncc || curricDF || intenc) && (
-                            <div className="bg-violet-50 rounded-xl p-3 space-y-2">
-                              <p className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-1.5">
-                                📋 Matriz Curricular
-                                {codigoBNCC && <span className="text-[11px] bg-violet-200 text-violet-800 px-1.5 py-0.5 rounded font-bold">{codigoBNCC}</span>}
-                              </p>
-                              {campo && <p className="text-xs font-semibold text-violet-700">🎯 Campo: {campo}</p>}
-                              {bncc && <p className="text-xs text-violet-800"><span className="font-semibold">BNCC:</span> {bncc}</p>}
-                              {curricDF && curricDF !== bncc && <p className="text-xs text-violet-800"><span className="font-semibold">Currículo DF:</span> {curricDF}</p>}
-                              {intenc && <p className="text-xs text-violet-800 italic"><span className="font-semibold not-italic">Intencionalidade:</span> {intenc}</p>}
-                            </div>
-                          )}
-                          {plano && (
-                            <div className={`rounded-xl p-3 ${execCfg ? execCfg.bg : 'bg-gray-50'}`}>
-                              <p className="text-[11px] font-semibold text-gray-500 uppercase mb-1">Conferência do Plano</p>
-                              <p className="text-xs text-gray-700">
-                                <span className="font-semibold">{plano.title}</span>
-                                {execCfg && <span className={`ml-2 font-bold ${execCfg.text}`}>{execCfg.label}</span>}
-                              </p>
-                              {conferencia?.observacao && <p className="text-xs text-gray-500 mt-0.5">"{conferencia.observacao}"</p>}
-                            </div>
-                          )}
-                          {metricasTurma && (
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { label: 'Publicados', val: `${metricasTurma.publicados}/${metricasTurma.total}` },
-                                { label: 'Com BNCC', val: `${metricasTurma.comMatriz}/${metricasTurma.total}` },
-                              ].map(m => (
-                                <div key={m.label} className="rounded-xl bg-slate-50 border border-slate-100 p-2.5 text-center">
-                                  <p className="text-[10px] text-slate-400 uppercase font-semibold">{m.label}</p>
-                                  <p className="text-sm font-bold text-slate-700 mt-0.5">{m.val}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <div className="flex justify-end pt-1">
-                            <button
-                              onClick={() => navigate(`/app/diario-calendario?classroomId=${diario.classroomId ?? diario.classroom?.id ?? ''}`)}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
-                            >
-                              <BookOpen className="h-3.5 w-3.5" /> Ver diário completo
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {diariosFiltrados.slice(0, paginaDiarios * ITENS_POR_PAGINA).map((diario: any) => (
+                  <DiarioFeedCard
+                    key={diario.id}
+                    diario={diario}
+                    metricasExecucao={metricasExecucao}
+                    navigate={navigate}
+                  />
+                ))}
 
                 {diariosFiltrados.length > paginaDiarios * ITENS_POR_PAGINA && (
                   <button
