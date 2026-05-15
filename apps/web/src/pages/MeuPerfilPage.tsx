@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { ProfileAvatarUploader } from '../components/profile/ProfileAvatarUploader';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -49,7 +50,6 @@ export default function MeuPerfilPage() {
   const [editandoSenha, setEditandoSenha] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const [formDados, setFormDados] = useState({ firstName: '', lastName: '', phone: '' });
   const [formEmail, setFormEmail] = useState({ email: '', senha: '' });
@@ -130,7 +130,7 @@ export default function MeuPerfilPage() {
 
   // FIX: backend retorna roles[0].type (não roleType) — tolerar ambos os formatos
   const roleAtual = (perfil.roles?.[0] as any)?.type || (perfil.roles?.[0] as any)?.roleType || '';
-  const iniciais = `${perfil.firstName?.[0] ?? '?'}${perfil.lastName?.[0] ?? ''}`.toUpperCase();
+  const nomeCompleto = `${perfil.firstName ?? ''} ${perfil.lastName ?? ''}`.trim();
 
   return (
     <PageShell title="Meu Perfil" subtitle="Gerencie suas informações pessoais e configurações de acesso">
@@ -141,18 +141,15 @@ export default function MeuPerfilPage() {
           <div className="h-24 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
           <CardContent className="pt-0 pb-5">
             <div className="flex items-end gap-4 -mt-10 mb-4">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center text-2xl font-bold text-blue-600 bg-gradient-to-br from-blue-100 to-purple-100">
-                  {iniciais}
-                </div>
-                <button onClick={() => fileRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 shadow-md">
-                  <Camera className="h-3.5 w-3.5" />
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" />
+              <div>
+                <ProfileAvatarUploader
+                  name={nomeCompleto}
+                  size="md"
+                  editable={false}
+                />
               </div>
               <div className="flex-1 pb-1">
-                <h2 className="text-xl font-bold text-gray-900">{perfil.firstName} {perfil.lastName}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{nomeCompleto}</h2>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   {roleAtual && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">

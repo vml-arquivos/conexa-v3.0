@@ -74,7 +74,7 @@ const ROLES_COR: Record<string, string> = {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function ConfiguracoesPage() {
   const { user } = useAuth() as any;
-  const [abaAtiva, setAbaAtiva] = useState<'perfil' | 'unidade' | 'usuarios' | 'sistema' | 'notificacoes'>('perfil');
+  const [abaAtiva, setAbaAtiva] = useState<'unidade' | 'usuarios' | 'sistema' | 'notificacoes'>('unidade');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -125,6 +125,7 @@ export default function ConfiguracoesPage() {
     ['DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL', 'UNIDADE'].includes(userRole);
   const isDev = userRole === 'DEVELOPER';
 
+  // Perfil carregado apenas para dados de contexto (nome/email no header)
   useEffect(() => { loadPerfil(); }, []);
   useEffect(() => {
     if (abaAtiva === 'usuarios' && isAdmin) loadUsuarios();
@@ -175,10 +176,10 @@ export default function ConfiguracoesPage() {
     if (!perfil.nome?.trim()) { toast.error('Nome é obrigatório'); return; }
     setSaving(true);
     try {
-      await http.put('/auth/profile', {
-        nome: perfil.nome,
-        telefone: perfil.telefone,
-        cargo: perfil.cargo,
+      await http.put('/auth/me', {
+        firstName: perfil.nome?.split(' ')[0]?.trim() || '',
+        lastName: perfil.nome?.split(' ').slice(1).join(' ')?.trim() || '',
+        phone: perfil.telefone || '',
       });
       toast.success('Perfil atualizado com sucesso!');
     } catch (err: any) {
@@ -192,7 +193,7 @@ export default function ConfiguracoesPage() {
     if (senhaForm.nova !== senhaForm.confirmar) { toast.error('As senhas não coincidem'); return; }
     setSaving(true);
     try {
-      await http.put('/auth/change-password', {
+      await http.put('/auth/me/password', {
         currentPassword: senhaForm.atual,
         newPassword: senhaForm.nova,
       });
@@ -265,7 +266,6 @@ export default function ConfiguracoesPage() {
   );
 
   const ABAS = [
-    { id: 'perfil', label: 'Meu Perfil', icon: <User className="h-4 w-4" /> },
     ...(isAdmin ? [{ id: 'unidade', label: 'Unidade', icon: <Building2 className="h-4 w-4" /> }] : []),
     ...(isAdmin ? [{ id: 'usuarios', label: 'Usuários', icon: <Users className="h-4 w-4" /> }] : []),
     { id: 'notificacoes', label: 'Notificações', icon: <Bell className="h-4 w-4" /> },
@@ -292,104 +292,6 @@ export default function ConfiguracoesPage() {
 
         {/* Conteúdo */}
         <div className="flex-1 min-w-0 space-y-6">
-
-          {/* ─── PERFIL ─── */}
-          {abaAtiva === 'perfil' && (
-            <>
-              <Card className="border-2 border-blue-100">
-                <CardHeader><CardTitle className="flex items-center gap-2 text-blue-700"><User className="h-5 w-5" /> Dados Pessoais</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Foto */}
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {perfil.photoUrl ? (
-                        <img src={perfil.photoUrl} alt="Foto de perfil" className="w-20 h-20 rounded-full object-cover border-4 border-blue-100" />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-4 border-blue-100">
-                          <User className="w-10 h-10 text-blue-400" />
-                        </div>
-                      )}
-                      <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={uploadFotoPerfil} />
-                      <button onClick={() => photoRef.current?.click()}
-                        className="absolute bottom-0 right-0 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 shadow-md">
-                        <Camera className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{perfil.nome}</p>
-                      <p className="text-sm text-gray-500">{perfil.email}</p>
-                      <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${ROLES_COR[perfil.role || ''] || 'bg-gray-100 text-gray-600'}`}>
-                        {ROLES_LABELS[perfil.role || ''] || perfil.role}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Nome Completo *</Label>
-                      <Input value={perfil.nome || ''} onChange={e => setPerfil(p => ({ ...p, nome: e.target.value }))} />
-                    </div>
-                    <div>
-                      <Label>E-mail</Label>
-                      <Input value={perfil.email || ''} disabled className="bg-gray-50 cursor-not-allowed" />
-                    </div>
-                    <div>
-                      <Label>Telefone</Label>
-                      <Input placeholder="(00) 00000-0000" value={perfil.telefone || ''} onChange={e => setPerfil(p => ({ ...p, telefone: e.target.value }))} />
-                    </div>
-                    <div>
-                      <Label>Cargo / Função</Label>
-                      <Input placeholder="Ex: Professora de Educação Infantil" value={perfil.cargo || ''} onChange={e => setPerfil(p => ({ ...p, cargo: e.target.value }))} />
-                    </div>
-                  </div>
-
-                  {perfil.unidade && (
-                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                      <Building2 className="h-4 w-4 text-gray-400" />
-                      <p className="text-sm text-gray-600">Unidade: <span className="font-medium text-gray-800">{perfil.unidade.name}</span></p>
-                    </div>
-                  )}
-
-                  <Button onClick={salvarPerfil} disabled={saving}>
-                    {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Salvar Perfil
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-orange-100">
-                <CardHeader><CardTitle className="flex items-center gap-2 text-orange-700"><Key className="h-5 w-5" /> Alterar Senha</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label>Senha Atual</Label>
-                    <div className="relative">
-                      <Input type={mostrarSenha ? 'text' : 'password'} value={senhaForm.atual} onChange={e => setSenhaForm(f => ({ ...f, atual: e.target.value }))} />
-                      <button onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                        {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Nova Senha</Label>
-                      <Input type="password" placeholder="Mínimo 6 caracteres" value={senhaForm.nova} onChange={e => setSenhaForm(f => ({ ...f, nova: e.target.value }))} />
-                    </div>
-                    <div>
-                      <Label>Confirmar Nova Senha</Label>
-                      <Input type="password" value={senhaForm.confirmar} onChange={e => setSenhaForm(f => ({ ...f, confirmar: e.target.value }))} />
-                    </div>
-                  </div>
-                  {senhaForm.nova && senhaForm.confirmar && senhaForm.nova !== senhaForm.confirmar && (
-                    <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> As senhas não coincidem</p>
-                  )}
-                  <Button onClick={alterarSenha} disabled={saving} variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50">
-                    {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Key className="h-4 w-4 mr-2" />}
-                    Alterar Senha
-                  </Button>
-                </CardContent>
-              </Card>
-            </>
-          )}
 
           {/* ─── UNIDADE ─── */}
           {abaAtiva === 'unidade' && isAdmin && (

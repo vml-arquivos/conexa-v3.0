@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen, ClipboardList, BarChart2, ShoppingCart, GraduationCap,
-  ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
+  ChevronRight, ChevronDown, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
   Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle,
@@ -266,6 +267,9 @@ export function Sidebar({ onClose }: SidebarProps) {
 
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
   const perfilItem: MenuItem = { path: '/app/meu-perfil',    label: 'Meu Perfil',    icon: <UserCircle className="h-4 w-4" /> };
+  const [configOpen, setConfigOpen] = useState(
+    () => location.pathname.startsWith('/app/meu-perfil') || location.pathname.startsWith('/app/configuracoes')
+  );
 
   // adminItems: exibido apenas para perfis com acesso administrativo real.
   // Nutricionista (isNutricionista) NÃO recebe este bloco — ela não gerencia
@@ -411,9 +415,23 @@ export function Sidebar({ onClose }: SidebarProps) {
         {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
           <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
         )}
-        <div className="space-y-0.5">
-          <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
-          <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
+        {/* Grupo recolhível — Configurações */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setConfigOpen(o => !o)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          >
+            <Settings className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left">Configurações</span>
+            <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${configOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {configOpen && (
+            <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/60 space-y-0.5">
+              <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
+              <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
+            </div>
+          )}
         </div>
         <p className="text-[10px] text-slate-700 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
