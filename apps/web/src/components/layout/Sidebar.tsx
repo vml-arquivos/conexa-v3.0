@@ -178,24 +178,29 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
     <Link
       to={item.path}
       onClick={onClick}
-      className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
+      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-100 ${
         active
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+          ? 'bg-brand-600 text-white shadow-ds-sm'
+          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
       }`}
     >
-      <span className="flex items-center gap-2.5">
-        {item.icon}
-        {item.label}
+      <span className="flex items-center gap-2">
+        <span className={`flex-shrink-0 transition-colors ${
+          active ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+        }`}>
+          {item.icon}
+        </span>
+        <span className="truncate">{item.label}</span>
       </span>
-      <span className="flex items-center gap-1">
-        {item.badge && (
-          <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
-            {item.badge}
-          </span>
-        )}
-        {active && <ChevronRight className="h-3 w-3 opacity-70" />}
-      </span>
+      {item.badge && (
+        <span className={`ml-1 flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
+          active
+            ? 'bg-white/20 text-white'
+            : 'bg-brand-900/60 text-brand-300'
+        }`}>
+          {item.badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -205,10 +210,10 @@ function NavSection({
 }: { titulo: string; items: MenuItem[]; location: ReturnType<typeof useLocation>; onItemClick?: () => void }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.07em] px-2.5 mb-1.5">
         {titulo}
       </p>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {items.map((item) => (
           <NavItem key={item.path} item={item} active={isActiveForItem(location, item.path)} onClick={onItemClick} />
         ))}
@@ -274,59 +279,59 @@ export function Sidebar({ onClose }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-gray-900 text-white h-full min-h-screen flex flex-col">
+    <aside className="w-64 bg-slate-950 text-white h-full min-h-screen flex flex-col">
       {/* Logo */}
-      <div className="p-5 border-b border-gray-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Logo institucional COCRIS — fallback para texto se imagem não carregar */}
-            <img
-              src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
-              alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
-              className="h-10 w-auto object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
-                if (fb) fb.style.display = 'flex';
-              }}
-            />
-            {/* Fallback: ícone + texto (oculto por padrão) */}
-            <div className="hidden items-center gap-2" aria-hidden="true">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">C</span>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold leading-none">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
-                <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
+      <div className="px-4 py-4 border-b border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Logo institucional COCRIS */}
+              <img
+                src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+                alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+                className="h-9 w-auto object-contain flex-shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = 'flex';
+                }}
+              />
+              {/* Fallback: ícone + texto */}
+              <div className="hidden items-center gap-2" aria-hidden="true">
+                <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-xs">C</span>
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-sm font-bold leading-tight text-white truncate">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Sistema Pedagógico</p>
+                </div>
               </div>
             </div>
+            {/* Botão fechar — só aparece em mobile */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+                aria-label="Fechar menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          {/* Botão fechar — só aparece em mobile */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              aria-label="Fechar menu"
-            >
-              <X className="h-5 w-5" />
-            </button>
+          {user && (
+            <div className="mt-3 px-2.5 py-2 bg-slate-900 rounded-lg border border-slate-800/60">
+              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Perfil ativo</p>
+              <p className="text-sm font-medium text-slate-100 truncate mt-0.5">
+                {(user.nome as string) || user.email}
+              </p>
+              <span className="inline-block mt-1.5 text-[10px] font-semibold bg-brand-900/70 text-brand-300 px-2 py-0.5 rounded-full tracking-wide">
+                {perfilLabel}
+              </span>
+            </div>
           )}
-        </div>
-        {user && (
-          <div className="mt-3 px-2 py-2 bg-gray-800 rounded-lg">
-            <p className="text-xs text-gray-400">Perfil</p>
-            <p className="text-sm font-medium text-gray-200 truncate">
-              {(user.nome as string) || user.email}
-            </p>
-            <span className="inline-block mt-1 text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded-full">
-              {perfilLabel}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
 
         {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
@@ -402,15 +407,15 @@ export function Sidebar({ onClose }: SidebarProps) {
       </nav>
 
       {/* Rodapé */}
-      <div className="p-3 border-t border-gray-800 space-y-1">
+      <div className="px-3 py-3 border-t border-slate-800/60 space-y-2">
         {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
           <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
         )}
-        <div className="pt-1 space-y-1">
+        <div className="space-y-0.5">
           <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
           <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
         </div>
-        <p className="text-xs text-gray-600 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
+        <p className="text-[10px] text-slate-700 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>
   );

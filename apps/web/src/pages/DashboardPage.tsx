@@ -12,6 +12,7 @@ import type { PlanningTemplateCocris } from '../types/lookup';
 import { UnitSelect } from '../components/select/UnitSelect';
 import { ClassroomSelect } from '../components/select/ClassroomSelect';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
+import { UnifiedDashboard } from '../components/dashboard/UnifiedDashboard';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -146,18 +147,22 @@ export function DashboardPage() {
   }, [teacherDate, classroomId, isProfessor]);
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Bem-vindo, {(user?.nome as string)?.split(' ')[0] || user?.email}!</h1>
+    <div className="space-y-0">
+      {/* ── Hub visual premium por perfil ── */}
+      <UnifiedDashboard />
 
-      {/* Informações do Usuário */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <p className="text-sm text-gray-600">
-          <span className="font-medium">Email:</span> {user?.email}
-        </p>
-        <p className="text-sm text-gray-600">
-          <span className="font-medium">Perfil:</span> {userRoles.join(', ')}
-        </p>
-      </div>
+      {/* ── Seções legadas: visíveis apenas para DEVELOPER ── */}
+      {isDeveloper && (
+        <div className="space-y-6 px-6 py-6">
+          <h2 className="text-base font-semibold text-slate-700">Debug — Dados Brutos</h2>
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Email:</span> {user?.email}
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Perfil:</span> {userRoles.join(', ')}
+            </p>
+          </div>
 
       {/* ========== Dashboard da Unidade ========== */}
       {canViewUnitDashboard && (
@@ -532,6 +537,8 @@ export function DashboardPage() {
               )}
             </div>
           )}
+        </div>
+      )}
         </div>
       )}
     </div>
