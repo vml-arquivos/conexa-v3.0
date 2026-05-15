@@ -11,7 +11,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import React from 'react';
 import { useApiCache } from '../hooks/useApiCache';
 import { PageShell } from '../components/ui/PageShell';
@@ -27,7 +27,7 @@ import {
   RefreshCw, BarChart2, FileText, ArrowRight,
   Shield, Zap, Activity, Clock, CheckCircle2,
   XCircle, Star,
-  GraduationCap, MessageSquare,
+  GraduationCap, MessageSquare, Printer, Download,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -40,6 +40,8 @@ import { TriangleAlert } from 'lucide-react';
 import { KPIGrid } from '../components/dashboard/KPIGrid';
 import { ActionRequiredBlock } from '../components/dashboard/ActionRequiredBlock';
 import { WorkQueueBlock } from '../components/dashboard/WorkQueueBlock';
+import { exportarPlanejamentosPDF } from '../lib/exportPlanejamentosPDF';
+import { GaleriaFotosTurma } from '../components/dashboard/GaleriaFotosTurma';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERFACES
@@ -563,11 +565,17 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const abaAtiva = (searchParams.get('aba') as any) ?? 'inicio';
+  // Ref para scroll automático ao mudar de aba
+  const tabsRef = useRef<HTMLDivElement>(null);
 
   function setAbaAtiva(novaAba: string) {
     const novosParams = new URLSearchParams(searchParams.toString());
     novosParams.set('aba', novaAba);
     setSearchParams(novosParams, { replace: false });
+    // Scroll suave até as tabs para que o conteúdo fique visível sem rolagem manual
+    setTimeout(() => {
+      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   // RBAC — preservado integralmente
@@ -975,7 +983,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ════════════════════════════════════════════════════════════════════
           TABS DE NAVEGAÇÃO
           ════════════════════════════════════════════════════════════════════ */}
-      <div className="mt-5 mb-4 flex gap-1 bg-gray-100 rounded-2xl p-1 overflow-x-auto scrollbar-none">
+      <div ref={tabsRef} className="mt-5 mb-4 flex gap-1 bg-gray-100 rounded-2xl p-1 overflow-x-auto scrollbar-none scroll-mt-4">
         {([
           { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,          badge: totalPendencias || undefined },
           { id: 'turmas',        label: 'Turmas',         icon: <Users className="h-4 w-4" /> },
@@ -989,8 +997,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             onClick={() => { setAbaAtiva(aba.id); }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
               abaAtiva === aba.id
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white text-indigo-700 shadow-md ring-1 ring-indigo-100'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
             }`}
           >
             {aba.icon}
@@ -1513,6 +1521,32 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         const grupos = Object.entries(porTurma);
         const pendentes = planejamentos.filter(p => ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')).length;
 
+        // Filtro de período para impressão em lote
+        const planosAprovados = planejamentos.filter(p => p.status === 'APROVADO' || p.status === 'PUBLICADO' || p.status === 'CONCLUIDO');
+
+        function handleImprimirLote() {
+          if (planosAprovados.length === 0) {
+            toast.error('Nenhum plano aprovado para imprimir no período atual.');
+            return;
+          }
+          const planosPDF = planosAprovados.map(p => ({
+            id: p.id,
+            titulo: p.title || 'Sem título',
+            turmaNome: (p as any).classroom?.name || p.turmaNome || '—',
+            professorNome: p.createdByUser
+              ? `${p.createdByUser.firstName} ${p.createdByUser.lastName}`.trim()
+              : p.professorNome || '—',
+            startDate: p.startDate || '',
+            status: p.status || '',
+            description: (p as any).description || '',
+            reviewComment: (p as any).reviewComment || '',
+          }));
+          const hoje = new Date();
+          const periodo = `${String(hoje.getMonth() + 1).padStart(2, '0')}-${hoje.getFullYear()}`;
+          exportarPlanejamentosPDF(planosPDF, periodo, 'Unidade Escolar');
+          toast.success(`PDF gerado com ${planosPDF.length} plano(s) aprovado(s).`);
+        }
+
         return (
           <div className="space-y-3">
             {/* Cabeçalho */}
@@ -1528,6 +1562,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200">
                     {pendentes} pendente{pendentes !== 1 ? 's' : ''}
                   </span>
+                )}
+                {planosAprovados.length > 0 && (
+                  <button
+                    onClick={handleImprimirLote}
+                    title={`Imprimir ${planosAprovados.length} plano(s) aprovado(s) em PDF`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 transition-colors"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Imprimir lote ({planosAprovados.length})
+                  </button>
                 )}
                 <button onClick={loadDashboard}
                   className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
@@ -1895,6 +1939,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               </div>
             );
           })()}
+
+          {/* Galeria de Fotos das Turmas */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <GaleriaFotosTurma
+              classroomId={filtroDiarioTurma ? undefined : undefined}
+              startDate={filtroDiarioDataInicio || undefined}
+              endDate={filtroDiarioDataFim || undefined}
+              turmasDisponiveis={dashboard?.turmasLista?.map((t: any) => ({ id: t.id, name: t.name })) ?? []}
+            />
+          </div>
         </div>
       )}
 

@@ -491,8 +491,20 @@ export default function PlanoDeAulaNovoPage() {
             }]);
           }
         }
-      } catch {
-        toast.error('Erro ao carregar dados');
+      } catch (err: any) {
+        const httpStatus = err?.response?.status;
+        if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
+          toast.error(
+            'Servidor temporariamente indisponível. Seus dados estão seguros. Tente novamente em alguns instantes.',
+            { duration: 8000 }
+          );
+        } else if (httpStatus === 401 || httpStatus === 403) {
+          // Não redireciona aqui — o interceptor HTTP já cuida do refresh/logout
+          toast.error('Sessão expirada. Redirecionando para o login...');
+        } else {
+          const msg = extractErrorMessage(err, 'Erro ao carregar dados do planejamento.');
+          toast.error(msg);
+        }
       } finally {
         setLoading(false);
       }

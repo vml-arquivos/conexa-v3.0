@@ -71,4 +71,22 @@ body {
     margin: 15mm 10mm;
     size: A4 landscape;
   }
+
+  /* Estilos específicos para impressão do Diário de Bordo */
+  .print\:hidden { display: none !important; }
+
+  /* Mostrar todos os meses no calendário ao imprimir */
+  [data-mes] { display: block !important; }
+
+  /* Garantir que cards de diário não sejam cortados */
+  .rounded-2xl, .rounded-xl {
+    border-radius: 4pt !important;
+    border: 0.5pt solid #e5e7eb !important;
+    page-break-inside: avoid;
+  }
+
+  /* Ocultar elementos de navegação e ações */
+  .no-print, [data-sidebar], .fixed, .sticky {
+    display: none !important;
+  }
 }

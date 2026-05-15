@@ -110,7 +110,16 @@ export default function CentralRdicCriancaPage() {
       const res = await http.get(`/rdic/child/${childId}/central`);
       setData(res?.data ?? null);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Erro ao carregar dados da criança.');
+      const status = err?.response?.status;
+      if (status === 403) {
+        toast.error('Você não tem permissão para acessar os dados desta criança. Verifique seu perfil de acesso.');
+      } else if (status === 404) {
+        toast.error('Criança não encontrada. Verifique se o registro ainda existe.');
+      } else if (status === 502 || status === 503 || status === 504) {
+        toast.error('Servidor temporáriamente indisponível. Tente novamente em instantes.', { duration: 8000 });
+      } else {
+        toast.error(err?.response?.data?.message ?? 'Erro ao carregar dados da criança.');
+      }
     } finally {
       setLoading(false);
     }

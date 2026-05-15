@@ -51,7 +51,9 @@ function redirectToLogin() {
 }
 
 function isSessionExpiredStatus(status?: number): boolean {
-  return status === 401 || status === 403;
+  // 401 = token expirado/inválido → tenta refresh e depois logout
+  // 403 = sem permissão (token válido, mas role insuficiente) → NÃO redireciona para login
+  return status === 401;
 }
 
 async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
@@ -120,6 +122,11 @@ http.interceptors.response.use(
   async (error: AuthExpiredAxiosError) => {
     const status = error.response?.status;
     const originalRequest = error.config as RetryableRequestConfig | undefined;
+
+    // 403 = sem permissão → não tenta refresh, apenas rejeita
+    if (status === 403) {
+      return Promise.reject(error);
+    }
 
     if (status !== 401 || !originalRequest || originalRequest._skipAuthRefresh) {
       return Promise.reject(error);
