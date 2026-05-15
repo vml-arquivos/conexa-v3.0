@@ -17,7 +17,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
-import { isUnidade, normalizeRoles } from '../api/auth';
+import { isUnidade } from '../api/auth';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
