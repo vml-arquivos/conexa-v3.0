@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -20,6 +20,28 @@ export class InsightsController {
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   getTeacherToday(@CurrentUser() user: JwtPayload) {
     return this.insightsService.getTeacherToday(user);
+  }
+
+
+
+  /**
+   * GET /insights/child/:childId/summary
+   * Resumo somente leitura da criança para Timeline/Painel.
+   * Não altera matriz, planejamento, diário, RDIC ou dados históricos.
+   */
+  @Get('child/:childId/summary')
+  @RequireRoles(
+    RoleLevel.PROFESSOR,
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  getChildSummary(
+    @Param('childId') childId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.insightsService.getChildSummary(childId, user);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

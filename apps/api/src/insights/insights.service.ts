@@ -547,4 +547,343 @@ export class InsightsService {
       alertas,
     };
   }
+
+  /**
+   * GET /insights/child/:childId/summary
+   * Camada somente leitura para análise da criança.
+   *
+   * Regras de integridade:
+   * - não altera matriz curricular;
+   * - não altera planos de aula;
+   * - não altera diário/RDIC/observações existentes;
+   * - não cria migrations;
+   * - não grava dados.
+   */
+  async getChildSummary(childId: string, user: JwtPayload) {
+    if (!childId) throw new ForbiddenException('Criança inválida');
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const child = await this.prisma.child.findFirst({
+      where: {
+        id: childId,
+        mantenedoraId: user.mantenedoraId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        unitId: true,
+        mantenedoraId: true,
+        allergies: true,
+        medicalConditions: true,
+        medicationNeeds: true,
+        enrollments: {
+          where: { status: 'ATIVA' },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            classroomId: true,
+            classroom: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!child) throw new ForbiddenException('Criança não encontrada no escopo permitido');
+
+    const activeEnrollment = child.enrollments?.[0] ?? null;
+    const classroomId = activeEnrollment?.classroomId ?? null;
+    const userRoles = Array.isArray(user.roles) ? user.roles : [];
+    const roleLevels = userRoles.map((role) => role.level);
+    const hasCentralAccess = roleLevels.some((level) =>
+      [RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL].includes(level),
+    );
+    const hasUnitAccess = roleLevels.includes(RoleLevel.UNIDADE);
+    const hasTeacherAccess = roleLevels.includes(RoleLevel.PROFESSOR);
+
+    if (hasCentralAccess) {
+      const scopedUnits = userRoles.flatMap((role) => role.unitScopes ?? []);
+      if (scopedUnits.length > 0 && !scopedUnits.includes(child.unitId)) {
+        throw new ForbiddenException('Usuário sem acesso à unidade da criança');
+      }
+    } else if (hasUnitAccess) {
+      if (!user.unitId || user.unitId !== child.unitId) {
+        throw new ForbiddenException('Usuário sem acesso à unidade da criança');
+      }
+    } else if (hasTeacherAccess) {
+      if (!classroomId) throw new ForbiddenException('Criança sem turma ativa para validação do professor');
+      const link = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId,
+          teacherId: user.sub,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!link) throw new ForbiddenException('Professor sem vínculo com a turma da criança');
+    } else {
+      throw new ForbiddenException('Perfil sem acesso ao resumo da criança');
+    }
+
+    const now = new Date();
+    const since30 = new Date(now);
+    since30.setDate(since30.getDate() - 30);
+
+    const [diaryEvents, observations, rdics, attendance30, dietaryRestrictions, openAlerts] = await Promise.all([
+      this.prisma.diaryEvent.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+        },
+        orderBy: { eventDate: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          description: true,
+          observations: true,
+          developmentNotes: true,
+          behaviorNotes: true,
+          eventDate: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.developmentObservation.findMany({
+        where: { childId },
+        orderBy: { date: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          category: true,
+          date: true,
+          behaviorDescription: true,
+          socialInteraction: true,
+          emotionalState: true,
+          motorSkills: true,
+          cognitiveSkills: true,
+          languageSkills: true,
+          learningProgress: true,
+          developmentAlerts: true,
+          recommendations: true,
+          nextSteps: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.rDIXInstancia.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+        },
+        orderBy: { criadoEm: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          periodo: true,
+          periodoEnum: true,
+          anoLetivo: true,
+          status: true,
+          submittedAt: true,
+          reviewedAt: true,
+          finalizadoEm: true,
+          publicadoEm: true,
+          criadoEm: true,
+          atualizadoEm: true,
+        },
+      }),
+      this.prisma.attendance.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+          date: { gte: since30, lte: now },
+        },
+        orderBy: { date: 'desc' },
+        select: {
+          id: true,
+          date: true,
+          status: true,
+          justification: true,
+        },
+      }),
+      this.prisma.dietaryRestriction.findMany({
+        where: { childId, isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          description: true,
+          severity: true,
+          forbiddenFoods: true,
+        },
+      }),
+      this.prisma.alertaOperacional.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          resolvido: false,
+        },
+        orderBy: { criadoEm: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          tipo: true,
+          severidade: true,
+          titulo: true,
+          descricao: true,
+          criadoEm: true,
+        },
+      }),
+    ]);
+
+    const attendanceTotal = attendance30.length;
+    const presentes = attendance30.filter((item) => item.status === 'PRESENTE').length;
+    const ausentes = attendance30.filter((item) => item.status === 'AUSENTE').length;
+    const justificados = attendance30.filter((item) => item.status === 'JUSTIFICADO').length;
+    const atrasos = attendance30.filter((item) => item.status === 'ATRASO').length;
+    const presencaPercentual = attendanceTotal > 0 ? Math.round((presentes / attendanceTotal) * 100) : null;
+
+    const observationsWithAlerts = observations.filter((item) =>
+      Boolean(item.developmentAlerts && item.developmentAlerts.trim().length > 0),
+    );
+
+    const pontosAtencao: Array<{ tipo: string; severidade: string; titulo: string; descricao: string }> = [];
+
+    if (observationsWithAlerts.length > 0) {
+      pontosAtencao.push({
+        tipo: 'DESENVOLVIMENTO',
+        severidade: observationsWithAlerts.length >= 3 ? 'ALTA' : 'MEDIA',
+        titulo: `${observationsWithAlerts.length} observação(ões) com alerta de desenvolvimento`,
+        descricao: 'Revisar registros recentes com coordenação ou psicologia antes de qualquer encaminhamento.',
+      });
+    }
+
+    if (presencaPercentual !== null && presencaPercentual < 80) {
+      pontosAtencao.push({
+        tipo: 'FREQUENCIA',
+        severidade: presencaPercentual < 60 ? 'ALTA' : 'MEDIA',
+        titulo: `Presença em ${presencaPercentual}% nos últimos 30 dias registrados`,
+        descricao: 'Acompanhar justificativas e comunicação com responsáveis.',
+      });
+    }
+
+    if (dietaryRestrictions.length > 0 || child.allergies || child.medicalConditions || child.medicationNeeds) {
+      pontosAtencao.push({
+        tipo: 'SAUDE_NUTRICAO',
+        severidade: dietaryRestrictions.some((item) => String(item.severity ?? '').toLowerCase().includes('sever')) ? 'ALTA' : 'MEDIA',
+        titulo: 'Atenção de saúde/nutrição cadastrada',
+        descricao: 'Conferir restrições, alergias e observações de saúde antes de atividades e refeições.',
+      });
+    }
+
+    for (const alerta of openAlerts.slice(0, 5)) {
+      pontosAtencao.push({
+        tipo: String(alerta.tipo),
+        severidade: String(alerta.severidade),
+        titulo: alerta.titulo,
+        descricao: alerta.descricao,
+      });
+    }
+
+    const timeline = [
+      ...diaryEvents.map((item) => ({
+        id: item.id,
+        type: 'DIARIO',
+        date: item.eventDate,
+        title: item.title || String(item.type).replace(/_/g, ' '),
+        description: item.description || item.observations || item.developmentNotes || item.behaviorNotes || '',
+        status: item.status,
+        source: 'DiaryEvent',
+      })),
+      ...observations.map((item) => ({
+        id: item.id,
+        type: 'OBSERVACAO',
+        date: item.date,
+        title: String(item.category || 'GERAL').replace(/_/g, ' '),
+        description:
+          item.behaviorDescription ||
+          item.learningProgress ||
+          item.socialInteraction ||
+          item.emotionalState ||
+          item.motorSkills ||
+          item.cognitiveSkills ||
+          item.languageSkills ||
+          '',
+        alert: item.developmentAlerts || '',
+        recommendation: item.recommendations || item.nextSteps || '',
+        source: 'DevelopmentObservation',
+      })),
+      ...rdics.map((item) => ({
+        id: item.id,
+        type: 'RDIC',
+        date: item.publicadoEm || item.finalizadoEm || item.reviewedAt || item.submittedAt || item.criadoEm || item.atualizadoEm,
+        title: `RDIC ${item.periodoEnum || item.periodo || ''}`.trim(),
+        description: `Status: ${item.status}`,
+        status: item.status,
+        source: 'RDIXInstancia',
+      })),
+      ...openAlerts.map((item) => ({
+        id: item.id,
+        type: 'ALERTA',
+        date: item.criadoEm,
+        title: item.titulo,
+        description: item.descricao,
+        alert: item.descricao,
+        status: item.severidade,
+        source: 'AlertaOperacional',
+      })),
+    ].sort((a, b) => new Date(b.date as any).getTime() - new Date(a.date as any).getTime());
+
+    return {
+      child: {
+        id: child.id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        name: `${child.firstName} ${child.lastName}`.trim(),
+        dateOfBirth: child.dateOfBirth,
+        unitId: child.unitId,
+        classroomId,
+        classroomName: activeEnrollment?.classroom?.name ?? null,
+        health: {
+          allergies: child.allergies,
+          medicalConditions: child.medicalConditions,
+          medicationNeeds: child.medicationNeeds,
+        },
+      },
+      metrics: {
+        diary: diaryEvents.length,
+        observations: observations.length,
+        observationsWithAlerts: observationsWithAlerts.length,
+        rdic: rdics.length,
+        openAlerts: openAlerts.length,
+        dietaryRestrictions: dietaryRestrictions.length,
+        attendance30: {
+          total: attendanceTotal,
+          presentes,
+          ausentes,
+          justificados,
+          atrasos,
+          presencaPercentual,
+        },
+      },
+      attentionPoints: pontosAtencao,
+      dietaryRestrictions,
+      recent: {
+        diary: diaryEvents.slice(0, 5),
+        observations: observations.slice(0, 5),
+        rdic: rdics.slice(0, 5),
+        attendance: attendance30.slice(0, 10),
+        alerts: openAlerts.slice(0, 5),
+      },
+      timeline,
+    };
+  }
+
 }
