@@ -597,13 +597,10 @@ export class InsightsService {
     const activeEnrollment = child.enrollments?.[0] ?? null;
     const classroomId = activeEnrollment?.classroomId ?? null;
     const userRoles = Array.isArray(user.roles) ? user.roles : [];
-    const roleLevels: RoleLevel[] = userRoles.map((role) => role.level as RoleLevel);
-    const centralAccessLevels: RoleLevel[] = [
-      RoleLevel.DEVELOPER,
-      RoleLevel.MANTENEDORA,
-      RoleLevel.STAFF_CENTRAL,
-    ];
-    const hasCentralAccess = roleLevels.some((level) => centralAccessLevels.includes(level));
+    const roleLevels = userRoles.map((role) => role.level);
+    const hasCentralAccess = roleLevels.some((level) =>
+      ([RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[]).includes(level),
+    );
     const hasUnitAccess = roleLevels.includes(RoleLevel.UNIDADE);
     const hasTeacherAccess = roleLevels.includes(RoleLevel.PROFESSOR);
 

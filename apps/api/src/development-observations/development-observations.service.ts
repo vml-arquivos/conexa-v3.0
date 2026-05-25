@@ -1,7 +1,63 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RoleLevel } from '@prisma/client';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
+
+
+const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
+const DEVELOPMENT_ATTACHMENT_MARKER = '[ANEXO_ATIVIDADE]';
+
+function safeFilename(name: string): string {
+  return String(name || 'arquivo')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 120) || 'arquivo';
+}
+
+function extractDevelopmentAttachment(nextSteps?: string | null): any | null {
+  if (!nextSteps) return null;
+  const line = nextSteps
+    .split('\n')
+    .find((part) => part.trim().startsWith(DEVELOPMENT_ATTACHMENT_MARKER));
+  if (!line) return null;
+  const rawJson = line.replace(DEVELOPMENT_ATTACHMENT_MARKER, '').trim();
+  try {
+    return JSON.parse(rawJson);
+  } catch {
+    return null;
+  }
+}
+
+function removeDevelopmentAttachmentMarker(nextSteps?: string | null): string {
+  if (!nextSteps) return '';
+  return nextSteps
+    .split('\n')
+    .filter((part) => !part.trim().startsWith(DEVELOPMENT_ATTACHMENT_MARKER))
+    .join('\n')
+    .trim();
+}
+
+function serializeDevelopmentObservation<T extends Record<string, any>>(obs: T): T & {
+  atividadeArquivoUrl?: string;
+  atividadeArquivoNome?: string;
+  atividadeArquivoMimeType?: string;
+  atividadeArquivoSize?: number;
+} {
+  const attachment = extractDevelopmentAttachment(obs?.nextSteps);
+  if (!attachment) return obs as any;
+  return {
+    ...obs,
+    atividadeArquivoUrl: attachment.url,
+    atividadeArquivoNome: attachment.name,
+    atividadeArquivoMimeType: attachment.mimeType,
+    atividadeArquivoSize: attachment.size,
+  };
+}
 
 function hasLevel(user: JwtPayload, ...levels: RoleLevel[]): boolean {
   return Array.isArray(user.roles) && user.roles.some((r: any) => levels.includes(r?.level));
@@ -29,12 +85,14 @@ export class DevelopmentObservationsService {
   async criar(dto: any, user: JwtPayload) {
     const data = this.mapCreateData(dto, user);
 
-    return this.prisma.developmentObservation.create({
+    const obs = await this.prisma.developmentObservation.create({
       data,
       include: {
         child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
       },
     });
+
+    return serializeDevelopmentObservation(obs);
   }
 
   /** Listar observações — filtro por criança, turma, categoria e período. */
@@ -57,7 +115,7 @@ export class DevelopmentObservationsService {
       where.createdBy = user.sub;
     }
 
-    return this.prisma.developmentObservation.findMany({
+    const obs = await this.prisma.developmentObservation.findMany({
       where,
       orderBy: { date: 'desc' },
       take: Number(limit) || 100,
@@ -65,6 +123,8 @@ export class DevelopmentObservationsService {
         child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } },
       },
     });
+
+    return obs.map((item) => serializeDevelopmentObservation(item));
   }
 
   /** Detalhe de uma observação. */
@@ -74,7 +134,7 @@ export class DevelopmentObservationsService {
       include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
     });
     if (!obs) throw new NotFoundException('Observação não encontrada');
-    return obs;
+    return serializeDevelopmentObservation(obs);
   }
 
   /** Atualizar observação sem aceitar campos inexistentes no Prisma. */
@@ -88,11 +148,13 @@ export class DevelopmentObservationsService {
 
     const data = this.mapUpdateData(dto);
 
-    return this.prisma.developmentObservation.update({
+    const updated = await this.prisma.developmentObservation.update({
       where: { id },
       data,
       include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
     });
+
+    return serializeDevelopmentObservation(updated);
   }
 
   /** Deletar observação. */
@@ -160,7 +222,7 @@ export class DevelopmentObservationsService {
       tendencia,
       categorias,
       serieSemanal: Object.values(porSemana),
-      ultimasObs: obs.slice(-5).reverse(),
+      ultimasObs: obs.slice(-5).reverse().map((item) => serializeDevelopmentObservation(item)),
     };
   }
 
@@ -184,7 +246,7 @@ export class DevelopmentObservationsService {
     const totalAlertas = obs.filter((o) => Boolean(o.developmentAlerts)).length;
     const totalRecomendacoes = obs.filter((o) => Boolean(o.recommendations)).length;
 
-    return { total, totalAlertas, totalRecomendacoes, porCategoria, ultimas: obs };
+    return { total, totalAlertas, totalRecomendacoes, porCategoria, ultimas: obs.map((item) => serializeDevelopmentObservation(item)) };
   }
 
   /** Resumo consolidado de uma turma. */
@@ -233,6 +295,67 @@ export class DevelopmentObservationsService {
       porCategoria,
       criancas,
     };
+  }
+
+
+  /**
+   * Upload de anexo da observação usando multipart/form-data.
+   * Não usa base64 em JSON e não cria/migra campos no banco.
+   * O link do arquivo é gravado em nextSteps com marcador técnico seguro.
+   */
+  async uploadAttachment(id: string, file: Express.Multer.File, user: JwtPayload) {
+    if (!file) throw new BadRequestException('Arquivo é obrigatório');
+
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+
+    if (!allowedMimeTypes.has(file.mimetype)) {
+      throw new BadRequestException('Tipo de arquivo não permitido. Envie imagem, PDF, DOC ou DOCX.');
+    }
+
+    const obs = await this.prisma.developmentObservation.findUnique({
+      where: { id },
+      include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
+    });
+    if (!obs) throw new NotFoundException('Observação não encontrada');
+
+    if (hasLevel(user, RoleLevel.PROFESSOR) && obs.createdBy !== user.sub) {
+      throw new ForbiddenException('Sem permissão para anexar arquivo nesta observação');
+    }
+
+    const originalName = safeFilename(file.originalname || 'anexo');
+    const extension = path.extname(originalName).slice(0, 16);
+    const filename = `${Date.now()}-${randomUUID()}${extension}`;
+    const relativeDir = path.join('development-observations', id);
+    const absoluteDir = path.join(UPLOADS_ROOT_DIR, relativeDir);
+    await fs.mkdir(absoluteDir, { recursive: true });
+    await fs.writeFile(path.join(absoluteDir, filename), file.buffer);
+
+    const attachment = {
+      url: `/uploads/development-observations/${id}/${filename}`,
+      name: originalName,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    const nextStepsBase = removeDevelopmentAttachmentMarker(obs.nextSteps);
+    const nextSteps = `${nextStepsBase}${nextStepsBase ? '\n' : ''}${DEVELOPMENT_ATTACHMENT_MARKER} ${JSON.stringify(attachment)}`;
+
+    const updated = await this.prisma.developmentObservation.update({
+      where: { id },
+      data: { nextSteps },
+      include: { child: { select: { id: true, firstName: true, lastName: true, photoUrl: true } } },
+    });
+
+    return serializeDevelopmentObservation(updated);
   }
 
   private mapCreateData(dto: any, user: JwtPayload) {

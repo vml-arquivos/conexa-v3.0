@@ -75,11 +75,35 @@ interface ObservacaoHistorico {
   atividadeDescricao?: string;
   atividadeArquivoUrl?: string;
   atividadeArquivoNome?: string;
+  atividadeArquivoMimeType?: string;
+  atividadeArquivoSize?: number;
+  nextSteps?: string;
 }
 
 interface Turma {
   id: string;
   name: string;
+}
+
+
+
+function resolveApiFileUrl(url?: string): string {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  const baseURL = String(http.defaults.baseURL ?? '').replace(/\/$/, '');
+  if (url.startsWith('/')) return `${baseURL}${url}`;
+  return `${baseURL}/${url}`;
+}
+
+function isImageAttachment(url?: string, name?: string, mimeType?: string): boolean {
+  if (!url && !name && !mimeType) return false;
+  if (url?.startsWith('data:image')) return true;
+  if (mimeType?.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url ?? name ?? '');
+}
+
+function joinNonEmpty(parts: Array<string | false | null | undefined>): string {
+  return parts.filter((part): part is string => Boolean(part && part.trim())).join('\n\n');
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -445,40 +469,43 @@ export default function SalaDeAulaVirtualPage() {
     }
     setSavingAluno(true);
     try {
-      // Upload de arquivo como base64 se houver
-      let arquivoUrl = '';
-      let arquivoNome = '';
-      if (arquivoAtividade) {
-        arquivoNome = arquivoAtividade.name;
-        // Converte para base64 para envio
-        arquivoUrl = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = ev => resolve(ev.target?.result as string);
-          reader.readAsDataURL(arquivoAtividade);
-        });
-      }
+      const behaviorDescription = joinNonEmpty([
+        atividadeTitulo.trim() ? `Atividade: ${atividadeTitulo.trim()}` : undefined,
+        atividadeDescricao.trim() ? `Descrição da atividade: ${atividadeDescricao.trim()}` : undefined,
+        anotacaoAluno.trim() ? `Observação: ${anotacaoAluno.trim()}` : undefined,
+      ]);
 
-      await http.post('/development-observations', {
+      // Correção de produção: não converter arquivo para base64 no JSON.
+      // O registro textual é criado primeiro; se houver arquivo, ele é enviado depois via multipart.
+      const createRes = await http.post('/development-observations', {
         childId: alunoSelecionado.id,
         classroomId: turmaId,
         date: new Date().toISOString(),
         category: 'ATIVIDADE',
         learningProgress: avaliacaoAluno !== 'NAO_AVALIADO' ? avaliacaoAluno : undefined,
-        behaviorDescription: anotacaoAluno || undefined,
+        behaviorDescription: behaviorDescription || undefined,
         planningParticipation: participacaoAtividade || undefined,
         emotionalState: estadoEmocional || undefined,
         psychologicalNotes: notasPsicologicas || undefined,
         developmentAlerts: alertasDesenvolvimento || undefined,
-        tags: tagsSelecionadas.length > 0 ? tagsSelecionadas : undefined,
+        interests: tagsSelecionadas.length > 0 ? tagsSelecionadas.join(', ') : undefined,
         recommendations: recomendacoes || undefined,
-        // Campos extras para atividade
-        atividadeTitulo: atividadeTitulo || undefined,
-        atividadeDescricao: atividadeDescricao || undefined,
-        atividadeArquivoUrl: arquivoUrl || undefined,
-        atividadeArquivoNome: arquivoNome || undefined,
       });
 
-      toast.success(`Registro de ${alunoSelecionado.firstName} salvo com sucesso!`);
+      const observationId = createRes?.data?.id;
+      if (arquivoAtividade && observationId) {
+        try {
+          const formData = new FormData();
+          formData.append('file', arquivoAtividade);
+          await http.post(`/development-observations/${observationId}/attachment`, formData);
+          toast.success(`Registro de ${alunoSelecionado.firstName} salvo com anexo!`);
+        } catch (uploadErr: any) {
+          toast.error(uploadErr?.response?.data?.message || 'Registro salvo, mas houve erro ao enviar o anexo.');
+        }
+      } else {
+        toast.success(`Registro de ${alunoSelecionado.firstName} salvo com sucesso!`);
+      }
+
       // Limpa o formulário
       setAnotacaoAluno('');
       setAvaliacaoAluno('NAO_AVALIADO');
@@ -492,6 +519,7 @@ export default function SalaDeAulaVirtualPage() {
       setRecomendacoes('');
       setArquivoAtividade(null);
       setArquivoPreview('');
+      if (fileInputAlunoRef.current) fileInputAlunoRef.current.value = '';
       // Recarrega histórico
       carregarHistoricoAluno(alunoSelecionado.id);
       setAbaAluno('historico');
@@ -662,9 +690,9 @@ export default function SalaDeAulaVirtualPage() {
                       👤 Individual
                     </span>
                   </div>
-                  {item.atividadeArquivoUrl?.startsWith('data:image') && (
+                  {item.atividadeArquivoUrl && isImageAttachment(item.atividadeArquivoUrl, item.atividadeArquivoNome, item.atividadeArquivoMimeType) && (
                     <img
-                      src={item.atividadeArquivoUrl}
+                      src={resolveApiFileUrl(item.atividadeArquivoUrl)}
                       alt={item.atividadeArquivoNome ?? 'Registro'}
                       className="w-full max-h-64 object-cover"
                       loading="lazy"
@@ -1242,10 +1270,10 @@ export default function SalaDeAulaVirtualPage() {
                           )}
                           {obs.atividadeArquivoUrl && (
                             <div className="mt-3">
-                              {obs.atividadeArquivoUrl.startsWith('data:image') ? (
-                                <img src={obs.atividadeArquivoUrl} className="w-full max-h-48 object-contain rounded-lg border" alt="atividade" />
+                              {isImageAttachment(obs.atividadeArquivoUrl, obs.atividadeArquivoNome, obs.atividadeArquivoMimeType) ? (
+                                <img src={resolveApiFileUrl(obs.atividadeArquivoUrl)} className="w-full max-h-48 object-contain rounded-lg border" alt="atividade" />
                               ) : (
-                                <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
+                                <a href={resolveApiFileUrl(obs.atividadeArquivoUrl)} target="_blank" rel="noopener noreferrer"
                                   className="flex items-center gap-2 text-indigo-600 text-xs hover:underline">
                                   <Paperclip className="h-3.5 w-3.5" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
                                 </a>
@@ -1301,7 +1329,7 @@ export default function SalaDeAulaVirtualPage() {
                               </div>
                             )}
                             {obs.atividadeArquivoUrl && (
-                              <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
+                              <a href={resolveApiFileUrl(obs.atividadeArquivoUrl)} target="_blank" rel="noopener noreferrer"
                                 className="flex items-center gap-2 text-sm text-indigo-600 hover:underline">
                                 <Paperclip className="h-4 w-4" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
                               </a>
