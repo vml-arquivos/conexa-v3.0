@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { LoadingState } from '../components/ui/LoadingState';
 import http from '../api/http';
 import { BookOpen, Activity, FileText, ArrowLeft } from 'lucide-react';
+import { ChildQuickActions } from '../components/child/ChildQuickActions';
 import { toast } from 'sonner';
 
 /**
@@ -21,6 +22,7 @@ export default function TimelineCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(true);
+  const [child, setChild] = useState<any>(null);
   const [events, setEvents] = useState<Array<{
     id: string;
     type: 'DIARIO' | 'OBSERVACAO' | 'RDIC';
@@ -72,6 +74,7 @@ export default function TimelineCriancaPage() {
         const rdicData: any[] = Array.isArray(rdicRes?.data?.rdics)
           ? rdicRes.data.rdics
           : [];
+        setChild(rdicRes?.data?.child ?? null);
 
         const evts: Array<{
           id: string;
@@ -83,7 +86,7 @@ export default function TimelineCriancaPage() {
 
         // Processa eventos do diário
         diaryData.forEach((item) => {
-          const data = item.date ?? item.createdAt;
+          const data = item.eventDate ?? item.date ?? item.createdAt;
           if (!data) return;
           evts.push({
             id: item.id,
@@ -96,14 +99,14 @@ export default function TimelineCriancaPage() {
 
         // Processa observações de desenvolvimento
         obsData.forEach((item) => {
-          const data = item.data ?? item.date ?? item.createdAt;
+          const data = item.date ?? item.createdAt;
           if (!data) return;
           evts.push({
             id: item.id,
             type: 'OBSERVACAO',
             date: data,
-            title: (item.categoria ?? '').replace(/_/g, ' '),
-            description: item.descricao ?? '',
+            title: String(item.category ?? item.categoria ?? 'Observação').replace(/_/g, ' '),
+            description: item.behaviorDescription ?? item.descricao ?? item.description ?? '',
           });
         });
 
@@ -137,7 +140,7 @@ export default function TimelineCriancaPage() {
   return (
     <PageShell>
       {/* Cabeçalho com botão de voltar e título */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -148,6 +151,13 @@ export default function TimelineCriancaPage() {
         </Button>
         <h1 className="text-lg font-semibold text-gray-800">Linha do Tempo</h1>
       </div>
+
+      <ChildQuickActions
+        childId={childId}
+        classroomId={child?.turma?.id}
+        current="timeline"
+        className="mb-4"
+      />
       {loading ? (
         <LoadingState />
       ) : events.length === 0 ? (

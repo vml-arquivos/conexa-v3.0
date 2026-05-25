@@ -12,8 +12,9 @@ import { hasRole } from '../api/auth';
 import {
   Brain, Heart, AlertTriangle, CheckCircle, Clock,
   RotateCcw, Globe, FileText, BookOpen, ArrowLeft,
-  RefreshCw, Utensils, Activity, Calendar, User,
+  Utensils, Activity, Calendar, User,
 } from 'lucide-react';
+import { ChildQuickActions } from '../components/child/ChildQuickActions';
 
 interface RdicHistorico {
   id: string;
@@ -143,27 +144,14 @@ export default function CentralRdicCriancaPage() {
           <Button variant="outline" onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Button>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={carregar} className="flex items-center gap-2 text-sm">
-              <RefreshCw className="h-4 w-4" /> Atualizar
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate(`/app/crianca/${childId}/painel-analitico`)}
-              className="flex items-center gap-2 text-sm border-purple-200 text-purple-700 hover:bg-purple-50"
-            >
-              <Activity className="h-4 w-4" /> Painel Analítico
-            </Button>
-            {podeCriar && (
-              <Button
-                onClick={() => navigate(`/app/rdic-crianca?childId=${childId}&classroomId=${child?.turma?.id ?? ''}`)}
-                className="flex items-center gap-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                <Brain className="h-4 w-4" />
-                {rdicAtual ? 'Editar RDIC' : 'Criar RDIC'}
-              </Button>
-            )}
-          </div>
+          <ChildQuickActions
+            childId={childId}
+            classroomId={child?.turma?.id}
+            current="central"
+            canCreateRdic={podeCriar}
+            rdicLabel={rdicAtual ? 'Editar RDIC' : 'Criar RDIC'}
+            onRefresh={carregar}
+          />
         </div>
 
         <Card>

@@ -11,7 +11,8 @@ import { Button } from '../components/ui/button';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
-import { Brain, BookOpen, ArrowLeft, RefreshCw, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
+import { Brain, BookOpen, ArrowLeft, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChildQuickActions } from '../components/child/ChildQuickActions';
 
 const DIMENSOES = [
   { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: '#ec4899' },
@@ -154,12 +155,12 @@ export default function PainelAnaliticoCriancaPage() {
     <PageShell title={`Painel Analítico — ${nome}`} subtitle={`${central?.child?.turma?.name??'—'} · ${calcularIdade(central?.child?.dateOfBirth)}`}>
       <div className="space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <Button variant="outline" onClick={()=>navigate(`/app/crianca/${childId}/rdic-central`)} className="flex items-center gap-2 text-sm">
-            <ArrowLeft className="h-4 w-4"/>Central RDIC
-          </Button>
-          <Button variant="outline" onClick={()=>{carregarCentral();if(aba==='diario')carregarDiario();}} className="flex items-center gap-2 text-sm">
-            <RefreshCw className="h-4 w-4"/>Atualizar
-          </Button>
+          <ChildQuickActions
+            childId={childId}
+            classroomId={central?.child?.turma?.id}
+            current="painel"
+            onRefresh={() => { carregarCentral(); if (aba === 'diario') carregarDiario(); }}
+          />
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
