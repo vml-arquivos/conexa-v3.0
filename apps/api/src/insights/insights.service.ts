@@ -599,7 +599,7 @@ export class InsightsService {
     const userRoles = Array.isArray(user.roles) ? user.roles : [];
     const roleLevels = userRoles.map((role) => role.level);
     const hasCentralAccess = roleLevels.some((level) =>
-      [RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL].includes(level),
+      ([RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[]).includes(level),
     );
     const hasUnitAccess = roleLevels.includes(RoleLevel.UNIDADE);
     const hasTeacherAccess = roleLevels.includes(RoleLevel.PROFESSOR);
