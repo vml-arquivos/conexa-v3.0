@@ -575,18 +575,19 @@ export class DashboardsService {
       },
     });
 
-    // Indicadores de tags das observações dos últimos 30 dias
+    // Indicadores simples das observações dos últimos 30 dias.
+    // Usa apenas campos existentes em DevelopmentObservation (schema atual não possui tags neste model).
     let tagIndicadores: Record<string, number> = {};
     try {
       const obsRecentes = await this.prisma.developmentObservation.findMany({
         where: { classroomId, date: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
-        select: { tags: true },
+        select: { category: true, developmentAlerts: true, recommendations: true },
       });
       for (const obs of obsRecentes) {
-        const tags = Array.isArray(obs.tags) ? obs.tags as string[] : [];
-        for (const tag of tags) {
-          tagIndicadores[tag] = (tagIndicadores[tag] || 0) + 1;
-        }
+        const categoria = obs.category || 'GERAL';
+        tagIndicadores[`categoria:${categoria}`] = (tagIndicadores[`categoria:${categoria}`] || 0) + 1;
+        if (obs.developmentAlerts) tagIndicadores['alerta:desenvolvimento'] = (tagIndicadores['alerta:desenvolvimento'] || 0) + 1;
+        if (obs.recommendations) tagIndicadores['recomendacao:desenvolvimento'] = (tagIndicadores['recomendacao:desenvolvimento'] || 0) + 1;
       }
     } catch { /* tabela pode não existir ainda */ }
 

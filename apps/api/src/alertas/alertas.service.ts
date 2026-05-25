@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { SeveridadeAlerta, TipoAlerta } from '@prisma/client';
 
 @Injectable()
 export class AlertasService {
@@ -10,11 +11,17 @@ export class AlertasService {
 
   /**
    * Roda todo dia às 6h de segunda a sexta — analisa faltas dos últimos 30 dias
-   * e gera alertas de evasão por criança
+   * e gera alertas operacionais por criança.
+   *
+   * Correção aplicada:
+   * - usa modelos existentes no schema.prisma: Attendance e AlertaOperacional;
+   * - não usa alertaAluno nem childProfileStats, que não existem no schema atual;
+   * - não altera matriz, plano de aula, diário, RDIC ou dados históricos.
    */
-  @Cron('0 6 * * 1-5') // 06:00 de segunda a sexta
+  @Cron('0 6 * * 1-5')
   async analisarFaltas() {
-    this.logger.log('CronJob: analisando faltas para alertas de evasão...');
+    this.logger.log('CronJob: analisando faltas para alertas operacionais...');
+
     try {
       const matriculas = await this.prisma.enrollment.findMany({
         where: { status: 'ATIVA' },
@@ -29,32 +36,31 @@ export class AlertasService {
       trintaDiasAtras.setDate(hoje.getDate() - 30);
 
       for (const matricula of matriculas) {
-        const childId       = matricula.childId;
-        const classroomId   = matricula.classroomId;
-        const unitId        = matricula.classroom.unitId;
+        const childId = matricula.childId;
+        const classroomId = matricula.classroomId;
+        const unitId = matricula.classroom.unitId;
         const mantenedoraId = matricula.classroom.unit.mantenedoraId;
 
-        const registros = await (this.prisma as any).attendance.findMany({
+        const registros = await this.prisma.attendance.findMany({
           where: {
             childId,
             classroomId,
             date: { gte: trintaDiasAtras, lte: hoje },
           },
           orderBy: { date: 'desc' },
-        }).catch(() => []);
+        });
 
         if (registros.length === 0) continue;
 
-        const ausencias = registros.filter((r: any) => r.status === 'AUSENTE');
-        const presentes = registros.filter((r: any) => r.status === 'PRESENTE');
+        const ausencias = registros.filter((r) => r.status === 'AUSENTE');
+        const presentes = registros.filter((r) => r.status === 'PRESENTE');
         const totalDias = registros.length;
         const taxaFalta = totalDias > 0 ? ausencias.length / totalDias : 0;
 
-        // Detectar faltas consecutivas (3 ou mais)
         let consecutivas = 0;
         let maxConsec = 0;
         for (const r of registros) {
-          if ((r as any).status === 'AUSENTE') {
+          if (r.status === 'AUSENTE') {
             consecutivas++;
             if (consecutivas > maxConsec) maxConsec = consecutivas;
           } else {
@@ -63,142 +69,108 @@ export class AlertasService {
         }
 
         if (maxConsec >= 3) {
-          await this.upsertAlerta({
+          await this.upsertAlertaOperacional({
             childId,
             classroomId,
             unitId,
             mantenedoraId,
-            tipo: 'FALTAS_CONSECUTIVAS',
+            tipo: TipoAlerta.FALTA_CONSECUTIVA,
+            severidade: maxConsec >= 5 ? SeveridadeAlerta.ALTA : SeveridadeAlerta.MEDIA,
             titulo: `${matricula.child.firstName} — ${maxConsec} faltas consecutivas`,
             descricao: `A criança ${matricula.child.firstName} ${matricula.child.lastName} acumulou ${maxConsec} faltas consecutivas. Verificar com a família.`,
-            dados: { maxConsec, totalFaltas: ausencias.length, totalDias },
+            metadados: { regra: 'FALTAS_CONSECUTIVAS', maxConsec, totalFaltas: ausencias.length, totalDias },
           });
         }
 
         if (taxaFalta >= 0.25 && ausencias.length >= 5) {
-          await this.upsertAlerta({
+          await this.upsertAlertaOperacional({
             childId,
             classroomId,
             unitId,
             mantenedoraId,
-            tipo: 'FALTAS_FREQUENTES',
+            tipo: TipoAlerta.OUTRO,
+            severidade: taxaFalta >= 0.4 ? SeveridadeAlerta.ALTA : SeveridadeAlerta.MEDIA,
             titulo: `${matricula.child.firstName} — ${Math.round(taxaFalta * 100)}% de ausências`,
             descricao: `${ausencias.length} faltas nos últimos 30 dias (${Math.round(taxaFalta * 100)}%). Risco de evasão.`,
-            dados: { taxaFalta, ausencias: ausencias.length, presentes: presentes.length, totalDias },
+            metadados: {
+              regra: 'FALTAS_FREQUENTES',
+              taxaFalta,
+              ausencias: ausencias.length,
+              presentes: presentes.length,
+              totalDias,
+              ultimaPresenca: presentes[0]?.date ?? null,
+            },
           });
         }
-
-        await this.prisma.childProfileStats.upsert({
-          where: { childId },
-          create: {
-            childId,
-            unitId,
-            mantenedoraId,
-            totalFaltas: ausencias.length,
-            faltasUltimos30Dias: ausencias.length,
-            faltasConsecutivas: maxConsec,
-            ultimaPresenca: (presentes[0] as any)?.date ?? null,
-          },
-          update: {
-            totalFaltas: ausencias.length,
-            faltasUltimos30Dias: ausencias.length,
-            faltasConsecutivas: maxConsec,
-            ultimaPresenca: (presentes[0] as any)?.date ?? undefined,
-          },
-        }).catch(() => {});
       }
 
       this.logger.log('CronJob faltas concluído.');
     } catch (err) {
-      this.logger.error('Erro no CronJob de faltas:', err);
+      this.logger.error('Erro no CronJob de faltas:', err as any);
     }
   }
 
   /**
-   * Roda todo dia às 6h30 de segunda a sexta — analisa padrões de microgestos
+   * Mantido como ponto de extensão, mas sem acesso a modelos inexistentes.
+   * O schema atual não possui microgestoRegistro/childProfileStats; portanto
+   * esta rotina não executa gravações até existir modelo oficial ou análise via DiaryEvent.
    */
   @Cron('30 6 * * 1-5')
   async analisarMicrogestos() {
-    this.logger.log('CronJob: analisando padrões de microgestos...');
-    try {
-      const seteDiasAtras = new Date();
-      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
-
-      const alertasNivel = await this.prisma.microgestoRegistro.groupBy({
-        by: ['childId', 'classroomId', 'categoria'],
-        where: {
-          nivel: 'REQUER_ATENCAO',
-          data: { gte: seteDiasAtras },
-        },
-        _count: { id: true },
-        having: { id: { _count: { gte: 3 } } },
-      }).catch(() => []);
-
-      for (const item of alertasNivel) {
-        const classroom = await this.prisma.classroom.findUnique({
-          where: { id: item.classroomId },
-          include: { unit: { select: { mantenedoraId: true } } },
-        }).catch(() => null);
-        if (!classroom) continue;
-
-        const child = await this.prisma.child.findUnique({
-          where: { id: item.childId },
-          select: { firstName: true, lastName: true },
-        }).catch(() => null);
-        if (!child) continue;
-
-        await this.upsertAlerta({
-          childId: item.childId,
-          classroomId: item.classroomId,
-          unitId: classroom.unitId,
-          mantenedoraId: classroom.unit.mantenedoraId,
-          tipo: 'PADRAO_COMPORTAMENTO_NEGATIVO',
-          titulo: `${child.firstName} — Padrão de atenção em ${item.categoria}`,
-          descricao: `${item._count.id} registros "Requer Atenção" na área ${item.categoria} nos últimos 7 dias.`,
-          dados: { categoria: item.categoria, count: item._count.id },
-        });
-      }
-
-      this.logger.log('CronJob microgestos concluído.');
-    } catch (err) {
-      this.logger.error('Erro no CronJob de microgestos:', err);
-    }
+    this.logger.log('CronJob microgestos ignorado: schema atual não possui modelo microgestoRegistro.');
   }
 
-  private async upsertAlerta(params: {
+  private async upsertAlertaOperacional(params: {
     childId: string;
     classroomId: string;
     unitId: string;
     mantenedoraId: string;
-    tipo: string;
+    tipo: TipoAlerta;
+    severidade: SeveridadeAlerta;
     titulo: string;
     descricao: string;
-    dados: Record<string, any>;
+    metadados: Record<string, any>;
   }) {
-    const existente = await this.prisma.alertaAluno.findFirst({
+    const regra = String(params.metadados?.regra ?? params.tipo);
+
+    const existente = await this.prisma.alertaOperacional.findFirst({
       where: {
         childId: params.childId,
-        tipo: params.tipo as any,
-        status: 'ATIVO',
+        tipo: params.tipo,
+        resolvido: false,
+        metadados: {
+          path: ['regra'],
+          equals: regra,
+        },
       },
     });
+
     if (existente) {
-      await this.prisma.alertaAluno.update({
+      await this.prisma.alertaOperacional.update({
         where: { id: existente.id },
-        data: { titulo: params.titulo, descricao: params.descricao, dados: params.dados },
+        data: {
+          unitId: params.unitId,
+          classroomId: params.classroomId,
+          severidade: params.severidade,
+          titulo: params.titulo,
+          descricao: params.descricao,
+          metadados: params.metadados,
+        },
       });
       return;
     }
-    await this.prisma.alertaAluno.create({
+
+    await this.prisma.alertaOperacional.create({
       data: {
         childId: params.childId,
         classroomId: params.classroomId,
         unitId: params.unitId,
         mantenedoraId: params.mantenedoraId,
-        tipo: params.tipo as any,
+        tipo: params.tipo,
+        severidade: params.severidade,
         titulo: params.titulo,
         descricao: params.descricao,
-        dados: params.dados,
+        metadados: params.metadados,
       },
     });
   }
