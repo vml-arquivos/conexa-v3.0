@@ -12,7 +12,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
 import { Brain, BookOpen, ArrowLeft, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
-import { ChildQuickActions } from '../components/child/ChildQuickActions';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
 
 const DIMENSOES = [
   { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: '#ec4899' },

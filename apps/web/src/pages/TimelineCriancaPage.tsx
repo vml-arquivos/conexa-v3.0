@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button';
 import { LoadingState } from '../components/ui/LoadingState';
 import http from '../api/http';
 import { BookOpen, Activity, FileText, ArrowLeft } from 'lucide-react';
-import { ChildQuickActions } from '../components/child/ChildQuickActions';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
 import { toast } from 'sonner';
 
 /**

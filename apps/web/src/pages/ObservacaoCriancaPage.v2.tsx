@@ -8,7 +8,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import http from '../api/http';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
-import { ChildQuickActions } from '../components/child/ChildQuickActions';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
 
 /**
  * ObservacaoCriancaPage — tela de registro e listagem de observações de desenvolvimento

@@ -14,7 +14,7 @@ import {
   RotateCcw, Globe, FileText, BookOpen, ArrowLeft,
   Utensils, Activity, Calendar, User,
 } from 'lucide-react';
-import { ChildQuickActions } from '../components/child/ChildQuickActions';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
 
 interface RdicHistorico {
   id: string;
