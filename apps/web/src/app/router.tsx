@@ -47,7 +47,7 @@ import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
 import DesenvolvimentoInfantilPage from '../pages/DesenvolvimentoInfantilPage';
-// Timeline da criança
+// Timeline e observações da criança
 import TimelineCriancaPage from '../pages/TimelineCriancaPage';
 import ObservacaoCriancaPage from '../pages/ObservacaoCriancaPage';
 // ─── Módulo de Planejamento — Oficina e Painel de Planejamentos ─────────────────────
@@ -642,7 +642,6 @@ export const router = createBrowserRouter([
       { path:'crianca/:childId/painel-analitico', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelAnaliticoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       // Nova rota: linha do tempo consolidada da criança
       { path:'crianca/:childId/timeline', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><TimelineCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-      // Observações de desenvolvimento da criança (usa a página existente, sem duplicar componente/pasta)
       { path:'crianca/:childId/observacoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><ObservacaoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'inteligencia', element:(<RoleProtectedRoute allowedRoles={['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelInteligenciaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
     ],

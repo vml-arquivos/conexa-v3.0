@@ -8,6 +8,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import http from '../api/http';
 import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
 
 /**
  * ObservacaoCriancaPage — tela de registro e listagem de observações de desenvolvimento
@@ -166,6 +167,13 @@ export default function ObservacaoCriancaPage() {
           )}
         </div>
       )}
+
+      <ChildQuickActions
+        childId={childId}
+        classroomId={child?.turma?.id ?? child?.classroom?.id ?? child?.classroomId ?? child?.activeEnrollment?.classroomId}
+        current="observacoes"
+        className="mb-4"
+      />
 
       {/* Formulário de nova observação */}
       <Card className="mb-6">
