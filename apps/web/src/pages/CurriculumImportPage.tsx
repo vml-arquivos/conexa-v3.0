@@ -29,7 +29,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { http } from '../api/http';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 // ── Modelo CSV para download ──────────────────────────────────────────────────
 const CSV_MODELO = `data,campo_experiencia,objetivo_bncc,codigo_bncc,objetivo_curriculo,intencionalidade,exemplo_atividade
