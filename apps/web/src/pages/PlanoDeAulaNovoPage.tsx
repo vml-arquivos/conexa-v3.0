@@ -22,6 +22,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+// Tarefa 3.1 — IA no planejamento
+import { GeradorAtividadeIA } from '../components/planejamento/GeradorAtividadeIA';
 import {
   Save,
   Send,
@@ -1105,6 +1107,29 @@ export default function PlanoDeAulaNovoPage() {
                           Planejamento do Professor
                         </p>
                       </div>
+
+                      {/* Tarefa 3.1 — Sugestão de atividade via IA (opcional e editável) */}
+                      {!bloqueado && day.objectives.length > 0 && (() => {
+                        const obj = day.objectives[0];
+                        return (
+                          <GeradorAtividadeIA
+                            campoDeExperiencia={obj.campoExperiencia}
+                            objetivoBNCC={obj.objetivoBNCC}
+                            objetivoCurriculo={obj.objetivoCurriculoDF}
+                            onAtividadeGerada={(atividade) => {
+                              // Preenche o campo de atividade como rascunho editável
+                              // O professor sempre revisa antes de salvar
+                              if (!day.teacher.atividade.trim()) {
+                                updateTeacherField(day.date, 'atividade', atividade.descricao ?? '');
+                                if (atividade.materiais?.length) {
+                                  updateTeacherField(day.date, 'recursos', atividade.materiais.join(', '));
+                                }
+                              }
+                            }}
+                          />
+                        );
+                      })()}
+
                       <div>
                         <Label>
                           Desenvolvimento da Atividade <span className="text-red-500">*</span>

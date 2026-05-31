@@ -52,6 +52,7 @@ import TimelineCriancaPage from '../pages/TimelineCriancaPage';
 import ObservacaoCriancaPage from '../pages/ObservacaoCriancaPage';
 // ─── Módulo de Planejamento — Oficina e Painel de Planejamentos ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
+import { CurriculumImportPage } from '../pages/CurriculumImportPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 // ─── Módulo da Secretaria ────────────────────────────────────────────────────
 import SecretariaPage from '../pages/SecretariaPage';
@@ -108,6 +109,12 @@ export const router = createBrowserRouter([
       {
         path: 'matrices',
         element: <MatricesPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        // Tarefa 3.3 — Importação de Matriz Curricular via CSV
+        path: 'curriculum-import',
+        element: <CurriculumImportPage />,
         errorElement: <RouteErrorBoundary />,
       },
       {

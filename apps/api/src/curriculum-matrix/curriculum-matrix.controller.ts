@@ -65,4 +65,22 @@ export class CurriculumMatrixController {
   getImportStatus(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.curriculumMatrixService.getImportStatus(id, user);
   }
+
+  /**
+   * Tarefa 3.4 — Ativar ou desativar uma matriz curricular
+   *
+   * PATCH /curriculum-matrices/:id/activate
+   * Body: { isActive: boolean }
+   *
+   * RBAC: MANTENEDORA, STAFF_CENTRAL, DEVELOPER
+   */
+  @Patch(':id/activate')
+  @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
+  activate(
+    @Param('id') id: string,
+    @Body('isActive') isActive: boolean,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.curriculumMatrixService.activate(id, isActive, user);
+  }
 }

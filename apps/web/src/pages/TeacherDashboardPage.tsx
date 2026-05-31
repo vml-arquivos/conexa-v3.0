@@ -947,6 +947,44 @@ export default function TeacherDashboardPage() {
                 </div>
               </div>
 
+              {/* Tarefa 3.5 — Indicador de crianças com objetivos pendentes (sem RDIC no trimestre atual) */}
+              {!loadingRdics && alunos.length > 0 && (() => {
+                const trimestreAtual = Math.ceil((new Date().getMonth() + 1) / 4) || 1;
+                const semRdicTrimestre = alunos.filter(a => {
+                  const info = rdicsMap[a.id];
+                  if (!info || info.count === 0) return true;
+                  // Verifica se o último período é do trimestre atual
+                  const periodo = info.ultimoPeriodo?.toLowerCase() ?? '';
+                  const temTrimAtual = periodo.includes(`${trimestreAtual}º`) || periodo.includes(`${trimestreAtual}o`);
+                  return !temTrimAtual;
+                });
+                if (semRdicTrimestre.length === 0) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-800">
+                          {semRdicTrimestre.length} {semRdicTrimestre.length === 1 ? 'criança' : 'crianças'} sem RDIC no {trimestreAtual}º trimestre
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          {semRdicTrimestre.slice(0, 3).map(a => a.firstName).join(', ')}
+                          {semRdicTrimestre.length > 3 ? ` e mais ${semRdicTrimestre.length - 3}` : ''}
+                        </p>
+                        <button
+                          onClick={() => navigate('/app/rdic-crianca')}
+                          className="mt-2 text-xs text-amber-700 underline hover:text-amber-900"
+                        >
+                          Registrar agora →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Barra de cobertura geral */}
               {alunos.length > 0 && (
                 <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">

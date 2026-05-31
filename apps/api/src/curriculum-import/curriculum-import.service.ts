@@ -392,3 +392,196 @@ export class CurriculumImportService {
     }
   }
 }
+
+  // ─── Tarefa 3.3 — Importação via CSV ────────────────────────────────────────
+
+  /**
+   * Importa uma matriz curricular a partir de um CSV em memória (Buffer).
+   *
+   * Colunas esperadas (case-insensitive, separador vírgula):
+   *   data (YYYY-MM-DD), campo_experiencia, objetivo_bncc, codigo_bncc,
+   *   objetivo_curriculo, intencionalidade (opcional), exemplo_atividade (opcional)
+   *
+   * Cria a CurriculumMatrix se não existir, depois faz upsert das entries.
+   * Retorna relatório: { importados, erros, matrixId }
+   */
+  async importCsv(
+    csvBuffer: Buffer,
+    params: {
+      mantenedoraId: string;
+      name: string;
+      year: number;
+      segment: string;
+      version: number;
+    },
+    user: JwtPayload,
+  ): Promise<{ matrixId: string; importados: number; erros: string[] }> {
+    this.validatePermission(user);
+
+    const { mantenedoraId, name, year, segment, version } = params;
+
+    // Parse CSV em memória
+    const text = csvBuffer.toString('utf-8');
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (lines.length < 2) {
+      throw new BadRequestException('CSV vazio ou sem linhas de dados');
+    }
+
+    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/[^a-z_]/g, ''));
+
+    // Validar colunas obrigatórias
+    const obrigatorias = ['data', 'campo_experiencia', 'objetivo_bncc', 'objetivo_curriculo'];
+    const faltando = obrigatorias.filter((c) => !headers.includes(c));
+    if (faltando.length > 0) {
+      throw new BadRequestException(
+        `Colunas obrigatórias ausentes no CSV: ${faltando.join(', ')}`,
+      );
+    }
+
+    // Mapeamento de campo_experiencia string → enum
+    const CAMPO_MAP: Record<string, string> = {
+      'o eu o outro e o nos': 'O_EU_O_OUTRO_E_O_NOS',
+      'corpo gestos e movimentos': 'CORPO_GESTOS_E_MOVIMENTOS',
+      'tracos sons cores e formas': 'TRACOS_SONS_CORES_E_FORMAS',
+      'escuta fala pensamento e imaginacao': 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+      'espacos tempos quantidades relacoes e transformacoes':
+        'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+      // Abreviações comuns
+      'eu outro nos': 'O_EU_O_OUTRO_E_O_NOS',
+      'corpo gestos': 'CORPO_GESTOS_E_MOVIMENTOS',
+      'tracos sons': 'TRACOS_SONS_CORES_E_FORMAS',
+      'escuta fala': 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+      'espacos tempos': 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+    };
+
+    function normalizarCampo(raw: string): string | null {
+      const key = raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z ]/g, '')
+        .trim();
+      // Tentar match exato
+      if (CAMPO_MAP[key]) return CAMPO_MAP[key];
+      // Tentar match parcial
+      for (const [k, v] of Object.entries(CAMPO_MAP)) {
+        if (key.includes(k) || k.includes(key)) return v;
+      }
+      // Tentar enum direto
+      const enumValues = [
+        'O_EU_O_OUTRO_E_O_NOS',
+        'CORPO_GESTOS_E_MOVIMENTOS',
+        'TRACOS_SONS_CORES_E_FORMAS',
+        'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+        'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+      ];
+      const upper = raw.toUpperCase().replace(/[^A-Z_]/g, '');
+      if (enumValues.includes(upper)) return upper;
+      return null;
+    }
+
+    // Criar ou localizar a CurriculumMatrix
+    let matrix = await this.prisma.curriculumMatrix.findFirst({
+      where: { mantenedoraId, year, segment, version },
+    });
+
+    if (!matrix) {
+      matrix = await this.prisma.curriculumMatrix.create({
+        data: {
+          mantenedoraId,
+          name,
+          year,
+          segment,
+          version,
+          isActive: true,
+          createdBy: user.sub,
+        },
+      });
+    }
+
+    let importados = 0;
+    const erros: string[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] ?? ''; });
+
+      const dataStr = row['data'];
+      const campoRaw = row['campo_experiencia'];
+      const objetivoBNCC = row['objetivo_bncc'];
+      const objetivoCurriculo = row['objetivo_curriculo'];
+
+      if (!dataStr || !campoRaw || !objetivoBNCC || !objetivoCurriculo) {
+        erros.push(`Linha ${i + 1}: campos obrigatórios ausentes`);
+        continue;
+      }
+
+      // Validar data
+      const dateObj = new Date(`${dataStr}T12:00:00-03:00`);
+      if (isNaN(dateObj.getTime())) {
+        erros.push(`Linha ${i + 1}: data inválida "${dataStr}"`);
+        continue;
+      }
+
+      // Mapear campo de experiência
+      const campoEnum = normalizarCampo(campoRaw);
+      if (!campoEnum) {
+        erros.push(`Linha ${i + 1}: campo_experiencia não reconhecido "${campoRaw}"`);
+        continue;
+      }
+
+      // Calcular weekOfYear e dayOfWeek
+      const startOfYear = new Date(dateObj.getFullYear(), 0, 1);
+      const weekOfYear = Math.ceil(
+        ((dateObj.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7,
+      );
+      const dayOfWeek = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
+
+      try {
+        const existing = await this.prisma.curriculumMatrixEntry.findFirst({
+          where: {
+            matrixId: matrix.id,
+            date: { gte: new Date(`${dataStr}T00:00:00-03:00`), lte: new Date(`${dataStr}T23:59:59-03:00`) },
+          },
+        });
+
+        if (existing) {
+          await this.prisma.curriculumMatrixEntry.update({
+            where: { id: existing.id },
+            data: {
+              campoDeExperiencia: campoEnum as any,
+              objetivoBNCC,
+              objetivoBNCCCode: row['codigo_bncc'] || null,
+              objetivoCurriculo,
+              intencionalidade: row['intencionalidade'] || null,
+              exemploAtividade: row['exemplo_atividade'] || null,
+            },
+          });
+        } else {
+          await this.prisma.curriculumMatrixEntry.create({
+            data: {
+              matrixId: matrix.id,
+              date: dateObj,
+              weekOfYear,
+              dayOfWeek,
+              campoDeExperiencia: campoEnum as any,
+              objetivoBNCC,
+              objetivoBNCCCode: row['codigo_bncc'] || null,
+              objetivoCurriculo,
+              intencionalidade: row['intencionalidade'] || null,
+              exemploAtividade: row['exemplo_atividade'] || null,
+            },
+          });
+        }
+        importados++;
+      } catch (err: any) {
+        erros.push(`Linha ${i + 1}: ${err?.message ?? 'erro desconhecido'}`);
+      }
+    }
+
+    // Invalidar cache
+    await this.matrixCacheInvalidation.bump(mantenedoraId);
+
+    return { matrixId: matrix.id, importados, erros };
+  }
