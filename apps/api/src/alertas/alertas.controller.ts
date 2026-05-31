@@ -8,8 +8,14 @@
  *   - unread (opcional, boolean): se true, retorna apenas não resolvidos
  *   - limit (opcional, default 50)
  *
+ * PATCH /alertas/:id/resolver
+ *   - Marca um alerta como resolvido
+ *
  * Acesso: PROFESSOR, UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
  * O professor só vê alertas da sua turma (via classroomId ou turma vinculada).
+ *
+ * fix: usar user.sub (não user.userId), user.roles[0].level (não user.roleLevel),
+ *      isActive (não active) no ClassroomTeacher, remover include.child inexistente.
  */
 import {
   Controller,
@@ -56,13 +62,10 @@ export class AlertasController {
     const take = Math.min(Number(limit ?? 50), 200);
     const apenasNaoResolvidos = unread !== 'false';
 
-    // Determinar o mantenedoraId do usuário para escopo de segurança
-    const mantenedoraId: string | undefined =
-      (user as any).mantenedoraId ?? undefined;
-
     const where: Record<string, any> = {
       ...(apenasNaoResolvidos ? { resolvido: false } : {}),
-      ...(mantenedoraId ? { mantenedoraId } : {}),
+      // Escopo de segurança: restringir ao mantenedoraId do usuário
+      mantenedoraId: user.mantenedoraId,
     };
 
     // Filtros opcionais
@@ -70,14 +73,13 @@ export class AlertasController {
     if (classroomId) where.classroomId = classroomId;
 
     // Professor: restringir à turma vinculada se não informou classroomId
-    if (
-      user.roleLevel === RoleLevel.PROFESSOR &&
-      !classroomId &&
-      !unitId
-    ) {
-      // Buscar turma do professor
+    // user.roles é um array; verificar se algum role tem level PROFESSOR
+    const isProfessor = user.roles?.some(
+      (r) => r.level === RoleLevel.PROFESSOR,
+    );
+    if (isProfessor && !classroomId && !unitId) {
       const vinculo = await this.prisma.classroomTeacher.findFirst({
-        where: { teacherId: user.userId, active: true },
+        where: { teacherId: user.sub, isActive: true },
         select: { classroomId: true },
       });
       if (vinculo) where.classroomId = vinculo.classroomId;
@@ -90,16 +92,9 @@ export class AlertasController {
         { criadoEm: 'desc' },
       ],
       take,
-      include: {
-        // Incluir dados da criança para exibição no dashboard
-        child: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
+      // AlertaOperacional não tem relação direta com Child no schema —
+      // childId é apenas uma string. Retornamos o childId para o frontend
+      // buscar o nome se necessário.
     });
 
     // Resumo para os cards do dashboard
@@ -137,7 +132,7 @@ export class AlertasController {
       where: { id },
       data: {
         resolvido: true,
-        resolvidoPorId: user.userId,
+        resolvidoPorId: user.sub,
         resolvidoEm: new Date(),
       },
     });
