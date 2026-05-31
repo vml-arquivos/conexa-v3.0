@@ -21,31 +21,31 @@ const CLASSROOM_CODE = 'MATERNAL-II-PILOTO';
 
 // ── Mapeamento de RoleType → RoleLevel ───────────────────────────────────────
 const ROLE_TYPE_TO_LEVEL = {
-  DEVELOPER: 'DEVELOPER',
-  MANTENEDORA_ADMIN: 'MANTENEDORA',
-  MANTENEDORA_FINANCEIRO: 'MANTENEDORA',
-  STAFF_CENTRAL_PEDAGOGICO: 'STAFF_CENTRAL',
-  STAFF_CENTRAL_PSICOLOGIA: 'STAFF_CENTRAL',
-  UNIDADE_DIRETOR: 'UNIDADE',
+  DEVELOPER:                      'DEVELOPER',
+  MANTENEDORA_ADMIN:              'MANTENEDORA',
+  MANTENEDORA_FINANCEIRO:         'MANTENEDORA',
+  STAFF_CENTRAL_PEDAGOGICO:       'STAFF_CENTRAL',
+  STAFF_CENTRAL_PSICOLOGIA:       'STAFF_CENTRAL',
+  UNIDADE_DIRETOR:                'UNIDADE',
   UNIDADE_COORDENADOR_PEDAGOGICO: 'UNIDADE',
-  UNIDADE_ADMINISTRATIVO: 'UNIDADE',
-  UNIDADE_NUTRICIONISTA: 'UNIDADE',
-  PROFESSOR: 'PROFESSOR',
-  PROFESSOR_AUXILIAR: 'PROFESSOR',
+  UNIDADE_ADMINISTRATIVO:         'UNIDADE',
+  UNIDADE_NUTRICIONISTA:          'UNIDADE',
+  PROFESSOR:                      'PROFESSOR',
+  PROFESSOR_AUXILIAR:             'PROFESSOR',
 };
 
 const ROLE_TYPE_NAMES = {
-  DEVELOPER: 'Desenvolvedor',
-  MANTENEDORA_ADMIN: 'Administrador da Mantenedora',
-  MANTENEDORA_FINANCEIRO: 'Financeiro da Mantenedora',
-  STAFF_CENTRAL_PEDAGOGICO: 'Coordenação Pedagógica Central',
-  STAFF_CENTRAL_PSICOLOGIA: 'Psicologia Central',
-  UNIDADE_DIRETOR: 'Diretor de Unidade',
+  DEVELOPER:                      'Desenvolvedor',
+  MANTENEDORA_ADMIN:              'Administrador da Mantenedora',
+  MANTENEDORA_FINANCEIRO:         'Financeiro da Mantenedora',
+  STAFF_CENTRAL_PEDAGOGICO:       'Coordenação Pedagógica Central',
+  STAFF_CENTRAL_PSICOLOGIA:       'Psicologia Central',
+  UNIDADE_DIRETOR:                'Diretor de Unidade',
   UNIDADE_COORDENADOR_PEDAGOGICO: 'Coordenador Pedagógico de Unidade',
-  UNIDADE_ADMINISTRATIVO: 'Administrativo de Unidade',
-  UNIDADE_NUTRICIONISTA: 'Nutricionista de Unidade',
-  PROFESSOR: 'Professor',
-  PROFESSOR_AUXILIAR: 'Professor Auxiliar',
+  UNIDADE_ADMINISTRATIVO:         'Administrativo de Unidade',
+  UNIDADE_NUTRICIONISTA:          'Nutricionista de Unidade',
+  PROFESSOR:                      'Professor',
+  PROFESSOR_AUXILIAR:             'Professor Auxiliar',
 };
 
 // ── Usuários de teste ─────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const USUARIOS_TESTE_DEF = [
 // ── ensureRoles (inline) ──────────────────────────────────────────────────────
 async function ensureRoles(mantenedoraId) {
   console.log(`🔧 Garantindo roles para mantenedora ${mantenedoraId}...`);
-  const roleMap = new Map();
+  const roleMap = new Map(); // roleType → { id, level }
   let created = 0;
   let existing = 0;
 
@@ -75,7 +75,7 @@ async function ensureRoles(mantenedoraId) {
       update: { level, name, isActive: true },
     });
 
-    roleMap.set(type, role.id);
+    roleMap.set(type, { id: role.id, level });
     const isNew = role.createdAt.getTime() === role.updatedAt.getTime();
     if (isNew) { created++; console.log(`  ✅ Criado: ${type} (${role.id})`); }
     else        { existing++; console.log(`  🔄 Já existe: ${type} (${role.id})`); }
@@ -94,14 +94,7 @@ async function main() {
   // 1. Garantir roles
   const roleMap = await ensureRoles(MANTENEDORA_ID);
 
-  // 2. Resolver usuários com roleId dinâmico
-  const usuariosResolvidos = USUARIOS_TESTE_DEF.map((u) => ({
-    ...u,
-    roleId: roleMap.get(u.roleType),
-    level:  ROLE_TYPE_TO_LEVEL[u.roleType],
-  }));
-
-  // 3. Garantir unidade de teste
+  // 2. Garantir unidade de teste
   await prisma.unit.upsert({
     where: { id: UNIT_ID_TESTE },
     update: {},
@@ -120,48 +113,59 @@ async function main() {
     },
   });
 
-  // 4. Criar/atualizar usuários de teste
+  // 3. Criar/atualizar usuários de teste
   console.log('\n── Usuários de teste ──');
   let profTeste = null;
-  for (const u of usuariosResolvidos) {
-    if (!u.roleId) {
+
+  for (const u of USUARIOS_TESTE_DEF) {
+    const roleInfo = roleMap.get(u.roleType);
+    if (!roleInfo) {
       console.log(`  ⚠️  Role não encontrado para ${u.email} (${u.roleType}) — pulando`);
       continue;
     }
+
+    // 3a. Criar/atualizar o User (sem roleId — a relação é via UserRole)
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: { roleId: u.roleId },
+      update: { status: 'ATIVO' },
       create: {
         email: u.email,
         password: senhaHash,
         firstName: u.firstName,
         lastName: u.lastName,
-        roleId: u.roleId,
         mantenedoraId: MANTENEDORA_ID,
-        isActive: true,
+        status: 'ATIVO',
       },
     });
-    // Garantir unitScope
-    await prisma.userUnitScope.upsert({
-      where: { userId_unitId: { userId: user.id, unitId: UNIT_ID_TESTE } },
-      update: {},
-      create: { userId: user.id, unitId: UNIT_ID_TESTE },
+
+    // 3b. Criar/atualizar o UserRole (vínculo user ↔ role com scopeLevel)
+    const userRole = await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: roleInfo.id } },
+      update: { scopeLevel: roleInfo.level, isActive: true },
+      create: { userId: user.id, roleId: roleInfo.id, scopeLevel: roleInfo.level, isActive: true },
     });
+
+    // 3c. Criar/atualizar o UserRoleUnitScope (escopo de unidade)
+    await prisma.userRoleUnitScope.upsert({
+      where: { userRoleId_unitId: { userRoleId: userRole.id, unitId: UNIT_ID_TESTE } },
+      update: {},
+      create: { userRoleId: userRole.id, unitId: UNIT_ID_TESTE },
+    });
+
     if (u.roleType === 'PROFESSOR') profTeste = user;
     console.log(`  ✅ ${u.email.padEnd(42)} → ${u.roleType}`);
   }
 
   if (!profTeste) {
-    console.log('  ⚠️  Usuário professor não encontrado — buscando...');
     profTeste = await prisma.user.findUnique({ where: { email: 'professor@testepiloto.com.br' } });
   }
 
   if (!profTeste) {
-    console.log('❌ Professor de teste não encontrado. Abortando criação de turma/alunos.');
+    console.log('❌ Professor de teste não encontrado. Abortando criação de turma.');
     return;
   }
 
-  // 5. Garantir turma
+  // 4. Garantir turma
   const classroom = await prisma.classroom.upsert({
     where: { unitId_code: { unitId: UNIT_ID_TESTE, code: CLASSROOM_CODE } },
     update: {},
@@ -176,7 +180,7 @@ async function main() {
   });
   console.log(`\n  ✅ Turma: ${classroom.name}`);
 
-  // 6. Vincular professor à turma
+  // 5. Vincular professor à turma
   await prisma.classroomTeacher.upsert({
     where: { classroomId_teacherId: { classroomId: classroom.id, teacherId: profTeste.id } },
     update: {},
