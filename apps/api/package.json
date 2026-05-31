@@ -27,7 +27,9 @@
     "seed:catalog": "node scripts/seed-catalog.js",
     "seed:alimentos": "node scripts/seed-alimentos.js",
     "seed:alimentos:reset": "node scripts/seed-alimentos.js --reset",
-    "seed:teste": "ts-node src/scripts/seed-turma-teste.ts"
+    "seed:teste": "ts-node src/scripts/seed-turma-teste.ts",
+    "typecheck": "tsc --noEmit",
+    "prepush": "npm run typecheck"
   },
   "repository": {
     "type": "git",
