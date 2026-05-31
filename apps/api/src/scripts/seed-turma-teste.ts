@@ -1,30 +1,26 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, RoleType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { ensureRoles } from './_ensure-roles';
 
 export {};
 
 const prisma = new PrismaClient();
-const UNIT_ID_TESTE   = 'unit-cepi-piloto-teste';
-const MANTENEDORA_ID  = 'mant-cocris-001';
-const CLASSROOM_CODE  = 'TURMA-TESTE-PILOTO';
-const ROLE_PROFESSOR_ID    = 'cmlw6nyjl00097yvu0gf3ecdn';
-const ROLE_COORDENADOR_ID  = 'cmlw6nyji00077yvuv2sxlsdq';
-const ROLE_DIRETOR_ID      = 'cmmebkutl000j10r9aoteojhf';
-const ROLE_NUTRICIONISTA_ID= 'cmmebm0ix000s10r9xauj2imk';
-// Role UNIDADE_ADMINISTRATIVO — criado dinamicamente no seed (upsert por type)
-const ROLE_ADMINISTRATIVO_ID_PLACEHOLDER = 'ROLE_ADMINISTRATIVO_PILOTO';
+const UNIT_ID_TESTE  = 'unit-cepi-piloto-teste';
+const MANTENEDORA_ID = 'mant-cocris-001';
+const CLASSROOM_CODE = 'TURMA-TESTE-PILOTO';
 
-// Usuários de teste para todos os perfis
-const USUARIOS_TESTE = [
-  { email: 'professor@testepiloto.com.br',     firstName: 'PROFESSORA',    lastName: 'PILOTO',         roleId: 'cmlw6nyjl00097yvu0gf3ecdn', level: 'PROFESSOR',     unitId: UNIT_ID_TESTE },
-  { email: 'coordenador@testepiloto.com.br',   firstName: 'COORDENADORA',  lastName: 'PILOTO',         roleId: 'cmlw6nyji00077yvuv2sxlsdq', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
-  { email: 'diretor@testepiloto.com.br',       firstName: 'DIRETORA',      lastName: 'PILOTO',         roleId: 'cmmebkutl000j10r9aoteojhf', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
-  { email: 'nutricionista@testepiloto.com.br', firstName: 'NUTRICIONISTA', lastName: 'PILOTO',         roleId: 'cmmebm0ix000s10r9xauj2imk', level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
-  // FIX 1.2: secretaria agora usa ROLE_ADMINISTRATIVO_ID_PLACEHOLDER — substituído dinamicamente no main()
-  { email: 'secretaria@testepiloto.com.br',    firstName: 'SECRETÁRIA',    lastName: 'PILOTO',         roleId: ROLE_ADMINISTRATIVO_ID_PLACEHOLDER, level: 'UNIDADE',       unitId: UNIT_ID_TESTE },
-  { email: 'coordgeral@testepiloto.com.br',    firstName: 'COORD. GERAL',  lastName: 'PILOTO',         roleId: 'cmlw6nyjg00057yvuepi3pj4x', level: 'STAFF_CENTRAL', unitId: UNIT_ID_TESTE },
-
-
+/**
+ * Usuários de teste — roleType em vez de roleId hardcoded.
+ * O roleId real é resolvido dinamicamente via ensureRoles() no main(),
+ * garantindo funcionamento em testepiloto, planopiloto e produção.
+ */
+const USUARIOS_TESTE_DEF = [
+  { email: 'professor@testepiloto.com.br',     firstName: 'PROFESSORA',    lastName: 'PILOTO',         roleType: RoleType.PROFESSOR,                       unitId: UNIT_ID_TESTE },
+  { email: 'coordenador@testepiloto.com.br',   firstName: 'COORDENADORA',  lastName: 'PILOTO',         roleType: RoleType.UNIDADE_COORDENADOR_PEDAGOGICO,  unitId: UNIT_ID_TESTE },
+  { email: 'diretor@testepiloto.com.br',       firstName: 'DIRETORA',      lastName: 'PILOTO',         roleType: RoleType.UNIDADE_DIRETOR,                 unitId: UNIT_ID_TESTE },
+  { email: 'nutricionista@testepiloto.com.br', firstName: 'NUTRICIONISTA', lastName: 'PILOTO',         roleType: RoleType.UNIDADE_NUTRICIONISTA,           unitId: UNIT_ID_TESTE },
+  { email: 'secretaria@testepiloto.com.br',    firstName: 'SECRETÁRIA',    lastName: 'PILOTO',         roleType: RoleType.UNIDADE_ADMINISTRATIVO,          unitId: UNIT_ID_TESTE },
+  { email: 'coordgeral@testepiloto.com.br',    firstName: 'COORD. GERAL',  lastName: 'PILOTO',         roleType: RoleType.STAFF_CENTRAL_PEDAGOGICO,        unitId: UNIT_ID_TESTE },
 ];
 
 const ALUNOS: any[] = [
@@ -553,27 +549,17 @@ async function main() {
   console.log('\n🧪 SEED — Turma de Teste Piloto\n');
   const senhaHash = await bcrypt.hash('Teste@123', 10);
 
-  // ── 0.1 Garantir que o role UNIDADE_ADMINISTRATIVO existe para a mantenedora de teste ──
-  // FIX 1.2: secretaria@testepiloto.com.br precisa de type UNIDADE_ADMINISTRATIVO,
-  // não do role genérico de coordenador. Criamos (ou buscamos) o role aqui.
-  const roleAdministrativo = await prisma.role.upsert({
-    where: { mantenedoraId_type: { mantenedoraId: MANTENEDORA_ID, type: 'UNIDADE_ADMINISTRATIVO' as any } },
-    update: {},
-    create: {
-      mantenedoraId: MANTENEDORA_ID,
-      name: 'Administrativo de Unidade',
-      level: 'UNIDADE' as any,
-      type: 'UNIDADE_ADMINISTRATIVO' as any,
-      isActive: true,
-    },
+  // ── 0.1 Garantir que TODOS os roles existem para a mantenedora de teste ──
+  // Usa ensureRoles() — idempotente, funciona em testepiloto, planopiloto e produção.
+  // Elimina IDs hardcoded que causavam falha silenciosa em outros ambientes.
+  const roleMap = await ensureRoles(prisma as any, MANTENEDORA_ID);
+
+  // Resolver roleId de cada usuário de teste a partir do roleMap dinâmico
+  const USUARIOS_TESTE_RESOLVIDOS = USUARIOS_TESTE_DEF.map((u) => {
+    const roleId = roleMap.get(u.roleType);
+    if (!roleId) throw new Error(`Role não encontrado para type: ${u.roleType}`);
+    return { ...u, roleId };
   });
-  // Substituir o placeholder pelo ID real do role
-  const USUARIOS_TESTE_RESOLVIDOS = USUARIOS_TESTE.map((u) =>
-    u.roleId === ROLE_ADMINISTRATIVO_ID_PLACEHOLDER
-      ? { ...u, roleId: roleAdministrativo.id }
-      : u
-  );
-  console.log(`  ✅ Role UNIDADE_ADMINISTRATIVO: ${roleAdministrativo.id}`);
 
   // ── 0. Criar unidade de teste ───────────────────────────────────────────
   console.log('── Unidade de teste ──');
@@ -595,7 +581,6 @@ async function main() {
   // ── 1. Usuários de teste (todos os perfis) ─────────────────────────────
   console.log('── Usuários de teste ──');
   let profTeste: any = null;
-  // FIX 1.2: usar USUARIOS_TESTE_RESOLVIDOS (com roleId correto para secretaria)
   for (const u of USUARIOS_TESTE_RESOLVIDOS) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
@@ -612,16 +597,16 @@ async function main() {
       },
       update: {},
     });
-    const existingRole = await prisma.userRole.findUnique({
+    // Buscar o role completo para obter o level correto (não mais hardcoded)
+    const roleRecord = await prisma.role.findUnique({ where: { id: u.roleId } });
+    if (!roleRecord) throw new Error(`Role ${u.roleId} não encontrado no banco`);
+    await prisma.userRole.upsert({
       where: { userId_roleId: { userId: user.id, roleId: u.roleId } },
+      create: { userId: user.id, roleId: u.roleId, scopeLevel: roleRecord.level, isActive: true },
+      update: { isActive: true },
     });
-    if (!existingRole) {
-      await prisma.userRole.create({
-        data: { userId: user.id, roleId: u.roleId, scopeLevel: u.level as any, isActive: true },
-      });
-    }
     if (u.email === 'professor@testepiloto.com.br') profTeste = user;
-    console.log(`  ✅ ${u.email} → ${u.level}`);
+    console.log(`  ✅ ${u.email} → ${u.roleType} (${roleRecord.level})`);
   }
 
   // ── 2. Turma teste ──────────────────────────────────────────────────────
