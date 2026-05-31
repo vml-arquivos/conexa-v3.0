@@ -32,6 +32,11 @@ import { KPIExecutiveBlock } from '../components/dashboard/KPIExecutiveBlock';
 import { PedagogicalSupervisionBlock } from '../components/dashboard/PedagogicalSupervisionBlock';
 import { VitalSignsAlertsBlock } from '../components/dashboard/VitalSignsAlertsBlock';
 import { WorkQueueBlock } from '../components/dashboard/WorkQueueBlock';
+// Tarefa 2.6 — Recharts para gráficos de planejamentos e diários
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -1321,6 +1326,113 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (
         <div className="space-y-4">
+
+          {/* Tarefa 2.6 — Gráficos Recharts: status dos diários e planejamentos */}
+          {(diarios.length > 0 || planejamentos.length > 0) && (() => {
+            // Dados para gráfico de pizza: status dos diários
+            const statusCount: Record<string, number> = {};
+            for (const d of diarios) {
+              const s = (d.status ?? 'RASCUNHO').toUpperCase();
+              statusCount[s] = (statusCount[s] ?? 0) + 1;
+            }
+            const CORES_STATUS: Record<string, string> = {
+              PUBLICADO: '#10b981', REVISADO: '#6366f1', ARQUIVADO: '#94a3b8',
+              RASCUNHO: '#f59e0b', DEVOLVIDO: '#ef4444',
+            };
+            const dadosPizza = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
+
+            // Dados para gráfico de barras: diários por turma (top 8)
+            const porTurma: Record<string, number> = {};
+            for (const d of diarios) {
+              const turma = d.classroom?.name ?? d.turmaNome ?? 'Sem turma';
+              porTurma[turma] = (porTurma[turma] ?? 0) + 1;
+            }
+            const dadosBarras = Object.entries(porTurma)
+              .sort(([,a],[,b]) => b - a)
+              .slice(0, 8)
+              .map(([name, total]) => ({ name: name.length > 12 ? name.slice(0,12)+'…' : name, total }));
+
+            // Dados para gráfico de planejamentos por status
+            const planStatus: Record<string, number> = {};
+            for (const p of planejamentos) {
+              const s = (p.status ?? 'RASCUNHO').toUpperCase();
+              planStatus[s] = (planStatus[s] ?? 0) + 1;
+            }
+            const CORES_PLAN: Record<string, string> = {
+              APROVADO: '#10b981', EM_REVISAO: '#6366f1', RASCUNHO: '#f59e0b',
+              DEVOLVIDO: '#ef4444', EM_EXECUCAO: '#3b82f6', CONCLUIDO: '#8b5cf6',
+            };
+            const dadosPlanPizza = Object.entries(planStatus).map(([name, value]) => ({ name, value }));
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Gráfico de barras: diários por turma */}
+                {dadosBarras.length > 0 && (
+                  <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Diários por turma</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={dadosBarras} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip formatter={(v: any) => [v, 'Diários']} />
+                          <Bar dataKey="total" fill="#6366f1" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Gráfico de pizza: status dos diários */}
+                {dadosPizza.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos diários</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <PieChart>
+                          <Pie data={dadosPizza} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
+                            {dadosPizza.map((entry, i) => (
+                              <Cell key={i} fill={CORES_STATUS[entry.name] ?? '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, n: any) => [v, n]} />
+                          <Legend iconSize={10} wrapperStyle={{ fontSize: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Gráfico de pizza: status dos planejamentos */}
+                {dadosPlanPizza.length > 0 && (
+                  <Card className="lg:col-span-1">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos planejamentos</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <PieChart>
+                          <Pie data={dadosPlanPizza} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
+                            {dadosPlanPizza.map((entry, i) => (
+                              <Cell key={i} fill={CORES_PLAN[entry.name] ?? '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, n: any) => [v, n]} />
+                          <Legend iconSize={10} wrapperStyle={{ fontSize: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Header com resumo */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {(() => {

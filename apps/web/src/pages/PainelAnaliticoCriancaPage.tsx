@@ -66,6 +66,9 @@ export default function PainelAnaliticoCriancaPage() {
   const [loadingD, setLoadingD] = useState(false);
   const [central, setCentral] = useState<any>(null);
   const [eventos, setEventos] = useState<any[]>([]);
+  // Tarefa 2.2 — Frequência e restrições alimentares
+  const [frequencia, setFrequencia] = useState<{ total: number; presentes: number; pct: number | null } | null>(null);
+  const [restricoes, setRestricoes] = useState<any[]>([]);
 
   const carregarCentral = useCallback(async () => {
     if (!childId) return;
@@ -87,6 +90,27 @@ export default function PainelAnaliticoCriancaPage() {
 
   useEffect(() => { carregarCentral(); }, [carregarCentral]);
   useEffect(() => { if (aba === 'diario' && eventos.length === 0) carregarDiario(); }, [aba, carregarDiario, eventos.length]);
+
+  // Tarefa 2.2 — Buscar frequência e restrições ao montar
+  useEffect(() => {
+    if (!childId) return;
+    // Frequência dos últimos 60 dias
+    const start = new Date(Date.now() - 60*24*60*60*1000).toISOString().slice(0,10);
+    http.get('/attendance', { params: { childId, startDate: start, limit: '200' } })
+      .then(r => {
+        const data: any[] = Array.isArray(r?.data) ? r.data : (r?.data?.data ?? []);
+        const presentes = data.filter((a: any) => a.present ?? a.presente ?? a.status === 'PRESENTE').length;
+        setFrequencia({ total: data.length, presentes, pct: data.length > 0 ? Math.round(presentes/data.length*100) : null });
+      })
+      .catch(() => {});
+    // Restrições alimentares via /children/:id
+    http.get(`/children/${childId}`)
+      .then(r => {
+        const dr = r?.data?.dietaryRestrictions;
+        if (Array.isArray(dr)) setRestricoes(dr);
+      })
+      .catch(() => {});
+  }, [childId]);
 
   useEffect(() => {
     if (aba !== 'microgestos' || microgestos.length > 0) return;
@@ -163,19 +187,23 @@ export default function PainelAnaliticoCriancaPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { icon:<Brain className="h-5 w-5 mx-auto mb-1 text-indigo-400"/>, val:`${resumo.pctGeral}%`, label:'Consolidado BNCC', sub:`${resumo.totalCons}/${resumo.totalInd}` },
-            { icon:<Award className="h-5 w-5 mx-auto mb-1 text-emerald-400"/>, val:central?.rdics?.length??0, label:'RDICs registados', sub:'' },
-            { icon:<Activity className="h-5 w-5 mx-auto mb-1 text-blue-400"/>, val:totalEvt, label:'Observações (180d)', sub:aba!=='diario'?'Ver diário →':'' },
-            { icon:<TrendingUp className="h-5 w-5 mx-auto mb-1 text-purple-400"/>, val:resumo.tend==='up'?'↑ Progresso':resumo.tend==='down'?'↓ Atenção':resumo.tend==='stable'?'→ Estável':'— Primeiro RDIC', label:'Tendência', sub:'' },
+            { icon:<Brain className="h-5 w-5 mx-auto mb-1 text-indigo-400"/>, val:`${resumo.pctGeral}%`, label:'Consolidado BNCC', sub:`${resumo.totalCons}/${resumo.totalInd}`, onClick: undefined },
+            { icon:<Award className="h-5 w-5 mx-auto mb-1 text-emerald-400"/>, val:central?.rdics?.length??0, label:'RDICs registados', sub:'', onClick: undefined },
+            { icon:<Activity className="h-5 w-5 mx-auto mb-1 text-blue-400"/>, val:totalEvt, label:'Observações (180d)', sub:aba!=='diario'?'Ver diário →':'', onClick: ()=>setAba('diario') },
+            { icon:<TrendingUp className="h-5 w-5 mx-auto mb-1 text-purple-400"/>, val:resumo.tend==='up'?'↑ Progresso':resumo.tend==='down'?'↓ Atenção':resumo.tend==='stable'?'→ Estável':'— Primeiro RDIC', label:'Tendência', sub:'', onClick: undefined },
+            // Tarefa 2.2 — Frequência
+            { icon:<ChevronRight className="h-5 w-5 mx-auto mb-1 text-sky-400"/>, val: frequencia?.pct !== null && frequencia?.pct !== undefined ? `${frequencia.pct}%` : '—', label:`Frequência (60d)`, sub: frequencia ? `${frequencia.presentes}/${frequencia.total} dias` : 'Carregando...', onClick: undefined },
+            // Tarefa 2.2 — Restrições alimentares
+            { icon:<AlertCircle className="h-5 w-5 mx-auto mb-1 text-orange-400"/>, val: restricoes.length > 0 ? restricoes.length : '—', label:'Restrições alim.', sub: restricoes.length > 0 ? restricoes.map((r:any)=>r.name??r.nome??r.type??'').filter(Boolean).slice(0,2).join(', ') : 'Nenhuma', onClick: undefined },
           ].map((k,i)=>(
-            <Card key={i} className={i===2?'cursor-pointer hover:shadow-md':''}  onClick={i===2?()=>setAba('diario'):undefined}>
+            <Card key={i} className={k.onClick?'cursor-pointer hover:shadow-md':''} onClick={k.onClick}>
               <CardContent className="p-4 text-center">
                 {k.icon}
-                <p className={`font-bold text-gray-800 ${i===0||i===1?'text-2xl':'text-lg'}`}>{k.val}</p>
+                <p className={`font-bold text-gray-800 ${i<=1?'text-2xl':'text-lg'}`}>{k.val}</p>
                 <p className="text-xs text-gray-500">{k.label}</p>
-                {k.sub&&<p className="text-xs text-gray-400 mt-0.5">{k.sub}</p>}
+                {k.sub&&<p className="text-xs text-gray-400 mt-0.5 truncate">{k.sub}</p>}
               </CardContent>
             </Card>
           ))}

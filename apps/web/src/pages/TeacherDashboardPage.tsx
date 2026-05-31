@@ -271,6 +271,22 @@ export default function TeacherDashboardPage() {
       });
   }, [data?.classroom?.id]);
 
+  // Tarefa 2.4 — Alertas operacionais da turma (faltas consecutivas, etc.)
+  const [alertasOperacionais, setAlertasOperacionais] = useState<{
+    total: number;
+    criticos: number;
+    atencao: number;
+    alertas: any[];
+  } | null>(null);
+  useEffect(() => {
+    if (!data?.classroom?.id) return;
+    http.get('/alertas', { params: { classroomId: data.classroom.id, unread: 'true', limit: '20' } })
+      .then(r => {
+        if (r.data?.total > 0) setAlertasOperacionais(r.data);
+      })
+      .catch(() => { /* silencioso */ });
+  }, [data?.classroom?.id]);
+
   // Modal de microgesto rápido
   const [modalCriancaInfo, setModalCriancaInfo] = useState<string | null>(null);
   const [modalCrianca, setModalCrianca] = useState<{ id: string; nome: string } | null>(null);
@@ -770,6 +786,26 @@ export default function TeacherDashboardPage() {
               >
                 Ver detalhes
               </button>
+            </div>
+          )}
+
+          {/* Tarefa 2.4 — Card de alertas operacionais */}
+          {alertasOperacionais && (
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+              <Bell className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">
+                  {alertasOperacionais.total} alerta{alertasOperacionais.total !== 1 ? 's' : ''} operacional{alertasOperacionais.total !== 1 ? 'is' : ''} na turma
+                  {alertasOperacionais.criticos > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      {alertasOperacionais.criticos} crítico{alertasOperacionais.criticos !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                {alertasOperacionais.alertas.slice(0, 3).map((a: any) => (
+                  <p key={a.id} className="mt-0.5 text-xs text-amber-700 truncate">• {a.titulo}</p>
+                ))}
+              </div>
             </div>
           )}
 

@@ -413,6 +413,11 @@ export default function RdicCriancaPage() {
     return 3;
   };
   const [trimestre, setTrimestre] = useState<TrimestreId>(calcularTrimestreAtual);
+  // Tarefa 2.3 — recarregar evidências ao mudar trimestre
+  const handleSetTrimestre = (t: TrimestreId) => {
+    setTrimestre(t);
+    if (alunoSelecionado) carregarEvidencias(alunoSelecionado.id, t);
+  };
   const [dimensoes, setDimensoes] = useState<DimensaoAvaliacao[]>(criarDimensoesVazias());
   const [observacaoGeral, setObservacaoGeral] = useState('');
   const [proximosPassos, setProximosPassos] = useState('');
@@ -429,6 +434,11 @@ export default function RdicCriancaPage() {
   // Kanban
   const [kanbanTab, setKanbanTab] = useState<string>(RDIC_STATUS.PENDING);
   const [rdicsMap, setRdicsMap] = useState<Record<string, RdicSalvo[]>>({});
+
+  // Tarefa 2.3 — Evidências do diário no período
+  const [evidencias, setEvidencias] = useState<{ tipo: string; count: number; label: string; cor: string }[]>([]);
+  const [loadingEvidencias, setLoadingEvidencias] = useState(false);
+  const [evidenciasExpanded, setEvidenciasExpanded] = useState(true);
 
   // ─── Carregar turma e alunos ──────────────────────────────────────────────
   useEffect(() => {
@@ -534,6 +544,65 @@ export default function RdicCriancaPage() {
       // silencioso — Kanban fica com todos pendentes
     }
   }
+  // Tarefa 2.3 — Carregar evidências do diário para o período do trimestre selecionado
+  async function carregarEvidencias(childId: string, trimestreId: TrimestreId) {
+    const PERIODOS: Record<TrimestreId, { start: string; end: string }> = {
+      1: { start: `${new Date().getFullYear()}-02-01`, end: `${new Date().getFullYear()}-05-31` },
+      2: { start: `${new Date().getFullYear()}-06-01`, end: `${new Date().getFullYear()}-09-30` },
+      3: { start: `${new Date().getFullYear()}-10-01`, end: `${new Date().getFullYear()}-12-31` },
+    };
+    const { start, end } = PERIODOS[trimestreId];
+    setLoadingEvidencias(true);
+    try {
+      const res = await http.get('/diary-events', { params: { childId, startDate: start, endDate: end, limit: '500' } });
+      const data: any[] = Array.isArray(res?.data) ? res.data : (res?.data?.data ?? []);
+      const LABELS: Record<string, string> = {
+        ATIVIDADE_PEDAGOGICA: 'Atividades pedagógicas',
+        DESENVOLVIMENTO: 'Desenvolvimento',
+        COMPORTAMENTO: 'Comportamento social',
+        SAUDE: 'Saúde',
+        REFEICAO: 'Refeição',
+        HIGIENE: 'Higiene',
+        SONO: 'Sono',
+        FAMILIA: 'Família',
+        OBSERVACAO: 'Observações',
+        AVALIACAO: 'Avaliações',
+        OUTRO: 'Outros',
+      };
+      const CORES: Record<string, string> = {
+        ATIVIDADE_PEDAGOGICA: 'bg-blue-100 text-blue-700 border-blue-200',
+        DESENVOLVIMENTO: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+        COMPORTAMENTO: 'bg-amber-100 text-amber-700 border-amber-200',
+        SAUDE: 'bg-red-100 text-red-700 border-red-200',
+        REFEICAO: 'bg-orange-100 text-orange-700 border-orange-200',
+        HIGIENE: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+        SONO: 'bg-purple-100 text-purple-700 border-purple-200',
+        FAMILIA: 'bg-pink-100 text-pink-700 border-pink-200',
+        OBSERVACAO: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+        AVALIACAO: 'bg-teal-100 text-teal-700 border-teal-200',
+        OUTRO: 'bg-gray-100 text-gray-700 border-gray-200',
+      };
+      const contagem: Record<string, number> = {};
+      for (const ev of data) {
+        const t = ev.type ?? 'OUTRO';
+        contagem[t] = (contagem[t] ?? 0) + 1;
+      }
+      const lista = Object.entries(contagem)
+        .sort(([,a],[,b]) => b - a)
+        .map(([tipo, count]) => ({
+          tipo,
+          count,
+          label: LABELS[tipo] ?? tipo.replace(/_/g, ' '),
+          cor: CORES[tipo] ?? 'bg-gray-100 text-gray-700 border-gray-200',
+        }));
+      setEvidencias(lista);
+    } catch {
+      setEvidencias([]);
+    } finally {
+      setLoadingEvidencias(false);
+    }
+  }
+
    async function selecionarAluno(aluno: Aluno) {
     setAlunoSelecionado(aluno);
     setDimensoes(criarDimensoesVazias());
@@ -542,6 +611,8 @@ export default function RdicCriancaPage() {
     setRelatorioIA(null);
     setMostrarRelatorioIA(false);
     setEtapa('formulario');
+    // Tarefa 2.3 — carregar evidências do período
+    carregarEvidencias(aluno.id, trimestre);
 
     try {
       setLoadingRdics(true);
@@ -865,7 +936,7 @@ export default function RdicCriancaPage() {
                 {TRIMESTRES.map(t => (
                   <button
                     key={t.id}
-                    onClick={() => setTrimestre(t.id)}
+                    onClick={() => handleSetTrimestre(t.id)}
                     className={`p-3 rounded-xl border-2 text-center transition-all ${
                       trimestre === t.id
                         ? 'border-blue-500 bg-blue-50 text-blue-800'
@@ -879,6 +950,54 @@ export default function RdicCriancaPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Tarefa 2.3 — Evidências registradas no período */}
+          <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <button
+              onClick={() => setEvidenciasExpanded(v => !v)}
+              className="flex w-full items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-indigo-600" />
+                <span className="font-semibold text-indigo-800 text-sm">
+                  Evidências registradas no período
+                  {evidencias.length > 0 && (
+                    <span className="ml-2 text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+                      {evidencias.reduce((s, e) => s + e.count, 0)} registros
+                    </span>
+                  )}
+                </span>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-indigo-400 transition-transform ${evidenciasExpanded ? 'rotate-90' : ''}`} />
+            </button>
+
+            {evidenciasExpanded && (
+              <div className="mt-3">
+                {loadingEvidencias ? (
+                  <p className="text-xs text-indigo-500 animate-pulse">Carregando evidências...</p>
+                ) : evidencias.length === 0 ? (
+                  <p className="text-xs text-indigo-500">Nenhum registro no diário para este trimestre.</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-indigo-600 mb-2">
+                      Clique em “Gerar Rascunho IA” abaixo para usar estas evidências como base para o RDIC.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {evidencias.map(ev => (
+                        <span
+                          key={ev.tipo}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${ev.cor}`}
+                        >
+                          <span className="tabular-nums font-bold">{ev.count}</span>
+                          {ev.label}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Barra de progresso */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">

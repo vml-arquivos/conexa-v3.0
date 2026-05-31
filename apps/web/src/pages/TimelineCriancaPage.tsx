@@ -152,16 +152,25 @@ function normalizeTimelineEvent(item: any): TimelineEvent | null {
 }
 
 async function loadLegacyTimeline(childId: string): Promise<ChildSummary> {
-  const [diaryRes, obsRes, rdicRes] = await Promise.all([
+  const [diaryRes, obsRes, rdicRes, attendanceRes, planningRes, atendimentoRes, childRes] = await Promise.all([
     http.get('/diary-events', { params: { childId, limit: '200' } }),
     http.get('/development-observations', { params: { childId, limit: '200' } }),
     http.get(`/rdic/child/${childId}/central`),
+    // Tarefa 2.1 — novas fontes
+    http.get('/attendance', { params: { childId, limit: '200' } }).catch(() => ({ data: [] })),
+    http.get('/planning', { params: { childId, status: 'APROVADO', limit: '50' } }).catch(() => ({ data: [] })),
+    http.get('/atendimento-pais', { params: { childId, limit: '50' } }).catch(() => ({ data: [] })),
+    http.get(`/children/${childId}`).catch(() => ({ data: null })),
   ]);
 
   const diaryData = asArray(diaryRes?.data);
   const obsData = asArray(obsRes?.data);
   const rdicData = Array.isArray(rdicRes?.data?.rdics) ? rdicRes.data.rdics : [];
-  const childData = rdicRes?.data?.child ?? rdicRes?.data?.crianca ?? null;
+  const childData = rdicRes?.data?.child ?? rdicRes?.data?.crianca ?? childRes?.data ?? null;
+  const attendanceData = asArray(attendanceRes?.data);
+  const planningData = asArray(planningRes?.data);
+  const atendimentoData = asArray(atendimentoRes?.data);
+  const dietaryData: any[] = Array.isArray(childRes?.data?.dietaryRestrictions) ? childRes.data.dietaryRestrictions : [];
 
   const timeline: TimelineEvent[] = [];
 
@@ -210,7 +219,72 @@ async function loadLegacyTimeline(childId: string): Promise<ChildSummary> {
     });
   });
 
+  // Tarefa 2.1 — Attendance: faltas e presenças
+  attendanceData.forEach((item) => {
+    const date = pickDate(item.date, item.data, item.createdAt);
+    if (!date) return;
+    const presente = item.present ?? item.presente ?? item.status === 'PRESENTE';
+    const justificado = item.justified ?? item.justificado ?? false;
+    timeline.push({
+      id: String(item.id ?? `${date}-attendance`),
+      type: 'DIARIO',
+      date,
+      title: presente ? 'Presença registrada' : justificado ? 'Falta justificada' : 'Falta',
+      description: item.observation ?? item.observacao ?? item.justification ?? item.justificativa ?? '',
+      status: presente ? 'PRESENTE' : justificado ? 'JUSTIFICADO' : 'AUSENTE',
+      source: 'Attendance',
+    });
+  });
+
+  // Tarefa 2.1 — Planning aprovado: planos pedagógicos executados
+  planningData.forEach((item) => {
+    const date = pickDate(item.startDate, item.dataInicio, item.approvedAt, item.createdAt);
+    if (!date) return;
+    timeline.push({
+      id: String(item.id ?? `${date}-plano`),
+      type: 'RDIC',
+      date,
+      title: item.title ?? item.titulo ?? 'Plano Pedagógico',
+      description: item.description ?? item.descricao ?? (item.status ? `Status: ${item.status}` : 'Planejamento aprovado'),
+      status: item.status,
+      source: 'Planning',
+    });
+  });
+
+  // Tarefa 2.1 — AtendimentoPais
+  atendimentoData.forEach((item) => {
+    const date = pickDate(item.dataAtendimento, item.date, item.createdAt);
+    if (!date) return;
+    timeline.push({
+      id: String(item.id ?? `${date}-atendimento`),
+      type: 'OBSERVACAO',
+      date,
+      title: 'Atendimento com Responsáveis',
+      description: item.resumo ?? item.descricao ?? item.notes ?? item.observacao ?? '',
+      source: 'AtendimentoPais',
+    });
+  });
+
+  // Tarefa 2.1 — DietaryRestriction: restrições alimentares com data de registro
+  dietaryData.forEach((item) => {
+    const date = pickDate(item.createdAt, item.updatedAt);
+    if (!date) return;
+    timeline.push({
+      id: String(item.id ?? `${date}-nutricao`),
+      type: 'ALERTA',
+      date,
+      title: `Restrição alimentar: ${item.name ?? item.nome ?? item.type ?? 'Registrada'}`,
+      description: item.description ?? item.descricao ?? item.notes ?? '',
+      alert: item.severity === 'severa' || item.severity === 'SEVERA' ? 'Caso crítico — restrição severa' : undefined,
+      source: 'DietaryRestriction',
+    });
+  });
+
   timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Calcular métricas de presença
+  const presentes = attendanceData.filter((a) => a.present ?? a.presente ?? a.status === 'PRESENTE').length;
+  const presencaPercentual = attendanceData.length > 0 ? Math.round((presentes / attendanceData.length) * 100) : null;
 
   return {
     child: childData,
@@ -219,8 +293,16 @@ async function loadLegacyTimeline(childId: string): Promise<ChildSummary> {
       observations: obsData.length,
       observationsWithAlerts: obsData.filter((item) => Boolean(item.developmentAlerts?.trim?.())).length,
       rdic: rdicData.length,
-      openAlerts: 0,
-      attendance30: { total: 0, presentes: 0, ausentes: 0, justificados: 0, atrasos: 0, presencaPercentual: null },
+      openAlerts: dietaryData.filter((d) => d.severity === 'severa' || d.severity === 'SEVERA').length,
+      dietaryRestrictions: dietaryData.length,
+      attendance30: {
+        total: attendanceData.length,
+        presentes,
+        ausentes: attendanceData.length - presentes,
+        justificados: attendanceData.filter((a) => a.justified ?? a.justificado).length,
+        atrasos: attendanceData.filter((a) => a.late ?? a.atraso).length,
+        presencaPercentual,
+      },
     },
     attentionPoints: [],
     timeline,
