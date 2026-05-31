@@ -153,15 +153,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.replace('/login');
   }, []);
 
-  // Logout automático após 15 minutos de inatividade (sem movimentação do usuário)
+  // Logout automático após 8 horas de inatividade real (jornada escolar completa).
+  // O JWT auto-refresh (interceptor HTTP) mantém a sessão ativa durante uso.
+  // O logout ocorre apenas se o usuário ficar 8h SEM NENHUMA INTERAÇÃO.
   useIdleTimeout(
     useCallback(() => {
       if (user) {
-        console.info('[AuthProvider] Sessão encerrada por inatividade (15 min).');
+        console.info('[AuthProvider] Sessão encerrada por inatividade (8h).');
         logout();
       }
     }, [user, logout]),
-    15 * 60 * 1000,
+    8 * 60 * 60 * 1000, // 8 horas
   );
 
   return (

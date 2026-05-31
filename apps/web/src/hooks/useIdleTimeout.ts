@@ -2,7 +2,7 @@
  * useIdleTimeout.ts
  * Detecta inatividade do usuário e executa callback após o tempo configurado.
  * Eventos monitorados: mousemove, keydown, mousedown, touchstart, scroll, click.
- * Padrão: 15 minutos (900_000 ms).
+ * Padrão: 8 horas (28_800_000 ms) — jornada escolar completa.
  */
 import { useEffect, useRef, useCallback } from 'react';
 
@@ -17,9 +17,9 @@ const IDLE_EVENTS: (keyof WindowEventMap)[] = [
 
 /**
  * @param onIdle  Callback executado quando o usuário fica inativo pelo tempo definido.
- * @param timeout Tempo em milissegundos. Padrão: 15 minutos.
+ * @param timeout Tempo em milissegundos. Padrão: 8 horas.
  */
-export function useIdleTimeout(onIdle: () => void, timeout = 15 * 60 * 1000) {
+export function useIdleTimeout(onIdle: () => void, timeout = 8 * 60 * 60 * 1000) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onIdleRef = useRef(onIdle);
 

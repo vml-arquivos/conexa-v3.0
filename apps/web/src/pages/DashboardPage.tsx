@@ -81,6 +81,12 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Tarefa 1.3 — Refetch ao voltar para a aba (equivalente a refetchOnWindowFocus do TanStack Query)
+  // O DashboardPage usa handlers manuais (handleLoadUnitDashboard / handleLoadTeacherDashboard)
+  // que dependem de seleções do usuário, por isso não fazemos auto-refresh automático aqui.
+  // O UnifiedDashboard (hub visual) não faz chamadas de API — apenas navega por widgets.
+  // O auto-refresh real está no TeacherDashboardPage (Tarefa 1.3) e nos dashboards específicos.
+
   // Handler: Carregar Dashboard da Unidade
   const handleLoadUnitDashboard = useCallback(async () => {
     try {

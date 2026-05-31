@@ -12,6 +12,7 @@ import {
   Brain, Sparkles, TrendingUp, Award,
   Plus, Edit3, RefreshCw, FileText,
   Send, Download, Star, Lightbulb, ArrowRight, GraduationCap,
+  AlertTriangle, Shield,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http, { isAuthExpiredError } from '../api/http';
@@ -237,6 +238,39 @@ export default function TeacherDashboardPage() {
       .catch(() => setInsightsHoje(null));
   }, []);
 
+  // ─── Tarefa 1.5: Alertas de alergias da turma ────────────────────────────────
+  const [alertasAlergias, setAlertasAlergias] = useState<{
+    comAlergia: number;
+    casosCriticos: number;
+    nomes: string[];
+  } | null>(null);
+  useEffect(() => {
+    // Só busca após o dashboard carregar e a turma estar disponível
+    if (!data?.classroom?.id) return;
+    http.get('/children/health/dashboard', { params: { classroomId: data.classroom.id } })
+      .then(r => {
+        const children: any[] = r.data?.children ?? [];
+        const stats = r.data?.stats ?? {};
+        const comAlergia: number = stats.comAlergia ?? children.filter((c: any) =>
+          (c.dietaryRestrictions ?? []).some((dr: any) => dr.type === 'ALERGIA')
+        ).length;
+        const casosCriticos: number = stats.casosCriticos ?? children.filter((c: any) =>
+          (c.dietaryRestrictions ?? []).some((dr: any) => dr.severity === 'severa')
+        ).length;
+        const nomes: string[] = children
+          .filter((c: any) => (c.dietaryRestrictions ?? []).some((dr: any) => dr.type === 'ALERGIA' || dr.severity === 'severa'))
+          .map((c: any) => c.firstName ?? c.name ?? '')
+          .filter(Boolean)
+          .slice(0, 5);
+        if (comAlergia > 0 || casosCriticos > 0) {
+          setAlertasAlergias({ comAlergia, casosCriticos, nomes });
+        }
+      })
+      .catch(() => {
+        // Silencioso: não bloquear o dashboard se o endpoint falhar
+      });
+  }, [data?.classroom?.id]);
+
   // Modal de microgesto rápido
   const [modalCriancaInfo, setModalCriancaInfo] = useState<string | null>(null);
   const [modalCrianca, setModalCrianca] = useState<{ id: string; nome: string } | null>(null);
@@ -245,6 +279,25 @@ export default function TeacherDashboardPage() {
   const [savingMicrogesto, setSavingMicrogesto] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  // Tarefa 1.3 — Auto-refresh: recarregar dashboard a cada 5 minutos e ao voltar para a aba
+  useEffect(() => {
+    // Refetch ao focar na aba (visibilitychange)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadDashboard();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Refetch automático a cada 5 minutos
+    const interval = setInterval(() => {
+      loadDashboard();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Carregar RDICs da turma quando aba rdic é ativada
   useEffect(() => {
@@ -688,6 +741,35 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Tarefa 1.5 — Card de alertas de alergias */}
+          {alertasAlergias && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-800">
+                  {alertasAlergias.comAlergia} criança{alertasAlergias.comAlergia !== 1 ? 's' : ''} com alergia na turma
+                  {alertasAlergias.casosCriticos > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      <Shield className="h-3 w-3" />
+                      {alertasAlergias.casosCriticos} caso{alertasAlergias.casosCriticos !== 1 ? 's' : ''} crítico{alertasAlergias.casosCriticos !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                {alertasAlergias.nomes.length > 0 && (
+                  <p className="mt-0.5 text-xs text-red-700">
+                    {alertasAlergias.nomes.join(', ')}{alertasAlergias.nomes.length === 5 ? ' e outros' : ''}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => navigate('/app/painel-alergias')}
+                className="flex-shrink-0 rounded-full border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 transition-colors"
+              >
+                Ver detalhes
+              </button>
             </div>
           )}
 
