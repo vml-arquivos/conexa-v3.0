@@ -4,7 +4,11 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
+import { GeminiService } from '../ai/services/gemini.service';
+import { extrairObservacoesLocal } from './helpers/observacoes-extractor.helper';
+import { buildObservacoesPrompt } from './helpers/observacoes-gemini.prompt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreatePlanningDto } from './dto/create-planning.dto';
@@ -48,6 +52,7 @@ export class PlanningService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    @Optional() private readonly geminiService?: GeminiService,
   ) {}
 
   /**
@@ -1047,6 +1052,34 @@ export class PlanningService {
   }
 
   /**
+   * Gera o template de observações individuais para o plano.
+   * Usa Gemini se disponível, fallback para extrator local.
+   * NUNCA lança exceção — retorna array vazio em caso de erro.
+   */
+  private async gerarObservacoesTemplate(
+    planningId: string,
+    pedagogicalContent: Record<string, any> | null,
+  ): Promise<any[]> {
+    if (!pedagogicalContent) return [];
+
+    try {
+      // Tenta usar Gemini para geração rica
+      if (this.geminiService?.isEnabled()) {
+        const prompt = buildObservacoesPrompt(pedagogicalContent);
+        const resultado = await this.geminiService.generateJSON<{ observacoes: any[] }>(prompt);
+        if (resultado?.observacoes && Array.isArray(resultado.observacoes)) {
+          return resultado.observacoes;
+        }
+      }
+    } catch {
+      // Gemini falhou — usar fallback local sem interromper o fluxo
+    }
+
+    // Fallback: extrator local por palavras-chave
+    return extrairObservacoesLocal(pedagogicalContent, planningId);
+  }
+
+  /**
    * Aprova um planejamento (EM_REVISAO -> APROVADO)
    */
   async approve(id: string, user: JwtPayload) {
@@ -1083,6 +1116,31 @@ export class PlanningService {
         mantenedoraId: planning.mantenedoraId,
         unitId: planning.unitId,
     });
+
+    // Gerar template de observações individuais quando plano é aprovado
+    // Processo assíncrono não bloqueante — não impede a aprovação em caso de falha
+    try {
+      const planningWithContent = await this.prisma.planning.findUnique({
+        where: { id },
+        select: { pedagogicalContent: true },
+      });
+
+      if (planningWithContent?.pedagogicalContent) {
+        const obsTemplate = await this.gerarObservacoesTemplate(
+          id,
+          planningWithContent.pedagogicalContent as Record<string, any>,
+        );
+
+        if (obsTemplate.length > 0) {
+          await this.prisma.planning.update({
+            where: { id },
+            data: { observacoesTemplate: obsTemplate },
+          });
+        }
+      }
+    } catch {
+      // Não bloqueia o fluxo de aprovação em caso de erro na geração
+    }
 
     return maskMatrizEntryForProfessor(user, updatedPlanning);
   }

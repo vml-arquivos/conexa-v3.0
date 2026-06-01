@@ -719,6 +719,9 @@ export default function DiarioBordoPage() {
   const [saving, setSaving] = useState(false);
   const [gerandoIA, setGerandoIA] = useState(false);
   const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
+  // ── Estado das Observações Dinâmicas do Plano (Bloco 3.6) ──────────────────
+  const [obsDinamicasSelecionadas, setObsDinamicasSelecionadas] = useState<Record<string, string[]>>({});
+  const [obsPlanoAberta, setObsPlanoAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
   const [filtroBusca, setFiltroBusca] = useState('');
@@ -786,6 +789,15 @@ export default function DiarioBordoPage() {
     // Vínculo com matriz curricular — necessário para registrar ocorrências
     curriculumMatrixId?: string;
     curriculumEntryId?: string; // entrada da matriz para o dia de hoje
+    // Observações dinâmicas geradas pelo backend ao aprovar o plano
+    observacoesTemplate?: Array<{
+      id: string;
+      label: string;
+      emoji: string;
+      grupo: string;
+      origemObjetivo?: string;
+      campoExperiencia?: string;
+    }>;
   } | null>(null);
 
   // Ocorrências
@@ -1341,6 +1353,8 @@ export default function DiarioBordoPage() {
             curriculumMatrixId: undefined,
             // curriculumEntryId vem do endpoint active-today (opcional — não bloqueia o botão)
             curriculumEntryId: activePlan.curriculumEntryId,
+            // Observações dinâmicas geradas ao aprovar o plano
+            observacoesTemplate: Array.isArray(planHoje.observacoesTemplate) ? planHoje.observacoesTemplate : [],
           });
         }
       } catch {
@@ -1714,6 +1728,34 @@ export default function DiarioBordoPage() {
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
             observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
+            // Observações dinâmicas do plano (Bloco 3.6)
+            observacoesDinamicasPlano: Object.entries(obsDinamicasSelecionadas)
+              .filter(([, ids]) => ids.length > 0)
+              .map(([obsId, criancaIds]) => {
+                const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                return {
+                  id: obsId,
+                  label: tag?.label ?? obsId,
+                  emoji: tag?.emoji ?? '📌',
+                  grupo: 'plano',
+                  criancaIds,
+                  planningId: planejamentoHoje?.id,
+                };
+              }).length > 0
+              ? Object.entries(obsDinamicasSelecionadas)
+                  .filter(([, ids]) => ids.length > 0)
+                  .map(([obsId, criancaIds]) => {
+                    const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                    return {
+                      id: obsId,
+                      label: tag?.label ?? obsId,
+                      emoji: tag?.emoji ?? '📌',
+                      grupo: 'plano',
+                      criancaIds,
+                      planningId: planejamentoHoje?.id,
+                    };
+                  })
+              : null,
             planejamentoObjetivos: planejamentoHoje?.objetivosMatriz ?? null,
             planejamentoAtividade: planejamentoHoje?.activities ?? null,
             planejamentoRecursos: planejamentoHoje?.recursos ?? null,
@@ -1784,6 +1826,9 @@ export default function DiarioBordoPage() {
       setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
       // PR 141: limpar o ID de edição após salvar com sucesso
       setDiarioEditandoId(null);
+      // Limpar estados das observações dinâmicas do plano
+      setObsDinamicasSelecionadas({});
+      setObsPlanoAberta(null);
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
@@ -3447,6 +3492,173 @@ export default function DiarioBordoPage() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+              {/* ── Bloco 3.6: Observações Específicas do Plano de Hoje (dinâmicas) ── */}
+              {criancas.length > 0
+               && planejamentoHoje
+               && (planejamentoHoje.observacoesTemplate ?? []).length > 0 && (
+                <div className="rounded-2xl border-2 border-indigo-200 bg-white p-4 sm:p-5 space-y-4 shadow-sm">
+
+                  {/* Cabeçalho */}
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-sm flex-shrink-0">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-indigo-900">
+                        Observações do Plano de Hoje
+                      </p>
+                      <p className="text-xs text-indigo-500 truncate">
+                        Geradas a partir de: {planejamentoHoje.title}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                      {(planejamentoHoje.observacoesTemplate ?? []).length} pontos
+                    </span>
+                  </div>
+
+                  {/* Tags dinâmicas */}
+                  <div className="flex flex-wrap gap-2">
+                    {(planejamentoHoje.observacoesTemplate ?? []).map(tag => {
+                      const selecionados = obsDinamicasSelecionadas[tag.id] ?? [];
+                      const ativo = selecionados.length > 0;
+
+                      return (
+                        <div key={tag.id} className="relative" data-obs-panel>
+                          {/* Botão da tag */}
+                          <button
+                            type="button"
+                            onClick={() => setObsPlanoAberta(p => p === tag.id ? null : tag.id)}
+                            className={`rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                              ativo
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-400 hover:bg-indigo-50'
+                            }`}
+                          >
+                            <span>{tag.emoji}</span>
+                            <span>{tag.label}</span>
+                            {ativo && (
+                              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px] font-bold">
+                                {selecionados.length}
+                              </span>
+                            )}
+                          </button>
+
+                          {/* Popover de seleção de crianças */}
+                          {obsPlanoAberta === tag.id && (
+                            <div
+                              className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border-2 border-indigo-200 bg-white shadow-xl p-3 space-y-3"
+                              data-obs-panel
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-indigo-900">{tag.emoji} {tag.label}</p>
+                                <button type="button" onClick={() => setObsPlanoAberta(null)} className="text-gray-400 hover:text-gray-600">
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {tag.origemObjetivo && (
+                                <p className="text-[10px] text-indigo-400 italic border border-indigo-100 rounded-lg px-2 py-1 bg-indigo-50 leading-relaxed">
+                                  Do objetivo: &ldquo;{tag.origemObjetivo.slice(0, 80)}{tag.origemObjetivo.length > 80 ? '...' : ''}&rdquo;
+                                </p>
+                              )}
+                              <p className="text-[10px] text-indigo-600">
+                                Quais crianças demonstraram isso hoje?
+                              </p>
+                              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                                {criancas
+                                  .slice()
+                                  .sort((a, b) => a.firstName.localeCompare(b.firstName, 'pt-BR'))
+                                  .map(c => {
+                                    const sel = selecionados.includes(c.id);
+                                    return (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setObsDinamicasSelecionadas(prev => {
+                                            const atual = prev[tag.id] ?? [];
+                                            const novas = sel
+                                              ? atual.filter(id => id !== c.id)
+                                              : [...atual, c.id];
+                                            if (novas.length === 0) {
+                                              const { [tag.id]: _rem, ...resto } = prev;
+                                              return resto;
+                                            }
+                                            return { ...prev, [tag.id]: novas };
+                                          });
+                                        }}
+                                        className={`flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition-all text-center ${
+                                          sel
+                                            ? 'border-indigo-500 bg-indigo-50'
+                                            : 'border-gray-100 bg-white hover:border-indigo-200'
+                                        }`}
+                                      >
+                                        {c.photoUrl ? (
+                                          <img src={c.photoUrl} alt={c.firstName} className="h-8 w-8 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                                            {c.firstName[0]}{c.lastName?.[0] ?? ''}
+                                          </div>
+                                        )}
+                                        <span className="text-[10px] font-medium text-gray-700 leading-tight max-w-[56px] truncate">
+                                          {c.firstName}
+                                        </span>
+                                        {sel && <CheckCircle className="h-3 w-3 text-indigo-500" />}
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setObsPlanoAberta(null)}
+                                className="w-full rounded-xl bg-indigo-600 text-white text-xs font-bold py-2 hover:bg-indigo-700 transition-colors"
+                              >
+                                Confirmar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Resumo das seleções */}
+                  {Object.values(obsDinamicasSelecionadas).some(ids => ids.length > 0) && (
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+                        Resumo — observações do plano
+                      </p>
+                      {Object.entries(obsDinamicasSelecionadas)
+                        .filter(([, ids]) => ids.length > 0)
+                        .map(([obsId, ids]) => {
+                          const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                          const nomes = ids.map(id => criancas.find(c => c.id === id)?.firstName ?? id).join(', ');
+                          return (
+                            <div key={obsId} className="flex items-start gap-2 text-xs text-indigo-800">
+                              <span>{tag?.emoji}</span>
+                              <span><strong>{tag?.label}:</strong> {nomes}</span>
+                              <button
+                                type="button"
+                                onClick={() => setObsDinamicasSelecionadas(prev => {
+                                  const { [obsId]: _rem, ...resto } = prev;
+                                  return resto;
+                                })}
+                                className="ml-auto text-indigo-300 hover:text-red-400 flex-shrink-0"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {/* Nota informativa */}
+                  <p className="text-[10px] text-indigo-400 text-center italic">
+                    Estas observações foram geradas automaticamente a partir do plano de aula de hoje.
+                    Alimentam o RDIC e os relatórios de desenvolvimento.
+                  </p>
                 </div>
               )}
               {/* ── Bloco 4: Complementares (materiais, adaptações, ocorrências) ── */}

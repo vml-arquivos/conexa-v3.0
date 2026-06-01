@@ -829,6 +829,11 @@ model Planning {
   // Conteúdo Pedagógico de Autoria Docente (NOVO)
   pedagogicalContent Json? // Experiências, materiais e estratégias por dia
 
+  // NOVO: Template de observações gerado automaticamente ao aprovar o plano
+  // Gerado a partir do pedagogicalContent + IA ou extrator local
+  // Formato: Array<{ id: string, label: string, emoji: string, grupo: string, origemObjetivo: string }>
+  observacoesTemplate Json? @map("observacoes_template")
+
   // Status
   status PlanningStatus @default(RASCUNHO)
 
