@@ -424,6 +424,14 @@ export default function RdicCriancaPage() {
   const [proximosPassos, setProximosPassos] = useState('');
     const [saving, setSaving] = useState(false);
 
+  // IA LGPD
+  const [gerandoIA, setGerandoIA] = useState(false);
+  const [relatorioIA, setRelatorioIA] = useState<RelatorioIAConsolidado | null>(null);
+  const [mostrarRelatorioIA, setMostrarRelatorioIA] = useState(false);
+
+  // Navegação — declarado ANTES do useAutoSave para evitar TDZ no bundle de produção
+  const [etapa, setEtapa] = useState<'selecionar' | 'formulario' | 'historico'>('selecionar');
+
   // ─── Auto-save no localStorage ───────────────────────────────────────────────────────────────────────
   const rdicAutoSaveKey = alunoSelecionado
     ? `rdic-rascunho-${user?.id ?? 'anon'}-${alunoSelecionado.id}-t${trimestre}`
@@ -440,14 +448,6 @@ export default function RdicCriancaPage() {
       toast.info('Rascunho do RDIC recuperado automaticamente.');
     },
   });
-
-  // IA LGPD
-  const [gerandoIA, setGerandoIA] = useState(false);
-  const [relatorioIA, setRelatorioIA] = useState<RelatorioIAConsolidado | null>(null);
-  const [mostrarRelatorioIA, setMostrarRelatorioIA] = useState(false);
-
-  // Navegação
-  const [etapa, setEtapa] = useState<'selecionar' | 'formulario' | 'historico'>('selecionar');
   const [dimensaoAberta, setDimensaoAberta] = useState<string | null>('eu-outro-nos');
   // Kanban
   const [kanbanTab, setKanbanTab] = useState<string>(RDIC_STATUS.PENDING);
