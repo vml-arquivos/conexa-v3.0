@@ -152,9 +152,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.replace('/login');
   }, []);
 
-  // Sessão permanente: sem logout por inatividade.
-  // O JWT é renovado automaticamente pelo interceptor HTTP a cada requisição.
-  // O usuário só é desconectado ao clicar em "Sair" explicitamente.
+  // ─────────────────────────────────────────────────────────────────────────
+  // SESSÃO PERMANENTE — SEM DESCONEXÃO POR INATIVIDADE
+  //
+  // Regra de negócio: enquanto o navegador estiver aberto e o usuário na
+  // página, a sessão NUNCA expira por ociosidade.
+  //
+  // O que desconecta o usuário:
+  //   1. Clicar em "Sair" (logout explícito)
+  //   2. Fechar o navegador / encerrar o app (localStorage é preservado
+  //      em reaberturas — o usuário volta autenticado)
+  //   3. Refresh token expirar após longo período sem abrir o sistema
+  //      (configurável via JWT_REFRESH_EXPIRES_IN no backend)
+  //
+  // O que NÃO desconecta:
+  //   ✗ Inatividade (mouse parado, sem cliques)
+  //   ✗ Tempo na mesma página
+  //   ✗ Qualquer temporizador interno
+  //
+  // O access token (curto) é renovado silenciosamente pelo interceptor
+  // HTTP sempre que uma requisição retorna 401. O usuário não percebe.
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
