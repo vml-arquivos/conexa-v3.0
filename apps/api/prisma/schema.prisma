@@ -292,6 +292,7 @@ model Mantenedora {
   materiais            Material[]
   cardapios                    Cardapio[]
   acompanhamentosNutricionais  AcompanhamentoNutricional[]
+  iaRequests                   IaRequest[] @relation("MantenedoraIaRequests")
 
   @@index([cnpj])
   @@index([isActive])
@@ -352,6 +353,7 @@ model Unit {
   cardapios             Cardapio[]
    configuracoesRefeicao ConfiguracaoRefeicao[]
   developmentReports    DevelopmentReport[]
+  iaRequests            IaRequest[] @relation("UnitIaRequests")
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
@@ -401,6 +403,7 @@ model User {
    auditLogs               AuditLog[]         @relation("User")
   developmentReports      DevelopmentReport[]
   microgestosRegistrados  MicrogestoRegistro[] @relation("MicrogestosRegistrados")
+  iaRequests              IaRequest[]          @relation("UserIaRequests")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([email])
@@ -2460,4 +2463,163 @@ model AlertaAluno {
   @@index([unitId])
   @@index([status])
   @@map("alerta_aluno")
+}
+
+// ============================================================================
+// IA — FUNDAÇÃO TÉCNICA (Fase 1 do Plano de IA)
+// Modelos para orquestração, histórico, logs, prompts, configuração e feedback
+// Todas as tabelas são ADITIVAS — zero impacto nos dados existentes
+// ============================================================================
+
+/// Tipos de requisição de IA
+enum IaRequestType {
+  ATIVIDADE
+  MICROGESTOS
+  RELATORIO_ALUNO
+  RELATORIO_TURMA
+  ANALISE_PLANO
+  ANALISE_DIARIO
+  LEMBRETE
+  VARREDURA
+  TEXTO_PERSONALIZADO
+}
+
+/// Status do ciclo de vida de uma requisição de IA
+enum IaRequestStatus {
+  PENDENTE
+  PROCESSANDO
+  SUCESSO
+  FALHA
+  CANCELADO
+}
+
+/// Status de aprovação humana de uma resposta de IA
+enum IaResponseStatus {
+  PENDENTE_REVISAO
+  APROVADO
+  REJEITADO
+}
+
+/// Registro de cada solicitação feita ao motor de IA
+model IaRequest {
+  id            String          @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  requesterId   String
+  type          IaRequestType
+  status        IaRequestStatus @default(PENDENTE)
+  payload       Json
+  promptId      String?
+  errorMessage  String?         @db.Text
+  createdAt     DateTime        @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  mantenedora Mantenedora    @relation("MantenedoraIaRequests", fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit           @relation("UnitIaRequests", fields: [unitId], references: [id], onDelete: Cascade)
+  requester   User           @relation("UserIaRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  prompt      PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  response    IaResponse?
+  logs        IaLog[]
+
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([requesterId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ia_request")
+}
+
+/// Resposta gerada pela IA para uma requisição
+model IaResponse {
+  id                   String           @id @default(cuid())
+  requestId            String           @unique
+  result               Json
+  rawResponse          String?          @db.Text
+  promptUsed           String?          @db.Text
+  costTokensPrompt     Int?
+  costTokensCompletion Int?
+  totalCost            Float?
+  modelUsed            String?          @db.VarChar(100)
+  status               IaResponseStatus @default(PENDENTE_REVISAO)
+  reviewedBy           String?          @db.VarChar(255)
+  approved             Boolean?
+  createdAt            DateTime         @default(now())
+
+  request   IaRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  feedbacks IaFeedback[]
+
+  @@index([requestId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ia_response")
+}
+
+/// Log de eventos do ciclo de vida de uma requisição de IA
+model IaLog {
+  id        String   @id @default(cuid())
+  requestId String
+  event     String   @db.VarChar(50)
+  message   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  request IaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("ia_log")
+}
+
+/// Template de prompt versionado e parametrizável
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  template    String   @db.Text
+  variables   Json     @default("[]")
+  version     Int      @default(1)
+  active      Boolean  @default(true)
+  createdBy   String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests IaRequest[]
+
+  @@index([active])
+  @@index([version])
+  @@map("prompt_template")
+}
+
+/// Configuração de IA por unidade ou mantenedora
+model IaConfig {
+  id            String   @id @default(cuid())
+  mantenedoraId String?
+  unitId        String?
+  key           String   @db.VarChar(100)
+  value         String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([mantenedoraId, unitId, key])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@map("ia_config")
+}
+
+/// Feedback do usuário sobre uma resposta de IA
+model IaFeedback {
+  id         String   @id @default(cuid())
+  responseId String
+  userId     String
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  response IaResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([userId])
+  @@map("ia_feedback")
 }
