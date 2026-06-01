@@ -1,53 +1,15 @@
 /**
- * useIdleTimeout.ts
- * Detecta inatividade do usuário e executa callback após o tempo configurado.
- * Eventos monitorados: mousemove, keydown, mousedown, touchstart, scroll, click.
- * Padrão: 8 horas (28_800_000 ms) — jornada escolar completa.
+ * useIdleTimeout.ts — DESATIVADO
+ *
+ * Sessão permanente: o sistema NÃO desconecta o usuário por inatividade.
+ * O usuário só é desconectado ao clicar explicitamente em "Sair"
+ * ou quando o refresh token expirar (configurado via JWT_REFRESH_EXPIRES_IN).
+ *
+ * Este hook foi mantido apenas para compatibilidade de importações legadas.
+ * Ele não faz nada.
  */
-import { useEffect, useRef, useCallback } from 'react';
 
-const IDLE_EVENTS: (keyof WindowEventMap)[] = [
-  'mousemove',
-  'keydown',
-  'mousedown',
-  'touchstart',
-  'scroll',
-  'click',
-];
-
-/**
- * @param onIdle  Callback executado quando o usuário fica inativo pelo tempo definido.
- * @param timeout Tempo em milissegundos. Padrão: 8 horas.
- */
-export function useIdleTimeout(onIdle: () => void, timeout = 8 * 60 * 60 * 1000) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onIdleRef = useRef(onIdle);
-
-  // Manter referência atualizada sem recriar o efeito
-  useEffect(() => {
-    onIdleRef.current = onIdle;
-  }, [onIdle]);
-
-  const resetTimer = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      onIdleRef.current();
-    }, timeout);
-  }, [timeout]);
-
-  useEffect(() => {
-    // Iniciar contagem ao montar
-    resetTimer();
-
-    IDLE_EVENTS.forEach(event => {
-      window.addEventListener(event, resetTimer, { passive: true });
-    });
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      IDLE_EVENTS.forEach(event => {
-        window.removeEventListener(event, resetTimer);
-      });
-    };
-  }, [resetTimer]);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function useIdleTimeout(_onIdle: () => void, _timeout?: number): void {
+  // Intencionalmente vazio — sem timeout por inatividade.
 }
