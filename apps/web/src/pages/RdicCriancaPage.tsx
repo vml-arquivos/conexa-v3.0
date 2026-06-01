@@ -13,6 +13,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor as checkIsProfessor } from '../api/auth';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -421,7 +422,24 @@ export default function RdicCriancaPage() {
   const [dimensoes, setDimensoes] = useState<DimensaoAvaliacao[]>(criarDimensoesVazias());
   const [observacaoGeral, setObservacaoGeral] = useState('');
   const [proximosPassos, setProximosPassos] = useState('');
-  const [saving, setSaving] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+  // ─── Auto-save no localStorage ───────────────────────────────────────────────────────────────────────
+  const rdicAutoSaveKey = alunoSelecionado
+    ? `rdic-rascunho-${user?.id ?? 'anon'}-${alunoSelecionado.id}-t${trimestre}`
+    : null;
+  const rdicAutoSaveData = { dimensoes, observacaoGeral, proximosPassos, trimestre };
+  const { hasDraft: rdicHasDraft, clearDraft: rdicClearDraft, lastSaved: rdicLastSaved } = useAutoSave({
+    key: rdicAutoSaveKey ?? 'rdic-noop',
+    data: rdicAutoSaveData,
+    enabled: !!alunoSelecionado && etapa === 'formulario',
+    onRestore: (saved) => {
+      if (saved.dimensoes && Array.isArray(saved.dimensoes)) setDimensoes(saved.dimensoes);
+      if (typeof saved.observacaoGeral === 'string') setObservacaoGeral(saved.observacaoGeral);
+      if (typeof saved.proximosPassos === 'string') setProximosPassos(saved.proximosPassos);
+      toast.info('Rascunho do RDIC recuperado automaticamente.');
+    },
+  });
 
   // IA LGPD
   const [gerandoIA, setGerandoIA] = useState(false);
@@ -729,6 +747,7 @@ export default function RdicCriancaPage() {
         await http.post('/rdic', payload);
       }
       toast.success(`RDIC de ${alunoSelecionado.firstName} salvo com sucesso!`);
+      rdicClearDraft();
       await carregarRdicsDoAluno(alunoSelecionado.id);
       setEtapa('historico');
     } catch (err: any) {
@@ -890,6 +909,16 @@ export default function RdicCriancaPage() {
       {/* ─── ETAPA 2: Formulário RDIC ─── */}
       {etapa === 'formulario' && alunoSelecionado && (
         <div className="space-y-6">
+          {/* Banner de auto-save */}
+          {rdicHasDraft && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm">
+              <span className="text-amber-800">
+                💾 Rascunho salvo automaticamente
+                {rdicLastSaved && ` às ${rdicLastSaved.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+              </span>
+              <button onClick={rdicClearDraft} className="text-xs text-amber-600 underline hover:text-amber-800">Descartar rascunho</button>
+            </div>
+          )}
           {/* Header da criança selecionada */}
           <div className="flex items-center gap-4">
             <button

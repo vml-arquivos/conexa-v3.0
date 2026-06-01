@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { login as apiLogin, loadMe } from '../api/auth';
 import type { User } from '../api/auth';
 import { isAuthExpiredError } from '../api/http';
-import { useIdleTimeout } from '../hooks/useIdleTimeout';
 
 interface AuthContextType {
   user: User | null;
@@ -153,18 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.replace('/login');
   }, []);
 
-  // Logout automático após 8 horas de inatividade real (jornada escolar completa).
-  // O JWT auto-refresh (interceptor HTTP) mantém a sessão ativa durante uso.
-  // O logout ocorre apenas se o usuário ficar 8h SEM NENHUMA INTERAÇÃO.
-  useIdleTimeout(
-    useCallback(() => {
-      if (user) {
-        console.info('[AuthProvider] Sessão encerrada por inatividade (8h).');
-        logout();
-      }
-    }, [user, logout]),
-    8 * 60 * 60 * 1000, // 8 horas
-  );
+  // Sessão permanente: sem logout por inatividade.
+  // O JWT é renovado automaticamente pelo interceptor HTTP a cada requisição.
+  // O usuário só é desconectado ao clicar em "Sair" explicitamente.
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

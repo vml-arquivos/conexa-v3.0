@@ -46,6 +46,7 @@ import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
 import { useAuth } from '../app/AuthProvider';
 import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { toPedagogicalISODate } from '../lib/formatDate';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { extractErrorMessage } from '../lib/utils';
 // Fallback local: usado SOMENTE quando o backend retornar objectives vazio
 import { MATRIZ_2026, type EntradaMatriz, type SegmentoKey } from '../data/matrizCompleta2026';
@@ -383,6 +384,24 @@ export default function PlanoDeAulaNovoPage() {
   // Datas ocupadas (já existem planejamentos nessas datas)
   const [occupiedDates, setOccupiedDates] = useState<string[]>([]);
   const [checkingDates, setCheckingDates] = useState(false);
+
+  // ─── Auto-save no localStorage (apenas para novos planos — planningId nulo) ──
+  const autoSaveKey = `plano-aula-rascunho-${user?.id ?? 'anon'}-${classroomId || 'sem-turma'}`;
+  const autoSaveData = { classroomId, startDate, numDays, title, days };
+  const { hasDraft, clearDraft, lastSaved } = useAutoSave({
+    key: autoSaveKey,
+    data: autoSaveData,
+    enabled: !planningId && !loading, // só salva rascunhos locais (não planos já persistidos)
+    onRestore: (saved) => {
+      if (planningId) return; // não restaurar se já há um plano carregado do servidor
+      if (saved.classroomId) setClassroomId(saved.classroomId);
+      if (saved.startDate)   setStartDate(saved.startDate);
+      if (saved.numDays)     setNumDays(saved.numDays);
+      if (saved.title)       setTitle(saved.title);
+      if (Array.isArray(saved.days) && saved.days.length > 0) setDays(saved.days);
+      toast.info('Rascunho recuperado automaticamente. Revise antes de enviar.');
+    },
+  });
 
   // Cache de matriz: chave = "classroomId|YYYY-MM-DD"
   const matrizCache = useRef<Map<string, MatrizByDayResponse>>(new Map());
@@ -757,6 +776,7 @@ export default function PlanoDeAulaNovoPage() {
       if (!currentId) throw new Error('ID do planejamento não encontrado');
       await submitPlanningForReview(currentId);
       setStatus('EM_REVISAO');
+      clearDraft(); // limpar rascunho local após envio bem-sucedido
       toast.success('Planejamento enviado para revisão!');
       navigate('/app/planejamentos');
     } catch (err: any) {
@@ -811,6 +831,17 @@ export default function PlanoDeAulaNovoPage() {
           </span>
         </div>
 
+        {/* Banner de auto-save */}
+        {hasDraft && !planningId && (
+          <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
+            <Save className="h-4 w-4 flex-shrink-0 text-blue-500" />
+            <span className="flex-1">
+              Rascunho salvo automaticamente
+              {lastSaved && ` às ${lastSaved.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}.
+              Seus dados não serão perdidos.
+            </span>
+          </div>
+        )}
         {/* Aviso quando bloqueado */}
         {bloqueado && (
           <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
