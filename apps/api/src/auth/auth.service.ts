@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,71 +15,28 @@ export class AuthService {
   ) {}
 
   /**
-   * Realiza o login do usuário
+   * Realiza o login do usuário.
+   * Regra central: todo usuário autenticado precisa carregar mantenedoraId.
    */
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Buscar usuário com suas roles e permissões
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: {
-        roles: {
-          where: { isActive: true },
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-            unitScopes: {
-              include: {
-                unit: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const user = await this.findActiveUserWithAccessContextByEmail(email);
 
     if (!user) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    // Verificar status do usuário
-    if (user.status !== 'ATIVO') {
-      throw new UnauthorizedException('Usuário inativo');
-    }
-
-    // Verificar senha
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    // Construir payload do JWT
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      mantenedoraId: user.mantenedoraId,
-      unitId: user.unitId || undefined,
-      roles: user.roles.map((userRole) => ({
-        roleId: userRole.roleId,
-        level: userRole.role.level,  // FIX: usar role.level (RoleLevel) e não scopeLevel
-        type: userRole.role.type,    // Papel específico (UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
-        unitScopes: userRole.unitScopes.map((scope) => scope.unitId),
-      })),
-    };
+    const payload = this.buildJwtPayload(user);
 
-    // Gerar tokens
     const accessToken = await this.generateAccessToken(payload);
     const refreshToken = await this.generateRefreshToken(payload);
 
-    // Atualizar lastLogin
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
@@ -105,29 +58,27 @@ export class AuthService {
   }
 
   /**
-   * Renova o access token usando o refresh token
+   * Renova o access token usando o refresh token.
+   * Importante: não reutiliza cegamente o payload antigo.
+   * Recarrega usuário, mantenedora, unidade e roles do banco para evitar token desatualizado.
    */
   async refreshAccessToken(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync<JwtPayload>(
+      const oldPayload = await this.jwtService.verifyAsync<JwtPayload>(
         refreshToken,
         {
           secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         },
       );
 
-      // Verificar se o usuário ainda existe e está ativo
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: { id: true, status: true },
-      });
+      const user = await this.findActiveUserWithAccessContextById(oldPayload.sub);
 
-      if (!user || user.status !== 'ATIVO') {
+      if (!user) {
         throw new UnauthorizedException('Usuário inativo ou não encontrado');
       }
 
-      // Gerar novo access token
-      const newAccessToken = await this.generateAccessToken(payload);
+      const freshPayload = this.buildJwtPayload(user);
+      const newAccessToken = await this.generateAccessToken(freshPayload);
 
       return {
         accessToken: newAccessToken,
@@ -135,6 +86,78 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Refresh token inválido ou expirado');
     }
+  }
+
+  private async findActiveUserWithAccessContextByEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: this.userAccessContextInclude(),
+    });
+
+    if (!user || user.status !== 'ATIVO') {
+      return null;
+    }
+
+    return user;
+  }
+
+  private async findActiveUserWithAccessContextById(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: this.userAccessContextInclude(),
+    });
+
+    if (!user || user.status !== 'ATIVO') {
+      return null;
+    }
+
+    return user;
+  }
+
+  private userAccessContextInclude() {
+    return {
+      roles: {
+        where: { isActive: true },
+        include: {
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+          unitScopes: {
+            include: {
+              unit: true,
+            },
+          },
+        },
+      },
+    } as const;
+  }
+
+  private buildJwtPayload(user: any): JwtPayload {
+    if (!user.mantenedoraId) {
+      throw new UnauthorizedException(
+        'Usuário sem mantenedora vinculada. Acesso bloqueado por segurança.',
+      );
+    }
+
+    return {
+      sub: user.id,
+      id: user.id,
+      email: user.email,
+      mantenedoraId: user.mantenedoraId,
+      unitId: user.unitId || undefined,
+      roles: user.roles.map((userRole: any) => ({
+        roleId: userRole.roleId,
+        level: userRole.role.level,
+        type: userRole.role.type,
+        unitScopes: userRole.unitScopes.map((scope: any) => scope.unitId),
+      })),
+    };
   }
 
   /**
@@ -181,7 +204,7 @@ export class AuthService {
 
   /**
    * Retorna os dados do usuário autenticado — GET /auth/me
-   * Utilizado pelo frontend para carregar o perfil após login
+   * Utilizado pelo frontend para carregar o perfil após login.
    */
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -202,10 +225,17 @@ export class AuthService {
         unit: { select: { id: true, name: true, code: true } },
       },
     });
-    if (!user) throw new UnauthorizedException('Usuário não encontrado');
 
-    // Buscar roles com unitScopes — mesmo formato do JWT — para consistência frontend
-    // FIX: usar role.level (RoleLevel real) em vez de scopeLevel
+    if (!user || user.status !== 'ATIVO') {
+      throw new UnauthorizedException('Usuário não encontrado ou inativo');
+    }
+
+    if (!user.mantenedoraId) {
+      throw new UnauthorizedException(
+        'Usuário sem mantenedora vinculada. Acesso bloqueado por segurança.',
+      );
+    }
+
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId, isActive: true },
       include: {
@@ -214,12 +244,10 @@ export class AuthService {
       },
     });
 
-    // Formato rico (igual ao JWT): array de objetos com level + unitScopes
-    // O frontend (normalizeRoles) suporta ambos os formatos (string[] e objeto[])
     const rolesRich = userRoles.map((r) => ({
       roleId: r.roleId,
       level: r.role.level,
-      type: r.role.type,   // Papel específico (UNIDADE_NUTRICIONISTA, UNIDADE_DIRETOR, etc.)
+      type: r.role.type,
       unitScopes: r.unitScopes.map((s) => s.unitId),
     }));
 
