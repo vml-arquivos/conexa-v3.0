@@ -67,11 +67,15 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
-    const data: Prisma.ChildUncheckedCreateInput = {
+    // Usamos 'any' no objeto intermediário porque o spread do DTO traz campos
+    // tipados como Record<string,unknown> que o TypeScript não atribui diretamente
+    // a InputJsonValue do Prisma — normalizeChildJsonFields sobrescreve com os
+    // valores corretos antes de chegar ao Prisma.
+    const data = {
       ...createChildDto,
       ...normalizeChildJsonFields(createChildDto),
       mantenedoraId: user.mantenedoraId,
-    };
+    } as Prisma.ChildUncheckedCreateInput;
 
     const child = await this.prisma.child.create({
       data,
@@ -194,10 +198,10 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
-    const data: Prisma.ChildUncheckedUpdateInput = {
+    const data = {
       ...updateChildDto,
       ...normalizeChildJsonFields(updateChildDto),
-    };
+    } as Prisma.ChildUncheckedUpdateInput;
 
     const updated = await this.prisma.child.update({
       where: { id },
