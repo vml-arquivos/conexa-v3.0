@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { MetricsModule } from './metrics/metrics.module';
 import { AppService } from './app.service';
@@ -47,6 +47,8 @@ import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/ac
 import { PlanningConferenciaModule } from './planning-conferencia/planning-conferencia.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AlertasModule } from './alertas/alertas.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
+import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
 
 @Module({
   imports: [
@@ -97,6 +99,7 @@ import { AlertasModule } from './alertas/alertas.module';
     PlanningConferenciaModule,
     ScheduleModule.forRoot(),
     AlertasModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [
@@ -104,6 +107,10 @@ import { AlertasModule } from './alertas/alertas.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
     },
   ],
 })

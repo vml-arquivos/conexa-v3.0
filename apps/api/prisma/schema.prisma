@@ -301,7 +301,7 @@ model Mantenedora {
 /// Unidade: Creche/Escola dentro de uma mantenedora
 model Unit {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   name          String @db.VarChar(255)
   code          String @db.VarChar(50)
 
@@ -366,7 +366,7 @@ model Unit {
 /// Usuário do sistema
 model User {
   id            String  @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String?
 
   // Credenciais
@@ -413,7 +413,7 @@ model User {
 /// Papel/Role no sistema
 model Role {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
 
   name        String    @db.VarChar(100)
   description String?   @db.Text
@@ -528,7 +528,7 @@ model RolePermission {
 /// Criança/Aluno
 model Child {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
 
   // Identificação
@@ -706,7 +706,7 @@ model ClassroomTeacher {
 /// Matriz Curricular (versão anual da matriz oficial)
 model CurriculumMatrix {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
 
   // Identificação
   name    String @db.VarChar(255)
@@ -988,7 +988,7 @@ model DiaryEvent {
 /// Registro de frequência
 model Attendance {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   classroomId   String
   childId       String
@@ -1061,7 +1061,7 @@ model DietaryRestriction {
 /// Requisição de material
 model MaterialRequest {
   id            String  @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   classroomId   String? // Opcional: permite requisição por turma
 
@@ -1166,7 +1166,7 @@ model StockItem {
 /// Log de auditoria: rastreamento de todas as ações no sistema
 model AuditLog {
   id            String  @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String?
   userId        String?
 
@@ -1185,7 +1185,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // Relações
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
   user        User?       @relation("User", fields: [userId], references: [id], onDelete: SetNull)
 
@@ -1205,7 +1205,7 @@ model AuditLog {
 /// Base para geração de relatórios oficiais
 model ReportBase {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   classroomId   String
   childId       String
@@ -1231,7 +1231,7 @@ model ReportBase {
   updatedAt DateTime @updatedAt
 
   // Relações
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   classroom   Classroom   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
@@ -1252,7 +1252,7 @@ model ReportBase {
 /// Histórico de contexto para agentes IA (suporte, não decisão)
 model AIContext {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   childId       String
 
@@ -1271,7 +1271,7 @@ model AIContext {
   updatedAt DateTime @updatedAt
 
   // Relações
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
 
@@ -1326,7 +1326,7 @@ enum StatusPedidoCompra {
 /// Pedido de Compra consolidado mensalmente pela unidade para a mantenedora
 model PedidoCompra {
   id            String  @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   fornecedorId  String?
 
@@ -1418,7 +1418,7 @@ enum TipoAlvoCorrecao {
 model SolicitacaoCorrecao {
   id String @id @default(cuid())
 
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
 
   criadoPorId   String @db.VarChar(255)
@@ -1437,7 +1437,7 @@ model SolicitacaoCorrecao {
   atualizadoEm DateTime  @updatedAt
   resolvidaEm  DateTime?
 
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([mantenedoraId])
@@ -1557,7 +1557,7 @@ model CoordenacaoAta {
 
 model Formacao {
   id            String      @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String?
   titulo        String      @db.VarChar(255)
   descricao     String?     @db.Text
@@ -1627,7 +1627,7 @@ model AtendimentoPais {
 // ============================================================================
 model RelatorioFoto {
   id            String      @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   classroomId   String
   titulo        String      @db.VarChar(255)
@@ -1678,7 +1678,7 @@ enum RdicPeriodo {
 
 model RDIXTemplate {
   id            String          @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   segmento      String          @db.VarChar(50)
   titulo        String          @db.VarChar(255)
   estruturaJson Json
@@ -1695,7 +1695,7 @@ model RDIXTemplate {
 
 model RDIXInstancia {
   id            String       @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   templateId    String
   childId       String
@@ -2059,7 +2059,7 @@ model DevelopmentObservation {
 /// Material do catálogo da mantenedora (referência para requisições e pedidos de compra)
 model Material {
   id            String @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
 
   // Identificação (nomes em inglês para compatibilidade com o service)
   code            String   @db.VarChar(50)
@@ -2105,7 +2105,7 @@ enum TipoRefeicao {
 /// Cardápio semanal da unidade
 model Cardapio {
   id            String   @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   /// Semana de referência: primeiro dia da semana (segunda-feira) no formato YYYY-MM-DD
   semana        String   @db.VarChar(10)
@@ -2291,7 +2291,7 @@ model AcompanhamentoNutricional {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   // Relações
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
 
   @@unique([childId]) // uma criança tem no máximo 1 caso ativo por vez
@@ -2444,7 +2444,7 @@ model AlertaAluno {
   childId       String
   classroomId   String
   unitId        String
-  mantenedoraId String
+  mantenedoraId String?
   tipo          AlertaTipo
   status        AlertaStatus @default(ATIVO)
   titulo        String       @db.VarChar(255)
@@ -2503,7 +2503,7 @@ enum IaResponseStatus {
 /// Registro de cada solicitação feita ao motor de IA
 model IaRequest {
   id            String          @id @default(cuid())
-  mantenedoraId String
+  mantenedoraId String?
   unitId        String
   requesterId   String
   type          IaRequestType
