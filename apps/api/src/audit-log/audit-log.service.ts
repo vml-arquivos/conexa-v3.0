@@ -33,6 +33,16 @@ export class AuditLogService {
       userAgent,
     } = params;
 
+    // A mantenedora é raiz do modelo multi-tenant.
+    // Auditoria só grava quando existe mantenedoraId.
+    // Se faltar contexto, registra warning e nunca quebra o fluxo principal.
+    if (!mantenedoraId) {
+      this.logger.warn(
+        `AuditLog ignorado sem mantenedoraId: ${action} ${entity} ${entityId}`,
+      );
+      return;
+    }
+
     try {
       await this.prisma.auditLog.create({
         data: {
