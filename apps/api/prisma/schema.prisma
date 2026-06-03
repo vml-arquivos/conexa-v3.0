@@ -1166,7 +1166,7 @@ model StockItem {
 /// Log de auditoria: rastreamento de todas as ações no sistema
 model AuditLog {
   id            String  @id @default(cuid())
-  mantenedoraId String?
+  mantenedoraId String
   unitId        String?
   userId        String?
 
@@ -1185,7 +1185,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   // Relações
-  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
   user        User?       @relation("User", fields: [userId], references: [id], onDelete: SetNull)
 
