@@ -21,10 +21,10 @@ export class AuditLogInterceptor implements NestInterceptor {
       tap({
         next: () => {
           void this.auditLogService.createLog({
-            userId: user?.sub ?? user?.id,
+            userId: user?.id,
             unitId: user?.unitId,
             mantenedoraId: user?.mantenedoraId,
-            action: this.mapAction(method, originalUrl),
+            action: this.mapAction(method),
             entity: this.mapEntity(originalUrl),
             entityId: originalUrl,
             description: `${method} ${originalUrl}`,
@@ -36,15 +36,7 @@ export class AuditLogInterceptor implements NestInterceptor {
     );
   }
 
-  private mapAction(method: string, originalUrl: string): AuditLogAction {
-    const path = originalUrl.toLowerCase();
-
-    if (path.includes('/auth/login')) return 'LOGIN';
-    if (path.includes('/auth/logout')) return 'LOGOUT';
-    if (path.includes('/submit-review')) return 'SUBMIT_REVIEW';
-    if (path.includes('/approve') && path.includes('/planning')) return 'APPROVE_PLANNING';
-    if (path.includes('/return') && path.includes('/planning')) return 'RETURN_PLANNING';
-
+  private mapAction(method: string): AuditLogAction {
     switch (method) {
       case 'POST':
         return 'CREATE';
@@ -69,10 +61,7 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (path.includes('/children')) return 'CHILD';
     if (path.includes('/classrooms')) return 'CLASSROOM';
     if (path.includes('/units')) return 'UNIT';
-    if (path.includes('/roles')) return 'ROLE';
-    if (path.includes('/permissions')) return 'PERMISSION';
-    if (path.includes('/auth') || path.includes('/users')) return 'USER';
-    if (path.includes('/curriculum-matrix-entry')) return 'CURRICULUM_MATRIX_ENTRY';
+    if (path.includes('/users') || path.includes('/auth')) return 'USER';
     if (path.includes('/curriculum-matrix')) return 'CURRICULUM_MATRIX';
 
     return 'USER';

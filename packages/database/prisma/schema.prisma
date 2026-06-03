@@ -567,6 +567,19 @@ model Child {
   // Foto do aluno
   photoUrl String? @db.Text
 
+  // Dossiê administrativo da matrícula (Secretaria)
+  // Campos aditivos para preservar dados exigidos nas planilhas oficiais da unidade.
+  nacionalidade       String? @db.VarChar(100)
+  naturalidade        String? @db.VarChar(100)
+  ufNascimento        String? @map("uf_nascimento") @db.VarChar(2)
+  endereco            String? @db.VarChar(255)
+  cep                 String? @db.VarChar(10)
+  dadosResponsaveis   Json?   @map("dados_responsaveis")
+  documentosMatricula Json?   @map("documentos_matricula")
+  autorizadosRetirada Json?   @map("autorizados_retirada")
+  transporteEscolar   Json?   @map("transporte_escolar")
+  fichaAdministrativa Json?   @map("ficha_administrativa")
+
   // Status
   isActive Boolean @default(true)
 

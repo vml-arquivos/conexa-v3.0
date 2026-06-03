@@ -1,231 +1,194 @@
 /**
- * SecretariaPage — Painel Operacional da Secretaria
+ * SecretariaPage — Cockpit Administrativo da Unidade
  *
- * Central operacional da instituição: matrículas, alunos, atendimentos,
- * comunicação, faltas, ocorrências, funcionários e pedidos administrativos.
+ * Identidade exclusiva da Secretaria: matrículas, fichas, faltas, atestados,
+ * ocorrências de saúde, atendimento aos pais, documentos e pedidos administrativos.
  *
- * RBAC: UNIDADE_ADMINISTRATIVO, UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
- * Sem alteração de backend, APIs, RBAC ou funcionalidades existentes.
+ * Não usa dashboard da coordenação e não expõe módulos pedagógicos como menu/atalho.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertTriangle,
+  Bell,
+  CheckCircle,
+  ChevronRight,
+  ClipboardList,
+  FileArchive,
+  FileWarning,
+  HeartPulse,
+  Inbox,
+  Loader2,
+  MessageCircle,
+  RefreshCw,
+  UserCheck,
+  UserCog,
+  UserPlus,
+  Users,
+  XCircle,
+} from 'lucide-react';
 import { useAuth } from '../app/AuthProvider';
-import { PageShell } from '../components/ui/PageShell';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
-import {
-  UserPlus, Users, AlertTriangle, MessageCircle, FileWarning,
-  UserCog, Inbox, Bell, ClipboardCheck, RefreshCw, ChevronRight,
-  CheckCircle, Clock, XCircle, TrendingUp, Calendar,
-} from 'lucide-react';
+import { PageShell } from '../components/ui/PageShell';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface SecretariaKPIs {
-  totalAlunos: number;
-  alunosAtivos: number;
-  matriculasPendentes: number;
-  turmasAtivas: number;
-  atendimentosPendentes: number;
-  faltasCriticas: number;
-  ocorrenciasAbertas: number;
-  funcionariosAtivos: number;
-}
-
-interface TurmaResumo {
+interface AlunoResumo {
   id: string;
-  name: string;
-  totalAlunos: number;
-  chamadaFeita: boolean;
-  professor: string | null;
+  firstName: string;
+  lastName: string;
+  isActive?: boolean;
+  enrollments?: Array<{
+    status?: string;
+    classroomId?: string;
+    classroom?: { name?: string };
+  }>;
+  allergies?: string | null;
+  medicalConditions?: string | null;
+  medicationNeeds?: string | null;
+  laudado?: boolean | null;
 }
 
-interface AtendimentoRecente {
+interface TurmaChamadaResumo {
+  classroomId: string;
+  classroomName: string;
+  professor?: string;
+  totalAlunos: number;
+  registrados: number;
+  presentes: number;
+  ausentes: number;
+  chamadaFeita: boolean;
+  taxaPresenca: number;
+}
+
+interface AtendimentoResumo {
   id: string;
   responsavelNome: string;
   assunto: string;
   status: string;
-  dataAtendimento: string;
+  dataAtendimento?: string;
 }
 
-// ─── Atalhos de ação rápida ───────────────────────────────────────────────────
+interface AlertaResumo {
+  id: string;
+  titulo: string;
+  descricao: string;
+  severidade: string;
+  tipo: string;
+  criadoEm?: string;
+}
 
-const ACOES_RAPIDAS = [
+const MODULOS_SECRETARIA = [
   {
-    id: 'nova-matricula',
-    label: 'Nova Matrícula',
-    icon: <UserPlus className="h-5 w-5" />,
-    path: '/app/secretaria/matriculas/nova',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
-  },
-  {
-    id: 'atendimento',
-    label: 'Registrar Atendimento',
-    icon: <MessageCircle className="h-5 w-5" />,
-    path: '/app/atendimentos-pais',
-    color: 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100',
-  },
-  {
-    id: 'ocorrencia',
-    label: 'Nova Ocorrência',
-    icon: <FileWarning className="h-5 w-5" />,
-    path: '/app/secretaria/ocorrencias/nova',
-    color: 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-  },
-  {
-    id: 'comunicado',
-    label: 'Enviar Comunicado',
-    icon: <Bell className="h-5 w-5" />,
-    path: '/app/secretaria/comunicacao',
-    color: 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100',
-  },
-];
-
-// ─── Módulos da Secretaria ────────────────────────────────────────────────────
-
-const MODULOS = [
-  {
-    id: 'matriculas',
-    label: 'Matrículas',
-    desc: 'Novas matrículas, cadastro de alunos e responsáveis',
-    icon: <UserPlus className="h-5 w-5" />,
+    label: 'Matrículas e Fichas',
+    desc: 'Criar matrícula, localizar alunos, conferir dados e documentação.',
     path: '/app/secretaria/matriculas',
+    icon: <UserCheck className="h-5 w-5" />,
     accent: 'border-l-emerald-500',
-    badge: null as string | null,
   },
   {
-    id: 'movimentacoes',
+    label: 'Nova Matrícula',
+    desc: 'Ficha completa baseada nos dados exigidos pela unidade.',
+    path: '/app/secretaria/matriculas/nova',
+    icon: <UserPlus className="h-5 w-5" />,
+    accent: 'border-l-blue-500',
+  },
+  {
     label: 'Cancelamentos e Transferências',
-    desc: 'Movimentações, histórico e rastreabilidade',
-    icon: <ClipboardCheck className="h-5 w-5" />,
+    desc: 'Movimentações administrativas com histórico e rastreabilidade.',
     path: '/app/secretaria/movimentacoes',
+    icon: <FileArchive className="h-5 w-5" />,
     accent: 'border-l-amber-500',
-    badge: null as string | null,
   },
   {
-    id: 'atendimentos',
-    label: 'Atendimento aos Pais',
-    desc: 'Histórico de contatos, ligações e encaminhamentos',
-    icon: <MessageCircle className="h-5 w-5" />,
-    path: '/app/atendimentos-pais',
-    accent: 'border-l-teal-500',
-    badge: null as string | null,
-  },
-  {
-    id: 'comunicacao',
-    label: 'Comunicação',
-    desc: 'Recados, avisos e comunicados institucionais',
-    icon: <Bell className="h-5 w-5" />,
-    path: '/app/secretaria/comunicacao',
-    accent: 'border-l-violet-500',
-    badge: 'Novo',
-  },
-  {
-    id: 'faltas',
     label: 'Controle de Faltas',
-    desc: 'Alertas de reincidência, justificativas e histórico',
-    icon: <AlertTriangle className="h-5 w-5" />,
+    desc: 'Acompanhar faltas, justificativas, atestados e reincidências.',
     path: '/app/secretaria/faltas',
+    icon: <ClipboardList className="h-5 w-5" />,
     accent: 'border-l-red-500',
-    badge: null as string | null,
   },
   {
-    id: 'ocorrencias',
-    label: 'Ocorrências',
-    desc: 'Ocorrências administrativas e pedagógicas',
-    icon: <FileWarning className="h-5 w-5" />,
+    label: 'Saúde e Ocorrências',
+    desc: 'Crianças passando mal, acidentes, ligações aos pais e atestados.',
     path: '/app/secretaria/ocorrencias',
-    accent: 'border-l-orange-500',
-    badge: null as string | null,
+    icon: <HeartPulse className="h-5 w-5" />,
+    accent: 'border-l-rose-500',
   },
   {
-    id: 'funcionarios',
-    label: 'Funcionários',
-    desc: 'Cadastro, status, vínculo e permissões',
-    icon: <UserCog className="h-5 w-5" />,
-    path: '/app/secretaria/funcionarios',
-    accent: 'border-l-indigo-500',
-    badge: null as string | null,
+    label: 'Atendimento aos Pais',
+    desc: 'Registro de ligações, atendimentos, retornos e encaminhamentos.',
+    path: '/app/atendimentos-pais',
+    icon: <MessageCircle className="h-5 w-5" />,
+    accent: 'border-l-teal-500',
   },
   {
-    id: 'pedidos',
     label: 'Pedidos Administrativos',
-    desc: 'Limpeza, manutenção, suprimentos e apoio',
-    icon: <Inbox className="h-5 w-5" />,
+    desc: 'Demandas de limpeza, manutenção, material e apoio operacional.',
     path: '/app/secretaria/pedidos',
+    icon: <Inbox className="h-5 w-5" />,
     accent: 'border-l-slate-500',
-    badge: null as string | null,
+  },
+  {
+    label: 'Funcionários da Unidade',
+    desc: 'Profissionais, contatos e apoio administrativo da unidade.',
+    path: '/app/secretaria/funcionarios',
+    icon: <UserCog className="h-5 w-5" />,
+    accent: 'border-l-indigo-500',
   },
 ];
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
+function hojeISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getStatusAtivo(aluno: AlunoResumo) {
+  return aluno.enrollments?.some((e) => e.status === 'ATIVA') ?? aluno.isActive !== false;
+}
 
 export default function SecretariaPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [kpis, setKpis] = useState<SecretariaKPIs | null>(null);
-  const [turmas, setTurmas] = useState<TurmaResumo[]>([]);
-  const [atendimentos, setAtendimentos] = useState<AtendimentoRecente[]>([]);
+  const { user } = useAuth();
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [alunos, setAlunos] = useState<AlunoResumo[]>([]);
+  const [turmas, setTurmas] = useState<TurmaChamadaResumo[]>([]);
+  const [atendimentos, setAtendimentos] = useState<AtendimentoResumo[]>([]);
+  const [alertas, setAlertas] = useState<AlertaResumo[]>([]);
 
-  const unitName = (user as any)?.unit?.name ?? '';
-  const userName = (user as any)?.nome || (user as any)?.email || 'Secretaria';
+  const unidadeNome = (user as any)?.unit?.name ?? (user as any)?.unitName ?? 'Unidade';
+  const usuarioNome = (user as any)?.nome ?? (user as any)?.email ?? 'Secretaria';
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro(null);
+
     try {
-      // Dados do dashboard de unidade (endpoint existente)
-      const [dashRes, atendRes] = await Promise.allSettled([
-        http.get('/coordenacao/dashboard/unidade'),
-        http.get('/atendimento-pais?limit=5'),
+      const [alunosRes, chamadaRes, atendRes, alertasRes] = await Promise.allSettled([
+        http.get('/children', { params: { limit: 300 } }),
+        http.get('/attendance/unit-summary', { params: { date: hojeISO() } }),
+        http.get('/atendimentos-pais'),
+        http.get('/alertas', { params: { unread: 'true', limit: 20 } }),
       ]);
 
-      if (dashRes.status === 'fulfilled') {
-        const d = dashRes.value.data;
-        setTurmas(
-          Array.isArray(d.turmas)
-            ? d.turmas.map((t: any) => ({
-                id: t.id,
-                name: t.nome || t.name,
-                totalAlunos: t.totalAlunos ?? 0,
-                chamadaFeita: t.chamadaFeita ?? false,
-                professor: t.professor ?? null,
-              }))
-            : [],
-        );
-        // Montar KPIs a partir dos dados disponíveis
-        const totalAlunos = Array.isArray(d.turmas)
-          ? d.turmas.reduce((s: number, t: any) => s + (t.totalAlunos ?? 0), 0)
-          : 0;
-        setKpis({
-          totalAlunos,
-          alunosAtivos: totalAlunos,
-          matriculasPendentes: d.matriculasPendentes ?? 0,
-          turmasAtivas: Array.isArray(d.turmas) ? d.turmas.length : 0,
-          atendimentosPendentes: d.atendimentosPendentes ?? 0,
-          faltasCriticas: d.faltasCriticas ?? 0,
-          ocorrenciasAbertas: d.ocorrenciasAbertas ?? 0,
-          funcionariosAtivos: d.funcionariosAtivos ?? 0,
-        });
+      if (alunosRes.status === 'fulfilled') {
+        const data = alunosRes.value.data;
+        setAlunos(Array.isArray(data) ? data : data?.data ?? []);
+      }
+
+      if (chamadaRes.status === 'fulfilled') {
+        const data = chamadaRes.value.data;
+        setTurmas(Array.isArray(data?.turmas) ? data.turmas : []);
       }
 
       if (atendRes.status === 'fulfilled') {
-        const lista = Array.isArray(atendRes.value.data)
-          ? atendRes.value.data
-          : atendRes.value.data?.data ?? [];
-        setAtendimentos(
-          lista.slice(0, 5).map((a: any) => ({
-            id: a.id,
-            responsavelNome: a.responsavelNome ?? '—',
-            assunto: a.assunto ?? '—',
-            status: a.status ?? 'AGENDADO',
-            dataAtendimento: a.dataAtendimento ?? '',
-          })),
-        );
+        const data = atendRes.value.data;
+        const lista = Array.isArray(data) ? data : data?.data ?? [];
+        setAtendimentos(lista.slice(0, 8));
+      }
+
+      if (alertasRes.status === 'fulfilled') {
+        const data = alertasRes.value.data;
+        setAlertas(Array.isArray(data?.alertas) ? data.alertas : []);
       }
     } catch (e) {
       setErro(getErrorMessage(e));
@@ -234,28 +197,76 @@ export default function SecretariaPage() {
     }
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
-  // ─── KPI Cards ─────────────────────────────────────────────────────────────
+  const indicadores = useMemo(() => {
+    const alunosAtivos = alunos.filter(getStatusAtivo).length;
+    const semTurma = alunos.filter((a) => !a.enrollments?.some((e) => e.status === 'ATIVA' && e.classroomId)).length;
+    const laudos = alunos.filter((a) => Boolean(a.laudado)).length;
+    const saudeAtencao = alunos.filter(
+      (a) => Boolean(a.allergies || a.medicalConditions || a.medicationNeeds || a.laudado),
+    ).length;
+    const turmasSemChamada = turmas.filter((t) => !t.chamadaFeita).length;
+    const faltasHoje = turmas.reduce((total, turma) => total + (turma.ausentes ?? 0), 0);
+    const atendimentosPendentes = atendimentos.filter((a) => a.status === 'AGENDADO' || a.status === 'PENDENTE_RETORNO').length;
+    const alertasCriticos = alertas.filter((a) => a.severidade === 'ALTA' || a.severidade === 'CRITICA').length;
 
-  const kpiCards = kpis
-    ? [
-        { label: 'Alunos Ativos', value: kpis.alunosAtivos, icon: <Users className="h-4 w-4 text-blue-500" />, color: 'text-blue-600' },
-        { label: 'Turmas', value: kpis.turmasAtivas, icon: <Calendar className="h-4 w-4 text-emerald-500" />, color: 'text-emerald-600' },
-        { label: 'Atend. Pendentes', value: kpis.atendimentosPendentes, icon: <Clock className="h-4 w-4 text-amber-500" />, color: 'text-amber-600' },
-        { label: 'Faltas Críticas', value: kpis.faltasCriticas, icon: <AlertTriangle className="h-4 w-4 text-red-500" />, color: 'text-red-600' },
-        { label: 'Ocorrências', value: kpis.ocorrenciasAbertas, icon: <FileWarning className="h-4 w-4 text-orange-500" />, color: 'text-orange-600' },
-        { label: 'Funcionários', value: kpis.funcionariosAtivos, icon: <UserCog className="h-4 w-4 text-indigo-500" />, color: 'text-indigo-600' },
-      ]
-    : [];
+    return {
+      alunosAtivos,
+      semTurma,
+      laudos,
+      saudeAtencao,
+      turmasSemChamada,
+      faltasHoje,
+      atendimentosPendentes,
+      alertasCriticos,
+    };
+  }, [alunos, turmas, atendimentos, alertas]);
 
-  const turmasSemChamada = turmas.filter((t) => !t.chamadaFeita);
-  const turmasComChamada = turmas.filter((t) => t.chamadaFeita);
+  const fila = [
+    {
+      titulo: 'Turmas sem chamada hoje',
+      valor: indicadores.turmasSemChamada,
+      desc: 'Acompanhar com professor/coordenação para fechar frequência.',
+      path: '/app/secretaria/faltas',
+      urgente: indicadores.turmasSemChamada > 0,
+    },
+    {
+      titulo: 'Faltas registradas hoje',
+      valor: indicadores.faltasHoje,
+      desc: 'Conferir justificativas, atestados e contato com responsáveis.',
+      path: '/app/secretaria/faltas',
+      urgente: indicadores.faltasHoje >= 3,
+    },
+    {
+      titulo: 'Atendimentos pendentes',
+      valor: indicadores.atendimentosPendentes,
+      desc: 'Retornos, ligações e encaminhamentos ainda em aberto.',
+      path: '/app/atendimentos-pais',
+      urgente: indicadores.atendimentosPendentes > 0,
+    },
+    {
+      titulo: 'Alertas críticos',
+      valor: indicadores.alertasCriticos,
+      desc: 'Ocorrências de maior severidade para ação administrativa.',
+      path: '/app/secretaria/ocorrencias',
+      urgente: indicadores.alertasCriticos > 0,
+    },
+    {
+      titulo: 'Alunos sem turma ativa',
+      valor: indicadores.semTurma,
+      desc: 'Regularizar matrícula, transferência ou alocação.',
+      path: '/app/secretaria/matriculas',
+      urgente: indicadores.semTurma > 0,
+    },
+  ];
 
   return (
     <PageShell
-      title="Secretaria"
-      description={unitName ? `${unitName} · Central operacional` : 'Central operacional da instituição'}
+      title="Secretaria da Unidade"
+      description={`${unidadeNome} · administrativo, matrículas, frequência, atendimento e documentação`}
       headerActions={
         <button
           onClick={carregar}
@@ -267,185 +278,153 @@ export default function SecretariaPage() {
         </button>
       }
     >
-      {/* ── Erro ── */}
-      {erro && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2">
-          <XCircle className="h-4 w-4 flex-shrink-0" />
-          {erro}
-        </div>
-      )}
+      <div className="space-y-6">
+        {erro && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2">
+            <XCircle className="h-4 w-4 flex-shrink-0" />
+            {erro}
+          </div>
+        )}
 
-      {/* ── Ações Rápidas ── */}
-      <section>
-        <p className="text-xs font-medium text-slate-400 mb-2.5 tracking-wide">Ações rápidas</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {ACOES_RAPIDAS.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => navigate(a.path)}
-              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all touch-manipulation ${a.color}`}
-            >
-              {a.icon}
-              <span className="text-left leading-tight">{a.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* ── KPIs ── */}
-      {kpis && (
-        <section>
-          <p className="text-xs font-medium text-slate-400 mb-2.5 tracking-wide">Indicadores do dia</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-            {kpiCards.map((k) => (
-              <div key={k.label} className="bg-white rounded-2xl border border-slate-100 p-3.5 shadow-sm">
-                <div className="flex items-center justify-between mb-1">
-                  {k.icon}
-                </div>
-                <p className={`text-2xl font-semibold tabular-nums ${k.color}`}>{k.value}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 font-normal">{k.label}</p>
-              </div>
-            ))}
+        <section className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cockpit operacional</p>
+              <h2 className="text-lg font-semibold text-slate-800 mt-1">Olá, {usuarioNome}</h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Priorize matrícula, frequência, ocorrências de saúde e contato com responsáveis.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+              <button onClick={() => navigate('/app/secretaria/matriculas/nova')} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                <UserPlus className="h-4 w-4" /> Nova matrícula
+              </button>
+              <button onClick={() => navigate('/app/secretaria/faltas')} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium bg-red-50 text-red-700 border-red-200 hover:bg-red-100">
+                <ClipboardList className="h-4 w-4" /> Faltas
+              </button>
+              <button onClick={() => navigate('/app/secretaria/ocorrencias')} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100">
+                <HeartPulse className="h-4 w-4" /> Ocorrência
+              </button>
+              <button onClick={() => navigate('/app/atendimentos-pais')} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100">
+                <MessageCircle className="h-4 w-4" /> Pais
+              </button>
+            </div>
           </div>
         </section>
-      )}
 
-      {/* ── Status das Chamadas ── */}
-      {turmas.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-xs font-medium text-slate-400 tracking-wide">Chamadas hoje</p>
-            <span className="text-[11px] text-slate-400">
-              {turmasComChamada.length}/{turmas.length} turmas
-            </span>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-            {/* Barra de progresso */}
-            <div className="px-4 pt-3 pb-2">
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-1.5 bg-emerald-500 rounded-full transition-all duration-500"
-                  style={{ width: `${turmas.length > 0 ? (turmasComChamada.length / turmas.length) * 100 : 0}%` }}
-                />
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <KpiCard label="Alunos ativos" value={indicadores.alunosAtivos} icon={<Users className="h-4 w-4 text-blue-500" />} />
+          <KpiCard label="Faltas hoje" value={indicadores.faltasHoje} icon={<AlertTriangle className="h-4 w-4 text-red-500" />} />
+          <KpiCard label="Atenção saúde" value={indicadores.saudeAtencao} icon={<HeartPulse className="h-4 w-4 text-rose-500" />} />
+          <KpiCard label="Atend. pendentes" value={indicadores.atendimentosPendentes} icon={<MessageCircle className="h-4 w-4 text-teal-500" />} />
+        </section>
+
+        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Fila da Secretaria</p>
+                <p className="text-xs text-slate-400">O que precisa de ação administrativa agora</p>
               </div>
+              {carregando && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
             </div>
             <div className="divide-y divide-slate-50">
-              {turmas.slice(0, 6).map((t) => (
-                <div key={t.id} className="flex items-center justify-between px-4 py-2.5">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {t.chamadaFeita
-                      ? <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                      : <Clock className="h-4 w-4 text-amber-400 flex-shrink-0" />
-                    }
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-700 truncate">{t.name}</p>
-                      {t.professor && (
-                        <p className="text-[11px] text-slate-400 truncate">{t.professor}</p>
-                      )}
-                    </div>
+              {fila.map((item) => (
+                <button
+                  key={item.titulo}
+                  onClick={() => navigate(item.path)}
+                  className="w-full px-4 py-3 text-left flex items-center gap-3 hover:bg-slate-50 transition-colors"
+                >
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-semibold ${
+                    item.urgente ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                  }`}>
+                    {item.valor}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[11px] text-slate-400 tabular-nums">{t.totalAlunos} alunos</span>
-                    {!t.chamadaFeita && (
-                      <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">
-                        Pendente
-                      </span>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700">{item.titulo}</p>
+                    <p className="text-xs text-slate-400 line-clamp-1">{item.desc}</p>
                   </div>
-                </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300" />
+                </button>
               ))}
-              {turmas.length > 6 && (
-                <div className="px-4 py-2 text-center">
-                  <button
-                    onClick={() => navigate('/app/coordenacao')}
-                    className="text-[11px] text-brand-600 hover:text-brand-700 font-medium"
-                  >
-                    Ver todas as {turmas.length} turmas →
-                  </button>
-                </div>
-              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+            <p className="text-sm font-semibold text-slate-800">Checklist diário</p>
+            <div className="mt-3 space-y-2">
+              <Checklist ok={indicadores.turmasSemChamada === 0} label="Todas as chamadas conferidas" />
+              <Checklist ok={indicadores.atendimentosPendentes === 0} label="Retornos aos pais em dia" />
+              <Checklist ok={indicadores.alertasCriticos === 0} label="Sem alerta crítico pendente" />
+              <Checklist ok={indicadores.semTurma === 0} label="Matrículas com turma regularizada" />
+              <Checklist ok={indicadores.laudos >= 0} label="Atenção a laudos/atestados monitorada" />
             </div>
           </div>
         </section>
-      )}
 
-      {/* ── Atendimentos Recentes ── */}
-      {atendimentos.length > 0 && (
         <section>
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-xs font-medium text-slate-400 tracking-wide">Atendimentos recentes</p>
-            <button
-              onClick={() => navigate('/app/atendimentos-pais')}
-              className="text-[11px] text-brand-600 hover:text-brand-700 font-medium flex items-center gap-0.5"
-            >
-              Ver todos <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50 shadow-sm overflow-hidden">
-            {atendimentos.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-700 truncate">{a.responsavelNome}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{a.assunto}</p>
+          <p className="text-xs font-medium text-slate-400 mb-2.5 tracking-wide">Módulos administrativos da Secretaria</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            {MODULOS_SECRETARIA.map((modulo) => (
+              <button
+                key={modulo.path}
+                onClick={() => navigate(modulo.path)}
+                className={`group text-left bg-white border border-slate-100 border-l-4 ${modulo.accent} rounded-2xl p-4 hover:shadow-sm hover:border-slate-200 transition-all`}
+              >
+                <div className="text-slate-500 group-hover:text-brand-600 transition-colors">
+                  {modulo.icon}
                 </div>
-                <StatusBadge status={a.status} />
-              </div>
+                <p className="text-sm font-medium text-slate-700 group-hover:text-brand-700 mt-2">{modulo.label}</p>
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{modulo.desc}</p>
+              </button>
             ))}
           </div>
         </section>
-      )}
 
-      {/* ── Módulos ── */}
-      <section>
-        <p className="text-xs font-medium text-slate-400 mb-2.5 tracking-wide">Módulos da secretaria</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-          {MODULOS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => navigate(m.path)}
-              className={`group relative text-left bg-white border border-slate-100 border-l-4 ${m.accent} rounded-2xl p-4 hover:shadow-sm hover:border-slate-200 transition-all`}
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="text-slate-500 group-hover:text-brand-600 transition-colors">
-                  {m.icon}
-                </div>
-                {m.badge && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-100">
-                    {m.badge}
+        {atendimentos.length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-800">Últimos atendimentos aos pais</p>
+              <button onClick={() => navigate('/app/atendimentos-pais')} className="text-xs text-brand-600 font-medium">
+                Ver todos
+              </button>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {atendimentos.slice(0, 5).map((a) => (
+                <div key={a.id} className="px-4 py-3 flex items-center gap-3">
+                  <MessageCircle className="h-4 w-4 text-teal-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-700 truncate">{a.responsavelNome}</p>
+                    <p className="text-xs text-slate-400 truncate">{a.assunto}</p>
+                  </div>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border border-slate-200 text-slate-500">
+                    {a.status}
                   </span>
-                )}
-              </div>
-              <p className="text-sm font-medium text-slate-700 group-hover:text-brand-700 transition-colors leading-snug">
-                {m.label}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5 font-normal line-clamp-2">
-                {m.desc}
-              </p>
-              <div className="flex items-center gap-1 mt-2.5 text-[11px] font-medium text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>Acessar</span>
-                <ChevronRight className="h-3 w-3" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     </PageShell>
   );
 }
 
-// ─── Badge de status de atendimento ──────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    AGENDADO:         { label: 'Agendado',        cls: 'bg-blue-50 text-blue-600 border-blue-200' },
-    REALIZADO:        { label: 'Realizado',        cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
-    CANCELADO:        { label: 'Cancelado',        cls: 'bg-slate-50 text-slate-500 border-slate-200' },
-    PENDENTE_RETORNO: { label: 'Ret. Pendente',    cls: 'bg-amber-50 text-amber-600 border-amber-200' },
-  };
-  const s = map[status] ?? { label: status, cls: 'bg-slate-50 text-slate-500 border-slate-200' };
+function KpiCard({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
-    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full border flex-shrink-0 ${s.cls}`}>
-      {s.label}
-    </span>
+    <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2">{icon}</div>
+      <p className="text-2xl font-semibold text-slate-800 tabular-nums">{value}</p>
+      <p className="text-xs text-slate-400 mt-1">{label}</p>
+    </div>
+  );
+}
+
+function Checklist({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+      <span className={ok ? 'text-slate-600' : 'text-amber-700'}>{label}</span>
+    </div>
   );
 }

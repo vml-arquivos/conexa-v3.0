@@ -1,171 +1,441 @@
 /**
- * MatriculaPage — Fluxo de Matrícula em 6 Etapas
+ * MatriculaPage — Nova Matrícula Administrativa da Secretaria
  *
- * Etapas:
- * 1. Dados da criança
- * 2. Responsáveis
- * 3. Saúde e necessidades especiais
- * 4. Documentos e autorizações
- * 5. Turma e unidade
- * 6. Revisão e confirmação
+ * Formulário baseado nas planilhas oficiais da unidade:
+ * COD. ALUNO, INSCRIÇÃO, dados pessoais, responsáveis, endereço, saúde,
+ * documentação, autorização de imagem, transporte, pessoas autorizadas e turma.
  *
- * RBAC: UNIDADE_ADMINISTRATIVO, UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
- * Usa endpoints existentes: POST /children, POST /children/:id/enrollment
+ * Persiste dados nativos no Child e guarda dossiês administrativos em JSON
+ * aditivo para futura ficha/PDF sem perder informação.
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageShell } from '../components/ui/PageShell';
-import { Button } from '../components/ui/button';
+import {
+  AlertTriangle,
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  FileText,
+  GraduationCap,
+  Heart,
+  Loader2,
+  ShieldCheck,
+  Trash2,
+  User,
+  Users,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../app/AuthProvider';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
-import { toast } from 'sonner';
-import {
-  ChevronRight, ChevronLeft, CheckCircle, User, Users,
-  Heart, FileText, GraduationCap, ClipboardCheck, Loader2,
-} from 'lucide-react';
+import { PageShell } from '../components/ui/PageShell';
+import { Button } from '../components/ui/button';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+type Genero = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 
-interface DadosCrianca {
+interface ResponsavelForm {
+  nome: string;
+  parentesco: string;
+  cpf: string;
+  identidade: string;
+  orgaoExpeditor: string;
+  dataDocumento: string;
+  pis: string;
+  nascimento: string;
+  telefoneTrabalho: string;
+  telefoneResidencial: string;
+  celular: string;
+  email: string;
+  escolaridade: string;
+  profissao: string;
+  dependentes: string;
+  endereco: string;
+  cep: string;
+  beneficio: string;
+  pessoasCasa: string;
+}
+
+interface AutorizadoForm {
+  nome: string;
+  parentesco: string;
+  telefone: string;
+}
+
+interface FormularioMatricula {
+  codigoAluno: string;
+  inscricao: string;
   firstName: string;
   lastName: string;
+  gender: Genero;
   dateOfBirth: string;
-  gender: string;
+  nacionalidade: string;
+  naturalidade: string;
+  ufNascimento: string;
   cpf: string;
   rg: string;
   raca: string;
-  nis: string;
-  codigoAluno: string;
-  inscricao: string;
-}
-
-interface Responsavel {
-  nome: string;
-  relacao: string;
-  cpf: string;
-  telefone: string;
-  email: string;
-  endereco: string;
-  bairro: string;
-  cidade: string;
-  cep: string;
-}
-
-interface DadosSaude {
+  peso: string;
   bloodType: string;
+  endereco: string;
+  cep: string;
+  nis: string;
+  nomeMae: string;
+  nomePai: string;
+  mae: ResponsavelForm;
+  pai: ResponsavelForm;
+  responsavelLegal: ResponsavelForm;
+  intolerancias: string;
   allergies: string;
   medicalConditions: string;
   medicationNeeds: string;
+  medicamentos: string;
   laudado: boolean;
   tipoLaudo: string;
   cid: string;
   descricaoLaudo: string;
-  medicamentos: string;
-  emergencyContactName: string;
-  emergencyContactPhone: string;
-}
-
-interface DadosDocumentos {
+  genitor: boolean;
   usoImagem: boolean;
-  observacoes: string;
-}
-
-interface DadosTurma {
+  serieAnterior: string;
+  transporteEscolar: boolean;
+  nomeTransporte: string;
+  autorizados: AutorizadoForm[];
+  documentos: {
+    certidaoNascimento: boolean;
+    cpfCrianca: boolean;
+    rgCpfResponsavel: boolean;
+    comprovanteResidencia: boolean;
+    cartaoVacina: boolean;
+    cartaoSUS: boolean;
+    nis: boolean;
+    laudoMedico: boolean;
+    foto: boolean;
+    termoImagem: boolean;
+    declaracaoEscolar: boolean;
+  };
   classroomId: string;
   enrollmentDate: string;
+  observacoesSecretaria: string;
 }
 
-// ─── Etapas ───────────────────────────────────────────────────────────────────
+interface Turma {
+  id: string;
+  name: string;
+}
+
+const STORAGE_KEY = 'conexa:secretaria:nova-matricula:v2';
 
 const ETAPAS = [
-  { id: 1, label: 'Criança',       icon: <User className="h-4 w-4" /> },
-  { id: 2, label: 'Responsáveis',  icon: <Users className="h-4 w-4" /> },
-  { id: 3, label: 'Saúde',         icon: <Heart className="h-4 w-4" /> },
-  { id: 4, label: 'Documentos',    icon: <FileText className="h-4 w-4" /> },
-  { id: 5, label: 'Turma',         icon: <GraduationCap className="h-4 w-4" /> },
-  { id: 6, label: 'Revisão',       icon: <ClipboardCheck className="h-4 w-4" /> },
+  { id: 1, label: 'Criança', icon: <User className="h-4 w-4" /> },
+  { id: 2, label: 'Responsáveis', icon: <Users className="h-4 w-4" /> },
+  { id: 3, label: 'Saúde', icon: <Heart className="h-4 w-4" /> },
+  { id: 4, label: 'Documentos', icon: <FileText className="h-4 w-4" /> },
+  { id: 5, label: 'Turma', icon: <GraduationCap className="h-4 w-4" /> },
+  { id: 6, label: 'Revisão', icon: <ClipboardCheck className="h-4 w-4" /> },
 ];
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
+const responsavelVazio: ResponsavelForm = {
+  nome: '',
+  parentesco: '',
+  cpf: '',
+  identidade: '',
+  orgaoExpeditor: '',
+  dataDocumento: '',
+  pis: '',
+  nascimento: '',
+  telefoneTrabalho: '',
+  telefoneResidencial: '',
+  celular: '',
+  email: '',
+  escolaridade: '',
+  profissao: '',
+  dependentes: '',
+  endereco: '',
+  cep: '',
+  beneficio: '',
+  pessoasCasa: '',
+};
+
+function estadoInicial(): FormularioMatricula {
+  return {
+    codigoAluno: '',
+    inscricao: '',
+    firstName: '',
+    lastName: '',
+    gender: 'NAO_INFORMADO',
+    dateOfBirth: '',
+    nacionalidade: 'BRASIL',
+    naturalidade: '',
+    ufNascimento: 'DF',
+    cpf: '',
+    rg: '',
+    raca: '',
+    peso: '',
+    bloodType: '',
+    endereco: '',
+    cep: '',
+    nis: '',
+    nomeMae: '',
+    nomePai: '',
+    mae: { ...responsavelVazio, parentesco: 'MÃE' },
+    pai: { ...responsavelVazio, parentesco: 'PAI' },
+    responsavelLegal: { ...responsavelVazio, parentesco: 'RESPONSÁVEL' },
+    intolerancias: '',
+    allergies: '',
+    medicalConditions: '',
+    medicationNeeds: '',
+    medicamentos: '',
+    laudado: false,
+    tipoLaudo: '',
+    cid: '',
+    descricaoLaudo: '',
+    genitor: false,
+    usoImagem: false,
+    serieAnterior: '',
+    transporteEscolar: false,
+    nomeTransporte: '',
+    autorizados: [
+      { nome: '', parentesco: '', telefone: '' },
+      { nome: '', parentesco: '', telefone: '' },
+    ],
+    documentos: {
+      certidaoNascimento: false,
+      cpfCrianca: false,
+      rgCpfResponsavel: false,
+      comprovanteResidencia: false,
+      cartaoVacina: false,
+      cartaoSUS: false,
+      nis: false,
+      laudoMedico: false,
+      foto: false,
+      termoImagem: false,
+      declaracaoEscolar: false,
+    },
+    classroomId: '',
+    enrollmentDate: new Date().toISOString().slice(0, 10),
+    observacoesSecretaria: '',
+  };
+}
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function cleanText(value: string | undefined) {
+  const cleaned = (value ?? '').replace(/\s+/g, ' ').trim();
+  return cleaned || undefined;
+}
+
+function splitName(nomeCompleto: string) {
+  const partes = nomeCompleto.trim().replace(/\s+/g, ' ').split(' ');
+  if (partes.length <= 1) return { firstName: partes[0] ?? '', lastName: '' };
+  return { firstName: partes[0], lastName: partes.slice(1).join(' ') };
+}
+
+function isValidEmail(email: string) {
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function compactObject<T extends Record<string, any>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+  ) as T;
+}
 
 export default function MatriculaPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [etapa, setEtapa] = useState(1);
   const [salvando, setSalvando] = useState(false);
-  const [childId, setChildId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormularioMatricula>(() => {
+    try {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      return salvo ? { ...estadoInicial(), ...JSON.parse(salvo) } : estadoInicial();
+    } catch {
+      return estadoInicial();
+    }
+  });
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [turmasCarregadas, setTurmasCarregadas] = useState(false);
 
-  // Estado de cada etapa
-  const [crianca, setCrianca] = useState<DadosCrianca>({
-    firstName: '', lastName: '', dateOfBirth: '', gender: 'NAO_INFORMADO',
-    cpf: '', rg: '', raca: '', nis: '', codigoAluno: '', inscricao: '',
-  });
-  const [responsavel, setResponsavel] = useState<Responsavel>({
-    nome: '', relacao: 'MAE', cpf: '', telefone: '', email: '',
-    endereco: '', bairro: '', cidade: '', cep: '',
-  });
-  const [saude, setSaude] = useState<DadosSaude>({
-    bloodType: '', allergies: '', medicalConditions: '', medicationNeeds: '',
-    laudado: false, tipoLaudo: '', cid: '', descricaoLaudo: '', medicamentos: '',
-    emergencyContactName: '', emergencyContactPhone: '',
-  });
-  const [documentos, setDocumentos] = useState<DadosDocumentos>({
-    usoImagem: false, observacoes: '',
-  });
-  const [turma, setTurma] = useState<DadosTurma>({
-    classroomId: '', enrollmentDate: new Date().toISOString().split('T')[0],
-  });
-  const [classrooms, setClassrooms] = useState<{ id: string; name: string }[]>([]);
-  const [classroomsLoaded, setClassroomsLoaded] = useState(false);
+  const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
-  // Carregar turmas ao chegar na etapa 5
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+  }, [form]);
+
+  const atualizar = <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => {
+    setForm((atual) => ({ ...atual, [campo]: valor }));
+  };
+
+  const atualizarResponsavel = (tipo: 'mae' | 'pai' | 'responsavelLegal', campo: keyof ResponsavelForm, valor: string) => {
+    setForm((atual) => ({
+      ...atual,
+      [tipo]: { ...atual[tipo], [campo]: valor },
+    }));
+  };
+
+  const atualizarDocumento = (campo: keyof FormularioMatricula['documentos'], valor: boolean) => {
+    setForm((atual) => ({
+      ...atual,
+      documentos: { ...atual.documentos, [campo]: valor },
+    }));
+  };
+
+  const atualizarAutorizado = (index: number, campo: keyof AutorizadoForm, valor: string) => {
+    setForm((atual) => {
+      const autorizados = [...atual.autorizados];
+      autorizados[index] = { ...autorizados[index], [campo]: valor };
+      return { ...atual, autorizados };
+    });
+  };
+
   const carregarTurmas = useCallback(async () => {
-    if (classroomsLoaded) return;
+    if (turmasCarregadas) return;
     try {
       const res = await http.get('/lookup/classrooms/accessible');
-      setClassrooms(Array.isArray(res.data) ? res.data : []);
-      setClassroomsLoaded(true);
+      setTurmas(Array.isArray(res.data) ? res.data : []);
     } catch {
-      setClassrooms([]);
-      setClassroomsLoaded(true);
+      setTurmas([]);
+    } finally {
+      setTurmasCarregadas(true);
     }
-  }, [classroomsLoaded]);
+  }, [turmasCarregadas]);
+
+  useEffect(() => {
+    if (etapa === 5) void carregarTurmas();
+  }, [etapa, carregarTurmas]);
+
+  const pendencias = useMemo(() => {
+    const erros: string[] = [];
+
+    if (!unitId) erros.push('Usuário sem unidade vinculada. A secretaria precisa estar vinculada a uma unidade.');
+    if (!form.firstName.trim()) erros.push('Nome da criança é obrigatório.');
+    if (!form.lastName.trim()) erros.push('Sobrenome da criança é obrigatório.');
+    if (!form.dateOfBirth) erros.push('Data de nascimento é obrigatória.');
+    if (form.cpf && onlyDigits(form.cpf).length !== 11) erros.push('CPF da criança deve ter 11 dígitos.');
+    if (!form.nomeMae.trim() && !form.nomePai.trim() && !form.responsavelLegal.nome.trim()) {
+      erros.push('Informe mãe, pai ou responsável legal.');
+    }
+    if (form.responsavelLegal.email && !isValidEmail(form.responsavelLegal.email)) {
+      erros.push('E-mail do responsável legal está inválido.');
+    }
+    if (form.responsavelLegal.cpf && onlyDigits(form.responsavelLegal.cpf).length !== 11) {
+      erros.push('CPF do responsável legal deve ter 11 dígitos.');
+    }
+    if (form.laudado && !form.tipoLaudo.trim()) erros.push('Tipo de laudo é obrigatório quando a criança é laudada.');
+    if (!form.enrollmentDate) erros.push('Data de matrícula é obrigatória.');
+
+    return erros;
+  }, [form, unitId]);
+
+  const podeAvancar = () => {
+    if (etapa === 1) return form.firstName.trim() && form.lastName.trim() && form.dateOfBirth;
+    if (etapa === 2) return form.nomeMae.trim() || form.nomePai.trim() || form.responsavelLegal.nome.trim();
+    if (etapa === 6) return pendencias.length === 0;
+    return true;
+  };
 
   const avancar = async () => {
-    if (etapa === 5) await carregarTurmas();
-    if (etapa < 6) { setEtapa(e => e + 1); return; }
-    // Etapa 6 = salvar
+    if (etapa < 6) {
+      setEtapa((e) => e + 1);
+      return;
+    }
     await salvar();
   };
 
-  const voltar = () => { if (etapa > 1) setEtapa(e => e - 1); };
-
   const salvar = async () => {
+    if (pendencias.length > 0) {
+      toast.error(`Revise ${pendencias.length} pendência(s) antes de concluir.`);
+      return;
+    }
+
     setSalvando(true);
     try {
-      // 1. Criar a criança
-      const payload = {
-        ...crianca,
-        nomeMae: responsavel.relacao === 'MAE' ? responsavel.nome : undefined,
-        nomePai: responsavel.relacao === 'PAI' ? responsavel.nome : undefined,
-        celPai: responsavel.telefone,
-        ...saude,
-        usoImagem: documentos.usoImagem,
-      };
+      const responsavelEmergencia = form.responsavelLegal.nome || form.nomeMae || form.nomePai;
+      const telefoneEmergencia =
+        form.responsavelLegal.celular ||
+        form.mae.celular ||
+        form.pai.celular ||
+        form.responsavelLegal.telefoneResidencial ||
+        form.mae.telefoneResidencial ||
+        form.pai.telefoneResidencial;
+
+      const payload = compactObject({
+        unitId,
+        firstName: cleanText(form.firstName),
+        lastName: cleanText(form.lastName),
+        dateOfBirth: form.dateOfBirth,
+        gender: form.gender,
+        cpf: onlyDigits(form.cpf) || undefined,
+        rg: cleanText(form.rg),
+        nacionalidade: cleanText(form.nacionalidade),
+        naturalidade: cleanText(form.naturalidade),
+        ufNascimento: cleanText(form.ufNascimento)?.toUpperCase(),
+        raca: cleanText(form.raca),
+        peso: cleanText(form.peso),
+        bloodType: cleanText(form.bloodType),
+        endereco: cleanText(form.endereco),
+        cep: onlyDigits(form.cep) || undefined,
+        nis: cleanText(form.nis),
+        codigoAluno: cleanText(form.codigoAluno),
+        inscricao: cleanText(form.inscricao),
+        nomeMae: cleanText(form.nomeMae),
+        nomePai: cleanText(form.nomePai),
+        celPai: cleanText(form.pai.celular || form.mae.celular || form.responsavelLegal.celular),
+        emergencyContactName: cleanText(responsavelEmergencia),
+        emergencyContactPhone: cleanText(telefoneEmergencia),
+        allergies: cleanText([form.allergies, form.intolerancias].filter(Boolean).join(' | ')),
+        medicalConditions: cleanText(form.medicalConditions),
+        medicationNeeds: cleanText(form.medicationNeeds),
+        medicamentos: cleanText(form.medicamentos),
+        laudado: form.laudado,
+        tipoLaudo: cleanText(form.tipoLaudo),
+        cid: cleanText(form.cid),
+        descricaoLaudo: cleanText(form.descricaoLaudo),
+        usoImagem: form.usoImagem,
+        dadosResponsaveis: compactObject({
+          mae: compactObject({ ...form.mae, cpf: onlyDigits(form.mae.cpf), celular: onlyDigits(form.mae.celular), telefoneResidencial: onlyDigits(form.mae.telefoneResidencial) }),
+          pai: compactObject({ ...form.pai, cpf: onlyDigits(form.pai.cpf), celular: onlyDigits(form.pai.celular), telefoneResidencial: onlyDigits(form.pai.telefoneResidencial) }),
+          responsavelLegal: compactObject({
+            ...form.responsavelLegal,
+            cpf: onlyDigits(form.responsavelLegal.cpf),
+            celular: onlyDigits(form.responsavelLegal.celular),
+            telefoneResidencial: onlyDigits(form.responsavelLegal.telefoneResidencial),
+          }),
+        }),
+        documentosMatricula: form.documentos,
+        autorizadosRetirada: form.autorizados
+          .filter((a) => a.nome.trim())
+          .map((a) => compactObject({ ...a, telefone: onlyDigits(a.telefone) })),
+        transporteEscolar: compactObject({
+          utiliza: form.transporteEscolar,
+          nomeTransporte: cleanText(form.nomeTransporte),
+        }),
+        fichaAdministrativa: compactObject({
+          genitor: form.genitor,
+          serieAnterior: cleanText(form.serieAnterior),
+          observacoesSecretaria: cleanText(form.observacoesSecretaria),
+          origemCampos: 'Planilha DADOS PARA PLATAFORMA PEDAGÓGICA',
+        }),
+      });
+
       const res = await http.post('/children', payload);
       const id = res.data?.id ?? res.data?.child?.id;
-      if (!id) throw new Error('ID da criança não retornado pela API.');
-      setChildId(id);
+      if (!id) throw new Error('A API não retornou o ID da criança.');
 
-      // 2. Criar a matrícula se turma selecionada
-      if (turma.classroomId) {
+      if (form.classroomId) {
         await http.post(`/children/${id}/enrollment`, {
-          classroomId: turma.classroomId,
-          enrollmentDate: turma.enrollmentDate,
+          classroomId: form.classroomId,
+          enrollmentDate: form.enrollmentDate,
         });
       }
 
-      toast.success('Matrícula realizada com sucesso!');
+      localStorage.removeItem(STORAGE_KEY);
+      toast.success('Matrícula cadastrada com sucesso.');
       navigate('/app/secretaria/matriculas');
     } catch (e) {
       toast.error(getErrorMessage(e));
@@ -174,451 +444,379 @@ export default function MatriculaPage() {
     }
   };
 
-  const podeAvancar = () => {
-    if (etapa === 1) return crianca.firstName.trim() !== '' && crianca.lastName.trim() !== '' && crianca.dateOfBirth !== '';
-    if (etapa === 2) return responsavel.nome.trim() !== '' && responsavel.telefone.trim() !== '';
-    return true;
+  const limparRascunho = () => {
+    if (!confirm('Limpar todos os dados preenchidos neste rascunho?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    setForm(estadoInicial());
+    setEtapa(1);
   };
 
   return (
     <PageShell
       title="Nova Matrícula"
-      description="Cadastre uma nova criança em 6 etapas"
+      description="Ficha administrativa completa da Secretaria"
+      headerActions={
+        <button onClick={limparRascunho} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50">
+          <Trash2 className="h-3.5 w-3.5" />
+          Limpar rascunho
+        </button>
+      }
     >
-      {/* ── Indicador de etapas ── */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {ETAPAS.map((e, idx) => (
-          <div key={e.id} className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => etapa > e.id && setEtapa(e.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                etapa === e.id
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : etapa > e.id
-                  ? 'bg-emerald-50 text-emerald-700 cursor-pointer hover:bg-emerald-100'
-                  : 'bg-slate-100 text-slate-400 cursor-default'
-              }`}
-            >
-              {etapa > e.id ? <CheckCircle className="h-3.5 w-3.5" /> : e.icon}
-              <span className="hidden sm:inline">{e.label}</span>
-            </button>
-            {idx < ETAPAS.length - 1 && (
-              <ChevronRight className="h-3 w-3 text-slate-300 flex-shrink-0" />
-            )}
-          </div>
-        ))}
-      </div>
+      <div className="space-y-5">
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {ETAPAS.map((e, idx) => (
+            <div key={e.id} className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => etapa > e.id && setEtapa(e.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  etapa === e.id
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : etapa > e.id
+                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                {etapa > e.id ? <CheckCircle className="h-3.5 w-3.5" /> : e.icon}
+                <span>{e.label}</span>
+              </button>
+              {idx < ETAPAS.length - 1 && <ChevronRight className="h-3 w-3 text-slate-300" />}
+            </div>
+          ))}
+        </div>
 
-      {/* ── Conteúdo da etapa ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-        {etapa === 1 && (
-          <EtapaCrianca dados={crianca} onChange={setCrianca} />
-        )}
-        {etapa === 2 && (
-          <EtapaResponsavel dados={responsavel} onChange={setResponsavel} />
-        )}
-        {etapa === 3 && (
-          <EtapaSaude dados={saude} onChange={setSaude} />
-        )}
-        {etapa === 4 && (
-          <EtapaDocumentos dados={documentos} onChange={setDocumentos} />
-        )}
-        {etapa === 5 && (
-          <EtapaTurma dados={turma} onChange={setTurma} classrooms={classrooms} />
-        )}
-        {etapa === 6 && (
-          <EtapaRevisao
-            crianca={crianca}
-            responsavel={responsavel}
-            saude={saude}
-            documentos={documentos}
-            turma={turma}
-            classrooms={classrooms}
-          />
-        )}
-      </div>
-
-      {/* ── Navegação ── */}
-      <div className="flex items-center justify-between gap-3">
-        <Button
-          variant="outline"
-          onClick={etapa === 1 ? () => navigate('/app/secretaria') : voltar}
-          className="flex items-center gap-1.5"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          {etapa === 1 ? 'Cancelar' : 'Voltar'}
-        </Button>
-        <Button
-          onClick={avancar}
-          disabled={!podeAvancar() || salvando}
-          className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white"
-        >
-          {salvando ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</>
-          ) : etapa === 6 ? (
-            <><CheckCircle className="h-4 w-4" /> Confirmar Matrícula</>
-          ) : (
-            <>Próximo <ChevronRight className="h-4 w-4" /></>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
+          {etapa === 1 && <EtapaCrianca form={form} atualizar={atualizar} />}
+          {etapa === 2 && (
+            <EtapaResponsaveis
+              form={form}
+              atualizar={atualizar}
+              atualizarResponsavel={atualizarResponsavel}
+              atualizarAutorizado={atualizarAutorizado}
+            />
           )}
-        </Button>
+          {etapa === 3 && <EtapaSaude form={form} atualizar={atualizar} />}
+          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} />}
+          {etapa === 5 && <EtapaTurma form={form} atualizar={atualizar} turmas={turmas} />}
+          {etapa === 6 && <EtapaRevisao form={form} turmas={turmas} pendencias={pendencias} />}
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <Button
+            variant="outline"
+            onClick={etapa === 1 ? () => navigate('/app/secretaria') : () => setEtapa((e) => e - 1)}
+            className="flex items-center gap-1.5"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {etapa === 1 ? 'Cancelar' : 'Voltar'}
+          </Button>
+
+          <Button
+            onClick={avancar}
+            disabled={!podeAvancar() || salvando}
+            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white"
+          >
+            {salvando ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</>
+            ) : etapa === 6 ? (
+              <><ShieldCheck className="h-4 w-4" /> Confirmar Matrícula</>
+            ) : (
+              <>Próximo <ChevronRight className="h-4 w-4" /></>
+            )}
+          </Button>
+        </div>
       </div>
     </PageShell>
   );
 }
 
-// ─── Etapa 1 — Dados da Criança ───────────────────────────────────────────────
-
-function EtapaCrianca({ dados, onChange }: { dados: DadosCrianca; onChange: (d: DadosCrianca) => void }) {
-  const set = (k: keyof DadosCrianca) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    onChange({ ...dados, [k]: e.target.value });
-
+function EtapaCrianca({ form, atualizar }: { form: FormularioMatricula; atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-slate-800">Dados da Criança</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Nome *" required>
-          <input className={inputCls} value={dados.firstName} onChange={set('firstName')} placeholder="Nome" />
-        </FormField>
-        <FormField label="Sobrenome *" required>
-          <input className={inputCls} value={dados.lastName} onChange={set('lastName')} placeholder="Sobrenome" />
-        </FormField>
-        <FormField label="Data de Nascimento *" required>
-          <input type="date" className={inputCls} value={dados.dateOfBirth} onChange={set('dateOfBirth')} />
-        </FormField>
-        <FormField label="Gênero">
-          <select className={inputCls} value={dados.gender} onChange={set('gender')}>
+      <TituloEtapa titulo="Dados da criança" subtitulo="Identificação conforme planilha oficial da unidade." />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Campo label="COD. ALUNO"><Input value={form.codigoAluno} onChange={(v) => atualizar('codigoAluno', v)} /></Campo>
+        <Campo label="Inscrição"><Input value={form.inscricao} onChange={(v) => atualizar('inscricao', v)} /></Campo>
+        <Campo label="CPF da criança"><Input value={form.cpf} onChange={(v) => atualizar('cpf', v)} placeholder="000.000.000-00" /></Campo>
+        <Campo label="Nome *"><Input value={form.firstName} onChange={(v) => atualizar('firstName', v)} /></Campo>
+        <Campo label="Sobrenome *"><Input value={form.lastName} onChange={(v) => atualizar('lastName', v)} /></Campo>
+        <Campo label="Nascimento *"><Input type="date" value={form.dateOfBirth} onChange={(v) => atualizar('dateOfBirth', v)} /></Campo>
+        <Campo label="Sexo">
+          <select className={inputCls} value={form.gender} onChange={(e) => atualizar('gender', e.target.value as Genero)}>
             <option value="NAO_INFORMADO">Não informado</option>
-            <option value="MASCULINO">Masculino</option>
             <option value="FEMININO">Feminino</option>
-          </select>
-        </FormField>
-        <FormField label="CPF">
-          <input className={inputCls} value={dados.cpf} onChange={set('cpf')} placeholder="000.000.000-00" />
-        </FormField>
-        <FormField label="RG">
-          <input className={inputCls} value={dados.rg} onChange={set('rg')} placeholder="RG" />
-        </FormField>
-        <FormField label="Raça/Cor">
-          <select className={inputCls} value={dados.raca} onChange={set('raca')}>
-            <option value="">Não informado</option>
-            <option value="Branca">Branca</option>
-            <option value="Preta">Preta</option>
-            <option value="Parda">Parda</option>
-            <option value="Amarela">Amarela</option>
-            <option value="Indígena">Indígena</option>
-          </select>
-        </FormField>
-        <FormField label="NIS">
-          <input className={inputCls} value={dados.nis} onChange={set('nis')} placeholder="NIS" />
-        </FormField>
-        <FormField label="Código do Aluno">
-          <input className={inputCls} value={dados.codigoAluno} onChange={set('codigoAluno')} placeholder="Código" />
-        </FormField>
-        <FormField label="Inscrição">
-          <input className={inputCls} value={dados.inscricao} onChange={set('inscricao')} placeholder="Inscrição" />
-        </FormField>
-      </div>
-    </div>
-  );
-}
-
-// ─── Etapa 2 — Responsáveis ───────────────────────────────────────────────────
-
-function EtapaResponsavel({ dados, onChange }: { dados: Responsavel; onChange: (d: Responsavel) => void }) {
-  const set = (k: keyof Responsavel) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    onChange({ ...dados, [k]: e.target.value });
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-semibold text-slate-800">Responsável Principal</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Nome do Responsável *" required>
-          <input className={inputCls} value={dados.nome} onChange={set('nome')} placeholder="Nome completo" />
-        </FormField>
-        <FormField label="Relação">
-          <select className={inputCls} value={dados.relacao} onChange={set('relacao')}>
-            <option value="MAE">Mãe</option>
-            <option value="PAI">Pai</option>
-            <option value="AVO">Avó/Avô</option>
-            <option value="TUTOR">Tutor(a)</option>
+            <option value="MASCULINO">Masculino</option>
             <option value="OUTRO">Outro</option>
           </select>
-        </FormField>
-        <FormField label="CPF">
-          <input className={inputCls} value={dados.cpf} onChange={set('cpf')} placeholder="000.000.000-00" />
-        </FormField>
-        <FormField label="Telefone *" required>
-          <input className={inputCls} value={dados.telefone} onChange={set('telefone')} placeholder="(00) 00000-0000" />
-        </FormField>
-        <FormField label="E-mail">
-          <input type="email" className={inputCls} value={dados.email} onChange={set('email')} placeholder="email@exemplo.com" />
-        </FormField>
-        <FormField label="CEP">
-          <input className={inputCls} value={dados.cep} onChange={set('cep')} placeholder="00000-000" />
-        </FormField>
-        <FormField label="Endereço">
-          <input className={inputCls} value={dados.endereco} onChange={set('endereco')} placeholder="Rua, número" />
-        </FormField>
-        <FormField label="Bairro">
-          <input className={inputCls} value={dados.bairro} onChange={set('bairro')} placeholder="Bairro" />
-        </FormField>
-        <FormField label="Cidade">
-          <input className={inputCls} value={dados.cidade} onChange={set('cidade')} placeholder="Cidade" />
-        </FormField>
+        </Campo>
+        <Campo label="Raça/Cor"><Input value={form.raca} onChange={(v) => atualizar('raca', v)} /></Campo>
+        <Campo label="Peso"><Input value={form.peso} onChange={(v) => atualizar('peso', v)} placeholder="Ex.: 11kg" /></Campo>
+        <Campo label="Nacionalidade"><Input value={form.nacionalidade} onChange={(v) => atualizar('nacionalidade', v)} /></Campo>
+        <Campo label="Naturalidade"><Input value={form.naturalidade} onChange={(v) => atualizar('naturalidade', v)} /></Campo>
+        <Campo label="UF"><Input value={form.ufNascimento} onChange={(v) => atualizar('ufNascimento', v.toUpperCase().slice(0, 2))} /></Campo>
+        <Campo label="Endereço" className="sm:col-span-2"><Input value={form.endereco} onChange={(v) => atualizar('endereco', v)} /></Campo>
+        <Campo label="CEP"><Input value={form.cep} onChange={(v) => atualizar('cep', v)} /></Campo>
+        <Campo label="NIS"><Input value={form.nis} onChange={(v) => atualizar('nis', v)} /></Campo>
+        <Campo label="Série anterior"><Input value={form.serieAnterior} onChange={(v) => atualizar('serieAnterior', v)} /></Campo>
+        <Campo label="RG"><Input value={form.rg} onChange={(v) => atualizar('rg', v)} /></Campo>
       </div>
     </div>
   );
 }
 
-// ─── Etapa 3 — Saúde ─────────────────────────────────────────────────────────
-
-function EtapaSaude({ dados, onChange }: { dados: DadosSaude; onChange: (d: DadosSaude) => void }) {
-  const set = (k: keyof DadosSaude) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    onChange({ ...dados, [k]: e.target.value });
-  const setCheck = (k: keyof DadosSaude) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    onChange({ ...dados, [k]: e.target.checked });
-
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-semibold text-slate-800">Saúde e Necessidades Especiais</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Tipo Sanguíneo">
-          <select className={inputCls} value={dados.bloodType} onChange={set('bloodType')}>
-            <option value="">Não informado</option>
-            {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </FormField>
-        <FormField label="Alergias">
-          <input className={inputCls} value={dados.allergies} onChange={set('allergies')} placeholder="Descreva alergias" />
-        </FormField>
-        <FormField label="Condições Médicas">
-          <input className={inputCls} value={dados.medicalConditions} onChange={set('medicalConditions')} placeholder="Ex.: asma, diabetes" />
-        </FormField>
-        <FormField label="Medicamentos em Uso">
-          <input className={inputCls} value={dados.medicationNeeds} onChange={set('medicationNeeds')} placeholder="Medicamentos" />
-        </FormField>
-        <FormField label="Contato de Emergência">
-          <input className={inputCls} value={dados.emergencyContactName} onChange={set('emergencyContactName')} placeholder="Nome" />
-        </FormField>
-        <FormField label="Telefone de Emergência">
-          <input className={inputCls} value={dados.emergencyContactPhone} onChange={set('emergencyContactPhone')} placeholder="(00) 00000-0000" />
-        </FormField>
-      </div>
-      <div className="flex items-center gap-2 pt-1">
-        <input
-          type="checkbox"
-          id="laudado"
-          checked={dados.laudado}
-          onChange={setCheck('laudado')}
-          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-        />
-        <label htmlFor="laudado" className="text-sm text-slate-700">Criança com laudo médico</label>
-      </div>
-      {dados.laudado && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 pl-6 border-l-2 border-brand-200">
-          <FormField label="Tipo de Laudo">
-            <input className={inputCls} value={dados.tipoLaudo} onChange={set('tipoLaudo')} placeholder="Ex.: TEA, TDAH" />
-          </FormField>
-          <FormField label="CID">
-            <input className={inputCls} value={dados.cid} onChange={set('cid')} placeholder="CID-10" />
-          </FormField>
-          <FormField label="Descrição do Laudo" className="sm:col-span-2">
-            <textarea
-              className={`${inputCls} resize-none`}
-              rows={2}
-              value={dados.descricaoLaudo}
-              onChange={set('descricaoLaudo')}
-              placeholder="Descrição detalhada"
-            />
-          </FormField>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Etapa 4 — Documentos ─────────────────────────────────────────────────────
-
-function EtapaDocumentos({ dados, onChange }: { dados: DadosDocumentos; onChange: (d: DadosDocumentos) => void }) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-semibold text-slate-800">Documentos e Autorizações</h2>
-      <div className="space-y-3">
-        <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-          <input
-            type="checkbox"
-            id="usoImagem"
-            checked={dados.usoImagem}
-            onChange={(e) => onChange({ ...dados, usoImagem: e.target.checked })}
-            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-          />
-          <div>
-            <label htmlFor="usoImagem" className="text-sm font-medium text-slate-700 cursor-pointer">
-              Autorização de uso de imagem
-            </label>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Autorizo o uso da imagem da criança em materiais institucionais, redes sociais e publicações da unidade.
-            </p>
-          </div>
-        </div>
-        <FormField label="Observações adicionais">
-          <textarea
-            className={`${inputCls} resize-none`}
-            rows={3}
-            value={dados.observacoes}
-            onChange={(e) => onChange({ ...dados, observacoes: e.target.value })}
-            placeholder="Informações adicionais relevantes para a secretaria..."
-          />
-        </FormField>
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
-          <p className="font-medium mb-1">Documentos físicos necessários:</p>
-          <ul className="space-y-0.5 list-disc list-inside text-blue-600">
-            <li>Certidão de nascimento</li>
-            <li>Cartão de vacinação atualizado</li>
-            <li>Comprovante de residência</li>
-            <li>Documento do responsável (RG/CPF)</li>
-            <li>Laudo médico (se aplicável)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Etapa 5 — Turma ─────────────────────────────────────────────────────────
-
-function EtapaTurma({
-  dados, onChange, classrooms,
+function EtapaResponsaveis({
+  form, atualizar, atualizarResponsavel, atualizarAutorizado,
 }: {
-  dados: DadosTurma;
-  onChange: (d: DadosTurma) => void;
-  classrooms: { id: string; name: string }[];
+  form: FormularioMatricula;
+  atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
+  atualizarResponsavel: (tipo: 'mae' | 'pai' | 'responsavelLegal', campo: keyof ResponsavelForm, valor: string) => void;
+  atualizarAutorizado: (index: number, campo: keyof AutorizadoForm, valor: string) => void;
 }) {
-  return (
-    <div className="space-y-4">
-      <h2 className="text-base font-semibold text-slate-800">Turma e Unidade</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <FormField label="Turma">
-          <select
-            className={inputCls}
-            value={dados.classroomId}
-            onChange={(e) => onChange({ ...dados, classroomId: e.target.value })}
-          >
-            <option value="">Selecione uma turma (opcional)</option>
-            {classrooms.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Data de Matrícula">
-          <input
-            type="date"
-            className={inputCls}
-            value={dados.enrollmentDate}
-            onChange={(e) => onChange({ ...dados, enrollmentDate: e.target.value })}
-          />
-        </FormField>
-      </div>
-      {classrooms.length === 0 && (
-        <p className="text-xs text-slate-400 italic">
-          Nenhuma turma disponível. A criança será cadastrada sem turma e poderá ser matriculada posteriormente.
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ─── Etapa 6 — Revisão ───────────────────────────────────────────────────────
-
-function EtapaRevisao({
-  crianca, responsavel, saude, documentos, turma, classrooms,
-}: {
-  crianca: DadosCrianca;
-  responsavel: Responsavel;
-  saude: DadosSaude;
-  documentos: DadosDocumentos;
-  turma: DadosTurma;
-  classrooms: { id: string; name: string }[];
-}) {
-  const turmaNome = classrooms.find(c => c.id === turma.classroomId)?.name ?? 'Sem turma';
-
   return (
     <div className="space-y-5">
-      <h2 className="text-base font-semibold text-slate-800">Revisão — Confirme os dados antes de salvar</h2>
+      <TituloEtapa titulo="Responsáveis e retirada da criança" subtitulo="Dados de mãe, pai, responsável legal e pessoas autorizadas." />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ResponsavelBloco titulo="Mãe" tipo="mae" dados={form.mae} atualizar={atualizarResponsavel} nomePrincipal={form.nomeMae} setNomePrincipal={(v) => atualizar('nomeMae', v)} />
+        <ResponsavelBloco titulo="Pai" tipo="pai" dados={form.pai} atualizar={atualizarResponsavel} nomePrincipal={form.nomePai} setNomePrincipal={(v) => atualizar('nomePai', v)} />
+        <ResponsavelBloco titulo="Responsável legal" tipo="responsavelLegal" dados={form.responsavelLegal} atualizar={atualizarResponsavel} />
+      </div>
 
-      <RevisaoBloco titulo="Criança">
-        <RevisaoLinha label="Nome" value={`${crianca.firstName} ${crianca.lastName}`} />
-        <RevisaoLinha label="Nascimento" value={crianca.dateOfBirth} />
-        <RevisaoLinha label="Gênero" value={crianca.gender} />
-        {crianca.cpf && <RevisaoLinha label="CPF" value={crianca.cpf} />}
-        {crianca.raca && <RevisaoLinha label="Raça/Cor" value={crianca.raca} />}
-      </RevisaoBloco>
-
-      <RevisaoBloco titulo="Responsável">
-        <RevisaoLinha label="Nome" value={responsavel.nome} />
-        <RevisaoLinha label="Relação" value={responsavel.relacao} />
-        <RevisaoLinha label="Telefone" value={responsavel.telefone} />
-        {responsavel.email && <RevisaoLinha label="E-mail" value={responsavel.email} />}
-      </RevisaoBloco>
-
-      <RevisaoBloco titulo="Saúde">
-        {saude.bloodType && <RevisaoLinha label="Tipo Sanguíneo" value={saude.bloodType} />}
-        {saude.allergies && <RevisaoLinha label="Alergias" value={saude.allergies} />}
-        {saude.medicalConditions && <RevisaoLinha label="Condições" value={saude.medicalConditions} />}
-        <RevisaoLinha label="Laudo" value={saude.laudado ? `Sim — ${saude.tipoLaudo || 'tipo não especificado'}` : 'Não'} />
-        {saude.emergencyContactName && <RevisaoLinha label="Emergência" value={`${saude.emergencyContactName} · ${saude.emergencyContactPhone}`} />}
-      </RevisaoBloco>
-
-      <RevisaoBloco titulo="Documentos">
-        <RevisaoLinha label="Uso de imagem" value={documentos.usoImagem ? 'Autorizado' : 'Não autorizado'} />
-        {documentos.observacoes && <RevisaoLinha label="Observações" value={documentos.observacoes} />}
-      </RevisaoBloco>
-
-      <RevisaoBloco titulo="Turma">
-        <RevisaoLinha label="Turma" value={turmaNome} />
-        <RevisaoLinha label="Data de matrícula" value={turma.enrollmentDate} />
-      </RevisaoBloco>
+      <div className="rounded-xl border border-slate-100 p-4">
+        <p className="text-sm font-semibold text-slate-800 mb-3">Pessoas autorizadas para liberar a criança</p>
+        <div className="space-y-3">
+          {form.autorizados.map((a, idx) => (
+            <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Campo label={`Nome autorizado ${idx + 1}`}><Input value={a.nome} onChange={(v) => atualizarAutorizado(idx, 'nome', v)} /></Campo>
+              <Campo label="Parentesco"><Input value={a.parentesco} onChange={(v) => atualizarAutorizado(idx, 'parentesco', v)} /></Campo>
+              <Campo label="Telefone"><Input value={a.telefone} onChange={(v) => atualizarAutorizado(idx, 'telefone', v)} /></Campo>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-// ─── Utilitários de UI ────────────────────────────────────────────────────────
+function ResponsavelBloco({
+  titulo, tipo, dados, atualizar, nomePrincipal, setNomePrincipal,
+}: {
+  titulo: string;
+  tipo: 'mae' | 'pai' | 'responsavelLegal';
+  dados: ResponsavelForm;
+  atualizar: (tipo: 'mae' | 'pai' | 'responsavelLegal', campo: keyof ResponsavelForm, valor: string) => void;
+  nomePrincipal?: string;
+  setNomePrincipal?: (valor: string) => void;
+}) {
+  const set = (campo: keyof ResponsavelForm) => (valor: string) => atualizar(tipo, campo, valor);
+  return (
+    <div className="rounded-xl border border-slate-100 p-4 space-y-3">
+      <p className="text-sm font-semibold text-slate-800">{titulo}</p>
+      <Campo label="Nome"><Input value={nomePrincipal ?? dados.nome} onChange={(v) => { set('nome')(v); setNomePrincipal?.(v); }} /></Campo>
+      <Campo label="CPF"><Input value={dados.cpf} onChange={set('cpf')} /></Campo>
+      <Campo label="Celular"><Input value={dados.celular} onChange={set('celular')} /></Campo>
+      <Campo label="Telefone residencial"><Input value={dados.telefoneResidencial} onChange={set('telefoneResidencial')} /></Campo>
+      <Campo label="E-mail"><Input value={dados.email} onChange={set('email')} /></Campo>
+      <Campo label="Endereço"><Input value={dados.endereco} onChange={set('endereco')} /></Campo>
+      <Campo label="CEP"><Input value={dados.cep} onChange={set('cep')} /></Campo>
+      <Campo label="Identidade"><Input value={dados.identidade} onChange={set('identidade')} /></Campo>
+      <Campo label="Órgão expedidor"><Input value={dados.orgaoExpeditor} onChange={set('orgaoExpeditor')} /></Campo>
+      <Campo label="Escolaridade"><Input value={dados.escolaridade} onChange={set('escolaridade')} /></Campo>
+      <Campo label="Profissão"><Input value={dados.profissao} onChange={set('profissao')} /></Campo>
+      <Campo label="Benefício"><Input value={dados.beneficio} onChange={set('beneficio')} /></Campo>
+      <Campo label="Nº pessoas em casa"><Input value={dados.pessoasCasa} onChange={set('pessoasCasa')} /></Campo>
+    </div>
+  );
+}
+
+function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void }) {
+  return (
+    <div className="space-y-4">
+      <TituloEtapa titulo="Saúde, laudos, intolerâncias e medicamentos" subtitulo="Informações críticas para secretaria, nutrição, professores e contato com responsáveis." />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Campo label="Tipagem sanguínea">
+          <select className={inputCls} value={form.bloodType} onChange={(e) => atualizar('bloodType', e.target.value)}>
+            <option value="">Não informado</option>
+            {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Intolerantes"><Input value={form.intolerancias} onChange={(v) => atualizar('intolerancias', v)} placeholder="Ex.: lactose, glúten" /></Campo>
+        <Campo label="Alergias"><Input value={form.allergies} onChange={(v) => atualizar('allergies', v)} /></Campo>
+        <Campo label="Condições médicas"><Input value={form.medicalConditions} onChange={(v) => atualizar('medicalConditions', v)} /></Campo>
+        <Campo label="Necessidades de medicação"><Input value={form.medicationNeeds} onChange={(v) => atualizar('medicationNeeds', v)} /></Campo>
+        <Campo label="Medicamentos"><Input value={form.medicamentos} onChange={(v) => atualizar('medicamentos', v)} /></Campo>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Check label="Laudado" checked={form.laudado} onChange={(v) => atualizar('laudado', v)} />
+        <Check label="Genitor informado" checked={form.genitor} onChange={(v) => atualizar('genitor', v)} />
+        <Check label="Uso de imagem autorizado" checked={form.usoImagem} onChange={(v) => atualizar('usoImagem', v)} />
+      </div>
+      {form.laudado && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50/60">
+          <Campo label="Tipo de laudo *"><Input value={form.tipoLaudo} onChange={(v) => atualizar('tipoLaudo', v)} /></Campo>
+          <Campo label="CID"><Input value={form.cid} onChange={(v) => atualizar('cid', v)} /></Campo>
+          <Campo label="Descrição do laudo" className="sm:col-span-3">
+            <textarea className={`${inputCls} resize-none`} rows={3} value={form.descricaoLaudo} onChange={(e) => atualizar('descricaoLaudo', e.target.value)} />
+          </Campo>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
+  form: FormularioMatricula;
+  atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
+  atualizarDocumento: (campo: keyof FormularioMatricula['documentos'], valor: boolean) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <TituloEtapa titulo="Documentos, transporte e autorizações" subtitulo="Checklist administrativo da ficha da criança." />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {Object.entries({
+          certidaoNascimento: 'Certidão de nascimento',
+          cpfCrianca: 'CPF da criança',
+          rgCpfResponsavel: 'RG/CPF do responsável',
+          comprovanteResidencia: 'Comprovante de residência',
+          cartaoVacina: 'Cartão de vacinação',
+          cartaoSUS: 'Cartão SUS',
+          nis: 'NIS',
+          laudoMedico: 'Laudo médico',
+          foto: 'Foto',
+          termoImagem: 'Termo de uso de imagem',
+          declaracaoEscolar: 'Declaração escolar',
+        } as Record<keyof FormularioMatricula['documentos'], string>).map(([key, label]) => (
+          <Check key={key} label={label} checked={form.documentos[key as keyof FormularioMatricula['documentos']]} onChange={(v) => atualizarDocumento(key as keyof FormularioMatricula['documentos'], v)} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Check label="Utiliza transporte escolar" checked={form.transporteEscolar} onChange={(v) => atualizar('transporteEscolar', v)} />
+        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} /></Campo>
+      </div>
+
+      <Campo label="Observações da Secretaria">
+        <textarea className={`${inputCls} resize-none`} rows={4} value={form.observacoesSecretaria} onChange={(e) => atualizar('observacoesSecretaria', e.target.value)} />
+      </Campo>
+    </div>
+  );
+}
+
+function EtapaTurma({ form, atualizar, turmas }: {
+  form: FormularioMatricula;
+  atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
+  turmas: Turma[];
+}) {
+  return (
+    <div className="space-y-4">
+      <TituloEtapa titulo="Turma e data de matrícula" subtitulo="A criança pode ser cadastrada sem turma e regularizada depois pela Secretaria." />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Campo label="Turma">
+          <select className={inputCls} value={form.classroomId} onChange={(e) => atualizar('classroomId', e.target.value)}>
+            <option value="">Sem turma neste momento</option>
+            {turmas.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Data de matrícula *"><Input type="date" value={form.enrollmentDate} onChange={(v) => atualizar('enrollmentDate', v)} /></Campo>
+      </div>
+    </div>
+  );
+}
+
+function EtapaRevisao({ form, turmas, pendencias }: { form: FormularioMatricula; turmas: Turma[]; pendencias: string[] }) {
+  const turma = turmas.find((t) => t.id === form.classroomId)?.name ?? 'Sem turma definida';
+  return (
+    <div className="space-y-4">
+      <TituloEtapa titulo="Revisão final" subtitulo="Confirme antes de gravar no cadastro da criança." />
+      {pendencias.length > 0 && (
+        <div className="p-3 rounded-xl border border-red-200 bg-red-50 text-sm text-red-700">
+          <div className="flex items-center gap-2 font-medium mb-1">
+            <AlertTriangle className="h-4 w-4" />
+            Pendências obrigatórias
+          </div>
+          <ul className="list-disc list-inside space-y-0.5 text-xs">
+            {pendencias.map((p) => <li key={p}>{p}</li>)}
+          </ul>
+        </div>
+      )}
+      <Resumo titulo="Criança" linhas={[
+        ['Nome', `${form.firstName} ${form.lastName}`],
+        ['Nascimento', form.dateOfBirth],
+        ['CPF', form.cpf],
+        ['Código/Inscrição', [form.codigoAluno, form.inscricao].filter(Boolean).join(' / ')],
+        ['Endereço', [form.endereco, form.cep].filter(Boolean).join(' · ')],
+      ]} />
+      <Resumo titulo="Responsáveis" linhas={[
+        ['Mãe', form.nomeMae],
+        ['Pai', form.nomePai],
+        ['Resp. legal', form.responsavelLegal.nome],
+        ['Telefone', form.responsavelLegal.celular || form.mae.celular || form.pai.celular],
+      ]} />
+      <Resumo titulo="Saúde e documentos" linhas={[
+        ['Alergias/intolerâncias', [form.allergies, form.intolerancias].filter(Boolean).join(' | ')],
+        ['Laudo', form.laudado ? `${form.tipoLaudo || 'Sim'} ${form.cid || ''}` : 'Não'],
+        ['Uso de imagem', form.usoImagem ? 'Autorizado' : 'Não autorizado'],
+        ['Transporte', form.transporteEscolar ? form.nomeTransporte || 'Sim' : 'Não'],
+      ]} />
+      <Resumo titulo="Matrícula" linhas={[
+        ['Turma', turma],
+        ['Data', form.enrollmentDate],
+      ]} />
+    </div>
+  );
+}
+
+function TituloEtapa({ titulo, subtitulo }: { titulo: string; subtitulo: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-slate-800">{titulo}</h2>
+      <p className="text-xs text-slate-400 mt-0.5">{subtitulo}</p>
+    </div>
+  );
+}
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400 transition-colors';
 
-function FormField({ label, required, children, className }: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Campo({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={className}>
-      <label className="block text-xs font-medium text-slate-500 mb-1">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
-      </label>
+    <label className={className}>
+      <span className="block text-xs font-medium text-slate-500 mb-1">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
-function RevisaoBloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Input({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
+  return <input type={type} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+}
+
+function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-2 p-3 rounded-xl border border-slate-200 bg-white text-sm text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+      />
+      <span>{label}</span>
+    </label>
+  );
+}
+
+function Resumo({ titulo, linhas }: { titulo: string; linhas: Array<[string, string]> }) {
   return (
     <div className="rounded-xl border border-slate-100 overflow-hidden">
       <div className="px-4 py-2 bg-slate-50 border-b border-slate-100">
         <p className="text-xs font-semibold text-slate-600">{titulo}</p>
       </div>
-      <div className="divide-y divide-slate-50">{children}</div>
-    </div>
-  );
-}
-
-function RevisaoLinha({ label, value }: { label: string; value: string }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-start justify-between gap-4 px-4 py-2">
-      <span className="text-xs text-slate-400 flex-shrink-0">{label}</span>
-      <span className="text-xs text-slate-700 text-right font-medium">{value}</span>
+      <div className="divide-y divide-slate-50">
+        {linhas.filter(([, value]) => value).map(([label, value]) => (
+          <div key={label} className="flex items-start justify-between gap-4 px-4 py-2">
+            <span className="text-xs text-slate-400">{label}</span>
+            <span className="text-xs text-slate-700 text-right font-medium">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
