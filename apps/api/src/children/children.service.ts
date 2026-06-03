@@ -22,13 +22,15 @@ type ChildAdministrativeJsonFields = Pick<
   | 'fichaAdministrativa'
 >;
 
-function toPrismaJson(value: unknown): Prisma.InputJsonValue | undefined {
+function toPrismaJson(value: unknown): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue | undefined {
   if (value === undefined) {
     return undefined;
   }
 
   if (value === null) {
-    return Prisma.JsonNull;
+    // Prisma 5: para setar null em campos Json? nullable, usar DbNull (não JsonNull)
+    // JsonNull = armazena o valor JSON literal "null"; DbNull = armazena NULL no banco
+    return Prisma.DbNull;
   }
 
   return value as Prisma.InputJsonValue;
@@ -36,14 +38,13 @@ function toPrismaJson(value: unknown): Prisma.InputJsonValue | undefined {
 
 function normalizeChildJsonFields<T extends Partial<ChildAdministrativeJsonFields>>(
   dto: T,
-): Pick<
-  Prisma.ChildUncheckedCreateInput,
-  | 'dadosResponsaveis'
-  | 'documentosMatricula'
-  | 'autorizadosRetirada'
-  | 'transporteEscolar'
-  | 'fichaAdministrativa'
-> {
+): {
+  dadosResponsaveis?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
+  documentosMatricula?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
+  autorizadosRetirada?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
+  transporteEscolar?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
+  fichaAdministrativa?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
+} {
   return {
     dadosResponsaveis: toPrismaJson(dto.dadosResponsaveis),
     documentosMatricula: toPrismaJson(dto.documentosMatricula),
