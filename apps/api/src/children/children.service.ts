@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -10,6 +11,47 @@ import * as crypto from 'crypto';
 
 const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
 const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
+
+
+type ChildAdministrativeJsonFields = Pick<
+  CreateChildDto,
+  | 'dadosResponsaveis'
+  | 'documentosMatricula'
+  | 'autorizadosRetirada'
+  | 'transporteEscolar'
+  | 'fichaAdministrativa'
+>;
+
+function toPrismaJson(value: unknown): Prisma.InputJsonValue | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return Prisma.JsonNull;
+  }
+
+  return value as Prisma.InputJsonValue;
+}
+
+function normalizeChildJsonFields<T extends Partial<ChildAdministrativeJsonFields>>(
+  dto: T,
+): Pick<
+  Prisma.ChildUncheckedCreateInput,
+  | 'dadosResponsaveis'
+  | 'documentosMatricula'
+  | 'autorizadosRetirada'
+  | 'transporteEscolar'
+  | 'fichaAdministrativa'
+> {
+  return {
+    dadosResponsaveis: toPrismaJson(dto.dadosResponsaveis),
+    documentosMatricula: toPrismaJson(dto.documentosMatricula),
+    autorizadosRetirada: toPrismaJson(dto.autorizadosRetirada),
+    transporteEscolar: toPrismaJson(dto.transporteEscolar),
+    fichaAdministrativa: toPrismaJson(dto.fichaAdministrativa),
+  };
+}
 
 @Injectable()
 export class ChildrenService {
@@ -24,11 +66,14 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
+    const data: Prisma.ChildUncheckedCreateInput = {
+      ...createChildDto,
+      ...normalizeChildJsonFields(createChildDto),
+      mantenedoraId: user.mantenedoraId,
+    };
+
     const child = await this.prisma.child.create({
-      data: {
-        ...createChildDto,
-        mantenedoraId: user.mantenedoraId,
-      },
+      data,
       include: {
         unit: true,
       },
@@ -142,11 +187,20 @@ export class ChildrenService {
    * Atualizar criança
    */
   async update(id: string, updateChildDto: UpdateChildDto, user: any) {
-    const child = await this.findOne(id, user);
+    await this.findOne(id, user);
+
+    if (updateChildDto.unitId && !canAccessUnit(user, updateChildDto.unitId)) {
+      throw new ForbiddenException('Você não tem acesso a esta unidade');
+    }
+
+    const data: Prisma.ChildUncheckedUpdateInput = {
+      ...updateChildDto,
+      ...normalizeChildJsonFields(updateChildDto),
+    };
 
     const updated = await this.prisma.child.update({
       where: { id },
-      data: updateChildDto,
+      data,
       include: {
         unit: true,
         enrollments: {
