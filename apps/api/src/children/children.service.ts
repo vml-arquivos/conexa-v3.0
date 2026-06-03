@@ -13,45 +13,40 @@ const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
 const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
 
 
-type ChildAdministrativeJsonFields = Pick<
-  CreateChildDto,
+type ChildAdministrativeJsonFieldName =
   | 'dadosResponsaveis'
   | 'documentosMatricula'
   | 'autorizadosRetirada'
   | 'transporteEscolar'
-  | 'fichaAdministrativa'
->;
+  | 'fichaAdministrativa';
 
-function toPrismaJson(value: unknown): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue | undefined {
+type PrismaJsonWriteValue =
+  | Prisma.InputJsonValue
+  | Prisma.NullableJsonNullValueInput
+  | undefined;
+
+function toPrismaJson(value: unknown): PrismaJsonWriteValue {
   if (value === undefined) {
     return undefined;
   }
 
   if (value === null) {
-    // Prisma 5: para setar null em campos Json? nullable, usar DbNull (não JsonNull)
-    // JsonNull = armazena o valor JSON literal "null"; DbNull = armazena NULL no banco
-    return Prisma.DbNull;
+    return Prisma.JsonNull;
   }
 
-  return value as Prisma.InputJsonValue;
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
-function normalizeChildJsonFields<T extends Partial<ChildAdministrativeJsonFields>>(
-  dto: T,
-): {
-  dadosResponsaveis?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
-  documentosMatricula?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
-  autorizadosRetirada?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
-  transporteEscolar?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
-  fichaAdministrativa?: Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue;
-} {
+function normalizeChildJsonFields(
+  dto: Partial<Record<ChildAdministrativeJsonFieldName, unknown>>,
+): Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput> {
   return {
     dadosResponsaveis: toPrismaJson(dto.dadosResponsaveis),
     documentosMatricula: toPrismaJson(dto.documentosMatricula),
     autorizadosRetirada: toPrismaJson(dto.autorizadosRetirada),
     transporteEscolar: toPrismaJson(dto.transporteEscolar),
     fichaAdministrativa: toPrismaJson(dto.fichaAdministrativa),
-  };
+  } as Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput>;
 }
 
 @Injectable()
@@ -67,15 +62,26 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
-    // Usamos 'any' no objeto intermediário porque o spread do DTO traz campos
-    // tipados como Record<string,unknown> que o TypeScript não atribui diretamente
-    // a InputJsonValue do Prisma — normalizeChildJsonFields sobrescreve com os
-    // valores corretos antes de chegar ao Prisma.
-    const data = {
-      ...createChildDto,
-      ...normalizeChildJsonFields(createChildDto),
+    const {
+      dadosResponsaveis,
+      documentosMatricula,
+      autorizadosRetirada,
+      transporteEscolar,
+      fichaAdministrativa,
+      ...childBaseDto
+    } = createChildDto;
+
+    const data: Prisma.ChildUncheckedCreateInput = {
+      ...childBaseDto,
       mantenedoraId: user.mantenedoraId,
-    } as Prisma.ChildUncheckedCreateInput;
+      ...normalizeChildJsonFields({
+        dadosResponsaveis,
+        documentosMatricula,
+        autorizadosRetirada,
+        transporteEscolar,
+        fichaAdministrativa,
+      }),
+    };
 
     const child = await this.prisma.child.create({
       data,
@@ -192,16 +198,27 @@ export class ChildrenService {
    * Atualizar criança
    */
   async update(id: string, updateChildDto: UpdateChildDto, user: any) {
-    await this.findOne(id, user);
+    const child = await this.findOne(id, user);
 
-    if (updateChildDto.unitId && !canAccessUnit(user, updateChildDto.unitId)) {
-      throw new ForbiddenException('Você não tem acesso a esta unidade');
-    }
+    const {
+      dadosResponsaveis,
+      documentosMatricula,
+      autorizadosRetirada,
+      transporteEscolar,
+      fichaAdministrativa,
+      ...childBaseUpdateDto
+    } = updateChildDto;
 
-    const data = {
-      ...updateChildDto,
-      ...normalizeChildJsonFields(updateChildDto),
-    } as Prisma.ChildUncheckedUpdateInput;
+    const data: Prisma.ChildUncheckedUpdateInput = {
+      ...childBaseUpdateDto,
+      ...normalizeChildJsonFields({
+        dadosResponsaveis,
+        documentosMatricula,
+        autorizadosRetirada,
+        transporteEscolar,
+        fichaAdministrativa,
+      }),
+    };
 
     const updated = await this.prisma.child.update({
       where: { id },
