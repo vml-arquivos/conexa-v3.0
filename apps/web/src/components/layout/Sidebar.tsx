@@ -6,7 +6,7 @@ import {
   ChevronRight, ChevronDown, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
-  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle,
+  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle, UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
