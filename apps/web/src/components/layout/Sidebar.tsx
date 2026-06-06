@@ -84,16 +84,17 @@ const NUTRI_ITEMS: MenuItem[] = [
 
 // UNIDADE — Administrativo (Secretaria) ─────────────────────────────────────
 const ADMIN_UNIDADE_ITEMS: MenuItem[] = [
-  { path: '/app/secretaria',                    label: 'Painel da Secretaria',      icon: <Home className="h-4 w-4" /> },
-  { path: '/app/secretaria/matriculas',         label: 'Matrículas e Fichas',       icon: <UserCheck className="h-4 w-4" /> },
-  { path: '/app/secretaria/matriculas/nova',    label: 'Nova Matrícula',            icon: <UserPlus className="h-4 w-4" />, badge: 'Essencial' },
-  { path: '/app/secretaria/movimentacoes',      label: 'Cancelamentos/Transf.',     icon: <FileArchive className="h-4 w-4" /> },
-  { path: '/app/secretaria/faltas',             label: 'Controle de Faltas',        icon: <ClipboardList className="h-4 w-4" /> },
-  { path: '/app/secretaria/ocorrencias',        label: 'Saúde e Ocorrências',       icon: <HeartPulse className="h-4 w-4" /> },
-  { path: '/app/atendimentos-pais',             label: 'Atendimento aos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
-  { path: '/app/secretaria/pedidos',            label: 'Pedidos Administrativos',   icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/secretaria/funcionarios',       label: 'Funcionários da Unidade',   icon: <Building2 className="h-4 w-4" /> },
-  { path: '/app/secretaria/comunicacao',        label: 'Comunicados',               icon: <Bell className="h-4 w-4" /> },
+  { path: '/app/secretaria',                    label: 'Painel da Secretaria',         icon: <Home className="h-4 w-4" /> },
+  { path: '/app/secretaria/matriculas',         label: 'Matrículas e Fichas',          icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/secretaria/matriculas/nova',    label: 'Nova Matrícula',               icon: <UserPlus className="h-4 w-4" />, badge: 'Essencial' },
+  { path: '/app/secretaria/movimentacoes',      label: 'Cancelamentos/Transferências', icon: <FileArchive className="h-4 w-4" /> },
+  { path: '/app/secretaria/faltas',             label: 'Controle de Faltas',           icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/secretaria/atestados',          label: 'Atestados e Documentos',       icon: <FolderCheck className="h-4 w-4" /> },
+  { path: '/app/secretaria/ocorrencias',        label: 'Saúde e Ocorrências',          icon: <HeartPulse className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais',             label: 'Atendimento aos Pais',         icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/secretaria/transporte',         label: 'Transporte e Retirada',        icon: <Bus className="h-4 w-4" /> },
+  { path: '/app/secretaria/funcionarios',       label: 'Funcionários da Unidade',      icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/secretaria/comunicacao',        label: 'Comunicados Administrativos',  icon: <Bell className="h-4 w-4" /> },
 ];
 
 // UNIDADE — Genérico (sem roleType específico) ─────────────────────────────────
@@ -371,17 +372,17 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         {/* UNIDADE — Diretor */}
-        {!isDeveloper && isDiretor && (
+        {!isDeveloper && !isAdministrativo && isDiretor && (
           <NavSection titulo="Diretor" items={DIRETOR_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Nutricionista */}
-        {!isDeveloper && isNutricionista && (
+        {!isDeveloper && !isAdministrativo && isNutricionista && (
           <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Coordenadora Pedagógica */}
-        {!isDeveloper && isCoordPedagogico && (
+        {!isDeveloper && !isAdministrativo && isCoordPedagogico && (
           <>
             <NavSection titulo="Gestão"      items={COORD_GESTAO}      location={location} onItemClick={onClose} />
             <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  location={location} onItemClick={onClose} />
@@ -394,7 +395,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         {/* UNIDADE — Genérico (sem roleType específico) */}
-        {!isDeveloper && isUnidadeGenerica && (
+        {!isDeveloper && !isAdministrativo && isUnidadeGenerica && (
           <>
             <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      location={location} onItemClick={onClose} />
             <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  location={location} onItemClick={onClose} />
@@ -410,7 +411,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         {/* Fallback */}
-        {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
+        {!isDeveloper && !isAdministrativo && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 

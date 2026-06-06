@@ -2,9 +2,9 @@
  * SecretariaPage — Cockpit Administrativo da Unidade
  *
  * Identidade exclusiva da Secretaria: matrículas, fichas, faltas, atestados,
- * ocorrências de saúde, atendimento aos pais, documentos e pedidos administrativos.
+ * ocorrências de saúde, atendimento aos pais, atestados, transporte e documentos administrativos.
  *
- * Não usa dashboard da coordenação e não expõe módulos pedagógicos como menu/atalho.
+ * Não usa dashboard da coordenação pedagógica e não expõe módulos pedagógicos como menu/atalho.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
