@@ -591,6 +591,24 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorBoundary />,
       },
       {
+        path: 'secretaria/matriculas/:id',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <MatriculaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'secretaria/transporte',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <MatriculasListPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
         path: 'secretaria/movimentacoes',
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
