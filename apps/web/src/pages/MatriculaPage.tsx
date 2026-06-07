@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle,
@@ -247,14 +247,21 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
 
 export default function MatriculaPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: childIdParam } = useParams<{ id: string }>();
   const modoEdicao = Boolean(childIdParam);
+  const isNova = location.pathname.endsWith('/nova');
   const { user } = useAuth();
   const [etapa, setEtapa] = useState(1);
   const [salvando, setSalvando] = useState(false);
   const [carregandoDados, setCarregandoDados] = useState(modoEdicao);
   const [form, setForm] = useState<FormularioMatricula>(() => {
     if (modoEdicao) return estadoInicial();
+    // Rota /nova: sempre começa limpo — remove rascunho anterior
+    if (isNova) {
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      return estadoInicial();
+    }
     try {
       const salvo = localStorage.getItem(STORAGE_KEY);
       return salvo ? { ...estadoInicial(), ...JSON.parse(salvo) } : estadoInicial();
