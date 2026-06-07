@@ -279,9 +279,12 @@ export default function AdminUsuariosPage() {
         http.get('/admin/units'),
       ]);
       const u = usersRes.data;
-      setUsuarios(Array.isArray(u) ? u : u?.data ?? u?.users ?? []);
+      // Suporta: array direto, { data: [] }, { users: [] }, { items: [] }
+      const userList = Array.isArray(u) ? u : (u?.data ?? u?.users ?? u?.items ?? []);
+      setUsuarios(userList);
       const un = unitsRes.data;
-      setUnidades(Array.isArray(un) ? un : un?.data ?? un?.units ?? []);
+      const unitList = Array.isArray(un) ? un : (un?.data ?? un?.units ?? un?.items ?? []);
+      setUnidades(unitList);
     } catch {
       // Dados de demonstração
       setUsuarios([
