@@ -17,7 +17,7 @@ import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 import {
   UserPlus, Search, RefreshCw, Filter, ChevronRight,
-  XCircle, Loader2, Users, CheckCircle, AlertTriangle,
+  XCircle, Loader2, Users, CheckCircle, AlertTriangle, FileText,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -212,30 +212,41 @@ export default function MatriculasListPage() {
                 ?? turmas.find(t => t.id === enrollment?.classroomId)?.name
                 ?? 'Sem turma';
               return (
-                <button
+                <div
                   key={aluno.id}
-                  onClick={() => navigate(`/app/secretaria/matriculas/${aluno.id}`)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left touch-manipulation"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                 >
-                  <ChildAvatar
-                    firstName={aluno.firstName}
-                    lastName={aluno.lastName}
-                    photoUrl={aluno.photoUrl ?? undefined}
-                    size="sm"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700 truncate">
-                      {aluno.firstName} {aluno.lastName}
-                    </p>
-                    <p className="text-[11px] text-slate-400 truncate">{turmaNome}</p>
-                  </div>
+                  <button
+                    onClick={() => navigate(`/app/secretaria/matriculas/${aluno.id}`)}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left touch-manipulation"
+                  >
+                    <ChildAvatar
+                      firstName={aluno.firstName}
+                      lastName={aluno.lastName}
+                      photoUrl={aluno.photoUrl ?? undefined}
+                      size="sm"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 truncate">
+                        {aluno.firstName} {aluno.lastName}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">{turmaNome}</p>
+                    </div>
+                  </button>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {enrollment && (
                       <EnrollmentStatusBadge status={enrollment.status} />
                     )}
+                    <button
+                      onClick={() => navigate(`/app/secretaria/matriculas/${aluno.id}/ficha`)}
+                      title="Ver ficha / Imprimir PDF"
+                      className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 hover:text-blue-700 transition-colors"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </button>
                     <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
