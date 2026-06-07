@@ -257,7 +257,6 @@ export default function MatriculaPage() {
   const [carregandoDados, setCarregandoDados] = useState(modoEdicao);
   const [form, setForm] = useState<FormularioMatricula>(() => {
     if (modoEdicao) return estadoInicial();
-    // Rota /nova: sempre começa limpo
     if (location.pathname.endsWith('/nova')) {
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
       return estadoInicial();
