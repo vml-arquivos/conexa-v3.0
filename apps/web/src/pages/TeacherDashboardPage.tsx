@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -232,11 +232,12 @@ export default function TeacherDashboardPage() {
 
   // ─── Widget Hoje (API /insights/teacher/today) ─────────────────────────────────
   const [insightsHoje, setInsightsHoje] = useState<any>(null);
-  useEffect(() => {
+  const loadInsightsHoje = useCallback(() => {
     http.get('/insights/teacher/today')
       .then(r => setInsightsHoje(r.data))
       .catch(() => setInsightsHoje(null));
   }, []);
+  useEffect(() => { loadInsightsHoje(); }, [loadInsightsHoje]);
 
   // ─── Tarefa 1.5: Alertas de alergias da turma ────────────────────────────────
   const [alertasAlergias, setAlertasAlergias] = useState<{
@@ -384,6 +385,7 @@ export default function TeacherDashboardPage() {
       setLoading(true);
       const response = await http.get('/teachers/dashboard');
       setData(response.data);
+      loadInsightsHoje();
     } catch {
       toast.error('Não foi possível carregar seu painel.');
     } finally {
