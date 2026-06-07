@@ -245,6 +245,162 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
+
+type SelectOption = { label: string; value: string; data?: any };
+
+function asRecord(value: any): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function getPath(obj: any, path: string): any {
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+}
+
+function firstValue(...values: any[]): string {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).replace(/\s+/g, ' ').trim();
+    if (text && !['-', '--', '?', 'null', 'undefined'].includes(text.toLowerCase())) return text;
+  }
+  return '';
+}
+
+function firstFrom(obj: any, paths: string[]): string {
+  for (const path of paths) {
+    const value = getPath(obj, path);
+    const text = firstValue(value);
+    if (text) return text;
+  }
+  return '';
+}
+
+function firstBool(...values: any[]): boolean {
+  for (const value of values) {
+    if (typeof value === 'boolean') return value;
+    if (value === null || value === undefined || value === '') continue;
+    const normalized = String(value).trim().toLowerCase();
+    if (['sim', 's', 'yes', 'true', '1', 'x'].includes(normalized)) return true;
+    if (['não', 'nao', 'n', 'no', 'false', '0'].includes(normalized)) return false;
+  }
+  return false;
+}
+
+function normalizeResponsavel(input: any, parentescoPadrao: string): ResponsavelForm {
+  const r = asRecord(input);
+  return {
+    ...responsavelVazio,
+    parentesco: firstValue(r.parentesco, parentescoPadrao),
+    nome: firstValue(r.nome, r.name),
+    cpf: firstValue(r.cpf, r.documento),
+    identidade: firstValue(r.identidade, r.identidadeResponsavel, r.rg),
+    orgaoExpeditor: firstValue(r.orgaoExpeditor, r.orgao, r.orgaoExpedidor),
+    dataDocumento: firstValue(r.dataDocumento, r.dataIdentidade, r.data),
+    pis: firstValue(r.pis, r.pisResponsavel),
+    nascimento: firstValue(r.nascimento, r.dataNascimento),
+    telefoneTrabalho: firstValue(r.telefoneTrabalho, r.telTrabalho, r.trabalho),
+    telefoneResidencial: firstValue(r.telefoneResidencial, r.telefone, r.telefoneResidencia),
+    celular: firstValue(r.celular, r.cel, r.telefone, r.phone),
+    email: firstValue(r.email),
+    escolaridade: firstValue(r.escolaridade),
+    profissao: firstValue(r.profissao),
+    dependentes: firstValue(r.dependentes, r.numeroDependentes),
+    endereco: firstValue(r.endereco, r.address),
+    cep: firstValue(r.cep),
+    beneficio: firstValue(r.beneficio, r.benef),
+    pessoasCasa: firstValue(r.pessoasCasa, r.numeroPessoas, r.numeroPessoasCasa),
+  };
+}
+
+function normalizeAutorizados(value: any): AutorizadoForm[] {
+  const raw = Array.isArray(value) ? value : [];
+  const items = raw
+    .map((a) => ({
+      nome: firstValue(a?.nome, a?.name),
+      parentesco: firstValue(a?.parentesco, a?.relationship),
+      telefone: firstValue(a?.telefone, a?.phone),
+    }))
+    .filter((a) => a.nome || a.parentesco || a.telefone);
+  return [...items, { nome: '', parentesco: '', telefone: '' }, { nome: '', parentesco: '', telefone: '' }].slice(0, Math.max(2, items.length));
+}
+
+function mergeDocumentos(value: any): FormularioMatricula['documentos'] {
+  const d = asRecord(value);
+  return {
+    ...estadoInicial().documentos,
+    ...d,
+    cpfCrianca: firstBool(d.cpfCrianca, d.cpfAluno, d.cpf) || estadoInicial().documentos.cpfCrianca,
+    rgCpfResponsavel: firstBool(d.rgCpfResponsavel, d.cpfResponsavel, d.identidadeResponsavel),
+    nis: firstBool(d.nis),
+  };
+}
+
+function buildFormFromChild(c: any): FormularioMatricula {
+  const dad = asRecord(c?.dadosResponsaveis);
+  const docs = asRecord(c?.documentosMatricula);
+  const transporte = asRecord(c?.transporteEscolar);
+  const ficha = asRecord(c?.fichaAdministrativa);
+  const mae = normalizeResponsavel(dad.mae ?? dad.maeResponsavel ?? {}, 'MÃE');
+  const pai = normalizeResponsavel(dad.pai ?? {}, 'PAI');
+  const responsavelLegal = normalizeResponsavel(dad.responsavelLegal ?? dad.responsavelPrincipal ?? {}, 'RESPONSÁVEL');
+
+  return {
+    ...estadoInicial(),
+    firstName: firstValue(c.firstName),
+    lastName: firstValue(c.lastName),
+    dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : '',
+    gender: c.gender ?? 'NAO_INFORMADO',
+    cpf: firstValue(c.cpf, docs.cpfCrianca, docs.cpfAluno),
+    rg: firstValue(c.rg, docs.rgCrianca),
+    nacionalidade: firstValue(c.nacionalidade),
+    naturalidade: firstValue(c.naturalidade),
+    ufNascimento: firstValue(c.ufNascimento),
+    raca: firstValue(c.raca),
+    peso: firstValue(c.peso),
+    bloodType: firstValue(c.bloodType),
+    endereco: firstValue(c.endereco, dad.endereco, dad.mae?.endereco, dad.responsavelLegal?.endereco),
+    cep: firstValue(c.cep, dad.cep, dad.mae?.cep, dad.responsavelLegal?.cep),
+    nis: firstValue(c.nis, docs.nis),
+    codigoAluno: firstValue(c.codigoAluno, docs.codigoAluno),
+    inscricao: firstValue(c.inscricao, docs.inscricao),
+    nomeMae: firstValue(c.nomeMae, dad.mae?.nome, mae.nome),
+    nomePai: firstValue(c.nomePai, dad.pai?.nome, pai.nome),
+    allergies: firstValue(c.allergies, ficha.intolerantes),
+    intolerancias: firstValue(ficha.intolerantes),
+    medicalConditions: firstValue(c.medicalConditions),
+    medicationNeeds: firstValue(c.medicationNeeds),
+    medicamentos: firstValue(c.medicamentos),
+    laudado: firstBool(c.laudado, ficha.laudado),
+    tipoLaudo: firstValue(c.tipoLaudo),
+    cid: firstValue(c.cid),
+    descricaoLaudo: firstValue(c.descricaoLaudo),
+    usoImagem: firstBool(c.usoImagem, ficha.usoImagem),
+    mae: { ...mae, nome: firstValue(c.nomeMae, mae.nome), cpf: firstValue(mae.cpf, docs.cpfMae), celular: firstValue(mae.celular, dad.mae?.telefone) },
+    pai: { ...pai, nome: firstValue(c.nomePai, pai.nome), celular: firstValue(pai.celular, c.celPai, dad.pai?.telefone) },
+    responsavelLegal: { ...responsavelLegal, cpf: firstValue(responsavelLegal.cpf, docs.cpfResponsavel), identidade: firstValue(responsavelLegal.identidade, docs.identidadeResponsavel), orgaoExpeditor: firstValue(responsavelLegal.orgaoExpeditor, docs.orgaoExpeditor), dataDocumento: firstValue(responsavelLegal.dataDocumento, docs.dataIdentidade), pis: firstValue(responsavelLegal.pis, docs.pisResponsavel) },
+    documentos: mergeDocumentos(docs),
+    autorizados: normalizeAutorizados(c.autorizadosRetirada),
+    transporteEscolar: firstBool(transporte.utiliza, transporte.usaTransporteEscolar),
+    nomeTransporte: firstValue(transporte.nomeTransporte, transporte.nome, ficha.nomeTransporte),
+    enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
+    classroomId: c.enrollments?.[0]?.classroomId ?? '',
+    genitor: firstBool(ficha.genitor),
+    serieAnterior: firstValue(ficha.serieAnterior, ficha.serie2024),
+    observacoesSecretaria: firstValue(ficha.observacoesSecretaria),
+  };
+}
+
+function uniqueOptions(values: Array<{ label?: string; value?: string; data?: any }>): SelectOption[] {
+  const map = new Map<string, SelectOption>();
+  values.forEach((item) => {
+    const label = firstValue(item.label, item.value);
+    const value = firstValue(item.value, item.label);
+    if (!label || !value) return;
+    const key = value.toLowerCase();
+    if (!map.has(key)) map.set(key, { label, value, data: item.data });
+  });
+  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+
 export default function MatriculaPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -270,62 +426,53 @@ export default function MatriculaPage() {
   });
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasCarregadas, setTurmasCarregadas] = useState(false);
+  const [alunoOptions, setAlunoOptions] = useState<SelectOption[]>([]);
+  const [transporteOptions, setTransporteOptions] = useState<SelectOption[]>([]);
+  const [autorizadoOptions, setAutorizadoOptions] = useState<SelectOption[]>([]);
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
-  // Carregar dados do aluno em modo edição
+  // Carregar opções de alunos, transporte e pessoas autorizadas já cadastradas na unidade.
+  useEffect(() => {
+    let ativo = true;
+    http.get('/children', { params: { limit: 1000 } })
+      .then((res) => {
+        if (!ativo) return;
+        const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+        setAlunoOptions(uniqueOptions(data.map((c: any) => ({
+          label: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
+          value: c.id,
+          data: c,
+        }))));
+
+        const transportes: SelectOption[] = [];
+        const autorizados: SelectOption[] = [];
+        data.forEach((c: any) => {
+          const transporte = asRecord(c.transporteEscolar);
+          const nomeTransporte = firstValue(transporte.nomeTransporte, transporte.nome);
+          if (nomeTransporte) transportes.push({ label: nomeTransporte, value: nomeTransporte });
+          normalizeAutorizados(c.autorizadosRetirada).forEach((a) => {
+            if (a.nome) autorizados.push({ label: `${a.nome}${a.parentesco ? ` — ${a.parentesco}` : ''}${a.telefone ? ` — ${a.telefone}` : ''}`, value: a.nome, data: a });
+          });
+        });
+        setTransporteOptions(uniqueOptions(transportes));
+        setAutorizadoOptions(uniqueOptions(autorizados));
+      })
+      .catch(() => {
+        if (!ativo) return;
+        setAlunoOptions([]);
+        setTransporteOptions([]);
+        setAutorizadoOptions([]);
+      });
+    return () => { ativo = false; };
+  }, []);
+
+  // Carregar dados do aluno em modo edição.
   useEffect(() => {
     if (!modoEdicao || !childIdParam) return;
     setCarregandoDados(true);
     http.get(`/children/${childIdParam}`)
-      .then((res) => {
-        const c = res.data;
-        const dad = c.dadosResponsaveis ?? {};
-        setForm({
-          ...estadoInicial(),
-          firstName: c.firstName ?? '',
-          lastName: c.lastName ?? '',
-          dateOfBirth: c.dateOfBirth ? c.dateOfBirth.slice(0, 10) : '',
-          gender: c.gender ?? 'NAO_INFORMADO',
-          cpf: c.cpf ?? '',
-          rg: c.rg ?? '',
-          nacionalidade: c.nacionalidade ?? '',
-          naturalidade: c.naturalidade ?? '',
-          ufNascimento: c.ufNascimento ?? '',
-          raca: c.raca ?? '',
-          peso: c.peso ?? '',
-          bloodType: c.bloodType ?? '',
-          endereco: c.endereco ?? '',
-          cep: c.cep ?? '',
-          nis: c.nis ?? '',
-          codigoAluno: c.codigoAluno ?? '',
-          inscricao: c.inscricao ?? '',
-          nomeMae: c.nomeMae ?? '',
-          nomePai: c.nomePai ?? '',
-          allergies: c.allergies ?? '',
-          medicalConditions: c.medicalConditions ?? '',
-          medicationNeeds: c.medicationNeeds ?? '',
-          medicamentos: c.medicamentos ?? '',
-          laudado: c.laudado ?? false,
-          tipoLaudo: c.tipoLaudo ?? '',
-          cid: c.cid ?? '',
-          descricaoLaudo: c.descricaoLaudo ?? '',
-          usoImagem: c.usoImagem ?? false,
-          mae: dad.mae ?? estadoInicial().mae,
-          pai: dad.pai ?? estadoInicial().pai,
-          responsavelLegal: dad.responsavelLegal ?? estadoInicial().responsavelLegal,
-          documentos: c.documentosMatricula ?? estadoInicial().documentos,
-          autorizados: c.autorizadosRetirada ?? estadoInicial().autorizados,
-          transporteEscolar: c.transporteEscolar?.utiliza ?? false,
-          nomeTransporte: c.transporteEscolar?.nomeTransporte ?? '',
-          enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
-          classroomId: c.enrollments?.[0]?.classroomId ?? '',
-          genitor: c.fichaAdministrativa?.genitor ?? '',
-          serieAnterior: c.fichaAdministrativa?.serieAnterior ?? '',
-          observacoesSecretaria: c.fichaAdministrativa?.observacoesSecretaria ?? '',
-          intolerancias: '',
-        });
-      })
+      .then((res) => setForm(buildFormFromChild(res.data)))
       .catch(() => {
         toast.error('Erro ao carregar dados do aluno.');
         navigate('/app/secretaria/matriculas');
@@ -570,6 +717,26 @@ export default function MatriculaPage() {
           ))}
         </div>
 
+        {!modoEdicao && alunoOptions.length > 0 && (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+              <Campo label="Selecionar aluno já cadastrado para abrir/editar">
+                <select
+                  className={inputCls}
+                  defaultValue=""
+                  onChange={(e) => e.target.value && navigate(`/app/secretaria/matriculas/${e.target.value}`)}
+                >
+                  <option value="">Digite na busca da lista ou escolha um aluno existente...</option>
+                  {alunoOptions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                </select>
+              </Campo>
+              <Button variant="outline" onClick={() => navigate('/app/secretaria/matriculas')} className="h-10">
+                Ir para lista completa
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           {etapa === 1 && <EtapaCrianca form={form} atualizar={atualizar} />}
           {etapa === 2 && (
@@ -578,10 +745,11 @@ export default function MatriculaPage() {
               atualizar={atualizar}
               atualizarResponsavel={atualizarResponsavel}
               atualizarAutorizado={atualizarAutorizado}
+              autorizadoOptions={autorizadoOptions}
             />
           )}
           {etapa === 3 && <EtapaSaude form={form} atualizar={atualizar} />}
-          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} />}
+          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} transporteOptions={transporteOptions} />}
           {etapa === 5 && <EtapaTurma form={form} atualizar={atualizar} turmas={turmas} />}
           {etapa === 6 && <EtapaRevisao form={form} turmas={turmas} pendencias={pendencias} />}
         </div>
@@ -674,12 +842,13 @@ function EtapaCrianca({ form, atualizar }: { form: FormularioMatricula; atualiza
 }
 
 function EtapaResponsaveis({
-  form, atualizar, atualizarResponsavel, atualizarAutorizado,
+  form, atualizar, atualizarResponsavel, atualizarAutorizado, autorizadoOptions,
 }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
   atualizarResponsavel: (tipo: 'mae' | 'pai' | 'responsavelLegal', campo: keyof ResponsavelForm, valor: string) => void;
   atualizarAutorizado: (index: number, campo: keyof AutorizadoForm, valor: string) => void;
+  autorizadoOptions: SelectOption[];
 }) {
   return (
     <div className="space-y-5">
@@ -694,10 +863,29 @@ function EtapaResponsaveis({
         <p className="text-sm font-semibold text-slate-800 mb-3">Pessoas autorizadas para liberar a criança</p>
         <div className="space-y-3">
           {form.autorizados.map((a, idx) => (
-            <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Campo label={`Nome autorizado ${idx + 1}`}><Input value={a.nome} onChange={(v) => atualizarAutorizado(idx, 'nome', v)} /></Campo>
+            <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <Campo label="Escolher cadastrado">
+                <select
+                  className={inputCls}
+                  value=""
+                  onChange={(e) => {
+                    const opt = autorizadoOptions.find((item) => item.value === e.target.value);
+                    if (!opt?.data) return;
+                    atualizarAutorizado(idx, 'nome', opt.data.nome ?? '');
+                    atualizarAutorizado(idx, 'parentesco', opt.data.parentesco ?? '');
+                    atualizarAutorizado(idx, 'telefone', opt.data.telefone ?? '');
+                  }}
+                >
+                  <option value="">Selecionar...</option>
+                  {autorizadoOptions.map((opt) => <option key={`${idx}-${opt.value}-${opt.label}`} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </Campo>
+              <Campo label={`Nome autorizado ${idx + 1}`}><Input value={a.nome} onChange={(v) => atualizarAutorizado(idx, 'nome', v)} list={`autorizados-${idx}`} /></Campo>
               <Campo label="Parentesco"><Input value={a.parentesco} onChange={(v) => atualizarAutorizado(idx, 'parentesco', v)} /></Campo>
               <Campo label="Telefone"><Input value={a.telefone} onChange={(v) => atualizarAutorizado(idx, 'telefone', v)} /></Campo>
+              <datalist id={`autorizados-${idx}`}>
+                {autorizadoOptions.map((opt) => <option key={`${idx}-dl-${opt.value}-${opt.label}`} value={opt.data?.nome ?? opt.value}>{opt.label}</option>)}
+              </datalist>
             </div>
           ))}
         </div>
@@ -772,10 +960,11 @@ function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar:
   );
 }
 
-function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
+function EtapaDocumentos({ form, atualizar, atualizarDocumento, transporteOptions }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
   atualizarDocumento: (campo: keyof FormularioMatricula['documentos'], valor: boolean) => void;
+  transporteOptions: SelectOption[];
 }) {
   return (
     <div className="space-y-4">
@@ -801,7 +990,20 @@ function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Check label="Utiliza transporte escolar" checked={form.transporteEscolar} onChange={(v) => atualizar('transporteEscolar', v)} />
-        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} /></Campo>
+        <Campo label="Transportador cadastrado">
+          <select
+            className={inputCls}
+            value=""
+            onChange={(e) => e.target.value && atualizar('nomeTransporte', e.target.value)}
+          >
+            <option value="">Selecionar transportador existente...</option>
+            {transporteOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+          </select>
+        </Campo>
+        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} list="transportes-cadastrados" /></Campo>
+        <datalist id="transportes-cadastrados">
+          {transporteOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+        </datalist>
       </div>
 
       <Campo label="Observações da Secretaria">
@@ -895,8 +1097,8 @@ function Campo({ label, children, className }: { label: string; children: React.
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
-  return <input type={type} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+function Input({ value, onChange, placeholder, type = 'text', list }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string; list?: string }) {
+  return <input type={type} list={list} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
