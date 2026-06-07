@@ -65,6 +65,8 @@ import ComunicacaoPage from '../pages/ComunicacaoPage';
 import FaltasSecretariaPage from '../pages/FaltasSecretariaPage';
 import OcorrenciasSecretariaPage from '../pages/OcorrenciasSecretariaPage';
 import PedidosAdministrativosPage from '../pages/PedidosAdministrativosPage';
+import TransporteRetiradaPage from '../pages/TransporteRetiradaPage';
+import AtestadosDocumentosPage from '../pages/AtestadosDocumentosPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -613,7 +615,16 @@ export const router = createBrowserRouter([
         path: 'secretaria/transporte',
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MatriculasListPage />
+            <TransporteRetiradaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'secretaria/atestados',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <AtestadosDocumentosPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,
