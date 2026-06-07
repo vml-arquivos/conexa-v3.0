@@ -58,6 +58,7 @@ import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 import SecretariaPage from '../pages/SecretariaPage';
 import MatriculaPage from '../pages/MatriculaPage';
 import MatriculasListPage from '../pages/MatriculasListPage';
+import FichaAlunoPage from '../pages/FichaAlunoPage';
 import MovimentacoesPage from '../pages/MovimentacoesPage';
 import FuncionariosPage from '../pages/FuncionariosPage';
 import ComunicacaoPage from '../pages/ComunicacaoPage';
@@ -595,6 +596,15 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <MatriculaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'secretaria/matriculas/:id/ficha',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <FichaAlunoPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,
