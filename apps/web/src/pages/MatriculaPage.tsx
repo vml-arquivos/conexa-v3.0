@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle,
@@ -247,21 +247,14 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
 
 export default function MatriculaPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { id: childIdParam } = useParams<{ id: string }>();
   const modoEdicao = Boolean(childIdParam);
-  const isNova = location.pathname.endsWith('/nova');
   const { user } = useAuth();
   const [etapa, setEtapa] = useState(1);
   const [salvando, setSalvando] = useState(false);
   const [carregandoDados, setCarregandoDados] = useState(modoEdicao);
   const [form, setForm] = useState<FormularioMatricula>(() => {
     if (modoEdicao) return estadoInicial();
-    // Rota /nova: sempre começa limpo — remove rascunho anterior
-    if (isNova) {
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-      return estadoInicial();
-    }
     try {
       const salvo = localStorage.getItem(STORAGE_KEY);
       return salvo ? { ...estadoInicial(), ...JSON.parse(salvo) } : estadoInicial();
@@ -335,8 +328,11 @@ export default function MatriculaPage() {
   }, [childIdParam, modoEdicao, navigate]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
-  }, [form]);
+    // Só salva rascunho em modo criação — nunca em modo edição
+    if (!modoEdicao && !isNova) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
+    }
+  }, [form, modoEdicao, isNova]);
 
   const atualizar = <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => {
     setForm((atual) => ({ ...atual, [campo]: valor }));
@@ -551,16 +547,16 @@ export default function MatriculaPage() {
           {ETAPAS.map((e, idx) => (
             <div key={e.id} className="flex items-center gap-1 flex-shrink-0">
               <button
-                onClick={() => etapa > e.id && setEtapa(e.id)}
+                onClick={() => (modoEdicao || etapa > e.id) && setEtapa(e.id)}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   etapa === e.id
                     ? 'bg-brand-600 text-white shadow-sm'
-                    : etapa > e.id
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : (etapa > e.id || modoEdicao)
+                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer'
                     : 'bg-slate-100 text-slate-400'
                 }`}
               >
-                {etapa > e.id ? <CheckCircle className="h-3.5 w-3.5" /> : e.icon}
+                {(etapa > e.id || modoEdicao) && etapa !== e.id ? <CheckCircle className="h-3.5 w-3.5" /> : e.icon}
                 <span>{e.label}</span>
               </button>
               {idx < ETAPAS.length - 1 && <ChevronRight className="h-3 w-3 text-slate-300" />}
@@ -585,28 +581,52 @@ export default function MatriculaPage() {
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            onClick={etapa === 1 ? () => navigate('/app/secretaria') : () => setEtapa((e) => e - 1)}
-            className="flex items-center gap-1.5"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {etapa === 1 ? 'Cancelar' : 'Voltar'}
-          </Button>
-
-          <Button
-            onClick={avancar}
-            disabled={!podeAvancar() || salvando}
-            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white"
-          >
-            {salvando ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</>
-            ) : etapa === 6 ? (
-              <><ShieldCheck className="h-4 w-4" /> Confirmar Matrícula</>
-            ) : (
-              <>Próximo <ChevronRight className="h-4 w-4" /></>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={etapa === 1 ? () => navigate('/app/secretaria') : () => setEtapa((e) => e - 1)}
+              className="flex items-center gap-1.5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {etapa === 1 ? 'Cancelar' : 'Voltar'}
+            </Button>
+            {modoEdicao && (
+              <Button
+                variant="outline"
+                onClick={() => navigate('/app/secretaria/matriculas')}
+                className="flex items-center gap-1.5 text-slate-600"
+              >
+                <Users className="h-4 w-4" />
+                Lista de alunos
+              </Button>
             )}
-          </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {modoEdicao && etapa === 6 && childIdParam && (
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/app/secretaria/matriculas/${childIdParam}/ficha`)}
+                className="flex items-center gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50"
+              >
+                <FileText className="h-4 w-4" />
+                Ver ficha / Imprimir
+              </Button>
+            )}
+            <Button
+              onClick={avancar}
+              disabled={!podeAvancar() || salvando}
+              className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white"
+            >
+              {salvando ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Salvando...</>
+              ) : etapa === 6 ? (
+                <><ShieldCheck className="h-4 w-4" /> {modoEdicao ? 'Salvar alterações' : 'Confirmar Matrícula'}</>
+              ) : (
+                <>Próximo <ChevronRight className="h-4 w-4" /></>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </PageShell>
