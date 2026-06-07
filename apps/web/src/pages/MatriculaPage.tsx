@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   CheckCircle,
@@ -247,10 +247,14 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
 
 export default function MatriculaPage() {
   const navigate = useNavigate();
+  const { id: childIdParam } = useParams<{ id: string }>();
+  const modoEdicao = Boolean(childIdParam);
   const { user } = useAuth();
   const [etapa, setEtapa] = useState(1);
   const [salvando, setSalvando] = useState(false);
+  const [carregandoDados, setCarregandoDados] = useState(modoEdicao);
   const [form, setForm] = useState<FormularioMatricula>(() => {
+    if (modoEdicao) return estadoInicial();
     try {
       const salvo = localStorage.getItem(STORAGE_KEY);
       return salvo ? { ...estadoInicial(), ...JSON.parse(salvo) } : estadoInicial();
@@ -262,6 +266,66 @@ export default function MatriculaPage() {
   const [turmasCarregadas, setTurmasCarregadas] = useState(false);
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
+
+  // Carregar dados do aluno em modo edição
+  useEffect(() => {
+    if (!modoEdicao || !childIdParam) return;
+    setCarregandoDados(true);
+    http.get(`/children/${childIdParam}`)
+      .then((res) => {
+        const c = res.data;
+        const dad = c.dadosResponsaveis ?? {};
+        setForm({
+          ...estadoInicial(),
+          firstName: c.firstName ?? '',
+          lastName: c.lastName ?? '',
+          dateOfBirth: c.dateOfBirth ? c.dateOfBirth.slice(0, 10) : '',
+          gender: c.gender ?? 'NAO_INFORMADO',
+          cpf: c.cpf ?? '',
+          rg: c.rg ?? '',
+          nacionalidade: c.nacionalidade ?? '',
+          naturalidade: c.naturalidade ?? '',
+          ufNascimento: c.ufNascimento ?? '',
+          raca: c.raca ?? '',
+          peso: c.peso ?? '',
+          bloodType: c.bloodType ?? '',
+          endereco: c.endereco ?? '',
+          cep: c.cep ?? '',
+          nis: c.nis ?? '',
+          codigoAluno: c.codigoAluno ?? '',
+          inscricao: c.inscricao ?? '',
+          nomeMae: c.nomeMae ?? '',
+          nomePai: c.nomePai ?? '',
+          allergies: c.allergies ?? '',
+          medicalConditions: c.medicalConditions ?? '',
+          medicationNeeds: c.medicationNeeds ?? '',
+          medicamentos: c.medicamentos ?? '',
+          laudado: c.laudado ?? false,
+          tipoLaudo: c.tipoLaudo ?? '',
+          cid: c.cid ?? '',
+          descricaoLaudo: c.descricaoLaudo ?? '',
+          usoImagem: c.usoImagem ?? false,
+          mae: dad.mae ?? estadoInicial().mae,
+          pai: dad.pai ?? estadoInicial().pai,
+          responsavelLegal: dad.responsavelLegal ?? estadoInicial().responsavelLegal,
+          documentos: c.documentosMatricula ?? estadoInicial().documentos,
+          autorizados: c.autorizadosRetirada ?? estadoInicial().autorizados,
+          transporteEscolar: c.transporteEscolar?.utiliza ?? false,
+          nomeTransporte: c.transporteEscolar?.nomeTransporte ?? '',
+          enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
+          classroomId: c.enrollments?.[0]?.classroomId ?? '',
+          genitor: c.fichaAdministrativa?.genitor ?? '',
+          serieAnterior: c.fichaAdministrativa?.serieAnterior ?? '',
+          observacoesSecretaria: c.fichaAdministrativa?.observacoesSecretaria ?? '',
+          intolerancias: '',
+        });
+      })
+      .catch(() => {
+        toast.error('Erro ao carregar dados do aluno.');
+        navigate('/app/secretaria/matriculas');
+      })
+      .finally(() => setCarregandoDados(false));
+  }, [childIdParam, modoEdicao, navigate]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(form));
@@ -423,19 +487,24 @@ export default function MatriculaPage() {
         }),
       });
 
-      const res = await http.post('/children', payload);
-      const id = res.data?.id ?? res.data?.child?.id;
-      if (!id) throw new Error('A API não retornou o ID da criança.');
-
-      if (form.classroomId) {
-        await http.post(`/children/${id}/enrollment`, {
-          classroomId: form.classroomId,
-          enrollmentDate: form.enrollmentDate,
-        });
+      let id: string;
+      if (modoEdicao && childIdParam) {
+        await http.put(`/children/${childIdParam}`, payload);
+        id = childIdParam;
+        toast.success('Dados do aluno atualizados com sucesso.');
+      } else {
+        const res = await http.post('/children', payload);
+        id = res.data?.id ?? res.data?.child?.id;
+        if (!id) throw new Error('A API não retornou o ID da criança.');
+        if (form.classroomId) {
+          await http.post(`/children/${id}/enrollment`, {
+            classroomId: form.classroomId,
+            enrollmentDate: form.enrollmentDate,
+          });
+        }
+        localStorage.removeItem(STORAGE_KEY);
+        toast.success('Matrícula cadastrada com sucesso.');
       }
-
-      localStorage.removeItem(STORAGE_KEY);
-      toast.success('Matrícula cadastrada com sucesso.');
       navigate('/app/secretaria/matriculas');
     } catch (e) {
       toast.error(getErrorMessage(e));
@@ -451,10 +520,18 @@ export default function MatriculaPage() {
     setEtapa(1);
   };
 
+  if (carregandoDados) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
+
   return (
     <PageShell
-      title="Nova Matrícula"
-      description="Ficha administrativa completa da Secretaria"
+      title={modoEdicao ? `Editar Aluno` : 'Nova Matrícula'}
+      description={modoEdicao ? `${form.firstName} ${form.lastName}`.trim() || 'Ficha administrativa' : 'Ficha administrativa completa da Secretaria'}
       headerActions={
         <button onClick={limparRascunho} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 text-xs text-red-600 hover:bg-red-50">
           <Trash2 className="h-3.5 w-3.5" />
