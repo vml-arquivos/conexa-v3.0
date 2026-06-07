@@ -97,11 +97,7 @@ export default function MovimentacoesPage() {
     if (!enr) return;
     setSalvando(true);
     try {
-      await http.patch(`/children/${alunoSelecionado.id}/enrollment/${enr.id}`, {
-        status: 'CANCELADA',
-        withdrawalDate: new Date().toISOString(),
-        motivo,
-      });
+      await http.delete(`/children/${alunoSelecionado.id}`);
       toast.success('Matrícula cancelada com sucesso.');
       setAlunoSelecionado(null);
       setAcao(null);
