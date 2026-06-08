@@ -291,17 +291,172 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
-function hidratarResponsavel(base: ResponsavelForm, dados: Partial<ResponsavelForm> | undefined, nomePrincipal?: string): ResponsavelForm {
+function asRecord(value: any): Record<string, any> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function asList<T = any>(value: any): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function firstText(...values: any[]): string {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
+  }
+  return '';
+}
+
+function firstBoolean(...values: any[]): boolean {
+  for (const value of values) {
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value > 0;
+    const normalized = String(value).trim().toLowerCase();
+    if (['true', 'sim', 's', '1', 'yes'].includes(normalized)) return true;
+    if (['false', 'não', 'nao', 'n', '0', 'no'].includes(normalized)) return false;
+  }
+  return false;
+}
+
+function normalizeResponsavel(base: ResponsavelForm, rawValue: any, nomePrincipal?: string): ResponsavelForm {
+  const dados = asRecord(rawValue);
   return {
     ...base,
-    ...(dados ?? {}),
-    nome: (dados?.nome ?? nomePrincipal ?? base.nome ?? '').toString(),
+    nome: firstText(dados.nome, dados.name, nomePrincipal, base.nome),
+    parentesco: firstText(dados.parentesco, dados.relationship, dados.relacao, base.parentesco),
+    cpf: firstText(dados.cpf, dados.documentoCpf, base.cpf),
+    identidade: firstText(dados.identidade, dados.rg, dados.documento, dados.documentoIdentidade, base.identidade),
+    orgaoExpeditor: firstText(dados.orgaoExpeditor, dados.orgaoExpedidor, dados.orgao, base.orgaoExpeditor),
+    dataDocumento: firstText(dados.dataDocumento, dados.dataEmissao, dados.data, base.dataDocumento),
+    pis: firstText(dados.pis, dados.pisResponsavel, base.pis),
+    nascimento: firstText(dados.nascimento, dados.dataNascimento, dados.dateOfBirth, base.nascimento),
+    telefoneTrabalho: firstText(dados.telefoneTrabalho, dados.telefoneComercial, dados.telTrabalho, base.telefoneTrabalho),
+    telefoneResidencial: firstText(dados.telefoneResidencial, dados.telefone, dados.phone, base.telefoneResidencial),
+    celular: firstText(dados.celular, dados.whatsapp, dados.telefoneCelular, dados.phoneMobile, dados.telefone, base.celular),
+    email: firstText(dados.email, dados.eMail, dados.mail, base.email),
+    escolaridade: firstText(dados.escolaridade, base.escolaridade),
+    profissao: firstText(dados.profissao, dados.ocupacao, base.profissao),
+    dependentes: firstText(dados.dependentes, dados.numeroDependentes, base.dependentes),
+    endereco: firstText(dados.endereco, dados.endereço, dados.address, base.endereco),
+    cep: firstText(dados.cep, base.cep),
+    beneficio: firstText(dados.beneficio, dados.benefício, dados.beneficioSocial, base.beneficio),
+    pessoasCasa: firstText(dados.pessoasCasa, dados.numeroPessoasCasa, dados.pessoasEmCasa, dados.moradores, base.pessoasCasa),
+  };
+}
+
+function normalizeAutorizados(value: any): AutorizadoForm[] {
+  const autorizados = asList(value)
+    .map((item) => asRecord(item))
+    .filter((item) => firstText(item.nome, item.name))
+    .map((item) => ({
+      nome: firstText(item.nome, item.name),
+      parentesco: firstText(item.parentesco, item.relationship, item.relacao),
+      telefone: firstText(item.telefone, item.celular, item.phone, item.whatsapp),
+    }));
+
+  while (autorizados.length < 2) {
+    autorizados.push({ nome: '', parentesco: '', telefone: '' });
+  }
+  return autorizados;
+}
+
+function normalizeDocumentos(value: any, base: DocumentosMatricula): DocumentosMatricula {
+  const dados = asRecord(value);
+  return {
+    ...base,
+    ...dados,
+    certidaoNascimento: firstBoolean(dados.certidaoNascimento, dados.certidao, base.certidaoNascimento),
+    cpfCrianca: firstBoolean(dados.cpfCrianca, dados.cpfOriginalAluno, base.cpfCrianca),
+    rgCpfResponsavel: firstBoolean(dados.rgCpfResponsavel, dados.cpfResponsavel, dados.rgResponsavel, base.rgCpfResponsavel),
+    comprovanteResidencia: firstBoolean(dados.comprovanteResidencia, base.comprovanteResidencia),
+    cartaoVacina: firstBoolean(dados.cartaoVacina, dados.vacina, base.cartaoVacina),
+    cartaoSUS: firstBoolean(dados.cartaoSUS, dados.sus, base.cartaoSUS),
+    nis: firstBoolean(dados.nis, base.nis),
+    laudoMedico: firstBoolean(dados.laudoMedico, dados.laudo, base.laudoMedico),
+    foto: firstBoolean(dados.foto, dados.photoUrl, base.foto),
+    termoImagem: firstBoolean(dados.termoImagem, dados.usoImagem, base.termoImagem),
+    declaracaoEscolar: firstBoolean(dados.declaracaoEscolar, base.declaracaoEscolar),
+    anexos: asRecord(dados.anexos ?? base.anexos) as Record<string, DocumentoAnexo[]>,
   };
 }
 
 function obterMatriculaPrincipal(enrollments?: EnrollmentResumo[]): EnrollmentResumo | undefined {
   if (!Array.isArray(enrollments) || enrollments.length === 0) return undefined;
   return enrollments.find((e) => e.status === 'ATIVA') ?? enrollments[0];
+}
+
+function buildFormularioFromChild(child: any): FormularioMatricula {
+  const base = estadoInicial();
+  const dadosResponsaveis = asRecord(child?.dadosResponsaveis);
+  const documentosMatricula = asRecord(child?.documentosMatricula);
+  const fichaAdministrativa = asRecord(child?.fichaAdministrativa);
+  const transporteEscolar = asRecord(child?.transporteEscolar);
+  const matriculaPrincipal = obterMatriculaPrincipal(child?.enrollments);
+
+  const mae = normalizeResponsavel(
+    { ...base.mae, nome: firstText(child?.nomeMae) },
+    dadosResponsaveis.mae,
+    child?.nomeMae,
+  );
+  const pai = normalizeResponsavel(
+    { ...base.pai, nome: firstText(child?.nomePai), celular: firstText(child?.celPai) },
+    dadosResponsaveis.pai,
+    child?.nomePai,
+  );
+  const responsavelLegal = normalizeResponsavel(
+    base.responsavelLegal,
+    dadosResponsaveis.responsavelLegal ?? dadosResponsaveis.responsavelPrincipal,
+    child?.emergencyContactName,
+  );
+
+  return {
+    ...base,
+    codigoAluno: firstText(child?.codigoAluno),
+    inscricao: firstText(child?.inscricao),
+    firstName: firstText(child?.firstName),
+    lastName: firstText(child?.lastName),
+    dateOfBirth: child?.dateOfBirth ? String(child.dateOfBirth).slice(0, 10) : '',
+    gender: (firstText(child?.gender) || 'NAO_INFORMADO') as Genero,
+    cpf: firstText(child?.cpf),
+    rg: firstText(child?.rg, documentosMatricula.rgCrianca, documentosMatricula.identidadeAluno),
+    nacionalidade: firstText(child?.nacionalidade, fichaAdministrativa.nacionalidade, base.nacionalidade),
+    naturalidade: firstText(child?.naturalidade, fichaAdministrativa.naturalidade),
+    ufNascimento: firstText(child?.ufNascimento, fichaAdministrativa.ufNascimento).toUpperCase().slice(0, 2),
+    raca: firstText(child?.raca),
+    peso: firstText(child?.peso),
+    bloodType: firstText(child?.bloodType),
+    endereco: firstText(child?.endereco, fichaAdministrativa.endereco, mae.endereco, pai.endereco, responsavelLegal.endereco),
+    cep: firstText(child?.cep, fichaAdministrativa.cep, mae.cep, pai.cep, responsavelLegal.cep),
+    nis: firstText(child?.nis, documentosMatricula.nis),
+    photoUrl: firstText(child?.photoUrl),
+    nomeMae: firstText(child?.nomeMae, mae.nome),
+    nomePai: firstText(child?.nomePai, pai.nome),
+    mae,
+    pai,
+    responsavelLegal,
+    allergies: firstText(child?.allergies),
+    intolerancias: firstText(fichaAdministrativa.intolerancias),
+    medicalConditions: firstText(child?.medicalConditions),
+    medicationNeeds: firstText(child?.medicationNeeds),
+    medicamentos: firstText(child?.medicamentos),
+    laudado: firstBoolean(child?.laudado, fichaAdministrativa.laudado),
+    tipoLaudo: firstText(child?.tipoLaudo, fichaAdministrativa.tipoLaudo),
+    cid: firstText(child?.cid, fichaAdministrativa.cid),
+    descricaoLaudo: firstText(child?.descricaoLaudo, fichaAdministrativa.descricaoLaudo),
+    genitor: firstBoolean(fichaAdministrativa.genitor),
+    usoImagem: firstBoolean(child?.usoImagem, fichaAdministrativa.usoImagem, documentosMatricula.termoImagem),
+    serieAnterior: firstText(fichaAdministrativa.serieAnterior),
+    transporteEscolar: firstBoolean(transporteEscolar.utiliza, transporteEscolar.usaTransporteEscolar),
+    nomeTransporte: firstText(transporteEscolar.nomeTransporte, transporteEscolar.nome, transporteEscolar.transportador),
+    autorizados: normalizeAutorizados(child?.autorizadosRetirada),
+    documentos: normalizeDocumentos(child?.documentosMatricula, base.documentos),
+    enrollmentDate: firstText(matriculaPrincipal?.enrollmentDate?.slice?.(0, 10), base.enrollmentDate),
+    classroomId: firstText(matriculaPrincipal?.classroomId, matriculaPrincipal?.classroom?.id),
+    enrollmentId: firstText(matriculaPrincipal?.id),
+    observacoesSecretaria: firstText(fichaAdministrativa.observacoesSecretaria),
+  };
 }
 
 export default function MatriculaPage() {
@@ -336,61 +491,14 @@ export default function MatriculaPage() {
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
-  // Carregar dados do aluno em modo edição
+  // Carregar dados do aluno em modo edição.
+  // Regra: em edição, o formulário deve vir da API/banco, nunca de rascunho local.
   useEffect(() => {
     if (!modoEdicao || !childIdParam) return;
     setCarregandoDados(true);
-    http.get(`/children/${childIdParam}`)
+    http.get(`/children/${childIdParam}`, { params: { _ts: Date.now() } })
       .then((res) => {
-        const c = res.data;
-        const dad = c.dadosResponsaveis ?? {};
-        const matriculaPrincipal = obterMatriculaPrincipal(c.enrollments);
-        setForm({
-          ...estadoInicial(),
-          firstName: c.firstName ?? '',
-          lastName: c.lastName ?? '',
-          dateOfBirth: c.dateOfBirth ? c.dateOfBirth.slice(0, 10) : '',
-          gender: c.gender ?? 'NAO_INFORMADO',
-          cpf: c.cpf ?? '',
-          rg: c.rg ?? '',
-          nacionalidade: c.nacionalidade ?? '',
-          naturalidade: c.naturalidade ?? '',
-          ufNascimento: c.ufNascimento ?? '',
-          raca: c.raca ?? '',
-          peso: c.peso ?? '',
-          bloodType: c.bloodType ?? '',
-          endereco: c.endereco ?? '',
-          cep: c.cep ?? '',
-          nis: c.nis ?? '',
-          photoUrl: c.photoUrl ?? '',
-          codigoAluno: c.codigoAluno ?? '',
-          inscricao: c.inscricao ?? '',
-          nomeMae: c.nomeMae ?? '',
-          nomePai: c.nomePai ?? '',
-          allergies: c.allergies ?? '',
-          medicalConditions: c.medicalConditions ?? '',
-          medicationNeeds: c.medicationNeeds ?? '',
-          medicamentos: c.medicamentos ?? '',
-          laudado: c.laudado ?? false,
-          tipoLaudo: c.tipoLaudo ?? '',
-          cid: c.cid ?? '',
-          descricaoLaudo: c.descricaoLaudo ?? '',
-          usoImagem: c.usoImagem ?? false,
-          mae: hidratarResponsavel(estadoInicial().mae, dad.mae, c.nomeMae),
-          pai: hidratarResponsavel(estadoInicial().pai, dad.pai, c.nomePai),
-          responsavelLegal: hidratarResponsavel(estadoInicial().responsavelLegal, dad.responsavelLegal, c.emergencyContactName),
-          documentos: { ...estadoInicial().documentos, ...(c.documentosMatricula ?? {}) },
-          autorizados: c.autorizadosRetirada ?? estadoInicial().autorizados,
-          transporteEscolar: c.transporteEscolar?.utiliza ?? false,
-          nomeTransporte: c.transporteEscolar?.nomeTransporte ?? '',
-          enrollmentDate: matriculaPrincipal?.enrollmentDate?.slice(0, 10) ?? estadoInicial().enrollmentDate,
-          classroomId: matriculaPrincipal?.classroomId ?? matriculaPrincipal?.classroom?.id ?? '',
-          enrollmentId: matriculaPrincipal?.id ?? '',
-          genitor: Boolean(c.fichaAdministrativa?.genitor),
-          serieAnterior: c.fichaAdministrativa?.serieAnterior ?? '',
-          observacoesSecretaria: c.fichaAdministrativa?.observacoesSecretaria ?? '',
-          intolerancias: '',
-        });
+        setForm(buildFormularioFromChild(res.data));
       })
       .catch(() => {
         toast.error('Erro ao carregar dados do aluno.');
