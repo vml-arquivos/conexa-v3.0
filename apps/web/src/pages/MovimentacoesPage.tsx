@@ -2,7 +2,7 @@
  * MovimentacoesPage — Cancelamentos e Transferências
  *
  * Permite cancelar matrículas (status CANCELADA) e transferir alunos
- * entre turmas (nova matrícula + encerramento da anterior).
+ * entre turmas (nova matrícula + marcação da anterior como TRANSFERIDA).
  *
  * RBAC: UNIDADE_ADMINISTRATIVO, UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
  * Usa endpoints existentes: GET /children, PATCH /children/:id/enrollment/:eid,
@@ -97,7 +97,9 @@ export default function MovimentacoesPage() {
     if (!enr) return;
     setSalvando(true);
     try {
-      await http.delete(`/children/${alunoSelecionado.id}`);
+      await http.patch(`/children/${alunoSelecionado.id}/enrollment/${enr.id}`, {
+        status: 'CANCELADA',
+      });
       toast.success('Matrícula cancelada com sucesso.');
       setAlunoSelecionado(null);
       setAcao(null);
@@ -116,11 +118,9 @@ export default function MovimentacoesPage() {
     if (!enr) return;
     setSalvando(true);
     try {
-      // Encerrar matrícula atual
+      // Marcar matrícula atual como transferida sem exclusão
       await http.patch(`/children/${alunoSelecionado.id}/enrollment/${enr.id}`, {
-        status: 'CONCLUIDA',
-        withdrawalDate: new Date().toISOString(),
-        motivo: motivo || 'Transferência de turma',
+        status: 'TRANSFERIDA',
       });
       // Criar nova matrícula na turma destino
       await http.post(`/children/${alunoSelecionado.id}/enrollment`, {
