@@ -8,7 +8,22 @@ export class CreateEmpresaTransporteDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  cnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
   telefone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  responsavel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  placa?: string;
 
   @IsOptional()
   @IsString()
@@ -28,7 +43,22 @@ export class UpdateEmpresaTransporteDto {
   @IsOptional()
   @IsString()
   @MaxLength(20)
+  cnpj?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
   telefone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  responsavel?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  placa?: string | null;
 
   @IsOptional()
   @IsString()

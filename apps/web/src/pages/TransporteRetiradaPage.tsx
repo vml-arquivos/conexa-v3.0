@@ -93,19 +93,33 @@ export default function TransporteRetiradaPage() {
   const carregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const [childrenRes, classroomsRes, empresasRes] = await Promise.all([
+      const [childrenRes, classroomsRes, empresasRes] = await Promise.allSettled([
         http.get('/children', { params: { limit: 500 } }),
         http.get('/lookup/classrooms/accessible'),
         http.get('/empresas-transporte'),
       ]);
-      const childrenData = childrenRes.data;
-      const classroomsData = classroomsRes.data;
-      const empresasData = empresasRes.data;
-      setAlunos(Array.isArray(childrenData) ? childrenData : childrenData?.data ?? childrenData?.items ?? []);
-      setTurmas(Array.isArray(classroomsData) ? classroomsData : classroomsData?.data ?? classroomsData?.items ?? []);
-      setEmpresas(Array.isArray(empresasData) ? empresasData : empresasData?.data ?? empresasData?.items ?? []);
-    } catch (e) {
-      toast.error(getErrorMessage(e));
+
+      if (childrenRes.status === 'fulfilled') {
+        const childrenData = childrenRes.value.data;
+        setAlunos(Array.isArray(childrenData) ? childrenData : childrenData?.data ?? childrenData?.items ?? []);
+      } else {
+        toast.error(`Erro ao carregar alunos: ${getErrorMessage(childrenRes.reason)}`);
+      }
+
+      if (classroomsRes.status === 'fulfilled') {
+        const classroomsData = classroomsRes.value.data;
+        setTurmas(Array.isArray(classroomsData) ? classroomsData : classroomsData?.data ?? classroomsData?.items ?? []);
+      } else {
+        toast.error(`Erro ao carregar turmas: ${getErrorMessage(classroomsRes.reason)}`);
+      }
+
+      if (empresasRes.status === 'fulfilled') {
+        const empresasData = empresasRes.value.data;
+        setEmpresas(Array.isArray(empresasData) ? empresasData : empresasData?.data ?? empresasData?.items ?? []);
+      } else {
+        setEmpresas([]);
+        toast.error(`Erro ao carregar empresas de transporte: ${getErrorMessage(empresasRes.reason)}`);
+      }
     } finally {
       setCarregando(false);
     }
@@ -116,7 +130,6 @@ export default function TransporteRetiradaPage() {
   const turmaAtiva = (aluno: Aluno) => aluno.enrollments?.find((e) => e.status === 'ATIVA')?.classroom;
 
   const alunosPorTurmaTransporte = useMemo(() => alunos.filter((aluno) => {
-    if (!aluno.transporteEscolar?.utiliza) return false;
     if (turmaTransporteId && turmaAtiva(aluno)?.id !== turmaTransporteId) return false;
     if (empresaFiltroId) {
       const empresaNome = empresas.find((empresa) => empresa.id === empresaFiltroId)?.nome;
@@ -218,7 +231,7 @@ export default function TransporteRetiradaPage() {
         observacoes: empresaForm.observacoes.trim() || undefined,
       };
       if (empresaEditando) {
-        await http.put(`/empresas-transporte/${empresaEditando.id}`, payload);
+        await http.patch(`/empresas-transporte/${empresaEditando.id}`, payload);
         toast.success('Empresa atualizada.');
       } else {
         await http.post('/empresas-transporte', payload);
@@ -286,7 +299,7 @@ export default function TransporteRetiradaPage() {
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
               {alunosPorTurmaTransporte.map((aluno) => (
-                <LinhaAluno key={aluno.id} aluno={aluno} extra={aluno.transporteEscolar?.nomeTransporte ?? 'Transporte escolar'} onEditar={() => abrirEditarTransporte(aluno)} />
+                <LinhaAluno key={aluno.id} aluno={aluno} extra={aluno.transporteEscolar?.nomeTransporte ?? 'Sem transporte vinculado'} onEditar={() => abrirEditarTransporte(aluno)} />
               ))}
             </div>
           )}

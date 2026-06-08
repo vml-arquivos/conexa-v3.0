@@ -306,7 +306,10 @@ model EmpresaTransporte {
   mantenedoraId String
   unitId        String?
   nome          String   @db.VarChar(255)
+  cnpj          String?  @db.VarChar(20)
   telefone      String?  @db.VarChar(20)
+  responsavel   String?  @db.VarChar(255)
+  placa         String?  @db.VarChar(20)
   observacoes   String?  @db.Text
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
