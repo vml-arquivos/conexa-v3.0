@@ -1276,6 +1276,14 @@ export default function DiarioBordoPage() {
           let objetivosMatriz: Array<Record<string, any>> = [];
           let intencionalidadeGeral = '';
           let recursos = '';
+          let observacoesTemplate: Array<{
+            id: string;
+            label: string;
+            emoji: string;
+            grupo: string;
+            origemObjetivo?: string;
+            campoExperiencia?: string;
+          }> = [];
           try {
             const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
             const planHoje = detailRes.data;
@@ -1285,6 +1293,7 @@ export default function DiarioBordoPage() {
               ?? planHoje.content,
             );
             const day0 = pedagogicalContent.days?.[0] ?? {};
+            observacoesTemplate = Array.isArray(planHoje.observacoesTemplate) ? planHoje.observacoesTemplate : [];
             const parsedObjectives = normalizePlanningObjectives(
               day0.objectives
               ?? planHoje.objectives
@@ -1354,7 +1363,7 @@ export default function DiarioBordoPage() {
             // curriculumEntryId vem do endpoint active-today (opcional — não bloqueia o botão)
             curriculumEntryId: activePlan.curriculumEntryId,
             // Observações dinâmicas geradas ao aprovar o plano
-            observacoesTemplate: Array.isArray(planHoje.observacoesTemplate) ? planHoje.observacoesTemplate : [],
+            observacoesTemplate,
           });
         }
       } catch {

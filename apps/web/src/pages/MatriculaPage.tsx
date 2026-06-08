@@ -961,8 +961,8 @@ function Campo({ label, children, className }: { label: string; children: React.
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
-  return <input type={type} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+function Input({ value, onChange, placeholder, type = 'text', disabled = false }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string; disabled?: boolean }) {
+  return <input type={type} className={inputCls} value={value} placeholder={placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
