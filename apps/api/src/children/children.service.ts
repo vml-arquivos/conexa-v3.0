@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, EnrollmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -171,8 +171,16 @@ export class ChildrenService {
       include: {
         unit: true,
         enrollments: {
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
           include: {
-            classroom: true,
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         dietaryRestrictions: true,
@@ -226,8 +234,16 @@ export class ChildrenService {
       include: {
         unit: true,
         enrollments: {
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
           include: {
-            classroom: true,
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -751,11 +767,17 @@ export class ChildrenService {
       where: { id },
       include: {
         enrollments: {
-          where: { status: 'ACTIVE' },
-          include: {
-            classroom: { select: { id: true, name: true, gradeLevel: true } },
-          },
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
           take: 1,
+          include: {
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
         },
         unit: { select: { id: true, name: true, code: true } },
       },
