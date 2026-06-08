@@ -80,6 +80,10 @@ export class CreateChildDto {
   @IsOptional()
   usoImagem?: boolean;
 
+  @IsString()
+  @IsOptional()
+  photoUrl?: string;
+
   @IsBoolean()
   @IsOptional()
   laudado?: boolean;

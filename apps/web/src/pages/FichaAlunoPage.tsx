@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,8 @@ export default function FichaAlunoPage() {
     nomeTransporte: '',
   });
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const [enviandoFotoAluno, setEnviandoFotoAluno] = useState(false);
 
   // Carregar aluno
   const carregar = useCallback(async () => {
@@ -280,6 +283,24 @@ export default function FichaAlunoPage() {
     reader.readAsDataURL(file);
   }
 
+  async function handleFotoAlunoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    setEnviandoFotoAluno(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await http.post(`/children/${id}/photo`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setAluno((atual) => atual ? { ...atual, photoUrl: res.data?.photoUrl ?? atual.photoUrl } : atual);
+      toast.success('Foto do aluno atualizada.');
+    } catch (erro) {
+      toast.error(getErrorMessage(erro));
+    } finally {
+      setEnviandoFotoAluno(false);
+      if (fotoInputRef.current) fotoInputRef.current.value = '';
+    }
+  }
+
   function removerLogo() {
     const unitId = aluno?.unit?.id;
     if (unitId) localStorage.removeItem(logoKey(unitId));
@@ -359,6 +380,14 @@ export default function FichaAlunoPage() {
               {salvandoInline ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar ficha
             </button>
           )}
+          <input ref={fotoInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleFotoAlunoUpload} />
+          <button
+            onClick={() => fotoInputRef.current?.click()}
+            disabled={enviandoFotoAluno}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {enviandoFotoAluno ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />} Foto do aluno
+          </button>
           <button
             onClick={() => setModalLogo(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
@@ -419,14 +448,13 @@ export default function FichaAlunoPage() {
             {/* Foto */}
             <div className="flex-shrink-0">
               <div className="w-28 h-32 rounded-lg border-2 border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center">
-                {aluno.photoUrl ? (
-                  <img src={aluno.photoUrl} alt="Foto" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-center text-slate-400">
-                    <Camera className="h-8 w-8 mx-auto mb-1" />
-                    <span className="text-xs">Foto</span>
-                  </div>
-                )}
+                <ChildAvatar
+                  child={aluno}
+                  sizeClassName="w-full h-full"
+                  imageClassName="w-full h-full object-cover"
+                  fallbackClassName="w-full h-full flex flex-col items-center justify-center text-slate-400"
+                  iconClassName="h-8 w-8 mb-1 text-slate-400"
+                />
               </div>
             </div>
 

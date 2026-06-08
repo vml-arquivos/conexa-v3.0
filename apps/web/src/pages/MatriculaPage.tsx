@@ -19,11 +19,13 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileText,
+  Camera,
   GraduationCap,
   Heart,
   Loader2,
   ShieldCheck,
   Trash2,
+  Upload,
   User,
   Users,
 } from 'lucide-react';
@@ -33,6 +35,7 @@ import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 
 type Genero = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 
@@ -64,6 +67,29 @@ interface AutorizadoForm {
   telefone: string;
 }
 
+interface DocumentoAnexo {
+  nome: string;
+  url: string;
+  mimeType?: string;
+  size?: number;
+  uploadedAt?: string;
+}
+
+interface DocumentosMatricula {
+  certidaoNascimento: boolean;
+  cpfCrianca: boolean;
+  rgCpfResponsavel: boolean;
+  comprovanteResidencia: boolean;
+  cartaoVacina: boolean;
+  cartaoSUS: boolean;
+  nis: boolean;
+  laudoMedico: boolean;
+  foto: boolean;
+  termoImagem: boolean;
+  declaracaoEscolar: boolean;
+  anexos?: Record<string, DocumentoAnexo[]>;
+}
+
 interface FormularioMatricula {
   codigoAluno: string;
   inscricao: string;
@@ -82,6 +108,7 @@ interface FormularioMatricula {
   endereco: string;
   cep: string;
   nis: string;
+  photoUrl: string;
   nomeMae: string;
   nomePai: string;
   mae: ResponsavelForm;
@@ -102,20 +129,9 @@ interface FormularioMatricula {
   transporteEscolar: boolean;
   nomeTransporte: string;
   autorizados: AutorizadoForm[];
-  documentos: {
-    certidaoNascimento: boolean;
-    cpfCrianca: boolean;
-    rgCpfResponsavel: boolean;
-    comprovanteResidencia: boolean;
-    cartaoVacina: boolean;
-    cartaoSUS: boolean;
-    nis: boolean;
-    laudoMedico: boolean;
-    foto: boolean;
-    termoImagem: boolean;
-    declaracaoEscolar: boolean;
-  };
+  documentos: DocumentosMatricula;
   classroomId: string;
+  enrollmentId: string;
   enrollmentDate: string;
   observacoesSecretaria: string;
 }
@@ -125,12 +141,34 @@ interface Turma {
   name: string;
 }
 
+interface EnrollmentResumo {
+  id?: string;
+  status?: string;
+  classroomId?: string;
+  enrollmentDate?: string;
+  classroom?: { id?: string; name?: string };
+}
+
 interface EmpresaTransporte {
   id: string;
   nome: string;
 }
 
 const STORAGE_KEY = 'conexa:secretaria:nova-matricula:v2';
+
+const DOCUMENTOS_CHECKLIST: Array<{ key: keyof Omit<DocumentosMatricula, 'anexos'>; label: string }> = [
+  { key: 'certidaoNascimento', label: 'Certidão de nascimento' },
+  { key: 'cpfCrianca', label: 'CPF da criança' },
+  { key: 'rgCpfResponsavel', label: 'RG/CPF do responsável' },
+  { key: 'comprovanteResidencia', label: 'Comprovante de residência' },
+  { key: 'cartaoVacina', label: 'Cartão de vacinação' },
+  { key: 'cartaoSUS', label: 'Cartão SUS' },
+  { key: 'nis', label: 'NIS' },
+  { key: 'laudoMedico', label: 'Laudo médico' },
+  { key: 'foto', label: 'Foto' },
+  { key: 'termoImagem', label: 'Termo de uso de imagem' },
+  { key: 'declaracaoEscolar', label: 'Declaração escolar' },
+];
 
 const ETAPAS = [
   { id: 1, label: 'Criança', icon: <User className="h-4 w-4" /> },
@@ -182,6 +220,7 @@ function estadoInicial(): FormularioMatricula {
     endereco: '',
     cep: '',
     nis: '',
+    photoUrl: '',
     nomeMae: '',
     nomePai: '',
     mae: { ...responsavelVazio, parentesco: 'MÃE' },
@@ -217,8 +256,10 @@ function estadoInicial(): FormularioMatricula {
       foto: false,
       termoImagem: false,
       declaracaoEscolar: false,
+      anexos: {},
     },
     classroomId: '',
+    enrollmentId: '',
     enrollmentDate: new Date().toISOString().slice(0, 10),
     observacoesSecretaria: '',
   };
@@ -250,6 +291,19 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
+function hidratarResponsavel(base: ResponsavelForm, dados: Partial<ResponsavelForm> | undefined, nomePrincipal?: string): ResponsavelForm {
+  return {
+    ...base,
+    ...(dados ?? {}),
+    nome: (dados?.nome ?? nomePrincipal ?? base.nome ?? '').toString(),
+  };
+}
+
+function obterMatriculaPrincipal(enrollments?: EnrollmentResumo[]): EnrollmentResumo | undefined {
+  if (!Array.isArray(enrollments) || enrollments.length === 0) return undefined;
+  return enrollments.find((e) => e.status === 'ATIVA') ?? enrollments[0];
+}
+
 export default function MatriculaPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -259,6 +313,8 @@ export default function MatriculaPage() {
   const { user } = useAuth();
   const [etapa, setEtapa] = useState(1);
   const [salvando, setSalvando] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [enviandoDocumento, setEnviandoDocumento] = useState<string | null>(null);
   const [carregandoDados, setCarregandoDados] = useState(modoEdicao);
   const [form, setForm] = useState<FormularioMatricula>(() => {
     if (modoEdicao) return estadoInicial();
@@ -288,6 +344,7 @@ export default function MatriculaPage() {
       .then((res) => {
         const c = res.data;
         const dad = c.dadosResponsaveis ?? {};
+        const matriculaPrincipal = obterMatriculaPrincipal(c.enrollments);
         setForm({
           ...estadoInicial(),
           firstName: c.firstName ?? '',
@@ -305,6 +362,7 @@ export default function MatriculaPage() {
           endereco: c.endereco ?? '',
           cep: c.cep ?? '',
           nis: c.nis ?? '',
+          photoUrl: c.photoUrl ?? '',
           codigoAluno: c.codigoAluno ?? '',
           inscricao: c.inscricao ?? '',
           nomeMae: c.nomeMae ?? '',
@@ -318,16 +376,17 @@ export default function MatriculaPage() {
           cid: c.cid ?? '',
           descricaoLaudo: c.descricaoLaudo ?? '',
           usoImagem: c.usoImagem ?? false,
-          mae: dad.mae ?? estadoInicial().mae,
-          pai: dad.pai ?? estadoInicial().pai,
-          responsavelLegal: dad.responsavelLegal ?? estadoInicial().responsavelLegal,
-          documentos: c.documentosMatricula ?? estadoInicial().documentos,
+          mae: hidratarResponsavel(estadoInicial().mae, dad.mae, c.nomeMae),
+          pai: hidratarResponsavel(estadoInicial().pai, dad.pai, c.nomePai),
+          responsavelLegal: hidratarResponsavel(estadoInicial().responsavelLegal, dad.responsavelLegal, c.emergencyContactName),
+          documentos: { ...estadoInicial().documentos, ...(c.documentosMatricula ?? {}) },
           autorizados: c.autorizadosRetirada ?? estadoInicial().autorizados,
           transporteEscolar: c.transporteEscolar?.utiliza ?? false,
           nomeTransporte: c.transporteEscolar?.nomeTransporte ?? '',
-          enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
-          classroomId: c.enrollments?.[0]?.classroomId ?? '',
-          genitor: c.fichaAdministrativa?.genitor ?? '',
+          enrollmentDate: matriculaPrincipal?.enrollmentDate?.slice(0, 10) ?? estadoInicial().enrollmentDate,
+          classroomId: matriculaPrincipal?.classroomId ?? matriculaPrincipal?.classroom?.id ?? '',
+          enrollmentId: matriculaPrincipal?.id ?? '',
+          genitor: Boolean(c.fichaAdministrativa?.genitor),
           serieAnterior: c.fichaAdministrativa?.serieAnterior ?? '',
           observacoesSecretaria: c.fichaAdministrativa?.observacoesSecretaria ?? '',
           intolerancias: '',
@@ -358,7 +417,7 @@ export default function MatriculaPage() {
     }));
   };
 
-  const atualizarDocumento = (campo: keyof FormularioMatricula['documentos'], valor: boolean) => {
+  const atualizarDocumento = (campo: keyof Omit<DocumentosMatricula, 'anexos'>, valor: boolean) => {
     setForm((atual) => ({
       ...atual,
       documentos: { ...atual.documentos, [campo]: valor },
@@ -371,6 +430,58 @@ export default function MatriculaPage() {
       autorizados[index] = { ...autorizados[index], [campo]: valor };
       return { ...atual, autorizados };
     });
+  };
+
+  const enviarFotoAluno = async (file?: File | null) => {
+    if (!file || !childIdParam) return;
+    setEnviandoFoto(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await http.post(`/children/${childIdParam}/photo`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const photoUrl = res.data?.photoUrl ?? '';
+      setForm((atual) => ({
+        ...atual,
+        photoUrl,
+        documentos: { ...atual.documentos, foto: true },
+      }));
+      toast.success('Foto do aluno enviada e vinculada à ficha.');
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setEnviandoFoto(false);
+    }
+  };
+
+  const enviarDocumentoAluno = async (tipo: keyof Omit<DocumentosMatricula, 'anexos'>, file?: File | null) => {
+    if (!file || !childIdParam) return;
+    setEnviandoDocumento(tipo);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('type', tipo);
+      const res = await http.post(`/children/${childIdParam}/document`, body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const documento = res.data?.documento as DocumentoAnexo | undefined;
+      setForm((atual) => {
+        const anexosAtuais = atual.documentos.anexos ?? {};
+        return {
+          ...atual,
+          documentos: {
+            ...atual.documentos,
+            [tipo]: true,
+            anexos: {
+              ...anexosAtuais,
+              [tipo]: documento ? [...(anexosAtuais[tipo] ?? []), documento] : (anexosAtuais[tipo] ?? []),
+            },
+          },
+        };
+      });
+      toast.success('Documento enviado e vinculado à matrícula.');
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setEnviandoDocumento(null);
+    }
   };
 
   const carregarTurmas = useCallback(async () => {
@@ -506,6 +617,7 @@ export default function MatriculaPage() {
         tipoLaudo: cleanText(form.tipoLaudo),
         cid: cleanText(form.cid),
         descricaoLaudo: cleanText(form.descricaoLaudo),
+        photoUrl: cleanText(form.photoUrl),
         usoImagem: form.usoImagem,
         dadosResponsaveis: compactObject({
           mae: compactObject({ ...form.mae, cpf: onlyDigits(form.mae.cpf), celular: onlyDigits(form.mae.celular), telefoneResidencial: onlyDigits(form.mae.telefoneResidencial) }),
@@ -536,6 +648,13 @@ export default function MatriculaPage() {
       let id: string;
       if (modoEdicao && childIdParam) {
         await http.put(`/children/${childIdParam}`, payload);
+        if (form.classroomId || form.enrollmentId) {
+          await http.put(`/children/${childIdParam}/enrollment/active`, {
+            enrollmentId: form.enrollmentId || undefined,
+            classroomId: form.classroomId || undefined,
+            enrollmentDate: form.enrollmentDate || undefined,
+          });
+        }
         id = childIdParam;
         toast.success('Dados do aluno atualizados com sucesso.');
       } else {
@@ -608,7 +727,7 @@ export default function MatriculaPage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
-          {etapa === 1 && <EtapaCrianca form={form} atualizar={atualizar} />}
+          {etapa === 1 && <EtapaCrianca form={form} atualizar={atualizar} modoEdicao={modoEdicao} enviandoFoto={enviandoFoto} onEnviarFoto={enviarFotoAluno} />}
           {etapa === 2 && (
             <EtapaResponsaveis
               form={form}
@@ -625,6 +744,9 @@ export default function MatriculaPage() {
               atualizarDocumento={atualizarDocumento}
               empresasTransporte={empresasTransporte}
               onCadastrarEmpresaTransporte={cadastrarEmpresaTransporte}
+              modoEdicao={modoEdicao}
+              enviandoDocumento={enviandoDocumento}
+              onEnviarDocumento={enviarDocumentoAluno}
             />
           )}
           {etapa === 5 && <EtapaTurma form={form} atualizar={atualizar} turmas={turmas} />}
@@ -684,10 +806,39 @@ export default function MatriculaPage() {
   );
 }
 
-function EtapaCrianca({ form, atualizar }: { form: FormularioMatricula; atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void }) {
+function EtapaCrianca({ form, atualizar, modoEdicao, enviandoFoto, onEnviarFoto }: {
+  form: FormularioMatricula;
+  atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
+  modoEdicao: boolean;
+  enviandoFoto: boolean;
+  onEnviarFoto: (file?: File | null) => void;
+}) {
   return (
     <div className="space-y-4">
       <TituloEtapa titulo="Dados da criança" subtitulo="Identificação conforme planilha oficial da unidade." />
+      <div className="rounded-xl border border-slate-100 p-4 flex items-center gap-4">
+        <ChildAvatar
+          firstName={form.firstName}
+          lastName={form.lastName}
+          photoUrl={form.photoUrl}
+          sizeClassName="w-20 h-20"
+          imageClassName="rounded-2xl object-cover border border-slate-200"
+          fallbackClassName="w-20 h-20 rounded-2xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center"
+        />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-slate-800">Foto do aluno</p>
+          <p className="text-xs text-slate-500 mt-0.5">A foto fica vinculada à matrícula e aparece automaticamente na ficha/impressão.</p>
+          {modoEdicao ? (
+            <label className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer">
+              {enviandoFoto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+              Enviar/alterar foto
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => onEnviarFoto(e.target.files?.[0])} disabled={enviandoFoto} />
+            </label>
+          ) : (
+            <p className="text-xs text-amber-600 mt-2">Salve a matrícula primeiro para habilitar o upload da foto.</p>
+          )}
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Campo label="COD. ALUNO"><Input value={form.codigoAluno} onChange={(v) => atualizar('codigoAluno', v)} /></Campo>
         <Campo label="Inscrição"><Input value={form.inscricao} onChange={(v) => atualizar('inscricao', v)} /></Campo>
@@ -817,32 +968,35 @@ function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar:
   );
 }
 
-function EtapaDocumentos({ form, atualizar, atualizarDocumento, empresasTransporte, onCadastrarEmpresaTransporte }: {
+function EtapaDocumentos({ form, atualizar, atualizarDocumento, empresasTransporte, onCadastrarEmpresaTransporte, modoEdicao, enviandoDocumento, onEnviarDocumento }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
-  atualizarDocumento: (campo: keyof FormularioMatricula['documentos'], valor: boolean) => void;
+  atualizarDocumento: (campo: keyof Omit<DocumentosMatricula, 'anexos'>, valor: boolean) => void;
   empresasTransporte: EmpresaTransporte[];
   onCadastrarEmpresaTransporte: () => void;
+  modoEdicao: boolean;
+  enviandoDocumento: string | null;
+  onEnviarDocumento: (tipo: keyof Omit<DocumentosMatricula, 'anexos'>, file?: File | null) => void;
 }) {
   return (
     <div className="space-y-4">
       <TituloEtapa titulo="Documentos, transporte e autorizações" subtitulo="Checklist administrativo da ficha da criança." />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {Object.entries({
-          certidaoNascimento: 'Certidão de nascimento',
-          cpfCrianca: 'CPF da criança',
-          rgCpfResponsavel: 'RG/CPF do responsável',
-          comprovanteResidencia: 'Comprovante de residência',
-          cartaoVacina: 'Cartão de vacinação',
-          cartaoSUS: 'Cartão SUS',
-          nis: 'NIS',
-          laudoMedico: 'Laudo médico',
-          foto: 'Foto',
-          termoImagem: 'Termo de uso de imagem',
-          declaracaoEscolar: 'Declaração escolar',
-        } as Record<keyof FormularioMatricula['documentos'], string>).map(([key, label]) => (
-          <Check key={key} label={label} checked={form.documentos[key as keyof FormularioMatricula['documentos']]} onChange={(v) => atualizarDocumento(key as keyof FormularioMatricula['documentos'], v)} />
+        {DOCUMENTOS_CHECKLIST.map(({ key, label }) => (
+          <div key={key} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+            <Check label={label} checked={Boolean(form.documentos[key])} onChange={(v) => atualizarDocumento(key, v)} />
+            <div className="flex items-center justify-between gap-2 pl-1">
+              <span className="text-[11px] text-slate-400">{form.documentos.anexos?.[key]?.length ? `${form.documentos.anexos[key].length} arquivo(s)` : 'Sem arquivo anexado'}</span>
+              {modoEdicao && (
+                <label className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-200 text-[11px] text-slate-600 hover:bg-slate-50 cursor-pointer">
+                  {enviandoDocumento === key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                  Anexar
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx" onChange={(e) => onEnviarDocumento(key, e.target.files?.[0])} disabled={enviandoDocumento === key} />
+                </label>
+              )}
+            </div>
+          </div>
         ))}
       </div>
 

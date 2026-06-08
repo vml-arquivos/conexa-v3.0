@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
 
 const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
 const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
+const CHILDREN_DOCUMENTS_DIR = path.join(CHILDREN_UPLOADS_DIR, 'documents');
 
 
 type ChildAdministrativeJsonFieldName =
@@ -336,6 +337,107 @@ export class ChildrenService {
     return { photoUrl, message: 'Foto atualizada com sucesso' };
   }
 
+
+  /**
+   * Upload de documento/anexo da matrícula da criança.
+   * O arquivo é salvo em /uploads/children/documents e o vínculo fica no JSON documentosMatricula,
+   * preservando o checklist existente e sem exigir nova tabela para anexos.
+   */
+  async uploadDocument(id: string, type: string, file: Express.Multer.File, user: any) {
+    const child = await this.prisma.child.findFirst({
+      where: {
+        id,
+        mantenedoraId: user.mantenedoraId,
+      },
+      select: {
+        id: true,
+        unitId: true,
+        documentosMatricula: true,
+      },
+    });
+
+    if (!child) {
+      throw new NotFoundException('Criança não encontrada');
+    }
+
+    if (!(await canAccessUnit(user, child.unitId))) {
+      throw new ForbiddenException('Você não tem acesso a esta unidade');
+    }
+
+    if (!file?.buffer) {
+      throw new BadRequestException('Arquivo não recebido');
+    }
+
+    const allowedMimes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException('Tipo de documento não permitido. Use imagem, PDF, DOC ou DOCX.');
+    }
+
+    const documentType = (type || 'outros')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .slice(0, 60) || 'outros';
+
+    fs.mkdirSync(CHILDREN_DOCUMENTS_DIR, { recursive: true });
+
+    const originalExt = path.extname(file.originalname || '').toLowerCase();
+    const fallbackExt = file.mimetype === 'application/pdf' ? '.pdf' : `.${file.mimetype.split('/')[1]?.replace('jpeg', 'jpg') || 'bin'}`;
+    const ext = originalExt || fallbackExt;
+    const filename = `${id}-${documentType}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+    const filepath = path.join(CHILDREN_DOCUMENTS_DIR, filename);
+    const url = `/uploads/children/documents/${filename}`;
+
+    fs.writeFileSync(filepath, file.buffer);
+
+    const currentDocs =
+      child.documentosMatricula && typeof child.documentosMatricula === 'object' && !Array.isArray(child.documentosMatricula)
+        ? (child.documentosMatricula as Record<string, any>)
+        : {};
+    const currentAnexos =
+      currentDocs.anexos && typeof currentDocs.anexos === 'object' && !Array.isArray(currentDocs.anexos)
+        ? (currentDocs.anexos as Record<string, any[]>)
+        : {};
+
+    const documento = {
+      nome: file.originalname || filename,
+      url,
+      mimeType: file.mimetype,
+      size: file.size,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    const documentosMatricula = {
+      ...currentDocs,
+      [documentType]: true,
+      anexos: {
+        ...currentAnexos,
+        [documentType]: [...(currentAnexos[documentType] ?? []), documento],
+      },
+    };
+
+    try {
+      await this.prisma.child.update({
+        where: { id },
+        data: { documentosMatricula: toPrismaJson(documentosMatricula) },
+      });
+    } catch (error) {
+      if (fs.existsSync(filepath)) {
+        fs.unlinkSync(filepath);
+      }
+      throw error;
+    }
+
+    return { documento, documentosMatricula, message: 'Documento anexado com sucesso' };
+  }
+
   /**
    * Criar matrícula para criança
    */
@@ -356,6 +458,52 @@ export class ChildrenService {
     });
 
     return enrollment;
+  }
+
+
+  /**
+   * Criar ou atualizar a matrícula ativa da criança sem duplicar registros.
+   */
+  async upsertActiveEnrollment(id: string, enrollmentData: any, user: any) {
+    await this.findOne(id, user);
+
+    const enrollmentId = enrollmentData?.enrollmentId;
+    const classroomId = enrollmentData?.classroomId;
+    const enrollmentDate = enrollmentData?.enrollmentDate;
+
+    const existing = enrollmentId
+      ? await this.prisma.enrollment.findFirst({ where: { id: enrollmentId, childId: id } })
+      : await this.prisma.enrollment.findFirst({
+          where: { childId: id, status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+        });
+
+    if (existing) {
+      return this.prisma.enrollment.update({
+        where: { id: existing.id },
+        data: {
+          ...(classroomId ? { classroomId } : {}),
+          ...(enrollmentDate ? { enrollmentDate: new Date(enrollmentDate) } : {}),
+          status: EnrollmentStatus.ATIVA,
+          updatedBy: user.sub ?? user.id ?? null,
+        },
+        include: { classroom: true },
+      });
+    }
+
+    if (!classroomId) {
+      return null;
+    }
+
+    return this.prisma.enrollment.create({
+      data: {
+        childId: id,
+        classroomId,
+        status: EnrollmentStatus.ATIVA,
+        enrollmentDate: enrollmentDate ? new Date(enrollmentDate) : new Date(),
+      },
+      include: { classroom: true },
+    });
   }
 
   /**

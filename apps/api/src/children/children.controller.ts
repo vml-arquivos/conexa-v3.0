@@ -101,6 +101,39 @@ export class ChildrenController {
     return this.childrenService.uploadPhoto(id, file, req.user);
   }
 
+
+  /**
+   * Upload de documento/anexo da matrícula da criança
+   */
+  @Post(':id/document')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.PROFESSOR)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowedMimes = [
+          'image/jpeg',
+          'image/png',
+          'image/webp',
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        const accepted = allowedMimes.includes(file.mimetype);
+        cb(accepted ? null : new BadRequestException('Tipo de documento não permitido'), accepted);
+      },
+    }),
+  )
+  async uploadDocument(
+    @Param('id') id: string,
+    @Body('type') type: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    return this.childrenService.uploadDocument(id, type, file, req.user);
+  }
+
   /**
    * Criar matrícula para criança
    */
@@ -112,6 +145,20 @@ export class ChildrenController {
     @Request() req,
   ) {
     return this.childrenService.createEnrollment(id, enrollmentData, req.user);
+  }
+
+
+  /**
+   * Criar ou atualizar a matrícula ativa da criança
+   */
+  @Put(':id/enrollment/active')
+  @RequireRoles(RoleLevel.UNIDADE)
+  async upsertActiveEnrollment(
+    @Param('id') id: string,
+    @Body() enrollmentData: any,
+    @Request() req,
+  ) {
+    return this.childrenService.upsertActiveEnrollment(id, enrollmentData, req.user);
   }
 
   /**

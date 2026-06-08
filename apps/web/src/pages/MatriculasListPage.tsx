@@ -214,7 +214,7 @@ export default function MatriculasListPage() {
           </div>
           <div className="divide-y divide-slate-50">
             {alunosFiltrados.map((aluno) => {
-              const enrollment = aluno.enrollments?.[0];
+              const enrollment = aluno.enrollments?.find((e) => e.status === 'ATIVA') ?? aluno.enrollments?.[0];
               const turmaNome = enrollment?.classroom?.name
                 ?? turmas.find(t => t.id === enrollment?.classroomId)?.name
                 ?? 'Sem turma';
