@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -111,6 +112,20 @@ export class ChildrenController {
     @Request() req,
   ) {
     return this.childrenService.createEnrollment(id, enrollmentData, req.user);
+  }
+
+  /**
+   * Atualizar status de matrícula da criança sem exclusão
+   */
+  @Patch(':id/enrollment/:enrollmentId')
+  @RequireRoles(RoleLevel.UNIDADE)
+  async updateEnrollment(
+    @Param('id') id: string,
+    @Param('enrollmentId') enrollmentId: string,
+    @Body() enrollmentData: any,
+    @Request() req,
+  ) {
+    return this.childrenService.updateEnrollment(id, enrollmentId, enrollmentData, req.user);
   }
 
   /**

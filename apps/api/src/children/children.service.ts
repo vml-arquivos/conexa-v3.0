@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, EnrollmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -356,6 +356,72 @@ export class ChildrenService {
     });
 
     return enrollment;
+  }
+
+  /**
+   * Atualizar status de matrícula sem exclusão.
+   * Aceita apenas CANCELADA ou TRANSFERIDA e preserva o escopo do usuário.
+   */
+  async updateEnrollment(id: string, enrollmentId: string, enrollmentData: any, user: any) {
+    const receivedKeys = Object.keys(enrollmentData ?? {}).filter(
+      (key) => enrollmentData[key] !== undefined,
+    );
+    if (receivedKeys.length !== 1 || receivedKeys[0] !== 'status') {
+      throw new BadRequestException('Apenas o campo status pode ser atualizado nesta operação');
+    }
+
+    const status = enrollmentData.status as EnrollmentStatus;
+    if (status !== EnrollmentStatus.CANCELADA && status !== EnrollmentStatus.TRANSFERIDA) {
+      throw new BadRequestException('Status permitido apenas para CANCELADA ou TRANSFERIDA');
+    }
+
+    const child = await this.prisma.child.findFirst({
+      where: {
+        id,
+        mantenedoraId: user.mantenedoraId,
+      },
+      select: {
+        id: true,
+        unitId: true,
+        mantenedoraId: true,
+      },
+    });
+
+    if (!child) {
+      throw new NotFoundException('Criança não encontrada');
+    }
+
+    if (!(await canAccessUnit(user, child.unitId))) {
+      throw new ForbiddenException('Você não tem acesso a esta unidade');
+    }
+
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      select: {
+        id: true,
+        childId: true,
+      },
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Matrícula não encontrada');
+    }
+
+    if (enrollment.childId !== child.id) {
+      throw new BadRequestException('Matrícula não pertence à criança informada');
+    }
+
+    return this.prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        status,
+        ...(status === EnrollmentStatus.CANCELADA ? { withdrawalDate: new Date() } : {}),
+        updatedBy: user.sub ?? user.id ?? null,
+      },
+      include: {
+        classroom: true,
+      },
+    });
   }
 
   /**
