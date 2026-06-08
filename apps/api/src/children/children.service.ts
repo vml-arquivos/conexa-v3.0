@@ -50,6 +50,201 @@ function normalizeChildJsonFields(
   } as Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput>;
 }
 
+
+function parseJsonRecord(value: unknown): Record<string, any> {
+  if (!value) return {};
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parseJsonRecord(parsed);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, any>;
+  }
+  return {};
+}
+
+function parseJsonArray(value: unknown): any[] {
+  if (!value) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parseJsonArray(parsed);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(value) ? value : [];
+}
+
+function firstPresent(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
+  }
+  return undefined;
+}
+
+function omitUndefined<T extends Record<string, any>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined),
+  ) as T;
+}
+
+function normalizeBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value > 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['sim', 's', 'true', '1', 'yes', 'y'].includes(normalized)) return true;
+    if (['não', 'nao', 'n', 'false', '0', 'no'].includes(normalized)) return false;
+  }
+  return Boolean(value);
+}
+
+function normalizeResponsavelAdministrativo(
+  rawValue: unknown,
+  options: {
+    nome?: unknown;
+    parentesco?: unknown;
+    cpf?: unknown;
+    telefone?: unknown;
+    celularPlanilha?: unknown;
+    endereco?: unknown;
+    cep?: unknown;
+    dadosGerais?: Record<string, any>;
+    rawPlanilha?: Record<string, any>;
+  },
+): Record<string, any> {
+  const raw = parseJsonRecord(rawValue);
+  const gerais = options.dadosGerais ?? {};
+  const planilha = options.rawPlanilha ?? {};
+
+  return omitUndefined({
+    ...raw,
+    nome: firstPresent(raw.nome, raw.name, options.nome),
+    parentesco: firstPresent(raw.parentesco, options.parentesco),
+    cpf: firstPresent(raw.cpf, raw.documentoCpf, options.cpf),
+    identidade: firstPresent(raw.identidade, raw.identidadeResp, raw.documento, planilha['IDENTIDADE RESP']),
+    orgaoExpeditor: firstPresent(raw.orgaoExpeditor, raw.orgaoExpedidor, raw.orgao, planilha['ORG. EXPEDITOR']),
+    dataDocumento: firstPresent(raw.dataDocumento, raw.data, planilha['DATA']),
+    pis: firstPresent(raw.pis, raw.pisResponsavel, gerais.pisResponsavel),
+    nascimento: firstPresent(raw.nascimento, raw.dataNascimento, planilha['NASCIMENTO']),
+    telefoneTrabalho: firstPresent(raw.telefoneTrabalho, raw.telefoneComercial, planilha['TE. TRABALHO']),
+    telefoneResidencial: firstPresent(raw.telefoneResidencial, raw.residencial, planilha['TEL. RESIDENCIAL']),
+    celular: firstPresent(raw.celular, raw.telefone, raw.whatsapp, options.celularPlanilha, options.telefone),
+    email: firstPresent(raw.email, raw.eMail, raw.mail),
+    escolaridade: firstPresent(raw.escolaridade, gerais.escolaridade, planilha['ESCOLARIDADE']),
+    profissao: firstPresent(raw.profissao, gerais.profissao, planilha['PROFISSÃO']),
+    dependentes: firstPresent(raw.dependentes, raw.numeroDependentes, gerais.numeroDependentes, planilha['Nº DEPENDENTES']),
+    endereco: firstPresent(raw.endereco, raw.endereço, options.endereco),
+    cep: firstPresent(raw.cep, options.cep),
+    beneficio: firstPresent(raw.beneficio, raw.benefício, gerais.beneficio, planilha['BENEFÍCIO'], planilha['BENEFICIO']),
+    pessoasCasa: firstPresent(raw.pessoasCasa, raw.numeroPessoasCasa, raw.pessoasEmCasa, gerais.pessoasCasa, gerais.numeroPessoasCasa, gerais.numeroDependentes, planilha['Nº PESSOAS EM CASA'], planilha['Nº DEPENDENTES']),
+  });
+}
+
+function normalizeAutorizadosRetirada(value: unknown): Array<Record<string, any>> {
+  return parseJsonArray(value)
+    .map((item) => {
+      const autorizado = parseJsonRecord(item);
+      return omitUndefined({
+        ...autorizado,
+        nome: firstPresent(autorizado.nome, autorizado.name),
+        parentesco: firstPresent(autorizado.parentesco, autorizado.relacao, autorizado.relação),
+        telefone: firstPresent(autorizado.telefone, autorizado.celular, autorizado.phone),
+        documento: firstPresent(autorizado.documento, autorizado.cpf, autorizado.rg),
+      });
+    })
+    .filter((item) => firstPresent(item.nome));
+}
+
+function normalizeTransporteEscolar(value: unknown): Record<string, any> {
+  const transporte = parseJsonRecord(value);
+  const utiliza =
+    transporte.utiliza ??
+    transporte.usaTransporteEscolar ??
+    transporte.utilizaTransporteEscolar ??
+    transporte.transporteEscolar;
+
+  return omitUndefined({
+    ...transporte,
+    utiliza: normalizeBoolean(utiliza),
+    nomeTransporte: firstPresent(transporte.nomeTransporte, transporte.empresa, transporte.empresaTransporte, transporte.nomeEmpresa),
+  });
+}
+
+function normalizeDocumentosMatricula(value: unknown): Record<string, any> {
+  return parseJsonRecord(value);
+}
+
+function normalizeFichaAdministrativa(value: unknown): Record<string, any> {
+  const ficha = parseJsonRecord(value);
+  const raw = parseJsonRecord(ficha.raw);
+  return omitUndefined({
+    ...ficha,
+    serieAnterior: firstPresent(ficha.serieAnterior, ficha.turmaAnterior, raw['SÉRIE ANTERIOR'], raw['SERIE ANTERIOR']),
+    observacoesSecretaria: firstPresent(ficha.observacoesSecretaria, ficha.observacoes, raw['OBSERVAÇÕES'], raw['OBSERVACOES']),
+  });
+}
+
+function normalizeChildAdministrativePayload<T extends Record<string, any>>(child: T): T {
+  const dadosResponsaveis = parseJsonRecord(child.dadosResponsaveis);
+  const documentosMatricula = normalizeDocumentosMatricula(child.documentosMatricula);
+  const fichaAdministrativa = normalizeFichaAdministrativa(child.fichaAdministrativa);
+  const rawPlanilha = parseJsonRecord(fichaAdministrativa.raw);
+  const responsavelPrincipal = parseJsonRecord(
+    dadosResponsaveis.responsavelLegal ?? dadosResponsaveis.responsavelPrincipal,
+  );
+
+  const normalizedDadosResponsaveis = {
+    ...dadosResponsaveis,
+    mae: normalizeResponsavelAdministrativo(dadosResponsaveis.mae, {
+      nome: child.nomeMae ?? rawPlanilha['MÃE'],
+      parentesco: 'MÃE',
+      celularPlanilha: rawPlanilha['CEL. MÃE'],
+      endereco: child.endereco,
+      cep: child.cep,
+      dadosGerais: dadosResponsaveis,
+      rawPlanilha,
+    }),
+    pai: normalizeResponsavelAdministrativo(dadosResponsaveis.pai, {
+      nome: child.nomePai ?? rawPlanilha['PAI'],
+      parentesco: 'PAI',
+      telefone: child.celPai,
+      celularPlanilha: rawPlanilha['CEL. PAI'],
+      endereco: child.endereco,
+      cep: child.cep,
+      dadosGerais: dadosResponsaveis,
+      rawPlanilha,
+    }),
+    responsavelLegal: normalizeResponsavelAdministrativo(responsavelPrincipal, {
+      nome: child.emergencyContactName ?? responsavelPrincipal.nome ?? rawPlanilha['RESPONSÁVEL'],
+      parentesco: responsavelPrincipal.parentesco,
+      cpf: responsavelPrincipal.cpf ?? documentosMatricula.cpfResponsavel,
+      telefone: child.emergencyContactPhone ?? responsavelPrincipal.telefone,
+      celularPlanilha: responsavelPrincipal.telefone,
+      endereco: child.endereco,
+      cep: child.cep,
+      dadosGerais: dadosResponsaveis,
+      rawPlanilha,
+    }),
+  };
+
+  return {
+    ...child,
+    dadosResponsaveis: normalizedDadosResponsaveis,
+    documentosMatricula,
+    autorizadosRetirada: normalizeAutorizadosRetirada(child.autorizadosRetirada),
+    transporteEscolar: normalizeTransporteEscolar(child.transporteEscolar),
+    fichaAdministrativa,
+  };
+}
+
 @Injectable()
 export class ChildrenService {
   constructor(private prisma: PrismaService) {}
@@ -91,7 +286,7 @@ export class ChildrenService {
       },
     });
 
-    return child;
+    return normalizeChildAdministrativePayload(child);
   }
 
   /**
@@ -160,7 +355,7 @@ export class ChildrenService {
       orderBy: { firstName: 'asc' },
     });
 
-    return children;
+    return children.map((child) => normalizeChildAdministrativePayload(child));
   }
 
   /**
@@ -192,7 +387,7 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
-    return child;
+    return normalizeChildAdministrativePayload(child);
   }
 
   /**
@@ -234,7 +429,7 @@ export class ChildrenService {
       },
     });
 
-    return updated;
+    return normalizeChildAdministrativePayload(updated);
   }
 
   /**
