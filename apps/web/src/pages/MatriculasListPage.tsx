@@ -53,7 +53,6 @@ export default function MatriculasListPage() {
   const [busca, setBusca] = useState('');
   const [filtroTurma, setFiltroTurma] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('ATIVA');
-  const [alunoSelecionado, setAlunoSelecionado] = useState('');
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -153,21 +152,6 @@ export default function MatriculasListPage() {
         </div>
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-          <select
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30 min-w-[220px]"
-            value={alunoSelecionado}
-            onChange={(e) => {
-              const id = e.target.value;
-              setAlunoSelecionado(id);
-              if (id) navigate(`/app/secretaria/matriculas/${id}`);
-            }}
-          >
-            <option value="">Selecionar aluno cadastrado...</option>
-            {alunos
-              .slice()
-              .sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'pt-BR'))
-              .map((a) => <option key={a.id} value={a.id}>{a.firstName} {a.lastName}</option>)}
-          </select>
           <select
             className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             value={filtroTurma}

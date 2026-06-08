@@ -245,160 +245,144 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
-
-type SelectOption = { label: string; value: string; data?: any };
-
-function asRecord(value: any): Record<string, any> {
+function asObj(value: any): Record<string, any> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
-function getPath(obj: any, path: string): any {
-  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
+function asArray<T = any>(value: any): T[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function firstValue(...values: any[]): string {
   for (const value of values) {
-    if (value === null || value === undefined) continue;
-    const text = String(value).replace(/\s+/g, ' ').trim();
-    if (text && !['-', '--', '?', 'null', 'undefined'].includes(text.toLowerCase())) return text;
+    if (value === undefined || value === null) continue;
+    const text = String(value).trim();
+    if (text !== '') return text;
   }
   return '';
 }
 
-function firstFrom(obj: any, paths: string[]): string {
-  for (const path of paths) {
-    const value = getPath(obj, path);
-    const text = firstValue(value);
-    if (text) return text;
-  }
-  return '';
+function asBoolean(value: any): boolean {
+  if (typeof value === 'boolean') return value;
+  if (value === undefined || value === null || value === '') return false;
+  const normalized = String(value).trim().toLowerCase();
+  return ['true', 'sim', 's', '1', 'yes'].includes(normalized);
 }
 
-function firstBool(...values: any[]): boolean {
-  for (const value of values) {
-    if (typeof value === 'boolean') return value;
-    if (value === null || value === undefined || value === '') continue;
-    const normalized = String(value).trim().toLowerCase();
-    if (['sim', 's', 'yes', 'true', '1', 'x'].includes(normalized)) return true;
-    if (['não', 'nao', 'n', 'no', 'false', '0'].includes(normalized)) return false;
-  }
-  return false;
-}
-
-function normalizeResponsavel(input: any, parentescoPadrao: string): ResponsavelForm {
-  const r = asRecord(input);
+function normalizeResponsavel(value: any, defaults: ResponsavelForm): ResponsavelForm {
+  const data = asObj(value);
   return {
-    ...responsavelVazio,
-    parentesco: firstValue(r.parentesco, parentescoPadrao),
-    nome: firstValue(r.nome, r.name),
-    cpf: firstValue(r.cpf, r.documento),
-    identidade: firstValue(r.identidade, r.identidadeResponsavel, r.rg),
-    orgaoExpeditor: firstValue(r.orgaoExpeditor, r.orgao, r.orgaoExpedidor),
-    dataDocumento: firstValue(r.dataDocumento, r.dataIdentidade, r.data),
-    pis: firstValue(r.pis, r.pisResponsavel),
-    nascimento: firstValue(r.nascimento, r.dataNascimento),
-    telefoneTrabalho: firstValue(r.telefoneTrabalho, r.telTrabalho, r.trabalho),
-    telefoneResidencial: firstValue(r.telefoneResidencial, r.telefone, r.telefoneResidencia),
-    celular: firstValue(r.celular, r.cel, r.telefone, r.phone),
-    email: firstValue(r.email),
-    escolaridade: firstValue(r.escolaridade),
-    profissao: firstValue(r.profissao),
-    dependentes: firstValue(r.dependentes, r.numeroDependentes),
-    endereco: firstValue(r.endereco, r.address),
-    cep: firstValue(r.cep),
-    beneficio: firstValue(r.beneficio, r.benef),
-    pessoasCasa: firstValue(r.pessoasCasa, r.numeroPessoas, r.numeroPessoasCasa),
+    ...defaults,
+    nome: firstValue(data.nome, data.name, defaults.nome),
+    parentesco: firstValue(data.parentesco, data.relationship, defaults.parentesco),
+    cpf: firstValue(data.cpf, data.documentoCpf, defaults.cpf),
+    identidade: firstValue(data.identidade, data.rg, data.documentoIdentidade, defaults.identidade),
+    orgaoExpeditor: firstValue(data.orgaoExpeditor, data.orgaoExpedidor, data.orgao, defaults.orgaoExpeditor),
+    dataDocumento: firstValue(data.dataDocumento, data.dataEmissao, defaults.dataDocumento),
+    pis: firstValue(data.pis, data.pisNis, defaults.pis),
+    nascimento: firstValue(data.nascimento, data.dataNascimento, data.dateOfBirth, defaults.nascimento),
+    telefoneTrabalho: firstValue(data.telefoneTrabalho, data.telTrabalho, defaults.telefoneTrabalho),
+    telefoneResidencial: firstValue(data.telefoneResidencial, data.telefone, data.phone, defaults.telefoneResidencial),
+    celular: firstValue(data.celular, data.whatsapp, data.phoneMobile, data.telefoneCelular, defaults.celular),
+    email: firstValue(data.email, defaults.email),
+    escolaridade: firstValue(data.escolaridade, defaults.escolaridade),
+    profissao: firstValue(data.profissao, data.ocupacao, defaults.profissao),
+    dependentes: firstValue(data.dependentes, data.numeroDependentes, defaults.dependentes),
+    endereco: firstValue(data.endereco, data.address, defaults.endereco),
+    cep: firstValue(data.cep, defaults.cep),
+    beneficio: firstValue(data.beneficio, data.beneficioSocial, defaults.beneficio),
+    pessoasCasa: firstValue(data.pessoasCasa, data.numeroPessoasCasa, data.moradores, defaults.pessoasCasa),
+  };
+}
+
+function normalizeDocumentos(value: any, defaults: FormularioMatricula['documentos']): FormularioMatricula['documentos'] {
+  const data = asObj(value);
+  return {
+    certidaoNascimento: asBoolean(data.certidaoNascimento ?? data.certidao ?? defaults.certidaoNascimento),
+    cpfCrianca: asBoolean(data.cpfCrianca ?? data.cpfOriginalAluno ?? defaults.cpfCrianca),
+    rgCpfResponsavel: asBoolean(data.rgCpfResponsavel ?? data.cpfResponsavel ?? data.rgResponsavel ?? defaults.rgCpfResponsavel),
+    comprovanteResidencia: asBoolean(data.comprovanteResidencia ?? data.endereco ?? defaults.comprovanteResidencia),
+    cartaoVacina: asBoolean(data.cartaoVacina ?? data.vacina ?? defaults.cartaoVacina),
+    cartaoSUS: asBoolean(data.cartaoSUS ?? data.sus ?? defaults.cartaoSUS),
+    nis: asBoolean(data.nis ?? defaults.nis),
+    laudoMedico: asBoolean(data.laudoMedico ?? data.laudo ?? defaults.laudoMedico),
+    foto: asBoolean(data.foto ?? data.photoUrl ?? defaults.foto),
+    termoImagem: asBoolean(data.termoImagem ?? data.usoImagem ?? defaults.termoImagem),
+    declaracaoEscolar: asBoolean(data.declaracaoEscolar ?? defaults.declaracaoEscolar),
   };
 }
 
 function normalizeAutorizados(value: any): AutorizadoForm[] {
-  const raw = Array.isArray(value) ? value : [];
-  const items = raw
-    .map((a) => ({
-      nome: firstValue(a?.nome, a?.name),
-      parentesco: firstValue(a?.parentesco, a?.relationship),
-      telefone: firstValue(a?.telefone, a?.phone),
-    }))
-    .filter((a) => a.nome || a.parentesco || a.telefone);
-  return [...items, { nome: '', parentesco: '', telefone: '' }, { nome: '', parentesco: '', telefone: '' }].slice(0, Math.max(2, items.length));
+  const list = asArray(value)
+    .map((item) => asObj(item))
+    .filter((item) => firstValue(item.nome, item.name));
+  const normalized = list.map((item) => ({
+    nome: firstValue(item.nome, item.name),
+    parentesco: firstValue(item.parentesco, item.relationship),
+    telefone: firstValue(item.telefone, item.celular, item.phone),
+  }));
+  while (normalized.length < 2) normalized.push({ nome: '', parentesco: '', telefone: '' });
+  return normalized.slice(0, Math.max(2, normalized.length));
 }
 
-function mergeDocumentos(value: any): FormularioMatricula['documentos'] {
-  const d = asRecord(value);
-  return {
-    ...estadoInicial().documentos,
-    ...d,
-    cpfCrianca: firstBool(d.cpfCrianca, d.cpfAluno, d.cpf) || estadoInicial().documentos.cpfCrianca,
-    rgCpfResponsavel: firstBool(d.rgCpfResponsavel, d.cpfResponsavel, d.identidadeResponsavel),
-    nis: firstBool(d.nis),
-  };
-}
+function buildFormularioFromChild(c: any): FormularioMatricula {
+  const inicial = estadoInicial();
+  const dadosResponsaveis = asObj(c?.dadosResponsaveis);
+  const fichaAdministrativa = asObj(c?.fichaAdministrativa);
+  const transporte = asObj(c?.transporteEscolar);
+  const documentos = asObj(c?.documentosMatricula);
 
-function buildFormFromChild(c: any): FormularioMatricula {
-  const dad = asRecord(c?.dadosResponsaveis);
-  const docs = asRecord(c?.documentosMatricula);
-  const transporte = asRecord(c?.transporteEscolar);
-  const ficha = asRecord(c?.fichaAdministrativa);
-  const mae = normalizeResponsavel(dad.mae ?? dad.maeResponsavel ?? {}, 'MÃE');
-  const pai = normalizeResponsavel(dad.pai ?? {}, 'PAI');
-  const responsavelLegal = normalizeResponsavel(dad.responsavelLegal ?? dad.responsavelPrincipal ?? {}, 'RESPONSÁVEL');
+  const mae = normalizeResponsavel(dadosResponsaveis.mae, { ...inicial.mae, nome: firstValue(c?.nomeMae, inicial.mae.nome) });
+  const pai = normalizeResponsavel(dadosResponsaveis.pai, { ...inicial.pai, nome: firstValue(c?.nomePai, inicial.pai.nome), celular: firstValue(c?.celPai, inicial.pai.celular) });
+  const responsavelLegal = normalizeResponsavel(
+    dadosResponsaveis.responsavelLegal ?? dadosResponsaveis.responsavelPrincipal,
+    inicial.responsavelLegal,
+  );
 
   return {
-    ...estadoInicial(),
-    firstName: firstValue(c.firstName),
-    lastName: firstValue(c.lastName),
-    dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : '',
-    gender: c.gender ?? 'NAO_INFORMADO',
-    cpf: firstValue(c.cpf, docs.cpfCrianca, docs.cpfAluno),
-    rg: firstValue(c.rg, docs.rgCrianca),
-    nacionalidade: firstValue(c.nacionalidade),
-    naturalidade: firstValue(c.naturalidade),
-    ufNascimento: firstValue(c.ufNascimento),
-    raca: firstValue(c.raca),
-    peso: firstValue(c.peso),
-    bloodType: firstValue(c.bloodType),
-    endereco: firstValue(c.endereco, dad.endereco, dad.mae?.endereco, dad.responsavelLegal?.endereco),
-    cep: firstValue(c.cep, dad.cep, dad.mae?.cep, dad.responsavelLegal?.cep),
-    nis: firstValue(c.nis, docs.nis),
-    codigoAluno: firstValue(c.codigoAluno, docs.codigoAluno),
-    inscricao: firstValue(c.inscricao, docs.inscricao),
-    nomeMae: firstValue(c.nomeMae, dad.mae?.nome, mae.nome),
-    nomePai: firstValue(c.nomePai, dad.pai?.nome, pai.nome),
-    allergies: firstValue(c.allergies, ficha.intolerantes),
-    intolerancias: firstValue(ficha.intolerantes),
-    medicalConditions: firstValue(c.medicalConditions),
-    medicationNeeds: firstValue(c.medicationNeeds),
-    medicamentos: firstValue(c.medicamentos),
-    laudado: firstBool(c.laudado, ficha.laudado),
-    tipoLaudo: firstValue(c.tipoLaudo),
-    cid: firstValue(c.cid),
-    descricaoLaudo: firstValue(c.descricaoLaudo),
-    usoImagem: firstBool(c.usoImagem, ficha.usoImagem),
-    mae: { ...mae, nome: firstValue(c.nomeMae, mae.nome), cpf: firstValue(mae.cpf, docs.cpfMae), celular: firstValue(mae.celular, dad.mae?.telefone) },
-    pai: { ...pai, nome: firstValue(c.nomePai, pai.nome), celular: firstValue(pai.celular, c.celPai, dad.pai?.telefone) },
-    responsavelLegal: { ...responsavelLegal, cpf: firstValue(responsavelLegal.cpf, docs.cpfResponsavel), identidade: firstValue(responsavelLegal.identidade, docs.identidadeResponsavel), orgaoExpeditor: firstValue(responsavelLegal.orgaoExpeditor, docs.orgaoExpeditor), dataDocumento: firstValue(responsavelLegal.dataDocumento, docs.dataIdentidade), pis: firstValue(responsavelLegal.pis, docs.pisResponsavel) },
-    documentos: mergeDocumentos(docs),
-    autorizados: normalizeAutorizados(c.autorizadosRetirada),
-    transporteEscolar: firstBool(transporte.utiliza, transporte.usaTransporteEscolar),
-    nomeTransporte: firstValue(transporte.nomeTransporte, transporte.nome, ficha.nomeTransporte),
-    enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
-    classroomId: c.enrollments?.[0]?.classroomId ?? '',
-    genitor: firstBool(ficha.genitor),
-    serieAnterior: firstValue(ficha.serieAnterior, ficha.serie2024),
-    observacoesSecretaria: firstValue(ficha.observacoesSecretaria),
+    ...inicial,
+    firstName: firstValue(c?.firstName),
+    lastName: firstValue(c?.lastName),
+    dateOfBirth: c?.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : '',
+    gender: (firstValue(c?.gender) || 'NAO_INFORMADO') as Genero,
+    cpf: firstValue(c?.cpf),
+    rg: firstValue(c?.rg, documentos.rgCrianca, documentos.identidadeAluno),
+    nacionalidade: firstValue(c?.nacionalidade, fichaAdministrativa.nacionalidade, inicial.nacionalidade),
+    naturalidade: firstValue(c?.naturalidade, fichaAdministrativa.naturalidade),
+    ufNascimento: firstValue(c?.ufNascimento, fichaAdministrativa.ufNascimento).toUpperCase().slice(0, 2),
+    raca: firstValue(c?.raca),
+    peso: firstValue(c?.peso),
+    bloodType: firstValue(c?.bloodType),
+    endereco: firstValue(c?.endereco, fichaAdministrativa.endereco, mae.endereco, pai.endereco, responsavelLegal.endereco),
+    cep: firstValue(c?.cep, fichaAdministrativa.cep, mae.cep, pai.cep, responsavelLegal.cep),
+    nis: firstValue(c?.nis, documentos.nis),
+    codigoAluno: firstValue(c?.codigoAluno),
+    inscricao: firstValue(c?.inscricao),
+    nomeMae: firstValue(c?.nomeMae, mae.nome),
+    nomePai: firstValue(c?.nomePai, pai.nome),
+    mae,
+    pai,
+    responsavelLegal,
+    allergies: firstValue(c?.allergies),
+    intolerancias: firstValue(fichaAdministrativa.intolerancias),
+    medicalConditions: firstValue(c?.medicalConditions),
+    medicationNeeds: firstValue(c?.medicationNeeds),
+    medicamentos: firstValue(c?.medicamentos),
+    laudado: asBoolean(c?.laudado ?? fichaAdministrativa.laudado),
+    tipoLaudo: firstValue(c?.tipoLaudo, fichaAdministrativa.tipoLaudo),
+    cid: firstValue(c?.cid, fichaAdministrativa.cid),
+    descricaoLaudo: firstValue(c?.descricaoLaudo, fichaAdministrativa.descricaoLaudo),
+    genitor: asBoolean(fichaAdministrativa.genitor),
+    usoImagem: asBoolean(c?.usoImagem ?? fichaAdministrativa.usoImagem ?? documentos.termoImagem),
+    serieAnterior: firstValue(fichaAdministrativa.serieAnterior),
+    transporteEscolar: asBoolean(transporte.utiliza ?? transporte.usaTransporteEscolar),
+    nomeTransporte: firstValue(transporte.nomeTransporte, transporte.nome, transporte.transportador),
+    autorizados: normalizeAutorizados(c?.autorizadosRetirada),
+    documentos: normalizeDocumentos(c?.documentosMatricula, inicial.documentos),
+    enrollmentDate: firstValue(c?.enrollments?.[0]?.enrollmentDate?.slice?.(0, 10)),
+    classroomId: firstValue(c?.enrollments?.[0]?.classroomId),
+    observacoesSecretaria: firstValue(fichaAdministrativa.observacoesSecretaria),
   };
-}
-
-function uniqueOptions(values: Array<{ label?: string; value?: string; data?: any }>): SelectOption[] {
-  const map = new Map<string, SelectOption>();
-  values.forEach((item) => {
-    const label = firstValue(item.label, item.value);
-    const value = firstValue(item.value, item.label);
-    if (!label || !value) return;
-    const key = value.toLowerCase();
-    if (!map.has(key)) map.set(key, { label, value, data: item.data });
-  });
-  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
 }
 
 export default function MatriculaPage() {
@@ -426,53 +410,20 @@ export default function MatriculaPage() {
   });
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasCarregadas, setTurmasCarregadas] = useState(false);
-  const [alunoOptions, setAlunoOptions] = useState<SelectOption[]>([]);
-  const [transporteOptions, setTransporteOptions] = useState<SelectOption[]>([]);
-  const [autorizadoOptions, setAutorizadoOptions] = useState<SelectOption[]>([]);
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
-  // Carregar opções de alunos, transporte e pessoas autorizadas já cadastradas na unidade.
-  useEffect(() => {
-    let ativo = true;
-    http.get('/children', { params: { limit: 1000 } })
-      .then((res) => {
-        if (!ativo) return;
-        const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-        setAlunoOptions(uniqueOptions(data.map((c: any) => ({
-          label: `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
-          value: c.id,
-          data: c,
-        }))));
-
-        const transportes: SelectOption[] = [];
-        const autorizados: SelectOption[] = [];
-        data.forEach((c: any) => {
-          const transporte = asRecord(c.transporteEscolar);
-          const nomeTransporte = firstValue(transporte.nomeTransporte, transporte.nome);
-          if (nomeTransporte) transportes.push({ label: nomeTransporte, value: nomeTransporte });
-          normalizeAutorizados(c.autorizadosRetirada).forEach((a) => {
-            if (a.nome) autorizados.push({ label: `${a.nome}${a.parentesco ? ` — ${a.parentesco}` : ''}${a.telefone ? ` — ${a.telefone}` : ''}`, value: a.nome, data: a });
-          });
-        });
-        setTransporteOptions(uniqueOptions(transportes));
-        setAutorizadoOptions(uniqueOptions(autorizados));
-      })
-      .catch(() => {
-        if (!ativo) return;
-        setAlunoOptions([]);
-        setTransporteOptions([]);
-        setAutorizadoOptions([]);
-      });
-    return () => { ativo = false; };
-  }, []);
-
   // Carregar dados do aluno em modo edição.
+  // A hidratação precisa considerar tanto colunas nativas do Child quanto JSONs administrativos.
   useEffect(() => {
     if (!modoEdicao || !childIdParam) return;
     setCarregandoDados(true);
-    http.get(`/children/${childIdParam}`)
-      .then((res) => setForm(buildFormFromChild(res.data)))
+
+    http.get(`/children/${childIdParam}`, { params: { _ts: Date.now() } })
+      .then((res) => {
+        const formulario = buildFormularioFromChild(res.data);
+        setForm(formulario);
+      })
       .catch(() => {
         toast.error('Erro ao carregar dados do aluno.');
         navigate('/app/secretaria/matriculas');
@@ -717,26 +668,6 @@ export default function MatriculaPage() {
           ))}
         </div>
 
-        {!modoEdicao && alunoOptions.length > 0 && (
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
-              <Campo label="Selecionar aluno já cadastrado para abrir/editar">
-                <select
-                  className={inputCls}
-                  defaultValue=""
-                  onChange={(e) => e.target.value && navigate(`/app/secretaria/matriculas/${e.target.value}`)}
-                >
-                  <option value="">Digite na busca da lista ou escolha um aluno existente...</option>
-                  {alunoOptions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                </select>
-              </Campo>
-              <Button variant="outline" onClick={() => navigate('/app/secretaria/matriculas')} className="h-10">
-                Ir para lista completa
-              </Button>
-            </div>
-          </div>
-        )}
-
         <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm">
           {etapa === 1 && <EtapaCrianca form={form} atualizar={atualizar} />}
           {etapa === 2 && (
@@ -745,11 +676,10 @@ export default function MatriculaPage() {
               atualizar={atualizar}
               atualizarResponsavel={atualizarResponsavel}
               atualizarAutorizado={atualizarAutorizado}
-              autorizadoOptions={autorizadoOptions}
             />
           )}
           {etapa === 3 && <EtapaSaude form={form} atualizar={atualizar} />}
-          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} transporteOptions={transporteOptions} />}
+          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} />}
           {etapa === 5 && <EtapaTurma form={form} atualizar={atualizar} turmas={turmas} />}
           {etapa === 6 && <EtapaRevisao form={form} turmas={turmas} pendencias={pendencias} />}
         </div>
@@ -842,13 +772,12 @@ function EtapaCrianca({ form, atualizar }: { form: FormularioMatricula; atualiza
 }
 
 function EtapaResponsaveis({
-  form, atualizar, atualizarResponsavel, atualizarAutorizado, autorizadoOptions,
+  form, atualizar, atualizarResponsavel, atualizarAutorizado,
 }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
   atualizarResponsavel: (tipo: 'mae' | 'pai' | 'responsavelLegal', campo: keyof ResponsavelForm, valor: string) => void;
   atualizarAutorizado: (index: number, campo: keyof AutorizadoForm, valor: string) => void;
-  autorizadoOptions: SelectOption[];
 }) {
   return (
     <div className="space-y-5">
@@ -863,29 +792,10 @@ function EtapaResponsaveis({
         <p className="text-sm font-semibold text-slate-800 mb-3">Pessoas autorizadas para liberar a criança</p>
         <div className="space-y-3">
           {form.autorizados.map((a, idx) => (
-            <div key={idx} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <Campo label="Escolher cadastrado">
-                <select
-                  className={inputCls}
-                  value=""
-                  onChange={(e) => {
-                    const opt = autorizadoOptions.find((item) => item.value === e.target.value);
-                    if (!opt?.data) return;
-                    atualizarAutorizado(idx, 'nome', opt.data.nome ?? '');
-                    atualizarAutorizado(idx, 'parentesco', opt.data.parentesco ?? '');
-                    atualizarAutorizado(idx, 'telefone', opt.data.telefone ?? '');
-                  }}
-                >
-                  <option value="">Selecionar...</option>
-                  {autorizadoOptions.map((opt) => <option key={`${idx}-${opt.value}-${opt.label}`} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </Campo>
-              <Campo label={`Nome autorizado ${idx + 1}`}><Input value={a.nome} onChange={(v) => atualizarAutorizado(idx, 'nome', v)} list={`autorizados-${idx}`} /></Campo>
+            <div key={idx} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Campo label={`Nome autorizado ${idx + 1}`}><Input value={a.nome} onChange={(v) => atualizarAutorizado(idx, 'nome', v)} /></Campo>
               <Campo label="Parentesco"><Input value={a.parentesco} onChange={(v) => atualizarAutorizado(idx, 'parentesco', v)} /></Campo>
               <Campo label="Telefone"><Input value={a.telefone} onChange={(v) => atualizarAutorizado(idx, 'telefone', v)} /></Campo>
-              <datalist id={`autorizados-${idx}`}>
-                {autorizadoOptions.map((opt) => <option key={`${idx}-dl-${opt.value}-${opt.label}`} value={opt.data?.nome ?? opt.value}>{opt.label}</option>)}
-              </datalist>
             </div>
           ))}
         </div>
@@ -960,11 +870,10 @@ function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar:
   );
 }
 
-function EtapaDocumentos({ form, atualizar, atualizarDocumento, transporteOptions }: {
+function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
   atualizarDocumento: (campo: keyof FormularioMatricula['documentos'], valor: boolean) => void;
-  transporteOptions: SelectOption[];
 }) {
   return (
     <div className="space-y-4">
@@ -990,20 +899,7 @@ function EtapaDocumentos({ form, atualizar, atualizarDocumento, transporteOption
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Check label="Utiliza transporte escolar" checked={form.transporteEscolar} onChange={(v) => atualizar('transporteEscolar', v)} />
-        <Campo label="Transportador cadastrado">
-          <select
-            className={inputCls}
-            value=""
-            onChange={(e) => e.target.value && atualizar('nomeTransporte', e.target.value)}
-          >
-            <option value="">Selecionar transportador existente...</option>
-            {transporteOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-          </select>
-        </Campo>
-        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} list="transportes-cadastrados" /></Campo>
-        <datalist id="transportes-cadastrados">
-          {transporteOptions.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-        </datalist>
+        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} /></Campo>
       </div>
 
       <Campo label="Observações da Secretaria">
@@ -1097,8 +993,8 @@ function Campo({ label, children, className }: { label: string; children: React.
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text', list }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string; list?: string }) {
-  return <input type={type} list={list} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
+function Input({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (value: string) => void; placeholder?: string; type?: string }) {
+  return <input type={type} className={inputCls} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {

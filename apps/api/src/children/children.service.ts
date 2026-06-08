@@ -58,7 +58,7 @@ export class ChildrenService {
    */
   async create(createChildDto: CreateChildDto, user: any) {
     // Verificar acesso à unidade
-    if (!canAccessUnit(user, createChildDto.unitId)) {
+    if (!(await canAccessUnit(user, createChildDto.unitId))) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -103,7 +103,7 @@ export class ChildrenService {
 
     // Filtro por unidade
     if (filters.unitId) {
-      if (!canAccessUnit(user, filters.unitId)) {
+      if (!(await canAccessUnit(user, filters.unitId))) {
         throw new ForbiddenException('Você não tem acesso a esta unidade');
       }
       where.unitId = filters.unitId;
@@ -187,7 +187,7 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta criança');
     }
 
-    if (!canAccessUnit(user, child.unitId)) {
+    if (!(await canAccessUnit(user, child.unitId))) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -271,7 +271,7 @@ export class ChildrenService {
       throw new NotFoundException('Criança não encontrada');
     }
 
-    if (!canAccessUnit(user, child.unitId)) {
+    if (!(await canAccessUnit(user, child.unitId))) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
