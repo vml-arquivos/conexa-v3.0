@@ -125,6 +125,11 @@ interface Turma {
   name: string;
 }
 
+interface EmpresaTransporte {
+  id: string;
+  nome: string;
+}
+
 const STORAGE_KEY = 'conexa:secretaria:nova-matricula:v2';
 
 const ETAPAS = [
@@ -270,6 +275,8 @@ export default function MatriculaPage() {
   });
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasCarregadas, setTurmasCarregadas] = useState(false);
+  const [empresasTransporte, setEmpresasTransporte] = useState<EmpresaTransporte[]>([]);
+  const [empresasCarregadas, setEmpresasCarregadas] = useState(false);
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
@@ -378,9 +385,39 @@ export default function MatriculaPage() {
     }
   }, [turmasCarregadas]);
 
+  const carregarEmpresasTransporte = useCallback(async () => {
+    if (empresasCarregadas) return;
+    try {
+      const res = await http.get('/empresas-transporte', { params: { unitId: unitId || undefined } });
+      setEmpresasTransporte(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setEmpresasTransporte([]);
+    } finally {
+      setEmpresasCarregadas(true);
+    }
+  }, [empresasCarregadas, unitId]);
+
   useEffect(() => {
+    if (etapa === 4) void carregarEmpresasTransporte();
     if (etapa === 5) void carregarTurmas();
-  }, [etapa, carregarTurmas]);
+  }, [etapa, carregarEmpresasTransporte, carregarTurmas]);
+
+  const cadastrarEmpresaTransporte = useCallback(async () => {
+    const nome = form.nomeTransporte.trim();
+    if (!nome) {
+      toast.info('Informe o nome da empresa de transporte antes de cadastrar.');
+      return;
+    }
+    try {
+      const res = await http.post('/empresas-transporte', { nome, unitId: unitId || undefined });
+      const nova = res.data as EmpresaTransporte;
+      setEmpresasTransporte((atuais) => [...atuais.filter((e) => e.id !== nova.id), nova].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+      atualizar('nomeTransporte', nova.nome);
+      toast.success('Empresa de transporte cadastrada.');
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    }
+  }, [form.nomeTransporte, unitId]);
 
   const pendencias = useMemo(() => {
     const erros: string[] = [];
@@ -581,7 +618,15 @@ export default function MatriculaPage() {
             />
           )}
           {etapa === 3 && <EtapaSaude form={form} atualizar={atualizar} />}
-          {etapa === 4 && <EtapaDocumentos form={form} atualizar={atualizar} atualizarDocumento={atualizarDocumento} />}
+          {etapa === 4 && (
+            <EtapaDocumentos
+              form={form}
+              atualizar={atualizar}
+              atualizarDocumento={atualizarDocumento}
+              empresasTransporte={empresasTransporte}
+              onCadastrarEmpresaTransporte={cadastrarEmpresaTransporte}
+            />
+          )}
           {etapa === 5 && <EtapaTurma form={form} atualizar={atualizar} turmas={turmas} />}
           {etapa === 6 && <EtapaRevisao form={form} turmas={turmas} pendencias={pendencias} />}
         </div>
@@ -772,10 +817,12 @@ function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar:
   );
 }
 
-function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
+function EtapaDocumentos({ form, atualizar, atualizarDocumento, empresasTransporte, onCadastrarEmpresaTransporte }: {
   form: FormularioMatricula;
   atualizar: <K extends keyof FormularioMatricula>(campo: K, valor: FormularioMatricula[K]) => void;
   atualizarDocumento: (campo: keyof FormularioMatricula['documentos'], valor: boolean) => void;
+  empresasTransporte: EmpresaTransporte[];
+  onCadastrarEmpresaTransporte: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -801,7 +848,26 @@ function EtapaDocumentos({ form, atualizar, atualizarDocumento }: {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Check label="Utiliza transporte escolar" checked={form.transporteEscolar} onChange={(v) => atualizar('transporteEscolar', v)} />
-        <Campo label="Nome do transporte"><Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} /></Campo>
+        <Campo label="Empresa de transporte">
+          <div className="flex gap-2">
+            <select className={inputCls} value={form.nomeTransporte} onChange={(e) => atualizar('nomeTransporte', e.target.value)} disabled={!form.transporteEscolar}>
+              <option value="">Selecione ou cadastre</option>
+              {empresasTransporte.map((empresa) => <option key={empresa.id} value={empresa.nome}>{empresa.nome}</option>)}
+              {form.nomeTransporte && !empresasTransporte.some((empresa) => empresa.nome === form.nomeTransporte) && (
+                <option value={form.nomeTransporte}>{form.nomeTransporte}</option>
+              )}
+            </select>
+            <button
+              type="button"
+              onClick={onCadastrarEmpresaTransporte}
+              disabled={!form.transporteEscolar || !form.nomeTransporte.trim()}
+              className="px-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cadastrar
+            </button>
+          </div>
+          <Input value={form.nomeTransporte} onChange={(v) => atualizar('nomeTransporte', v)} placeholder="Digite para cadastrar nova empresa" disabled={!form.transporteEscolar} />
+        </Campo>
       </div>
 
       <Campo label="Observações da Secretaria">
