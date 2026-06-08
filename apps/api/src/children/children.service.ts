@@ -89,6 +89,39 @@ function firstPresent(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+function normalizeLookupKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toUpperCase();
+}
+
+function readRawValue(raw: Record<string, any>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const direct = firstPresent(raw[key]);
+    if (direct) return direct;
+
+    const normalizedKey = normalizeLookupKey(key);
+    const found = Object.keys(raw).find((candidate) => normalizeLookupKey(candidate) === normalizedKey);
+    if (found) {
+      const value = firstPresent(raw[found]);
+      if (value) return value;
+    }
+  }
+  return undefined;
+}
+
+function splitDelimitedList(value: unknown): string[] {
+  const text = firstPresent(value);
+  if (!text) return [];
+  return text
+    .split(/\s*\/\s*|\s*;\s*|\r?\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function omitUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, value]) => value !== undefined),
@@ -134,29 +167,29 @@ function normalizeResponsavelAdministrativo(
   return omitUndefined({
     ...raw,
     nome: firstPresent(raw.nome, raw.name, options.nome),
-    parentesco: firstPresent(raw.parentesco, options.parentesco),
-    cpf: firstPresent(raw.cpf, raw.documentoCpf, options.cpf),
-    identidade: firstPresent(raw.identidade, raw.identidadeResp, raw.documento, planilha['IDENTIDADE RESP']),
-    orgaoExpeditor: firstPresent(raw.orgaoExpeditor, raw.orgaoExpedidor, raw.orgao, planilha['ORG. EXPEDITOR']),
-    dataDocumento: firstPresent(raw.dataDocumento, raw.data, planilha['DATA']),
+    parentesco: firstPresent(raw.parentesco, options.parentesco, readRawValue(planilha, 'PARENTESCO', 'C37')),
+    cpf: firstPresent(raw.cpf, raw.documentoCpf, options.cpf, readRawValue(planilha, 'CPF RESPONSÁVEL', 'CPF RESPONSAVEL', 'CPF RESP', 'C41')),
+    identidade: firstPresent(raw.identidade, raw.identidadeResp, raw.documento, readRawValue(planilha, 'IDENTIDADE RESP', 'IDENTIDADE RESPONSÁVEL', 'IDENTIDADE RESPONSAVEL', 'RG RESPONSÁVEL', 'RG RESPONSAVEL', 'C38')),
+    orgaoExpeditor: firstPresent(raw.orgaoExpeditor, raw.orgaoExpedidor, raw.orgao, readRawValue(planilha, 'ORG. EXPEDITOR', 'ÓRGÃO EXPEDIDOR', 'ORGAO EXPEDIDOR', 'C39')),
+    dataDocumento: firstPresent(raw.dataDocumento, raw.data, readRawValue(planilha, 'DATA', 'DATA DOCUMENTO', 'DATA DOC', 'C40')),
     pis: firstPresent(raw.pis, raw.pisResponsavel, gerais.pisResponsavel),
-    nascimento: firstPresent(raw.nascimento, raw.dataNascimento, planilha['NASCIMENTO']),
-    telefoneTrabalho: firstPresent(raw.telefoneTrabalho, raw.telefoneComercial, planilha['TE. TRABALHO']),
-    telefoneResidencial: firstPresent(raw.telefoneResidencial, raw.residencial, planilha['TEL. RESIDENCIAL']),
-    celular: firstPresent(raw.celular, raw.telefone, raw.whatsapp, options.celularPlanilha, options.telefone),
-    email: firstPresent(raw.email, raw.eMail, raw.mail),
-    escolaridade: firstPresent(raw.escolaridade, gerais.escolaridade, planilha['ESCOLARIDADE']),
-    profissao: firstPresent(raw.profissao, gerais.profissao, planilha['PROFISSÃO']),
-    dependentes: firstPresent(raw.dependentes, raw.numeroDependentes, gerais.numeroDependentes, planilha['Nº DEPENDENTES']),
-    endereco: firstPresent(raw.endereco, raw.endereço, options.endereco),
-    cep: firstPresent(raw.cep, options.cep),
-    beneficio: firstPresent(raw.beneficio, raw.benefício, gerais.beneficio, planilha['BENEFÍCIO'], planilha['BENEFICIO']),
-    pessoasCasa: firstPresent(raw.pessoasCasa, raw.numeroPessoasCasa, raw.pessoasEmCasa, gerais.pessoasCasa, gerais.numeroPessoasCasa, gerais.numeroDependentes, planilha['Nº PESSOAS EM CASA'], planilha['Nº DEPENDENTES']),
+    nascimento: firstPresent(raw.nascimento, raw.dataNascimento, readRawValue(planilha, 'NASCIMENTO', 'NASCIMENTO RESPONSÁVEL', 'NASCIMENTO RESPONSAVEL', 'C43')),
+    telefoneTrabalho: firstPresent(raw.telefoneTrabalho, raw.telefoneComercial, readRawValue(planilha, 'TE. TRABALHO', 'TELEFONE TRABALHO', 'C47')),
+    telefoneResidencial: firstPresent(raw.telefoneResidencial, raw.residencial, readRawValue(planilha, 'TEL. RESIDENCIAL', 'TELEFONE RESIDENCIAL', 'C49')),
+    celular: firstPresent(raw.celular, raw.telefone, raw.whatsapp, options.celularPlanilha, options.telefone, readRawValue(planilha, 'CEL. MÃE', 'CEL MAE', 'CELULAR MÃE', 'CELULAR MAE', 'CEL. PAI', 'CEL PAI', 'CELULAR PAI', 'C48')),
+    email: firstPresent(raw.email, raw.eMail, raw.mail, readRawValue(planilha, 'E-MAIL', 'EMAIL')),
+    escolaridade: firstPresent(raw.escolaridade, gerais.escolaridade, readRawValue(planilha, 'ESCOLARIDADE', 'C50')),
+    profissao: firstPresent(raw.profissao, gerais.profissao, readRawValue(planilha, 'PROFISSÃO', 'PROFISSAO', 'C52')),
+    dependentes: firstPresent(raw.dependentes, raw.numeroDependentes, gerais.numeroDependentes, readRawValue(planilha, 'Nº DEPENDENTES', 'N DEPENDENTES', 'DEPENDENTES', 'C51')),
+    endereco: firstPresent(raw.endereco, raw.endereço, options.endereco, readRawValue(planilha, 'ENDEREÇO', 'ENDERECO', 'C13')),
+    cep: firstPresent(raw.cep, options.cep, readRawValue(planilha, 'CEP', 'C14')),
+    beneficio: firstPresent(raw.beneficio, raw.benefício, gerais.beneficio, readRawValue(planilha, 'BENEFÍCIO', 'BENEFICIO')),
+    pessoasCasa: firstPresent(raw.pessoasCasa, raw.numeroPessoasCasa, raw.pessoasEmCasa, gerais.pessoasCasa, gerais.numeroPessoasCasa, gerais.numeroDependentes, readRawValue(planilha, 'Nº PESSOAS EM CASA', 'N PESSOAS EM CASA', 'Nº DEPENDENTES', 'C51')),
   });
 }
 
-function normalizeAutorizadosRetirada(value: unknown): Array<Record<string, any>> {
-  return parseJsonArray(value)
+function normalizeAutorizadosRetirada(value: unknown, rawPlanilha: Record<string, any> = {}): Array<Record<string, any>> {
+  const fromArray = parseJsonArray(value)
     .map((item) => {
       const autorizado = parseJsonRecord(item);
       return omitUndefined({
@@ -168,6 +201,23 @@ function normalizeAutorizadosRetirada(value: unknown): Array<Record<string, any>
       });
     })
     .filter((item) => firstPresent(item.nome));
+
+  if (fromArray.length > 0) return fromArray;
+
+  const nomes = splitDelimitedList(
+    firstPresent(
+      value,
+      readRawValue(rawPlanilha, 'PESSOAS AUTORIZADAS PARA LIBERAR A CRIANÇA', 'PESSOAS AUTORIZADAS PARA RETIRADA', 'AUTORIZADOS', 'AUTORIZADAS', 'C53'),
+    ),
+  );
+  const parentescos = splitDelimitedList(readRawValue(rawPlanilha, 'PARENTESCO AUTORIZADOS', 'PARENTESCO AUTORIZADAS', 'PARENTESCO', 'C54'));
+  const telefones = splitDelimitedList(readRawValue(rawPlanilha, 'TELEFONE AUTORIZADOS', 'TELEFONES AUTORIZADOS', 'TELEFONE', 'C55'));
+
+  return nomes.map((nome, index) => omitUndefined({
+    nome,
+    parentesco: parentescos[index],
+    telefone: telefones[index],
+  }));
 }
 
 function normalizeTransporteEscolar(value: unknown): Record<string, any> {
@@ -194,11 +244,20 @@ function normalizeFichaAdministrativa(value: unknown): Record<string, any> {
   const raw = parseJsonRecord(ficha.raw);
   return omitUndefined({
     ...ficha,
-    serieAnterior: firstPresent(ficha.serieAnterior, ficha.turmaAnterior, raw['SÉRIE ANTERIOR'], raw['SERIE ANTERIOR']),
-    observacoesSecretaria: firstPresent(ficha.observacoesSecretaria, ficha.observacoes, raw['OBSERVAÇÕES'], raw['OBSERVACOES']),
-    altura: firstPresent(ficha.altura, raw['ALTURA']),
-    intolerancias: firstPresent(ficha.intolerancias, ficha.intolerantes, raw['INTOLERANTES'], raw['INTOLERÂNCIAS'], raw['INTOLERANCIAS']),
-    allergies: firstPresent(ficha.allergies, ficha.alergias, raw['ALERGIAS']),
+    serieAnterior: firstPresent(ficha.serieAnterior, ficha.turmaAnterior, readRawValue(raw, 'SÉRIE ANTERIOR', 'SERIE ANTERIOR')),
+    observacoesSecretaria: firstPresent(ficha.observacoesSecretaria, ficha.observacoes, readRawValue(raw, 'OBSERVAÇÕES', 'OBSERVACOES')),
+    altura: firstPresent(ficha.altura, readRawValue(raw, 'ALTURA')),
+    peso: firstPresent(ficha.peso, readRawValue(raw, 'PESO', 'C11')),
+    bloodType: firstPresent(ficha.bloodType, ficha.tipoSanguineo, readRawValue(raw, 'TIPO SANGUÍNEO', 'TIPO SANGUINEO', 'TIPAGEM SANGUÍNEA', 'TIPAGEM SANGUINEA', 'TIPAGEM', 'C12')),
+    nacionalidade: firstPresent(ficha.nacionalidade, readRawValue(raw, 'NACIONALIDADE', 'C6')),
+    naturalidade: firstPresent(ficha.naturalidade, readRawValue(raw, 'NATURALIDADE', 'C7')),
+    ufNascimento: firstPresent(ficha.ufNascimento, readRawValue(raw, 'UF NASCIMENTO', 'UF', 'C8')),
+    endereco: firstPresent(ficha.endereco, readRawValue(raw, 'ENDEREÇO', 'ENDERECO', 'C13')),
+    cep: firstPresent(ficha.cep, readRawValue(raw, 'CEP', 'C14')),
+    turmaPlanilha: firstPresent(ficha.turmaPlanilha, readRawValue(raw, 'TURMA', 'C15')),
+    professoraPlanilha: firstPresent(ficha.professoraPlanilha, readRawValue(raw, 'PROFESSORA', 'PROFESSOR', 'C16')),
+    intolerancias: firstPresent(ficha.intolerancias, ficha.intolerantes, readRawValue(raw, 'INTOLERANTES', 'INTOLERÂNCIAS', 'INTOLERANCIAS')),
+    allergies: firstPresent(ficha.allergies, ficha.alergias, readRawValue(raw, 'ALERGIAS')),
     genitor: ficha.genitor,
   });
 }
@@ -248,9 +307,16 @@ function normalizeChildAdministrativePayload<T extends Record<string, any>>(chil
 
   return {
     ...child,
+    peso: firstPresent(child.peso, fichaAdministrativa.peso, readRawValue(rawPlanilha, 'PESO', 'C11')) ?? child.peso,
+    bloodType: firstPresent(child.bloodType, fichaAdministrativa.bloodType, readRawValue(rawPlanilha, 'TIPO SANGUÍNEO', 'TIPO SANGUINEO', 'TIPAGEM SANGUÍNEA', 'TIPAGEM SANGUINEA', 'TIPAGEM', 'C12')) ?? child.bloodType,
+    nacionalidade: firstPresent(child.nacionalidade, fichaAdministrativa.nacionalidade, readRawValue(rawPlanilha, 'NACIONALIDADE', 'C6')) ?? child.nacionalidade,
+    naturalidade: firstPresent(child.naturalidade, fichaAdministrativa.naturalidade, readRawValue(rawPlanilha, 'NATURALIDADE', 'C7')) ?? child.naturalidade,
+    ufNascimento: firstPresent(child.ufNascimento, fichaAdministrativa.ufNascimento, readRawValue(rawPlanilha, 'UF NASCIMENTO', 'UF', 'C8')) ?? child.ufNascimento,
+    endereco: firstPresent(child.endereco, fichaAdministrativa.endereco, readRawValue(rawPlanilha, 'ENDEREÇO', 'ENDERECO', 'C13')) ?? child.endereco,
+    cep: firstPresent(child.cep, fichaAdministrativa.cep, readRawValue(rawPlanilha, 'CEP', 'C14')) ?? child.cep,
     dadosResponsaveis: normalizedDadosResponsaveis,
     documentosMatricula,
-    autorizadosRetirada: normalizeAutorizadosRetirada(child.autorizadosRetirada),
+    autorizadosRetirada: normalizeAutorizadosRetirada(child.autorizadosRetirada, rawPlanilha),
     transporteEscolar: normalizeTransporteEscolar(child.transporteEscolar),
     fichaAdministrativa,
   };

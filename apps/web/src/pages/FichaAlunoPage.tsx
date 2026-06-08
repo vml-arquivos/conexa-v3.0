@@ -335,6 +335,8 @@ export default function FichaAlunoPage() {
   const ficha = aluno.fichaAdministrativa ?? {};
   const alergias = ficha.allergies ?? aluno.allergies;
   const intolerancias = ficha.intolerancias;
+  const pesoAluno = aluno.peso ?? (ficha as any).peso;
+  const tipoSanguineoAluno = aluno.bloodType ?? (ficha as any).bloodType ?? (ficha as any).tipoSanguineo;
 
   const enderecoUnit = [unit?.address, unit?.city, unit?.state, unit?.zipCode]
     .filter(Boolean).join(', ');
@@ -470,9 +472,9 @@ export default function FichaAlunoPage() {
               <Campo label="Sexo" valor={generoLabel(aluno.gender)} />
               <Campo label="CPF" valor={aluno.cpf} />
               <Campo label="RG" valor={aluno.rg} />
-              <Campo label="Tipo sanguíneo" valor={aluno.bloodType} />
+              <Campo label="Tipo sanguíneo" valor={tipoSanguineoAluno} />
               <Campo label="Raça/Cor" valor={aluno.raca} />
-              <Campo label="Peso" valor={aluno.peso} />
+              <Campo label="Peso" valor={pesoAluno} />
               <Campo label="Altura" valor={ficha.altura} />
               <Campo label="Nacionalidade" valor={aluno.nacionalidade} />
               <Campo label="Naturalidade" valor={aluno.naturalidade ? `${aluno.naturalidade}/${aluno.ufNascimento ?? ''}` : undefined} />
@@ -746,7 +748,7 @@ function Campo({
         {label}
       </span>
       <span className="text-sm text-slate-800 border-b border-dotted border-slate-300 block pb-0.5 min-h-[1.25rem]">
-        {valor ?? '—'}
+        {valor && String(valor).trim() ? valor : '—'}
       </span>
     </div>
   );
