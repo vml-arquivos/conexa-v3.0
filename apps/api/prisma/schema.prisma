@@ -293,8 +293,32 @@ model Mantenedora {
   cardapios                    Cardapio[]
   acompanhamentosNutricionais  AcompanhamentoNutricional[]
   iaRequests                   IaRequest[] @relation("MantenedoraIaRequests")
+  empresasTransporte           EmpresaTransporte[]
 
   @@index([cnpj])
+  @@index([isActive])
+}
+
+/// Empresa de transporte escolar cadastrada pela secretaria
+model EmpresaTransporte {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String?
+  nome          String   @db.VarChar(255)
+  telefone      String?  @db.VarChar(20)
+  observacoes   String?  @db.Text
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?  @db.VarChar(255)
+  updatedBy     String?  @db.VarChar(255)
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@unique([mantenedoraId, unitId, nome])
+  @@index([mantenedoraId])
+  @@index([unitId])
   @@index([isActive])
 }
 
@@ -354,6 +378,7 @@ model Unit {
    configuracoesRefeicao ConfiguracaoRefeicao[]
   developmentReports    DevelopmentReport[]
   iaRequests            IaRequest[] @relation("UnitIaRequests")
+  empresasTransporte    EmpresaTransporte[]
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])

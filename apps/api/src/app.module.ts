@@ -49,6 +49,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AlertasModule } from './alertas/alertas.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
+import { EmpresasTransporteModule } from './empresas-transporte/empresas-transporte.module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
     ScheduleModule.forRoot(),
     AlertasModule,
     AuditLogModule,
+    EmpresasTransporteModule,
   ],
   controllers: [AppController],
   providers: [
