@@ -1,14 +1,14 @@
 /**
  * MatriculasListPage — Lista de Matrículas / Alunos
  *
- * Exibe todos os alunos matriculados na unidade com busca, filtros por turma
- * e status, e ações de edição, cancelamento e transferência.
+ * Exibe todos os alunos matriculados na unidade com filtros por selects de turma
+ * e aluno, preservando as ações de edição e visualização da ficha completa.
  *
  * RBAC: UNIDADE_ADMINISTRATIVO, UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
  * Usa endpoints existentes: GET /children, GET /lookup/classrooms/accessible
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
@@ -16,7 +16,7 @@ import { ChildAvatar } from '../components/children/ChildAvatar';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
 import {
-  UserPlus, Search, RefreshCw, Filter, ChevronRight,
+  UserPlus, RefreshCw, Filter, ChevronRight,
   XCircle, Loader2, Users, CheckCircle, AlertTriangle, FileText,
 } from 'lucide-react';
 
@@ -42,6 +42,10 @@ interface Turma {
   name: string;
 }
 
+function nomeCompleto(aluno: Aluno): string {
+  return `${aluno.firstName ?? ''} ${aluno.lastName ?? ''}`.replace(/\s+/g, ' ').trim();
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export default function MatriculasListPage() {
@@ -50,24 +54,26 @@ export default function MatriculasListPage() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [busca, setBusca] = useState('');
   const [filtroTurma, setFiltroTurma] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('ATIVA');
+  const [filtroAluno, setFiltroAluno] = useState('');
 
   const carregar = useCallback(async () => {
     setCarregando(true);
     setErro(null);
     try {
       const [alunosRes, turmasRes] = await Promise.allSettled([
-        http.get('/children', { params: { limit: 200 } }),
+        http.get('/children', { params: { limit: 300 } }),
         http.get('/lookup/classrooms/accessible'),
       ]);
       if (alunosRes.status === 'fulfilled') {
         const data = alunosRes.value.data;
-        setAlunos(Array.isArray(data) ? data : data?.data ?? []);
+        setAlunos(Array.isArray(data) ? data : data?.data ?? data?.items ?? []);
+      } else {
+        setErro(getErrorMessage(alunosRes.reason));
       }
       if (turmasRes.status === 'fulfilled') {
-        setTurmas(Array.isArray(turmasRes.value.data) ? turmasRes.value.data : []);
+        const data = turmasRes.value.data;
+        setTurmas(Array.isArray(data) ? data : data?.data ?? data?.items ?? []);
       }
     } catch (e) {
       setErro(getErrorMessage(e));
@@ -78,17 +84,30 @@ export default function MatriculasListPage() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
-  // Filtros
-  const alunosFiltrados = alunos.filter((a) => {
-    const nome = `${a.firstName} ${a.lastName}`.toLowerCase();
-    const matchBusca = nome.includes(busca.toLowerCase());
-    const matchStatus = filtroStatus === '' || a.enrollments.some(e => e.status === filtroStatus);
-    const matchTurma = filtroTurma === '' || a.enrollments.some(e => e.classroomId === filtroTurma);
-    return matchBusca && matchStatus && matchTurma;
-  });
+  const alunosDaTurma = useMemo(() => {
+    const base = filtroTurma
+      ? alunos.filter((a) => a.enrollments?.some((e) => e.classroomId === filtroTurma))
+      : alunos;
+    return [...base].sort((a, b) => nomeCompleto(a).localeCompare(nomeCompleto(b), 'pt-BR'));
+  }, [alunos, filtroTurma]);
+
+  const alunosFiltrados = useMemo(() => {
+    if (filtroAluno) return alunosDaTurma.filter((a) => a.id === filtroAluno);
+    return alunosDaTurma;
+  }, [alunosDaTurma, filtroAluno]);
 
   const totalAtivos = alunos.filter(a => a.isActive).length;
   const totalInativos = alunos.filter(a => !a.isActive).length;
+
+  function selecionarTurma(value: string) {
+    setFiltroTurma(value);
+    setFiltroAluno('');
+  }
+
+  function selecionarAluno(value: string) {
+    setFiltroAluno(value);
+    if (value) navigate(`/app/secretaria/matriculas/${value}/ficha`);
+  }
 
   return (
     <PageShell
@@ -139,39 +158,27 @@ export default function MatriculasListPage() {
         </div>
       </div>
 
-      {/* ── Filtros ── */}
+      {/* ── Filtros por select ── */}
       <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <input
-            className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-400"
-            placeholder="Buscar por nome..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <Filter className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
           <select
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
             value={filtroTurma}
-            onChange={(e) => setFiltroTurma(e.target.value)}
+            onChange={(e) => selecionarTurma(e.target.value)}
           >
             <option value="">Todas as turmas</option>
             {turmas.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
-          <select
-            className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-            value={filtroStatus}
-            onChange={(e) => setFiltroStatus(e.target.value)}
-          >
-            <option value="">Todos os status</option>
-            <option value="ATIVA">Ativa</option>
-            <option value="PAUSADA">Pausada</option>
-            <option value="CONCLUIDA">Concluída</option>
-            <option value="CANCELADA">Cancelada</option>
-          </select>
         </div>
+        <select
+          className="w-full sm:flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+          value={filtroAluno}
+          onChange={(e) => selecionarAluno(e.target.value)}
+        >
+          <option value="">Todos os alunos</option>
+          {alunosDaTurma.map(a => <option key={a.id} value={a.id}>{nomeCompleto(a)}</option>)}
+        </select>
       </div>
 
       {/* ── Erro ── */}
@@ -192,9 +199,9 @@ export default function MatriculasListPage() {
         <div className="text-center py-12 text-slate-400">
           <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
           <p className="text-sm">Nenhum aluno encontrado</p>
-          {busca && (
-            <button onClick={() => setBusca('')} className="text-xs text-brand-600 mt-1 hover:underline">
-              Limpar busca
+          {(filtroTurma || filtroAluno) && (
+            <button onClick={() => { setFiltroTurma(''); setFiltroAluno(''); }} className="text-xs text-brand-600 mt-1 hover:underline">
+              Limpar filtros
             </button>
           )}
         </div>
@@ -228,7 +235,7 @@ export default function MatriculasListPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">
-                        {aluno.firstName} {aluno.lastName}
+                        {nomeCompleto(aluno)}
                       </p>
                       <p className="text-[11px] text-slate-400 truncate">{turmaNome}</p>
                     </div>
