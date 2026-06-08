@@ -101,39 +101,6 @@ export class ChildrenController {
     return this.childrenService.uploadPhoto(id, file, req.user);
   }
 
-
-  /**
-   * Upload de documento/anexo da matrícula da criança
-   */
-  @Post(':id/document')
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.PROFESSOR)
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024 },
-      fileFilter: (_req, file, cb) => {
-        const allowedMimes = [
-          'image/jpeg',
-          'image/png',
-          'image/webp',
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ];
-        const accepted = allowedMimes.includes(file.mimetype);
-        cb(accepted ? null : new BadRequestException('Tipo de documento não permitido'), accepted);
-      },
-    }),
-  )
-  async uploadDocument(
-    @Param('id') id: string,
-    @Body('type') type: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Request() req,
-  ) {
-    return this.childrenService.uploadDocument(id, type, file, req.user);
-  }
-
   /**
    * Criar matrícula para criança
    */
@@ -145,34 +112,6 @@ export class ChildrenController {
     @Request() req,
   ) {
     return this.childrenService.createEnrollment(id, enrollmentData, req.user);
-  }
-
-
-  /**
-   * Criar ou atualizar a matrícula ativa da criança
-   */
-  @Put(':id/enrollment/active')
-  @RequireRoles(RoleLevel.UNIDADE)
-  async upsertActiveEnrollment(
-    @Param('id') id: string,
-    @Body() enrollmentData: any,
-    @Request() req,
-  ) {
-    return this.childrenService.upsertActiveEnrollment(id, enrollmentData, req.user);
-  }
-
-  /**
-   * Atualizar status de matrícula da criança sem exclusão
-   */
-  @Patch(':id/enrollment/:enrollmentId')
-  @RequireRoles(RoleLevel.UNIDADE)
-  async updateEnrollment(
-    @Param('id') id: string,
-    @Param('enrollmentId') enrollmentId: string,
-    @Body() enrollmentData: any,
-    @Request() req,
-  ) {
-    return this.childrenService.updateEnrollment(id, enrollmentId, enrollmentData, req.user);
   }
 
   /**
@@ -237,5 +176,84 @@ export class ChildrenController {
   @Get(':id/health-history')
   async getHealthHistory(@Param('id') id: string, @Request() req) {
     return this.childrenService.getHealthHistory(id, req.user);
+  }
+
+  /**
+   * Atualizar campos administrativos da Secretaria
+   *
+   * PATCH /children/:id/secretaria
+   *
+   * Endpoint exclusivo da Secretaria para salvar campos JSONB adicionados
+   * na migration 20260603040000_child_secretaria_administrative_fields:
+   *   - transporte_escolar
+   *   - autorizados_retirada
+   *   - documentos_matricula
+   *   - ficha_administrativa
+   *
+   * Acesso: UNIDADE_ADMINISTRATIVO, UNIDADE_DIRETOR, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
+   * Não altera dados pedagógicos (planos, diário, RDIC, matrículas).
+   */
+  @Patch(':id/secretaria')
+  async updateSecretariaFields(
+    @Param('id') id: string,
+    @Body() body: {
+      transporte_escolar?: Record<string, unknown>;
+      autorizados_retirada?: Record<string, unknown>[];
+      documentos_matricula?: Record<string, unknown>;
+      ficha_administrativa?: Record<string, unknown>;
+      nacionalidade?: string;
+      naturalidade?: string;
+      uf_nascimento?: string;
+      endereco?: string;
+      cep?: string;
+      dados_responsaveis?: Record<string, unknown>;
+    },
+    @Request() req,
+  ) {
+    // Validação: não permitir body vazio
+    if (!body || Object.keys(body).length === 0) {
+      throw new BadRequestException('Nenhum campo fornecido para atualização.');
+    }
+
+    // Campos permitidos neste endpoint (somente administrativos)
+    const allowedFields = [
+      'transporte_escolar',
+      'autorizados_retirada',
+      'documentos_matricula',
+      'ficha_administrativa',
+      'nacionalidade',
+      'naturalidade',
+      'uf_nascimento',
+      'endereco',
+      'cep',
+      'dados_responsaveis',
+    ];
+
+    const updateData: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (body[field as keyof typeof body] !== undefined) {
+        updateData[field] = body[field as keyof typeof body];
+      }
+    }
+
+    return this.childrenService.updateSecretariaFields(id, updateData, req.user);
+  }
+
+  /**
+   * Ficha completa da criança para a Secretaria
+   *
+   * GET /children/:id/ficha-completa
+   *
+   * Retorna todos os dados administrativos da criança em um único objeto:
+   * dados pessoais, responsáveis, saúde, documentos, transporte, autorizados,
+   * matrículas e histórico administrativo.
+   *
+   * Usado pela FichaAlunoSecretariaPage para exibição e geração de PDF.
+   *
+   * Acesso: UNIDADE_ADMINISTRATIVO, UNIDADE_DIRETOR, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
+   */
+  @Get(':id/ficha-completa')
+  async getFichaCompleta(@Param('id') id: string, @Request() req) {
+    return this.childrenService.getFichaCompleta(id, req.user);
   }
 }

@@ -105,7 +105,16 @@ export class AuthService {
   }
 
   /**
-   * Renova o access token usando o refresh token
+   * Renova o access token usando o refresh token.
+   *
+   * FIX p0.4: re-lê as roles ATIVAS do banco em vez de clonar o payload do
+   * refresh token. Isso garante que roles desativadas (ex: STAFF_CENTRAL
+   * substituído por UNIDADE_ADMINISTRATIVO) não persistam no novo token
+   * pelo período de vida do refresh token (até 7 dias).
+   *
+   * Antes deste fix, um usuário com role desativada no banco continuaria
+   * recebendo um access token com a role antiga a cada renovação silenciosa,
+   * causando o bug de "painel errado" mesmo após correção no banco.
    */
   async refreshAccessToken(refreshToken: string) {
     try {
@@ -116,39 +125,40 @@ export class AuthService {
         },
       );
 
-      // Verificar se o usuário ainda existe, está ativo e recarregar papéis/escopos atuais.
-      // Não reutilizar roles do refresh token antigo, pois isso mantém painel e permissões obsoletos.
+      // Verificar se o usuário ainda existe e está ativo
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        include: {
-          roles: {
-            where: { isActive: true },
-            include: {
-              role: { select: { level: true, type: true } },
-              unitScopes: { select: { unitId: true } },
-            },
-          },
-        },
+        select: { id: true, status: true },
       });
 
       if (!user || user.status !== 'ATIVO') {
         throw new UnauthorizedException('Usuário inativo ou não encontrado');
       }
 
+      // FIX: buscar roles ATUAIS do banco (isActive=true) em vez de reutilizar
+      // o payload do token antigo. Garante que roles desativadas não persistam.
+      const userRoles = await this.prisma.userRole.findMany({
+        where: { userId: payload.sub, isActive: true },
+        include: {
+          role: { select: { level: true, type: true } },
+          unitScopes: { select: { unitId: true } },
+        },
+      });
+
       const freshPayload: JwtPayload = {
-        sub: user.id,
-        email: user.email,
-        mantenedoraId: user.mantenedoraId,
-        unitId: user.unitId || undefined,
-        roles: user.roles.map((userRole) => ({
-          roleId: userRole.roleId,
-          level: userRole.role.level,
-          type: userRole.role.type,
-          unitScopes: userRole.unitScopes.map((scope) => scope.unitId),
+        sub: payload.sub,
+        email: payload.email,
+        mantenedoraId: payload.mantenedoraId,
+        unitId: payload.unitId,
+        roles: userRoles.map((ur) => ({
+          roleId: ur.roleId,
+          level: ur.role.level,
+          type: ur.role.type,
+          unitScopes: ur.unitScopes.map((s) => s.unitId),
         })),
       };
 
-      // Gerar novo access token com dados atuais do banco
+      // Gerar novo access token com roles atuais do banco
       const newAccessToken = await this.generateAccessToken(freshPayload);
 
       return {
@@ -227,7 +237,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Usuário não encontrado');
 
     // Buscar roles com unitScopes — mesmo formato do JWT — para consistência frontend
-    // FIX: usar role.level (RoleLevel real) em vez de scopeLevel
+    // Apenas roles ativas (isActive: true) são retornadas
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId, isActive: true },
       include: {

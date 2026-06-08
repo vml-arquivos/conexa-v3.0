@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { Prisma, EnrollmentStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -11,7 +11,6 @@ import * as crypto from 'crypto';
 
 const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
 const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
-const CHILDREN_DOCUMENTS_DIR = path.join(CHILDREN_UPLOADS_DIR, 'documents');
 
 
 type ChildAdministrativeJsonFieldName =
@@ -50,278 +49,6 @@ function normalizeChildJsonFields(
   } as Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput>;
 }
 
-
-function parseJsonRecord(value: unknown): Record<string, any> {
-  if (!value) return {};
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return parseJsonRecord(parsed);
-    } catch {
-      return {};
-    }
-  }
-  if (typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, any>;
-  }
-  return {};
-}
-
-function parseJsonArray(value: unknown): any[] {
-  if (!value) return [];
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value);
-      return parseJsonArray(parsed);
-    } catch {
-      return [];
-    }
-  }
-  return Array.isArray(value) ? value : [];
-}
-
-function firstPresent(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (value === undefined || value === null) continue;
-    const normalized = String(value).trim();
-    if (normalized) return normalized;
-  }
-  return undefined;
-}
-
-function normalizeLookupKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
-
-function readRawValue(raw: Record<string, any>, ...keys: string[]): string | undefined {
-  for (const key of keys) {
-    const direct = firstPresent(raw[key]);
-    if (direct) return direct;
-
-    const normalizedKey = normalizeLookupKey(key);
-    const found = Object.keys(raw).find((candidate) => normalizeLookupKey(candidate) === normalizedKey);
-    if (found) {
-      const value = firstPresent(raw[found]);
-      if (value) return value;
-    }
-  }
-  return undefined;
-}
-
-function splitDelimitedList(value: unknown): string[] {
-  const text = firstPresent(value);
-  if (!text) return [];
-  return text
-    .split(/\s*\/\s*|\s*;\s*|\r?\n+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function omitUndefined<T extends Record<string, any>>(obj: T): T {
-  return Object.fromEntries(
-    Object.entries(obj).filter(([, value]) => value !== undefined),
-  ) as T;
-}
-
-function mergeJsonRecord(existing: unknown, incoming: unknown): Record<string, any> | undefined {
-  if (incoming === undefined) return undefined;
-  const current = parseJsonRecord(existing);
-  const next = parseJsonRecord(incoming);
-  return { ...current, ...next };
-}
-
-function normalizeBoolean(value: unknown): boolean {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'number') return value > 0;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (['sim', 's', 'true', '1', 'yes', 'y'].includes(normalized)) return true;
-    if (['não', 'nao', 'n', 'false', '0', 'no'].includes(normalized)) return false;
-  }
-  return Boolean(value);
-}
-
-function normalizeResponsavelAdministrativo(
-  rawValue: unknown,
-  options: {
-    nome?: unknown;
-    parentesco?: unknown;
-    cpf?: unknown;
-    telefone?: unknown;
-    celularPlanilha?: unknown;
-    endereco?: unknown;
-    cep?: unknown;
-    dadosGerais?: Record<string, any>;
-    rawPlanilha?: Record<string, any>;
-  },
-): Record<string, any> {
-  const raw = parseJsonRecord(rawValue);
-  const gerais = options.dadosGerais ?? {};
-  const planilha = options.rawPlanilha ?? {};
-
-  return omitUndefined({
-    ...raw,
-    nome: firstPresent(raw.nome, raw.name, options.nome),
-    parentesco: firstPresent(raw.parentesco, options.parentesco, readRawValue(planilha, 'PARENTESCO', 'C37')),
-    cpf: firstPresent(raw.cpf, raw.documentoCpf, options.cpf, readRawValue(planilha, 'CPF RESPONSÁVEL', 'CPF RESPONSAVEL', 'CPF RESP', 'C41')),
-    identidade: firstPresent(raw.identidade, raw.identidadeResp, raw.documento, readRawValue(planilha, 'IDENTIDADE RESP', 'IDENTIDADE RESPONSÁVEL', 'IDENTIDADE RESPONSAVEL', 'RG RESPONSÁVEL', 'RG RESPONSAVEL', 'C38')),
-    orgaoExpeditor: firstPresent(raw.orgaoExpeditor, raw.orgaoExpedidor, raw.orgao, readRawValue(planilha, 'ORG. EXPEDITOR', 'ÓRGÃO EXPEDIDOR', 'ORGAO EXPEDIDOR', 'C39')),
-    dataDocumento: firstPresent(raw.dataDocumento, raw.data, readRawValue(planilha, 'DATA', 'DATA DOCUMENTO', 'DATA DOC', 'C40')),
-    pis: firstPresent(raw.pis, raw.pisResponsavel, gerais.pisResponsavel),
-    nascimento: firstPresent(raw.nascimento, raw.dataNascimento, readRawValue(planilha, 'NASCIMENTO', 'NASCIMENTO RESPONSÁVEL', 'NASCIMENTO RESPONSAVEL', 'C43')),
-    telefoneTrabalho: firstPresent(raw.telefoneTrabalho, raw.telefoneComercial, readRawValue(planilha, 'TE. TRABALHO', 'TELEFONE TRABALHO', 'C47')),
-    telefoneResidencial: firstPresent(raw.telefoneResidencial, raw.residencial, readRawValue(planilha, 'TEL. RESIDENCIAL', 'TELEFONE RESIDENCIAL', 'C49')),
-    celular: firstPresent(raw.celular, raw.telefone, raw.whatsapp, options.celularPlanilha, options.telefone, readRawValue(planilha, 'CEL. MÃE', 'CEL MAE', 'CELULAR MÃE', 'CELULAR MAE', 'CEL. PAI', 'CEL PAI', 'CELULAR PAI', 'C48')),
-    email: firstPresent(raw.email, raw.eMail, raw.mail, readRawValue(planilha, 'E-MAIL', 'EMAIL')),
-    escolaridade: firstPresent(raw.escolaridade, gerais.escolaridade, readRawValue(planilha, 'ESCOLARIDADE', 'C50')),
-    profissao: firstPresent(raw.profissao, gerais.profissao, readRawValue(planilha, 'PROFISSÃO', 'PROFISSAO', 'C52')),
-    dependentes: firstPresent(raw.dependentes, raw.numeroDependentes, gerais.numeroDependentes, readRawValue(planilha, 'Nº DEPENDENTES', 'N DEPENDENTES', 'DEPENDENTES', 'C51')),
-    endereco: firstPresent(raw.endereco, raw.endereço, options.endereco, readRawValue(planilha, 'ENDEREÇO', 'ENDERECO', 'C13')),
-    cep: firstPresent(raw.cep, options.cep, readRawValue(planilha, 'CEP', 'C14')),
-    beneficio: firstPresent(raw.beneficio, raw.benefício, gerais.beneficio, readRawValue(planilha, 'BENEFÍCIO', 'BENEFICIO')),
-    pessoasCasa: firstPresent(raw.pessoasCasa, raw.numeroPessoasCasa, raw.pessoasEmCasa, gerais.pessoasCasa, gerais.numeroPessoasCasa, gerais.numeroDependentes, readRawValue(planilha, 'Nº PESSOAS EM CASA', 'N PESSOAS EM CASA', 'Nº DEPENDENTES', 'C51')),
-  });
-}
-
-function normalizeAutorizadosRetirada(value: unknown, rawPlanilha: Record<string, any> = {}): Array<Record<string, any>> {
-  const fromArray = parseJsonArray(value)
-    .map((item) => {
-      const autorizado = parseJsonRecord(item);
-      return omitUndefined({
-        ...autorizado,
-        nome: firstPresent(autorizado.nome, autorizado.name),
-        parentesco: firstPresent(autorizado.parentesco, autorizado.relacao, autorizado.relação),
-        telefone: firstPresent(autorizado.telefone, autorizado.celular, autorizado.phone),
-        documento: firstPresent(autorizado.documento, autorizado.cpf, autorizado.rg),
-      });
-    })
-    .filter((item) => firstPresent(item.nome));
-
-  if (fromArray.length > 0) return fromArray;
-
-  const nomes = splitDelimitedList(
-    firstPresent(
-      value,
-      readRawValue(rawPlanilha, 'PESSOAS AUTORIZADAS PARA LIBERAR A CRIANÇA', 'PESSOAS AUTORIZADAS PARA RETIRADA', 'AUTORIZADOS', 'AUTORIZADAS', 'C53'),
-    ),
-  );
-  const parentescos = splitDelimitedList(readRawValue(rawPlanilha, 'PARENTESCO AUTORIZADOS', 'PARENTESCO AUTORIZADAS', 'PARENTESCO', 'C54'));
-  const telefones = splitDelimitedList(readRawValue(rawPlanilha, 'TELEFONE AUTORIZADOS', 'TELEFONES AUTORIZADOS', 'TELEFONE', 'C55'));
-
-  return nomes.map((nome, index) => omitUndefined({
-    nome,
-    parentesco: parentescos[index],
-    telefone: telefones[index],
-  }));
-}
-
-function normalizeTransporteEscolar(value: unknown): Record<string, any> {
-  const transporte = parseJsonRecord(value);
-  const utiliza =
-    transporte.utiliza ??
-    transporte.usaTransporteEscolar ??
-    transporte.utilizaTransporteEscolar ??
-    transporte.transporteEscolar;
-
-  return omitUndefined({
-    ...transporte,
-    utiliza: normalizeBoolean(utiliza),
-    nomeTransporte: firstPresent(transporte.nomeTransporte, transporte.empresa, transporte.empresaTransporte, transporte.nomeEmpresa),
-  });
-}
-
-function normalizeDocumentosMatricula(value: unknown): Record<string, any> {
-  return parseJsonRecord(value);
-}
-
-function normalizeFichaAdministrativa(value: unknown): Record<string, any> {
-  const ficha = parseJsonRecord(value);
-  const raw = parseJsonRecord(ficha.raw);
-  return omitUndefined({
-    ...ficha,
-    serieAnterior: firstPresent(ficha.serieAnterior, ficha.turmaAnterior, readRawValue(raw, 'SÉRIE ANTERIOR', 'SERIE ANTERIOR')),
-    observacoesSecretaria: firstPresent(ficha.observacoesSecretaria, ficha.observacoes, readRawValue(raw, 'OBSERVAÇÕES', 'OBSERVACOES')),
-    altura: firstPresent(ficha.altura, readRawValue(raw, 'ALTURA')),
-    peso: firstPresent(ficha.peso, readRawValue(raw, 'PESO', 'C11')),
-    bloodType: firstPresent(ficha.bloodType, ficha.tipoSanguineo, readRawValue(raw, 'TIPO SANGUÍNEO', 'TIPO SANGUINEO', 'TIPAGEM SANGUÍNEA', 'TIPAGEM SANGUINEA', 'TIPAGEM', 'C12')),
-    nacionalidade: firstPresent(ficha.nacionalidade, readRawValue(raw, 'NACIONALIDADE', 'C6')),
-    naturalidade: firstPresent(ficha.naturalidade, readRawValue(raw, 'NATURALIDADE', 'C7')),
-    ufNascimento: firstPresent(ficha.ufNascimento, readRawValue(raw, 'UF NASCIMENTO', 'UF', 'C8')),
-    endereco: firstPresent(ficha.endereco, readRawValue(raw, 'ENDEREÇO', 'ENDERECO', 'C13')),
-    cep: firstPresent(ficha.cep, readRawValue(raw, 'CEP', 'C14')),
-    turmaPlanilha: firstPresent(ficha.turmaPlanilha, readRawValue(raw, 'TURMA', 'C15')),
-    professoraPlanilha: firstPresent(ficha.professoraPlanilha, readRawValue(raw, 'PROFESSORA', 'PROFESSOR', 'C16')),
-    intolerancias: firstPresent(ficha.intolerancias, ficha.intolerantes, readRawValue(raw, 'INTOLERANTES', 'INTOLERÂNCIAS', 'INTOLERANCIAS')),
-    allergies: firstPresent(ficha.allergies, ficha.alergias, readRawValue(raw, 'ALERGIAS')),
-    genitor: ficha.genitor,
-  });
-}
-
-function normalizeChildAdministrativePayload<T extends Record<string, any>>(child: T): T {
-  const dadosResponsaveis = parseJsonRecord(child.dadosResponsaveis);
-  const documentosMatricula = normalizeDocumentosMatricula(child.documentosMatricula);
-  const fichaAdministrativa = normalizeFichaAdministrativa(child.fichaAdministrativa);
-  const rawPlanilha = parseJsonRecord(fichaAdministrativa.raw);
-  const responsavelPrincipal = parseJsonRecord(
-    dadosResponsaveis.responsavelLegal ?? dadosResponsaveis.responsavelPrincipal,
-  );
-
-  const normalizedDadosResponsaveis = {
-    ...dadosResponsaveis,
-    mae: normalizeResponsavelAdministrativo(dadosResponsaveis.mae, {
-      nome: child.nomeMae ?? rawPlanilha['MÃE'],
-      parentesco: 'MÃE',
-      celularPlanilha: rawPlanilha['CEL. MÃE'],
-      endereco: child.endereco,
-      cep: child.cep,
-      dadosGerais: dadosResponsaveis,
-      rawPlanilha,
-    }),
-    pai: normalizeResponsavelAdministrativo(dadosResponsaveis.pai, {
-      nome: child.nomePai ?? rawPlanilha['PAI'],
-      parentesco: 'PAI',
-      telefone: child.celPai,
-      celularPlanilha: rawPlanilha['CEL. PAI'],
-      endereco: child.endereco,
-      cep: child.cep,
-      dadosGerais: dadosResponsaveis,
-      rawPlanilha,
-    }),
-    responsavelLegal: normalizeResponsavelAdministrativo(responsavelPrincipal, {
-      nome: child.emergencyContactName ?? responsavelPrincipal.nome ?? rawPlanilha['RESPONSÁVEL'],
-      parentesco: responsavelPrincipal.parentesco,
-      cpf: responsavelPrincipal.cpf ?? documentosMatricula.cpfResponsavel,
-      telefone: child.emergencyContactPhone ?? responsavelPrincipal.telefone,
-      celularPlanilha: responsavelPrincipal.telefone,
-      endereco: child.endereco,
-      cep: child.cep,
-      dadosGerais: dadosResponsaveis,
-      rawPlanilha,
-    }),
-  };
-
-  return {
-    ...child,
-    peso: firstPresent(child.peso, fichaAdministrativa.peso, readRawValue(rawPlanilha, 'PESO', 'C11')) ?? child.peso,
-    bloodType: firstPresent(child.bloodType, fichaAdministrativa.bloodType, readRawValue(rawPlanilha, 'TIPO SANGUÍNEO', 'TIPO SANGUINEO', 'TIPAGEM SANGUÍNEA', 'TIPAGEM SANGUINEA', 'TIPAGEM', 'C12')) ?? child.bloodType,
-    nacionalidade: firstPresent(child.nacionalidade, fichaAdministrativa.nacionalidade, readRawValue(rawPlanilha, 'NACIONALIDADE', 'C6')) ?? child.nacionalidade,
-    naturalidade: firstPresent(child.naturalidade, fichaAdministrativa.naturalidade, readRawValue(rawPlanilha, 'NATURALIDADE', 'C7')) ?? child.naturalidade,
-    ufNascimento: firstPresent(child.ufNascimento, fichaAdministrativa.ufNascimento, readRawValue(rawPlanilha, 'UF NASCIMENTO', 'UF', 'C8')) ?? child.ufNascimento,
-    endereco: firstPresent(child.endereco, fichaAdministrativa.endereco, readRawValue(rawPlanilha, 'ENDEREÇO', 'ENDERECO', 'C13')) ?? child.endereco,
-    cep: firstPresent(child.cep, fichaAdministrativa.cep, readRawValue(rawPlanilha, 'CEP', 'C14')) ?? child.cep,
-    dadosResponsaveis: normalizedDadosResponsaveis,
-    documentosMatricula,
-    autorizadosRetirada: normalizeAutorizadosRetirada(child.autorizadosRetirada, rawPlanilha),
-    transporteEscolar: normalizeTransporteEscolar(child.transporteEscolar),
-    fichaAdministrativa,
-  };
-}
-
 @Injectable()
 export class ChildrenService {
   constructor(private prisma: PrismaService) {}
@@ -331,7 +58,7 @@ export class ChildrenService {
    */
   async create(createChildDto: CreateChildDto, user: any) {
     // Verificar acesso à unidade
-    if (!(await canAccessUnit(user, createChildDto.unitId))) {
+    if (!canAccessUnit(user, createChildDto.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -363,7 +90,7 @@ export class ChildrenService {
       },
     });
 
-    return normalizeChildAdministrativePayload(child);
+    return child;
   }
 
   /**
@@ -376,7 +103,7 @@ export class ChildrenService {
 
     // Filtro por unidade
     if (filters.unitId) {
-      if (!(await canAccessUnit(user, filters.unitId))) {
+      if (!canAccessUnit(user, filters.unitId)) {
         throw new ForbiddenException('Você não tem acesso a esta unidade');
       }
       where.unitId = filters.unitId;
@@ -432,7 +159,7 @@ export class ChildrenService {
       orderBy: { firstName: 'asc' },
     });
 
-    return children.map((child) => normalizeChildAdministrativePayload(child));
+    return children;
   }
 
   /**
@@ -460,11 +187,11 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta criança');
     }
 
-    if (!(await canAccessUnit(user, child.unitId))) {
+    if (!canAccessUnit(user, child.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
-    return normalizeChildAdministrativePayload(child);
+    return child;
   }
 
   /**
@@ -485,11 +212,11 @@ export class ChildrenService {
     const data: Prisma.ChildUncheckedUpdateInput = {
       ...childBaseUpdateDto,
       ...normalizeChildJsonFields({
-        dadosResponsaveis: mergeJsonRecord(child.dadosResponsaveis, dadosResponsaveis),
-        documentosMatricula: mergeJsonRecord(child.documentosMatricula, documentosMatricula),
-        autorizadosRetirada: autorizadosRetirada === undefined ? undefined : autorizadosRetirada,
-        transporteEscolar: mergeJsonRecord(child.transporteEscolar, transporteEscolar),
-        fichaAdministrativa: mergeJsonRecord(child.fichaAdministrativa, fichaAdministrativa),
+        dadosResponsaveis,
+        documentosMatricula,
+        autorizadosRetirada,
+        transporteEscolar,
+        fichaAdministrativa,
       }),
     };
 
@@ -506,7 +233,7 @@ export class ChildrenService {
       },
     });
 
-    return normalizeChildAdministrativePayload(updated);
+    return updated;
   }
 
   /**
@@ -544,7 +271,7 @@ export class ChildrenService {
       throw new NotFoundException('Criança não encontrada');
     }
 
-    if (!(await canAccessUnit(user, child.unitId))) {
+    if (!canAccessUnit(user, child.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -609,107 +336,6 @@ export class ChildrenService {
     return { photoUrl, message: 'Foto atualizada com sucesso' };
   }
 
-
-  /**
-   * Upload de documento/anexo da matrícula da criança.
-   * O arquivo é salvo em /uploads/children/documents e o vínculo fica no JSON documentosMatricula,
-   * preservando o checklist existente e sem exigir nova tabela para anexos.
-   */
-  async uploadDocument(id: string, type: string, file: Express.Multer.File, user: any) {
-    const child = await this.prisma.child.findFirst({
-      where: {
-        id,
-        mantenedoraId: user.mantenedoraId,
-      },
-      select: {
-        id: true,
-        unitId: true,
-        documentosMatricula: true,
-      },
-    });
-
-    if (!child) {
-      throw new NotFoundException('Criança não encontrada');
-    }
-
-    if (!(await canAccessUnit(user, child.unitId))) {
-      throw new ForbiddenException('Você não tem acesso a esta unidade');
-    }
-
-    if (!file?.buffer) {
-      throw new BadRequestException('Arquivo não recebido');
-    }
-
-    const allowedMimes = [
-      'image/jpeg',
-      'image/png',
-      'image/webp',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
-    if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Tipo de documento não permitido. Use imagem, PDF, DOC ou DOCX.');
-    }
-
-    const documentType = (type || 'outros')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9_-]/g, '')
-      .slice(0, 60) || 'outros';
-
-    fs.mkdirSync(CHILDREN_DOCUMENTS_DIR, { recursive: true });
-
-    const originalExt = path.extname(file.originalname || '').toLowerCase();
-    const fallbackExt = file.mimetype === 'application/pdf' ? '.pdf' : `.${file.mimetype.split('/')[1]?.replace('jpeg', 'jpg') || 'bin'}`;
-    const ext = originalExt || fallbackExt;
-    const filename = `${id}-${documentType}-${crypto.randomBytes(8).toString('hex')}${ext}`;
-    const filepath = path.join(CHILDREN_DOCUMENTS_DIR, filename);
-    const url = `/uploads/children/documents/${filename}`;
-
-    fs.writeFileSync(filepath, file.buffer);
-
-    const currentDocs =
-      child.documentosMatricula && typeof child.documentosMatricula === 'object' && !Array.isArray(child.documentosMatricula)
-        ? (child.documentosMatricula as Record<string, any>)
-        : {};
-    const currentAnexos =
-      currentDocs.anexos && typeof currentDocs.anexos === 'object' && !Array.isArray(currentDocs.anexos)
-        ? (currentDocs.anexos as Record<string, any[]>)
-        : {};
-
-    const documento = {
-      nome: file.originalname || filename,
-      url,
-      mimeType: file.mimetype,
-      size: file.size,
-      uploadedAt: new Date().toISOString(),
-    };
-
-    const documentosMatricula = {
-      ...currentDocs,
-      [documentType]: true,
-      anexos: {
-        ...currentAnexos,
-        [documentType]: [...(currentAnexos[documentType] ?? []), documento],
-      },
-    };
-
-    try {
-      await this.prisma.child.update({
-        where: { id },
-        data: { documentosMatricula: toPrismaJson(documentosMatricula) },
-      });
-    } catch (error) {
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
-      }
-      throw error;
-    }
-
-    return { documento, documentosMatricula, message: 'Documento anexado com sucesso' };
-  }
-
   /**
    * Criar matrícula para criança
    */
@@ -730,118 +356,6 @@ export class ChildrenService {
     });
 
     return enrollment;
-  }
-
-
-  /**
-   * Criar ou atualizar a matrícula ativa da criança sem duplicar registros.
-   */
-  async upsertActiveEnrollment(id: string, enrollmentData: any, user: any) {
-    await this.findOne(id, user);
-
-    const enrollmentId = enrollmentData?.enrollmentId;
-    const classroomId = enrollmentData?.classroomId;
-    const enrollmentDate = enrollmentData?.enrollmentDate;
-
-    const existing = enrollmentId
-      ? await this.prisma.enrollment.findFirst({ where: { id: enrollmentId, childId: id } })
-      : await this.prisma.enrollment.findFirst({
-          where: { childId: id, status: EnrollmentStatus.ATIVA },
-          orderBy: { enrollmentDate: 'desc' },
-        });
-
-    if (existing) {
-      return this.prisma.enrollment.update({
-        where: { id: existing.id },
-        data: {
-          ...(classroomId ? { classroomId } : {}),
-          ...(enrollmentDate ? { enrollmentDate: new Date(enrollmentDate) } : {}),
-          status: EnrollmentStatus.ATIVA,
-          updatedBy: user.sub ?? user.id ?? null,
-        },
-        include: { classroom: true },
-      });
-    }
-
-    if (!classroomId) {
-      return null;
-    }
-
-    return this.prisma.enrollment.create({
-      data: {
-        childId: id,
-        classroomId,
-        status: EnrollmentStatus.ATIVA,
-        enrollmentDate: enrollmentDate ? new Date(enrollmentDate) : new Date(),
-      },
-      include: { classroom: true },
-    });
-  }
-
-  /**
-   * Atualizar status de matrícula sem exclusão.
-   * Aceita apenas CANCELADA ou TRANSFERIDA e preserva o escopo do usuário.
-   */
-  async updateEnrollment(id: string, enrollmentId: string, enrollmentData: any, user: any) {
-    const receivedKeys = Object.keys(enrollmentData ?? {}).filter(
-      (key) => enrollmentData[key] !== undefined,
-    );
-    if (receivedKeys.length !== 1 || receivedKeys[0] !== 'status') {
-      throw new BadRequestException('Apenas o campo status pode ser atualizado nesta operação');
-    }
-
-    const status = enrollmentData.status as EnrollmentStatus;
-    if (status !== EnrollmentStatus.CANCELADA && status !== EnrollmentStatus.TRANSFERIDA) {
-      throw new BadRequestException('Status permitido apenas para CANCELADA ou TRANSFERIDA');
-    }
-
-    const child = await this.prisma.child.findFirst({
-      where: {
-        id,
-        mantenedoraId: user.mantenedoraId,
-      },
-      select: {
-        id: true,
-        unitId: true,
-        mantenedoraId: true,
-      },
-    });
-
-    if (!child) {
-      throw new NotFoundException('Criança não encontrada');
-    }
-
-    if (!(await canAccessUnit(user, child.unitId))) {
-      throw new ForbiddenException('Você não tem acesso a esta unidade');
-    }
-
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: { id: enrollmentId },
-      select: {
-        id: true,
-        childId: true,
-      },
-    });
-
-    if (!enrollment) {
-      throw new NotFoundException('Matrícula não encontrada');
-    }
-
-    if (enrollment.childId !== child.id) {
-      throw new BadRequestException('Matrícula não pertence à criança informada');
-    }
-
-    return this.prisma.enrollment.update({
-      where: { id: enrollmentId },
-      data: {
-        status,
-        ...(status === EnrollmentStatus.CANCELADA ? { withdrawalDate: new Date() } : {}),
-        updatedBy: user.sub ?? user.id ?? null,
-      },
-      include: {
-        classroom: true,
-      },
-    });
   }
 
   /**
@@ -1166,5 +680,137 @@ export class ChildrenService {
     });
 
     return healthEvents;
+  }
+
+  /**
+   * Atualizar campos administrativos da Secretaria (PATCH /children/:id/secretaria)
+   *
+   * Atualiza apenas campos JSONB administrativos, sem tocar em dados pedagógicos,
+   * matrículas, diário, planos ou RDIC.
+   */
+  async updateSecretariaFields(
+    id: string,
+    updateData: Record<string, unknown>,
+    user: any,
+  ) {
+    // Verificar se a criança existe e o usuário tem acesso a ela
+    const child = await this.findOne(id, user);
+
+    const updated = await this.prisma.child.update({
+      where: { id },
+      data: {
+        ...(updateData.transporte_escolar !== undefined && {
+          transporte_escolar: updateData.transporte_escolar as any,
+        }),
+        ...(updateData.autorizados_retirada !== undefined && {
+          autorizados_retirada: updateData.autorizados_retirada as any,
+        }),
+        ...(updateData.documentos_matricula !== undefined && {
+          documentos_matricula: updateData.documentos_matricula as any,
+        }),
+        ...(updateData.ficha_administrativa !== undefined && {
+          ficha_administrativa: updateData.ficha_administrativa as any,
+        }),
+        ...(updateData.dados_responsaveis !== undefined && {
+          dados_responsaveis: updateData.dados_responsaveis as any,
+        }),
+        ...(updateData.nacionalidade !== undefined && {
+          nacionalidade: updateData.nacionalidade as string,
+        }),
+        ...(updateData.naturalidade !== undefined && {
+          naturalidade: updateData.naturalidade as string,
+        }),
+        ...(updateData.uf_nascimento !== undefined && {
+          uf_nascimento: updateData.uf_nascimento as string,
+        }),
+        ...(updateData.endereco !== undefined && {
+          endereco: updateData.endereco as string,
+        }),
+        ...(updateData.cep !== undefined && {
+          cep: updateData.cep as string,
+        }),
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        updatedAt: true,
+      },
+    });
+
+    return { success: true, child: updated };
+  }
+
+  /**
+   * Retorna ficha administrativa completa da criança para a Secretaria
+   * (GET /children/:id/ficha-completa)
+   */
+  async getFichaCompleta(id: string, user: any) {
+    const child = await this.prisma.child.findUnique({
+      where: { id },
+      include: {
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          include: {
+            classroom: { select: { id: true, name: true, gradeLevel: true } },
+          },
+          take: 1,
+        },
+        unit: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    if (!child) {
+      throw new Error('Criança não encontrada');
+    }
+
+    // Buscar atendimentos aos pais
+    const atendimentos = await this.prisma.atendimentoPais.findMany({
+      where: { childId: id },
+      orderBy: { dataAtendimento: 'desc' },
+      take: 20,
+    }).catch(() => []);
+
+    // Buscar ocorrências de saúde no diário
+    const ocorrencias = await this.prisma.diaryEvent.findMany({
+      where: { childId: id, type: 'SAUDE' },
+      orderBy: { eventDate: 'desc' },
+      take: 20,
+    }).catch(() => []);
+
+    // Montar ficha completa
+    return {
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      dataNascimento: (child as any).dateOfBirth ?? null,
+      genero: (child as any).gender ?? null,
+      foto: (child as any).photoUrl ?? null,
+      // Dados pessoais (migration 20260603)
+      nacionalidade: (child as any).nacionalidade ?? null,
+      naturalidade: (child as any).naturalidade ?? null,
+      uf_nascimento: (child as any).uf_nascimento ?? null,
+      endereco: (child as any).endereco ?? null,
+      cep: (child as any).cep ?? null,
+      // Saúde
+      alergias: (child as any).allergies ?? null,
+      condicoesMedicas: (child as any).medicalConditions ?? null,
+      necessidadeMedicacao: (child as any).medicationNeeds ?? null,
+      laudado: (child as any).laudado ?? false,
+      // Dados JSONB administrativos
+      dadosResponsaveis: (child as any).dados_responsaveis ?? null,
+      documentosMatricula: (child as any).documentos_matricula ?? null,
+      autorizadosRetirada: (child as any).autorizados_retirada ?? null,
+      transporteEscolar: (child as any).transporte_escolar ?? null,
+      fichaAdministrativa: (child as any).ficha_administrativa ?? null,
+      // Turma ativa
+      turma: child.enrollments[0]?.classroom ?? null,
+      // Unidade
+      unidade: child.unit,
+      // Histórico
+      atendimentos,
+      ocorrenciasSaude: ocorrencias,
+    };
   }
 }

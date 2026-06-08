@@ -58,13 +58,13 @@ import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
 import SecretariaPage from '../pages/SecretariaPage';
 import MatriculaPage from '../pages/MatriculaPage';
 import MatriculasListPage from '../pages/MatriculasListPage';
-import FichaAlunoPage from '../pages/FichaAlunoPage';
 import MovimentacoesPage from '../pages/MovimentacoesPage';
 import FuncionariosPage from '../pages/FuncionariosPage';
 import ComunicacaoPage from '../pages/ComunicacaoPage';
 import FaltasSecretariaPage from '../pages/FaltasSecretariaPage';
 import OcorrenciasSecretariaPage from '../pages/OcorrenciasSecretariaPage';
 import PedidosAdministrativosPage from '../pages/PedidosAdministrativosPage';
+// FIX: páginas de Transporte/Retirada e Atestados/Documentos (antes causavam 404)
 import TransporteRetiradaPage from '../pages/TransporteRetiradaPage';
 import AtestadosDocumentosPage from '../pages/AtestadosDocumentosPage';
 import { AppLayout } from '../components/layout/AppLayout';
@@ -594,42 +594,6 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorBoundary />,
       },
       {
-        path: 'secretaria/matriculas/:id',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MatriculaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/matriculas/:id/ficha',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <FichaAlunoPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/transporte',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <TransporteRetiradaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/atestados',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <AtestadosDocumentosPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
         path: 'secretaria/movimentacoes',
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
@@ -679,6 +643,25 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <PedidosAdministrativosPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // FIX: rotas ausentes que causavam 404 ao clicar no menu da Secretaria
+      {
+        path: 'secretaria/transporte',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <TransporteRetiradaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'secretaria/atestados',
+        element: (
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+            <AtestadosDocumentosPage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

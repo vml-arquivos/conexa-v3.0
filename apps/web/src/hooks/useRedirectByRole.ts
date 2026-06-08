@@ -6,13 +6,16 @@ import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 /**
  * Hook para redirecionar usuário após login baseado em seu role e roleType
  *
- * Prioridade de redirecionamento:
- * - PROFESSOR / PROFESSOR_AUXILIAR → /app/teacher-dashboard
- * - UNIDADE_NUTRICIONISTA          → /app/nutricionista
- * - UNIDADE_DIRETOR                → /app/diretor
- * - STAFF_CENTRAL                  → /app/central
- * - MANTENEDORA / DEVELOPER        → /app/dashboard
- * - UNIDADE (outros)               → /app/dashboard
+ * Prioridade de redirecionamento (por tipo — mais específico antes):
+ * - PROFESSOR / PROFESSOR_AUXILIAR          → /app/teacher-dashboard
+ * - UNIDADE_ADMINISTRATIVO                  → /app/secretaria
+ * - UNIDADE_DIRETOR                         → /app/diretor
+ * - UNIDADE_NUTRICIONISTA                   → /app/nutricionista
+ * - UNIDADE_COORDENADOR_PEDAGOGICO          → /app/coordenacao-pedagogica
+ * - STAFF_CENTRAL_PSICOLOGIA                → /app/psicologo
+ * - STAFF_CENTRAL / STAFF_CENTRAL_PEDAGOGICO → /app/central
+ * - MANTENEDORA / DEVELOPER                 → /app/dashboard
+ * - UNIDADE (genérico sem tipo específico)  → /app/dashboard
  */
 export function useRedirectByRole() {
   const { user } = useAuth();
@@ -27,33 +30,55 @@ export function useRedirectByRole() {
 }
 
 /**
- * Função auxiliar para obter rota de redirecionamento baseada em roles e roleTypes
+ * Função auxiliar para obter rota de redirecionamento baseada em roles e roleTypes.
+ * Exportada separadamente para permitir testes unitários.
+ *
+ * @param levels - RoleLevels do usuário (ex: ['PROFESSOR', 'UNIDADE'])
+ * @param types  - RoleTypes do usuário (ex: ['UNIDADE_ADMINISTRATIVO'])
  */
 export function getRedirectPathByRoles(levels: string[], types: string[] = []): string {
-  // Professor
+  // ── Nível Professor ────────────────────────────────────────────────────
   if (levels.includes('PROFESSOR') || levels.includes('PROFESSOR_AUXILIAR')) {
     return '/app/teacher-dashboard';
   }
-  // Nutricionista
-  if (types.includes('UNIDADE_NUTRICIONISTA')) {
-    return '/app/nutricionista';
-  }
+
+  // ── Tipos de papel dentro de UNIDADE (mais específico primeiro) ────────
   // Administrativo (Secretaria)
   if (types.includes('UNIDADE_ADMINISTRATIVO')) {
     return '/app/secretaria';
   }
-  // Diretor
+  // Diretor de Unidade
   if (types.includes('UNIDADE_DIRETOR')) {
     return '/app/diretor';
   }
-  // Coordenação Central
-  if (levels.includes('STAFF_CENTRAL')) {
+  // Nutricionista de Unidade
+  if (types.includes('UNIDADE_NUTRICIONISTA')) {
+    return '/app/nutricionista';
+  }
+  // Coordenadora Pedagógica de Unidade — FIX: rota específica em vez de /app/dashboard
+  if (types.includes('UNIDADE_COORDENADOR_PEDAGOGICO')) {
+    return '/app/coordenacao-pedagogica';
+  }
+
+  // ── Tipos de papel Staff Central ──────────────────────────────────────
+  // Psicóloga Central
+  if (types.includes('STAFF_CENTRAL_PSICOLOGIA')) {
+    return '/app/psicologo';
+  }
+  // Staff Central Pedagógico e genérico
+  if (
+    levels.includes('STAFF_CENTRAL') ||
+    types.includes('STAFF_CENTRAL_PEDAGOGICO')
+  ) {
     return '/app/central';
   }
-  // Mantenedora / Developer
+
+  // ── Mantenedora / Developer ────────────────────────────────────────────
   if (levels.includes('MANTENEDORA') || levels.includes('DEVELOPER')) {
     return '/app/dashboard';
   }
-  // Unidade (Coordenadora Pedagógica, Administrativo, etc.)
+
+  // ── Fallback: qualquer UNIDADE sem tipo específico identificado ────────
+  // (ex: UNIDADE genérico ou novos tipos ainda não mapeados)
   return '/app/dashboard';
 }

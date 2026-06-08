@@ -28,12 +28,9 @@ const ROLE_PRIORITY: Record<string, number> = {
 };
 
 /**
- * Verifica se o JWT armazenado tem o formato antigo (roles como strings simples
- * em vez de objetos com .level). Tokens antigos (pré-fix 43129d6) tinham
- * scopeLevel em vez de role.level, resultando em roles inválidos.
- *
- * Estratégia: decodificar o payload do JWT sem verificar assinatura e checar
- * se roles[0] é string ou objeto com .level.
+ * Decodifica o payload do JWT sem verificar assinatura.
+ * Usado APENAS para detecção de tokens legados (formato antigo),
+ * NUNCA como fonte de roles ou identidade do usuário.
  */
 function decodeAccessTokenPayload(): Record<string, unknown> | null {
   try {
@@ -47,15 +44,31 @@ function decodeAccessTokenPayload(): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Detecta token no formato antigo (pré-fix 43129d6):
+ * roles como strings simples ou objetos sem .level.
+ *
+ * ATENÇÃO: esta função serve APENAS para forçar logout e renovação de token.
+ * Não deve ser usada para extrair dados do usuário.
+ */
 function hasLegacyToken(): boolean {
   const payload = decodeAccessTokenPayload();
   const roles = payload?.roles;
   if (!Array.isArray(roles) || roles.length === 0) return false;
-  // Token novo: roles[0] é objeto com .level
-  // Token antigo: roles[0] é string OU objeto sem .level
   if (typeof roles[0] === 'string') return true;
   if (typeof roles[0] === 'object' && roles[0] !== null && !roles[0].level) return true;
   return false;
+}
+
+/**
+ * Limpa todos os tokens e estado de sessão do cliente.
+ * Centralizado aqui para garantir consistência em todos os casos de logout.
+ */
+function clearLocalSession() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  sessionStorage.clear();
+  document.cookie = 'access_token=; Max-Age=0; path=/';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -73,26 +86,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // para que o usuário faça login novamente e obtenha JWT com role.level correto.
     if (hasLegacyToken()) {
       console.warn('[AuthProvider] Token antigo detectado (sem role.level) — forçando logout para renovação.');
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearLocalSession();
       setLoading(false);
       return;
     }
 
     loadMe()
       .then((response) => {
+        // Fonte única e confiável de verdade: o backend via /auth/me.
+        // Roles vêm do banco de dados, sempre com isActive=true.
         setUser(response.user);
       })
       .catch((error) => {
+        // FIX p0.2: NUNCA usar o JWT local como fallback de roles.
+        // Se /auth/me falha, o usuário deve fazer login novamente.
+        // Motivo: o JWT pode conter roles desatualizadas (ex: STAFF_CENTRAL de
+        // um papel que foi desativado no banco). O banco é a fonte de verdade.
         if (isAuthExpiredError(error)) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          return;
+          // Token expirado ou inválido — sessão encerrada normalmente.
+          clearLocalSession();
+        } else {
+          // Erro de rede ou erro transitório do servidor.
+          // Comportamento seguro: forçar novo login em vez de usar dados stale.
+          console.warn(
+            '[AuthProvider] Falha ao carregar /auth/me. ' +
+            'Por segurança, a sessão não será restaurada a partir do token local. ' +
+            'O usuário precisará fazer login novamente.',
+            error,
+          );
+          clearLocalSession();
         }
-
-        console.warn('[AuthProvider] Falha ao carregar /auth/me; limpando sessão para evitar perfil/escopo desatualizado.');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
       })
       .finally(() => {
         setLoading(false);
@@ -100,29 +123,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    sessionStorage.clear();
-    document.cookie = 'access_token=; Max-Age=0; path=/';
-
     const { accessToken, refreshToken } = await apiLogin(email, password);
     localStorage.setItem('accessToken', accessToken);
     if (refreshToken) {
       localStorage.setItem('refreshToken', refreshToken);
     }
 
-    // Carregar dados do usuário via /auth/me (retorna roles no formato rico)
+    // Carregar dados do usuário via /auth/me (retorna roles atuais do banco)
     const response = await loadMe();
     setUser(response.user);
   };
 
   const logout = useCallback(() => {
-    // Limpar todos os tokens e estado de sessão
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    sessionStorage.clear();
-    // Limpar cookie de sessão se existir (Missão 01 — cookie-parser)
-    document.cookie = 'access_token=; Max-Age=0; path=/';
+    clearLocalSession();
     setUser(null);
     window.location.replace('/login');
   }, []);
@@ -139,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   //      em reaberturas — o usuário volta autenticado)
   //   3. Refresh token expirar após longo período sem abrir o sistema
   //      (configurável via JWT_REFRESH_EXPIRES_IN no backend)
+  //   4. Falha ao validar sessão em /auth/me na reabertura (ex: role desativada)
   //
   // O que NÃO desconecta:
   //   ✗ Inatividade (mouse parado, sem cliques)
