@@ -116,18 +116,40 @@ export class AuthService {
         },
       );
 
-      // Verificar se o usuário ainda existe e está ativo
+      // Verificar se o usuário ainda existe, está ativo e recarregar papéis/escopos atuais.
+      // Não reutilizar roles do refresh token antigo, pois isso mantém painel e permissões obsoletos.
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, status: true },
+        include: {
+          roles: {
+            where: { isActive: true },
+            include: {
+              role: { select: { level: true, type: true } },
+              unitScopes: { select: { unitId: true } },
+            },
+          },
+        },
       });
 
       if (!user || user.status !== 'ATIVO') {
         throw new UnauthorizedException('Usuário inativo ou não encontrado');
       }
 
-      // Gerar novo access token
-      const newAccessToken = await this.generateAccessToken(payload);
+      const freshPayload: JwtPayload = {
+        sub: user.id,
+        email: user.email,
+        mantenedoraId: user.mantenedoraId,
+        unitId: user.unitId || undefined,
+        roles: user.roles.map((userRole) => ({
+          roleId: userRole.roleId,
+          level: userRole.role.level,
+          type: userRole.role.type,
+          unitScopes: userRole.unitScopes.map((scope) => scope.unitId),
+        })),
+      };
+
+      // Gerar novo access token com dados atuais do banco
+      const newAccessToken = await this.generateAccessToken(freshPayload);
 
       return {
         accessToken: newAccessToken,

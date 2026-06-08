@@ -110,9 +110,12 @@ interface Aluno {
   autorizadosRetirada?: Autorizado[];
   transporteEscolar?: { utiliza?: boolean; nomeTransporte?: string };
   fichaAdministrativa?: {
-    genitor?: string;
+    genitor?: string | boolean;
     serieAnterior?: string;
     observacoesSecretaria?: string;
+    altura?: string;
+    intolerancias?: string;
+    allergies?: string;
   };
   unit?: {
     id: string;
@@ -330,6 +333,8 @@ export default function FichaAlunoPage() {
   const autorizados = aluno.autorizadosRetirada ?? [];
   const transporte = aluno.transporteEscolar;
   const ficha = aluno.fichaAdministrativa ?? {};
+  const alergias = ficha.allergies ?? aluno.allergies;
+  const intolerancias = ficha.intolerancias;
 
   const enderecoUnit = [unit?.address, unit?.city, unit?.state, unit?.zipCode]
     .filter(Boolean).join(', ');
@@ -468,6 +473,7 @@ export default function FichaAlunoPage() {
               <Campo label="Tipo sanguíneo" valor={aluno.bloodType} />
               <Campo label="Raça/Cor" valor={aluno.raca} />
               <Campo label="Peso" valor={aluno.peso} />
+              <Campo label="Altura" valor={ficha.altura} />
               <Campo label="Nacionalidade" valor={aluno.nacionalidade} />
               <Campo label="Naturalidade" valor={aluno.naturalidade ? `${aluno.naturalidade}/${aluno.ufNascimento ?? ''}` : undefined} />
               <Campo label="NIS" valor={aluno.nis} />
@@ -535,7 +541,9 @@ export default function FichaAlunoPage() {
         {/* ── SEÇÃO 7 — Saúde ──────────────────────────────────────────── */}
         <Secao titulo="7. Informações de Saúde">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <Campo label="Alergias" valor={aluno.allergies} span2 />
+            <Campo label="Alergias" valor={alergias} span2 />
+            <Campo label="Intolerâncias" valor={intolerancias} span2 />
+            <Campo label="Altura" valor={ficha.altura} />
             <Campo label="Condições médicas" valor={aluno.medicalConditions} span2 />
             <Campo label="Necessidades de medicação" valor={aluno.medicationNeeds} span2 />
             <Campo label="Medicamentos em uso" valor={aluno.medicamentos} span2 />

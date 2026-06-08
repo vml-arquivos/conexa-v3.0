@@ -104,6 +104,7 @@ interface FormularioMatricula {
   rg: string;
   raca: string;
   peso: string;
+  altura: string;
   bloodType: string;
   endereco: string;
   cep: string;
@@ -216,6 +217,7 @@ function estadoInicial(): FormularioMatricula {
     rg: '',
     raca: '',
     peso: '',
+    altura: '',
     bloodType: '',
     endereco: '',
     cep: '',
@@ -338,6 +340,18 @@ function asBoolean(value: any): boolean {
   return Boolean(value);
 }
 
+function splitHealthText(value: string | undefined) {
+  const text = (value ?? '').trim();
+  if (!text.includes(' | ')) {
+    return { allergies: text, intolerancias: '' };
+  }
+  const [allergies, ...rest] = text.split(' | ');
+  return {
+    allergies: allergies.trim(),
+    intolerancias: rest.join(' | ').trim(),
+  };
+}
+
 function hidratarResponsavel(base: ResponsavelForm, dados: any, nomePrincipal?: string, raw: Record<string, any> = {}, prefixo = ''): ResponsavelForm {
   const d = asObj(dados);
   const rawKey = (campo: string) => prefixo ? readRaw(raw, `${campo} ${prefixo}`, `${prefixo} ${campo}`) : '';
@@ -404,6 +418,7 @@ function buildFormularioFromChild(c: any): FormularioMatricula {
   const raw = asObj(ficha.raw);
   const docs = asObj(c?.documentosMatricula);
   const transporte = asObj(c?.transporteEscolar);
+  const saudeSeparada = splitHealthText(firstValue(c?.allergies));
   const matriculaPrincipal = obterMatriculaPrincipal(c?.enrollments);
   const mae = hidratarResponsavel(inicial.mae, dad.mae, firstValue(c?.nomeMae, readRaw(raw, 'MÃE', 'MAE')), raw, 'MÃE');
   const pai = hidratarResponsavel(inicial.pai, dad.pai, firstValue(c?.nomePai, readRaw(raw, 'PAI')), raw, 'PAI');
@@ -428,6 +443,7 @@ function buildFormularioFromChild(c: any): FormularioMatricula {
     ufNascimento: firstValue(c?.ufNascimento, ficha.ufNascimento, readRaw(raw, 'UF', 'UF NASCIMENTO')).toUpperCase().slice(0, 2),
     raca: firstValue(c?.raca, readRaw(raw, 'RAÇA/COR', 'RACA/COR', 'RAÇA', 'RACA')),
     peso: firstValue(c?.peso, readRaw(raw, 'PESO')),
+    altura: firstValue(ficha.altura, readRaw(raw, 'ALTURA')),
     bloodType: firstValue(c?.bloodType, readRaw(raw, 'TIPO SANGUÍNEO', 'TIPO SANGUINEO')),
     endereco: firstValue(c?.endereco, ficha.endereco, readRaw(raw, 'ENDEREÇO', 'ENDERECO'), mae.endereco, pai.endereco, responsavelLegal.endereco),
     cep: firstValue(c?.cep, ficha.cep, readRaw(raw, 'CEP'), mae.cep, pai.cep, responsavelLegal.cep),
@@ -440,8 +456,8 @@ function buildFormularioFromChild(c: any): FormularioMatricula {
     mae,
     pai,
     responsavelLegal,
-    allergies: firstValue(c?.allergies, ficha.alergias, readRaw(raw, 'ALERGIAS')),
-    intolerancias: firstValue(ficha.intolerancias, readRaw(raw, 'INTOLERÂNCIAS', 'INTOLERANCIAS')),
+    allergies: firstValue(ficha.alergias, ficha.allergies, saudeSeparada.allergies, readRaw(raw, 'ALERGIAS')),
+    intolerancias: firstValue(ficha.intolerancias, saudeSeparada.intolerancias, readRaw(raw, 'INTOLERÂNCIAS', 'INTOLERANCIAS')),
     medicalConditions: firstValue(c?.medicalConditions, ficha.condicoesMedicas, readRaw(raw, 'CONDIÇÕES MÉDICAS', 'CONDICOES MEDICAS')),
     medicationNeeds: firstValue(c?.medicationNeeds, ficha.necessidadesMedicacao, readRaw(raw, 'NECESSIDADES DE MEDICAÇÃO', 'NECESSIDADES DE MEDICACAO')),
     medicamentos: firstValue(c?.medicamentos, ficha.medicamentos, readRaw(raw, 'MEDICAMENTOS')),
@@ -724,7 +740,7 @@ export default function MatriculaPage() {
         celPai: cleanText(form.pai.celular || form.mae.celular || form.responsavelLegal.celular),
         emergencyContactName: cleanText(responsavelEmergencia),
         emergencyContactPhone: cleanText(telefoneEmergencia),
-        allergies: cleanText([form.allergies, form.intolerancias].filter(Boolean).join(' | ')),
+        allergies: cleanText(form.allergies),
         medicalConditions: cleanText(form.medicalConditions),
         medicationNeeds: cleanText(form.medicationNeeds),
         medicamentos: cleanText(form.medicamentos),
@@ -756,6 +772,9 @@ export default function MatriculaPage() {
           genitor: form.genitor,
           serieAnterior: cleanText(form.serieAnterior),
           observacoesSecretaria: cleanText(form.observacoesSecretaria),
+          altura: cleanText(form.altura),
+          intolerancias: cleanText(form.intolerancias),
+          allergies: cleanText(form.allergies),
           origemCampos: 'Planilha DADOS PARA PLATAFORMA PEDAGÓGICA',
         }),
       });
@@ -971,6 +990,7 @@ function EtapaCrianca({ form, atualizar, modoEdicao, enviandoFoto, onEnviarFoto 
         </Campo>
         <Campo label="Raça/Cor"><Input value={form.raca} onChange={(v) => atualizar('raca', v)} /></Campo>
         <Campo label="Peso"><Input value={form.peso} onChange={(v) => atualizar('peso', v)} placeholder="Ex.: 11kg" /></Campo>
+        <Campo label="Altura"><Input value={form.altura} onChange={(v) => atualizar('altura', v)} placeholder="Ex.: 0,95 m" /></Campo>
         <Campo label="Nacionalidade"><Input value={form.nacionalidade} onChange={(v) => atualizar('nacionalidade', v)} /></Campo>
         <Campo label="Naturalidade"><Input value={form.naturalidade} onChange={(v) => atualizar('naturalidade', v)} /></Campo>
         <Campo label="UF"><Input value={form.ufNascimento} onChange={(v) => atualizar('ufNascimento', v.toUpperCase().slice(0, 2))} /></Campo>
@@ -1053,6 +1073,7 @@ function EtapaSaude({ form, atualizar }: { form: FormularioMatricula; atualizar:
     <div className="space-y-4">
       <TituloEtapa titulo="Saúde, laudos, intolerâncias e medicamentos" subtitulo="Informações críticas para secretaria, nutrição, professores e contato com responsáveis." />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Campo label="Altura"><Input value={form.altura} onChange={(v) => atualizar('altura', v)} placeholder="Ex.: 0,95 m" /></Campo>
         <Campo label="Tipagem sanguínea">
           <select className={inputCls} value={form.bloodType} onChange={(e) => atualizar('bloodType', e.target.value)}>
             <option value="">Não informado</option>
@@ -1197,7 +1218,9 @@ function EtapaRevisao({ form, turmas, pendencias }: { form: FormularioMatricula;
         ['Telefone', form.responsavelLegal.celular || form.mae.celular || form.pai.celular],
       ]} />
       <Resumo titulo="Saúde e documentos" linhas={[
-        ['Alergias/intolerâncias', [form.allergies, form.intolerancias].filter(Boolean).join(' | ')],
+        ['Altura', form.altura],
+        ['Alergias', form.allergies],
+        ['Intolerâncias', form.intolerancias],
         ['Laudo', form.laudado ? `${form.tipoLaudo || 'Sim'} ${form.cid || ''}` : 'Não'],
         ['Uso de imagem', form.usoImagem ? 'Autorizado' : 'Não autorizado'],
         ['Transporte', form.transporteEscolar ? form.nomeTransporte || 'Sim' : 'Não'],

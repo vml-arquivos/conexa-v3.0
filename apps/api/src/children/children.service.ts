@@ -95,6 +95,13 @@ function omitUndefined<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
+function mergeJsonRecord(existing: unknown, incoming: unknown): Record<string, any> | undefined {
+  if (incoming === undefined) return undefined;
+  const current = parseJsonRecord(existing);
+  const next = parseJsonRecord(incoming);
+  return { ...current, ...next };
+}
+
 function normalizeBoolean(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value > 0;
@@ -189,6 +196,10 @@ function normalizeFichaAdministrativa(value: unknown): Record<string, any> {
     ...ficha,
     serieAnterior: firstPresent(ficha.serieAnterior, ficha.turmaAnterior, raw['SÉRIE ANTERIOR'], raw['SERIE ANTERIOR']),
     observacoesSecretaria: firstPresent(ficha.observacoesSecretaria, ficha.observacoes, raw['OBSERVAÇÕES'], raw['OBSERVACOES']),
+    altura: firstPresent(ficha.altura, raw['ALTURA']),
+    intolerancias: firstPresent(ficha.intolerancias, ficha.intolerantes, raw['INTOLERANTES'], raw['INTOLERÂNCIAS'], raw['INTOLERANCIAS']),
+    allergies: firstPresent(ficha.allergies, ficha.alergias, raw['ALERGIAS']),
+    genitor: ficha.genitor,
   });
 }
 
@@ -408,11 +419,11 @@ export class ChildrenService {
     const data: Prisma.ChildUncheckedUpdateInput = {
       ...childBaseUpdateDto,
       ...normalizeChildJsonFields({
-        dadosResponsaveis,
-        documentosMatricula,
-        autorizadosRetirada,
-        transporteEscolar,
-        fichaAdministrativa,
+        dadosResponsaveis: mergeJsonRecord(child.dadosResponsaveis, dadosResponsaveis),
+        documentosMatricula: mergeJsonRecord(child.documentosMatricula, documentosMatricula),
+        autorizadosRetirada: autorizadosRetirada === undefined ? undefined : autorizadosRetirada,
+        transporteEscolar: mergeJsonRecord(child.transporteEscolar, transporteEscolar),
+        fichaAdministrativa: mergeJsonRecord(child.fichaAdministrativa, fichaAdministrativa),
       }),
     };
 

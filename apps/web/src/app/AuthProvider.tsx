@@ -58,30 +58,6 @@ function hasLegacyToken(): boolean {
   return false;
 }
 
-function buildUserFromToken(): User | null {
-  const payload = decodeAccessTokenPayload();
-  if (!payload) return null;
-
-  const firstName = typeof payload.firstName === 'string' ? payload.firstName : '';
-  const lastName = typeof payload.lastName === 'string' ? payload.lastName : '';
-  const nomeFromPayload = typeof payload.nome === 'string' ? payload.nome : undefined;
-  const nome = [firstName, lastName].filter(Boolean).join(' ').trim() || nomeFromPayload;
-
-  return {
-    id: typeof payload.sub === 'string'
-      ? payload.sub
-      : typeof payload.userId === 'string'
-        ? payload.userId
-        : '',
-    email: typeof payload.email === 'string' ? payload.email : '',
-    nome,
-    status: typeof payload.status === 'string' ? payload.status : undefined,
-    mantenedoraId: typeof payload.mantenedoraId === 'string' ? payload.mantenedoraId : undefined,
-    unitId: typeof payload.unitId === 'string' ? payload.unitId : undefined,
-    roles: Array.isArray(payload.roles) ? payload.roles as User['roles'] : [],
-  };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,13 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const fallbackUser = buildUserFromToken();
-        if (fallbackUser) {
-          console.warn('[AuthProvider] Falha transitória ao carregar /auth/me; preservando sessão a partir do token local.');
-          setUser(fallbackUser);
-          return;
-        }
-
+        console.warn('[AuthProvider] Falha ao carregar /auth/me; limpando sessão para evitar perfil/escopo desatualizado.');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
       })
@@ -130,6 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    sessionStorage.clear();
+    document.cookie = 'access_token=; Max-Age=0; path=/';
+
     const { accessToken, refreshToken } = await apiLogin(email, password);
     localStorage.setItem('accessToken', accessToken);
     if (refreshToken) {
