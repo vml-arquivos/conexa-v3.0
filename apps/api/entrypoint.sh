@@ -195,13 +195,39 @@ run_migrate_deploy() {
   exit 1
 }
 
+# ── Função: executar correção operacional de acessos no deploy ────────────────
+run_operational_access_fix() {
+  local ACCESS_FIX_SQL="/app/prisma/manual-sql/correcao-acessos-operacionais/04_auto_deploy_corrigir_acessos_operacionais.sql"
+
+  if [ "${RUN_ACCESS_FIX_ON_DEPLOY:-true}" != "true" ]; then
+    echo "ℹ️  Correção operacional de acessos desativada por RUN_ACCESS_FIX_ON_DEPLOY=${RUN_ACCESS_FIX_ON_DEPLOY:-}."
+    return 0
+  fi
+
+  if [ ! -f "$ACCESS_FIX_SQL" ]; then
+    echo "⚠️  SQL de correção operacional não encontrado em $ACCESS_FIX_SQL. Pulando."
+    return 0
+  fi
+
+  echo "🔐 Executando correção operacional idempotente de acessos..."
+  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$ACCESS_FIX_SQL"; then
+    echo "✅ Correção operacional de acessos concluída."
+  else
+    echo "⚠️  Correção operacional de acessos falhou; aplicação continuará para não derrubar o serviço. Verifique os logs do deploy."
+    return 0
+  fi
+}
+
 # ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
 resolve_failed_migrations
 
 # ── Passo 2: Aplicar migrations (com retry inteligente em P3009 e P3018) ──────
 run_migrate_deploy
 
-# ── Passo 3: Regenerar Prisma client com o schema atual ──────────────────────
+# ── Passo 3: Executar correção operacional idempotente de acessos ─────────────
+run_operational_access_fix
+
+# ── Passo 4: Regenerar Prisma client com o schema atual ──────────────────────
 # CRÍTICO: o Prisma client é gerado no build, mas novas migrations podem adicionar
 # modelos que o client buildado não conhece (ex: MaterialRequestItem, Material).
 # Sem este passo, qualquer 'include' em relações novas lança PrismaClientValidationError → 500.
@@ -209,7 +235,7 @@ echo "Regenerando Prisma client com schema atual..."
 npx prisma generate --schema=./prisma/schema.prisma
 echo "✅ Prisma client regenerado."
 
-# ── Passo 4: Popular banco de alimentos (idempotente) ─────────────────────────
+# ── Passo 5: Popular banco de alimentos (idempotente) ─────────────────────────
 # Executa o seed de alimentos a cada deploy — é idempotente (upsert por nome).
 # Garante que novos alimentos adicionados ao CSV sejam inseridos automaticamente.
 if [ -f /app/scripts/seed-alimentos.js ]; then
@@ -217,7 +243,7 @@ if [ -f /app/scripts/seed-alimentos.js ]; then
   node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
 fi
 
-# ── Passo 5: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 6: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js
