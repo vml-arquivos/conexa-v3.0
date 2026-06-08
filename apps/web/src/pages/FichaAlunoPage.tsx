@@ -16,6 +16,7 @@ import {
   Edit2,
   Loader2,
   Printer,
+  Save,
   Upload,
   X,
 } from 'lucide-react';
@@ -44,6 +45,25 @@ interface Autorizado {
   parentesco?: string;
   telefone?: string;
   documento?: string;
+}
+
+interface DiarioEvento {
+  id: string;
+  type?: string;
+  eventDate?: string;
+  createdAt?: string;
+  notes?: string;
+  description?: string;
+  observations?: string;
+  tags?: string[];
+}
+
+interface FichaInlineForm {
+  serieAnterior: string;
+  observacoesSecretaria: string;
+  usoImagem: boolean;
+  transporteEscolar: boolean;
+  nomeTransporte: string;
 }
 
 interface Aluno {
@@ -161,6 +181,16 @@ export default function FichaAlunoPage() {
   const [carregando, setCarregando] = useState(true);
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [modalLogo, setModalLogo] = useState(false);
+  const [editandoInline, setEditandoInline] = useState(false);
+  const [salvandoInline, setSalvandoInline] = useState(false);
+  const [ocorrencias, setOcorrencias] = useState<DiarioEvento[]>([]);
+  const [fichaForm, setFichaForm] = useState<FichaInlineForm>({
+    serieAnterior: '',
+    observacoesSecretaria: '',
+    usoImagem: false,
+    transporteEscolar: false,
+    nomeTransporte: '',
+  });
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Carregar aluno
@@ -170,6 +200,13 @@ export default function FichaAlunoPage() {
     try {
       const res = await http.get(`/children/${id}`);
       setAluno(res.data);
+      setFichaForm({
+        serieAnterior: res.data?.fichaAdministrativa?.serieAnterior ?? '',
+        observacoesSecretaria: res.data?.fichaAdministrativa?.observacoesSecretaria ?? '',
+        usoImagem: Boolean(res.data?.usoImagem),
+        transporteEscolar: Boolean(res.data?.transporteEscolar?.utiliza),
+        nomeTransporte: res.data?.transporteEscolar?.nomeTransporte ?? '',
+      });
       // Carregar logo da unidade do localStorage
       const unitId = res.data?.unit?.id ?? res.data?.unitId;
       if (unitId) {
@@ -185,6 +222,46 @@ export default function FichaAlunoPage() {
   }, [id, navigate]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    if (!id) return;
+    http.get('/diary-events', { params: { childId: id, limit: 20 } })
+      .then((res) => setOcorrencias(Array.isArray(res.data) ? res.data : res.data?.items ?? []))
+      .catch(() => setOcorrencias([]));
+  }, [id]);
+
+  async function salvarInline() {
+    if (!aluno || !id) return;
+    setSalvandoInline(true);
+    try {
+      const payload = {
+        usoImagem: fichaForm.usoImagem,
+        transporteEscolar: {
+          utiliza: fichaForm.transporteEscolar,
+          nomeTransporte: fichaForm.nomeTransporte.trim() || undefined,
+        },
+        fichaAdministrativa: {
+          ...(aluno.fichaAdministrativa ?? {}),
+          serieAnterior: fichaForm.serieAnterior.trim() || undefined,
+          observacoesSecretaria: fichaForm.observacoesSecretaria.trim() || undefined,
+        },
+      };
+      const res = await http.put(`/children/${id}`, payload);
+      setAluno((atual) => ({
+        ...(atual ?? aluno),
+        ...(res.data ?? {}),
+        usoImagem: payload.usoImagem,
+        transporteEscolar: payload.transporteEscolar,
+        fichaAdministrativa: payload.fichaAdministrativa,
+      }));
+      setEditandoInline(false);
+      toast.success('Ficha atualizada com sucesso.');
+    } catch (e) {
+      toast.error(getErrorMessage(e));
+    } finally {
+      setSalvandoInline(false);
+    }
+  }
 
   // Upload logo
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -265,8 +342,23 @@ export default function FichaAlunoPage() {
             onClick={() => navigate(`/app/secretaria/matriculas/${aluno.id}`)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
           >
-            <Edit2 className="h-4 w-4" /> Editar
+            <Edit2 className="h-4 w-4" /> Editar completa
           </button>
+          <button
+            onClick={() => setEditandoInline((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <Edit2 className="h-4 w-4" /> {editandoInline ? 'Cancelar edição rápida' : 'Edição rápida'}
+          </button>
+          {editandoInline && (
+            <button
+              onClick={salvarInline}
+              disabled={salvandoInline}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {salvandoInline ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar ficha
+            </button>
+          )}
           <button
             onClick={() => setModalLogo(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-50"
@@ -363,8 +455,16 @@ export default function FichaAlunoPage() {
             <Campo label="Turma" valor={matriculaAtiva?.classroom?.name} />
             <Campo label="Data de matrícula" valor={formatarData(matriculaAtiva?.enrollmentDate)} />
             <Campo label="Status" valor={matriculaAtiva?.status ?? 'Sem matrícula ativa'} />
-            <Campo label="Série anterior" valor={ficha.serieAnterior} />
-            <Campo label="Autorização de uso de imagem" valor={aluno.usoImagem ? 'Sim' : 'Não'} />
+            {editandoInline ? (
+              <CampoEditavel label="Série anterior" value={fichaForm.serieAnterior} onChange={(valor) => setFichaForm((atual) => ({ ...atual, serieAnterior: valor }))} />
+            ) : (
+              <Campo label="Série anterior" valor={ficha.serieAnterior} />
+            )}
+            {editandoInline ? (
+              <CampoBooleano label="Autorização de uso de imagem" checked={fichaForm.usoImagem} onChange={(valor) => setFichaForm((atual) => ({ ...atual, usoImagem: valor }))} />
+            ) : (
+              <Campo label="Autorização de uso de imagem" valor={aluno.usoImagem ? 'Sim' : 'Não'} />
+            )}
           </div>
         </Secao>
 
@@ -409,8 +509,14 @@ export default function FichaAlunoPage() {
         {/* ── SEÇÃO 8 — Transporte ─────────────────────────────────────── */}
         <Secao titulo="8. Transporte Escolar">
           <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-            <Campo label="Utiliza transporte escolar" valor={transporte?.utiliza ? 'Sim' : 'Não'} />
-            {transporte?.utiliza && (
+            {editandoInline ? (
+              <CampoBooleano label="Utiliza transporte escolar" checked={fichaForm.transporteEscolar} onChange={(valor) => setFichaForm((atual) => ({ ...atual, transporteEscolar: valor }))} />
+            ) : (
+              <Campo label="Utiliza transporte escolar" valor={transporte?.utiliza ? 'Sim' : 'Não'} />
+            )}
+            {editandoInline ? (
+              <CampoEditavel label="Nome do transporte/empresa" value={fichaForm.nomeTransporte} onChange={(valor) => setFichaForm((atual) => ({ ...atual, nomeTransporte: valor }))} />
+            ) : transporte?.utiliza && (
               <Campo label="Nome do transporte/empresa" valor={transporte.nomeTransporte} />
             )}
           </div>
@@ -453,11 +559,44 @@ export default function FichaAlunoPage() {
         )}
 
         {/* ── SEÇÃO 11 — Observações ───────────────────────────────────── */}
-        {ficha.observacoesSecretaria && (
+        {(ficha.observacoesSecretaria || editandoInline) && (
           <Secao titulo="11. Observações da Secretaria">
-            <p className="text-sm text-slate-700 whitespace-pre-line">{ficha.observacoesSecretaria}</p>
+            {editandoInline ? (
+              <textarea
+                value={fichaForm.observacoesSecretaria}
+                onChange={(e) => setFichaForm((atual) => ({ ...atual, observacoesSecretaria: e.target.value }))}
+                rows={4}
+                className="no-print w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            ) : (
+              <p className="text-sm text-slate-700 whitespace-pre-line">{ficha.observacoesSecretaria}</p>
+            )}
           </Secao>
         )}
+
+        {/* ── SEÇÃO 12 — Ocorrências recentes ───────────────────────────── */}
+        <Secao titulo="12. Ocorrências e registros recentes">
+          {ocorrencias.length === 0 ? (
+            <p className="text-sm text-slate-500">Nenhuma ocorrência recente localizada no diário do aluno.</p>
+          ) : (
+            <div className="space-y-2">
+              {ocorrencias.map((evento) => (
+                <div key={evento.id} className="rounded-lg border border-slate-100 p-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold text-slate-500 uppercase">{evento.type ?? 'Registro'}</span>
+                    <span className="text-xs text-slate-500">{formatarData(evento.eventDate ?? evento.createdAt)}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-700 whitespace-pre-line">
+                    {evento.notes ?? evento.description ?? evento.observations ?? 'Registro sem descrição textual.'}
+                  </p>
+                  {evento.tags && evento.tags.length > 0 && (
+                    <p className="mt-1 text-xs text-slate-500">Tags: {evento.tags.join(', ')}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Secao>
 
         {/* ── Rodapé ───────────────────────────────────────────────────── */}
         <div className="mt-10 pt-6 border-t border-slate-300 grid grid-cols-3 gap-8">
@@ -552,6 +691,35 @@ function Campo({
         {valor ?? '—'}
       </span>
     </div>
+  );
+}
+
+function CampoEditavel({ label, value, onChange }: { label: string; value: string; onChange: (valor: string) => void }) {
+  return (
+    <div className="min-h-[2rem]">
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide block leading-none mb-0.5">
+        {label}
+      </span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="no-print w-full rounded border border-slate-200 px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+    </div>
+  );
+}
+
+function CampoBooleano({ label, checked, onChange }: { label: string; checked: boolean; onChange: (valor: boolean) => void }) {
+  return (
+    <label className="no-print min-h-[2rem] flex items-center gap-2 text-sm text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+      />
+      <span className="font-medium">{label}</span>
+    </label>
   );
 }
 
