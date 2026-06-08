@@ -245,146 +245,6 @@ function compactObject<T extends Record<string, any>>(obj: T): T {
   ) as T;
 }
 
-function asObj(value: any): Record<string, any> {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-function asArray<T = any>(value: any): T[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function firstValue(...values: any[]): string {
-  for (const value of values) {
-    if (value === undefined || value === null) continue;
-    const text = String(value).trim();
-    if (text !== '') return text;
-  }
-  return '';
-}
-
-function asBoolean(value: any): boolean {
-  if (typeof value === 'boolean') return value;
-  if (value === undefined || value === null || value === '') return false;
-  const normalized = String(value).trim().toLowerCase();
-  return ['true', 'sim', 's', '1', 'yes'].includes(normalized);
-}
-
-function normalizeResponsavel(value: any, defaults: ResponsavelForm): ResponsavelForm {
-  const data = asObj(value);
-  return {
-    ...defaults,
-    nome: firstValue(data.nome, data.name, defaults.nome),
-    parentesco: firstValue(data.parentesco, data.relationship, defaults.parentesco),
-    cpf: firstValue(data.cpf, data.documentoCpf, defaults.cpf),
-    identidade: firstValue(data.identidade, data.rg, data.documentoIdentidade, defaults.identidade),
-    orgaoExpeditor: firstValue(data.orgaoExpeditor, data.orgaoExpedidor, data.orgao, defaults.orgaoExpeditor),
-    dataDocumento: firstValue(data.dataDocumento, data.dataEmissao, defaults.dataDocumento),
-    pis: firstValue(data.pis, data.pisNis, defaults.pis),
-    nascimento: firstValue(data.nascimento, data.dataNascimento, data.dateOfBirth, defaults.nascimento),
-    telefoneTrabalho: firstValue(data.telefoneTrabalho, data.telTrabalho, defaults.telefoneTrabalho),
-    telefoneResidencial: firstValue(data.telefoneResidencial, data.telefone, data.phone, defaults.telefoneResidencial),
-    celular: firstValue(data.celular, data.whatsapp, data.phoneMobile, data.telefoneCelular, defaults.celular),
-    email: firstValue(data.email, defaults.email),
-    escolaridade: firstValue(data.escolaridade, defaults.escolaridade),
-    profissao: firstValue(data.profissao, data.ocupacao, defaults.profissao),
-    dependentes: firstValue(data.dependentes, data.numeroDependentes, defaults.dependentes),
-    endereco: firstValue(data.endereco, data.address, defaults.endereco),
-    cep: firstValue(data.cep, defaults.cep),
-    beneficio: firstValue(data.beneficio, data.beneficioSocial, defaults.beneficio),
-    pessoasCasa: firstValue(data.pessoasCasa, data.numeroPessoasCasa, data.moradores, defaults.pessoasCasa),
-  };
-}
-
-function normalizeDocumentos(value: any, defaults: FormularioMatricula['documentos']): FormularioMatricula['documentos'] {
-  const data = asObj(value);
-  return {
-    certidaoNascimento: asBoolean(data.certidaoNascimento ?? data.certidao ?? defaults.certidaoNascimento),
-    cpfCrianca: asBoolean(data.cpfCrianca ?? data.cpfOriginalAluno ?? defaults.cpfCrianca),
-    rgCpfResponsavel: asBoolean(data.rgCpfResponsavel ?? data.cpfResponsavel ?? data.rgResponsavel ?? defaults.rgCpfResponsavel),
-    comprovanteResidencia: asBoolean(data.comprovanteResidencia ?? data.endereco ?? defaults.comprovanteResidencia),
-    cartaoVacina: asBoolean(data.cartaoVacina ?? data.vacina ?? defaults.cartaoVacina),
-    cartaoSUS: asBoolean(data.cartaoSUS ?? data.sus ?? defaults.cartaoSUS),
-    nis: asBoolean(data.nis ?? defaults.nis),
-    laudoMedico: asBoolean(data.laudoMedico ?? data.laudo ?? defaults.laudoMedico),
-    foto: asBoolean(data.foto ?? data.photoUrl ?? defaults.foto),
-    termoImagem: asBoolean(data.termoImagem ?? data.usoImagem ?? defaults.termoImagem),
-    declaracaoEscolar: asBoolean(data.declaracaoEscolar ?? defaults.declaracaoEscolar),
-  };
-}
-
-function normalizeAutorizados(value: any): AutorizadoForm[] {
-  const list = asArray(value)
-    .map((item) => asObj(item))
-    .filter((item) => firstValue(item.nome, item.name));
-  const normalized = list.map((item) => ({
-    nome: firstValue(item.nome, item.name),
-    parentesco: firstValue(item.parentesco, item.relationship),
-    telefone: firstValue(item.telefone, item.celular, item.phone),
-  }));
-  while (normalized.length < 2) normalized.push({ nome: '', parentesco: '', telefone: '' });
-  return normalized.slice(0, Math.max(2, normalized.length));
-}
-
-function buildFormularioFromChild(c: any): FormularioMatricula {
-  const inicial = estadoInicial();
-  const dadosResponsaveis = asObj(c?.dadosResponsaveis);
-  const fichaAdministrativa = asObj(c?.fichaAdministrativa);
-  const transporte = asObj(c?.transporteEscolar);
-  const documentos = asObj(c?.documentosMatricula);
-
-  const mae = normalizeResponsavel(dadosResponsaveis.mae, { ...inicial.mae, nome: firstValue(c?.nomeMae, inicial.mae.nome) });
-  const pai = normalizeResponsavel(dadosResponsaveis.pai, { ...inicial.pai, nome: firstValue(c?.nomePai, inicial.pai.nome), celular: firstValue(c?.celPai, inicial.pai.celular) });
-  const responsavelLegal = normalizeResponsavel(
-    dadosResponsaveis.responsavelLegal ?? dadosResponsaveis.responsavelPrincipal,
-    inicial.responsavelLegal,
-  );
-
-  return {
-    ...inicial,
-    firstName: firstValue(c?.firstName),
-    lastName: firstValue(c?.lastName),
-    dateOfBirth: c?.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : '',
-    gender: (firstValue(c?.gender) || 'NAO_INFORMADO') as Genero,
-    cpf: firstValue(c?.cpf),
-    rg: firstValue(c?.rg, documentos.rgCrianca, documentos.identidadeAluno),
-    nacionalidade: firstValue(c?.nacionalidade, fichaAdministrativa.nacionalidade, inicial.nacionalidade),
-    naturalidade: firstValue(c?.naturalidade, fichaAdministrativa.naturalidade),
-    ufNascimento: firstValue(c?.ufNascimento, fichaAdministrativa.ufNascimento).toUpperCase().slice(0, 2),
-    raca: firstValue(c?.raca),
-    peso: firstValue(c?.peso),
-    bloodType: firstValue(c?.bloodType),
-    endereco: firstValue(c?.endereco, fichaAdministrativa.endereco, mae.endereco, pai.endereco, responsavelLegal.endereco),
-    cep: firstValue(c?.cep, fichaAdministrativa.cep, mae.cep, pai.cep, responsavelLegal.cep),
-    nis: firstValue(c?.nis, documentos.nis),
-    codigoAluno: firstValue(c?.codigoAluno),
-    inscricao: firstValue(c?.inscricao),
-    nomeMae: firstValue(c?.nomeMae, mae.nome),
-    nomePai: firstValue(c?.nomePai, pai.nome),
-    mae,
-    pai,
-    responsavelLegal,
-    allergies: firstValue(c?.allergies),
-    intolerancias: firstValue(fichaAdministrativa.intolerancias),
-    medicalConditions: firstValue(c?.medicalConditions),
-    medicationNeeds: firstValue(c?.medicationNeeds),
-    medicamentos: firstValue(c?.medicamentos),
-    laudado: asBoolean(c?.laudado ?? fichaAdministrativa.laudado),
-    tipoLaudo: firstValue(c?.tipoLaudo, fichaAdministrativa.tipoLaudo),
-    cid: firstValue(c?.cid, fichaAdministrativa.cid),
-    descricaoLaudo: firstValue(c?.descricaoLaudo, fichaAdministrativa.descricaoLaudo),
-    genitor: asBoolean(fichaAdministrativa.genitor),
-    usoImagem: asBoolean(c?.usoImagem ?? fichaAdministrativa.usoImagem ?? documentos.termoImagem),
-    serieAnterior: firstValue(fichaAdministrativa.serieAnterior),
-    transporteEscolar: asBoolean(transporte.utiliza ?? transporte.usaTransporteEscolar),
-    nomeTransporte: firstValue(transporte.nomeTransporte, transporte.nome, transporte.transportador),
-    autorizados: normalizeAutorizados(c?.autorizadosRetirada),
-    documentos: normalizeDocumentos(c?.documentosMatricula, inicial.documentos),
-    enrollmentDate: firstValue(c?.enrollments?.[0]?.enrollmentDate?.slice?.(0, 10)),
-    classroomId: firstValue(c?.enrollments?.[0]?.classroomId),
-    observacoesSecretaria: firstValue(fichaAdministrativa.observacoesSecretaria),
-  };
-}
-
 export default function MatriculaPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -413,16 +273,58 @@ export default function MatriculaPage() {
 
   const unitId = (user as any)?.unitId ?? (user as any)?.unit?.id ?? '';
 
-  // Carregar dados do aluno em modo edição.
-  // A hidratação precisa considerar tanto colunas nativas do Child quanto JSONs administrativos.
+  // Carregar dados do aluno em modo edição
   useEffect(() => {
     if (!modoEdicao || !childIdParam) return;
     setCarregandoDados(true);
-
-    http.get(`/children/${childIdParam}`, { params: { _ts: Date.now() } })
+    http.get(`/children/${childIdParam}`)
       .then((res) => {
-        const formulario = buildFormularioFromChild(res.data);
-        setForm(formulario);
+        const c = res.data;
+        const dad = c.dadosResponsaveis ?? {};
+        setForm({
+          ...estadoInicial(),
+          firstName: c.firstName ?? '',
+          lastName: c.lastName ?? '',
+          dateOfBirth: c.dateOfBirth ? c.dateOfBirth.slice(0, 10) : '',
+          gender: c.gender ?? 'NAO_INFORMADO',
+          cpf: c.cpf ?? '',
+          rg: c.rg ?? '',
+          nacionalidade: c.nacionalidade ?? '',
+          naturalidade: c.naturalidade ?? '',
+          ufNascimento: c.ufNascimento ?? '',
+          raca: c.raca ?? '',
+          peso: c.peso ?? '',
+          bloodType: c.bloodType ?? '',
+          endereco: c.endereco ?? '',
+          cep: c.cep ?? '',
+          nis: c.nis ?? '',
+          codigoAluno: c.codigoAluno ?? '',
+          inscricao: c.inscricao ?? '',
+          nomeMae: c.nomeMae ?? '',
+          nomePai: c.nomePai ?? '',
+          allergies: c.allergies ?? '',
+          medicalConditions: c.medicalConditions ?? '',
+          medicationNeeds: c.medicationNeeds ?? '',
+          medicamentos: c.medicamentos ?? '',
+          laudado: c.laudado ?? false,
+          tipoLaudo: c.tipoLaudo ?? '',
+          cid: c.cid ?? '',
+          descricaoLaudo: c.descricaoLaudo ?? '',
+          usoImagem: c.usoImagem ?? false,
+          mae: dad.mae ?? estadoInicial().mae,
+          pai: dad.pai ?? estadoInicial().pai,
+          responsavelLegal: dad.responsavelLegal ?? estadoInicial().responsavelLegal,
+          documentos: c.documentosMatricula ?? estadoInicial().documentos,
+          autorizados: c.autorizadosRetirada ?? estadoInicial().autorizados,
+          transporteEscolar: c.transporteEscolar?.utiliza ?? false,
+          nomeTransporte: c.transporteEscolar?.nomeTransporte ?? '',
+          enrollmentDate: c.enrollments?.[0]?.enrollmentDate?.slice(0, 10) ?? '',
+          classroomId: c.enrollments?.[0]?.classroomId ?? '',
+          genitor: c.fichaAdministrativa?.genitor ?? '',
+          serieAnterior: c.fichaAdministrativa?.serieAnterior ?? '',
+          observacoesSecretaria: c.fichaAdministrativa?.observacoesSecretaria ?? '',
+          intolerancias: '',
+        });
       })
       .catch(() => {
         toast.error('Erro ao carregar dados do aluno.');

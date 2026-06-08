@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -10,13 +9,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: ['react-is'],
+  },
   build: {
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('react-router')) {
+            if (id.includes('react-dom') || id.includes('react-router') || id.includes('react-is')) {
               return 'vendor-react'
             }
             if (id.includes('recharts') || id.includes('d3-')) {
