@@ -87,6 +87,7 @@ enum EnrollmentStatus {
   PAUSADA
   CONCLUIDA
   CANCELADA
+  TRANSFERIDA
 }
 
 /// Tipo de evento no diário de bordo
