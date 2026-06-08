@@ -466,6 +466,20 @@ export default function FichaAlunoPage() {
               <Campo label="Autorização de uso de imagem" valor={aluno.usoImagem ? 'Sim' : 'Não'} />
             )}
           </div>
+          {(aluno.enrollments?.length ?? 0) > 0 && (
+            <div className="mt-4 rounded-lg border border-slate-100 overflow-hidden">
+              <div className="bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Histórico de matrículas</div>
+              <div className="divide-y divide-slate-100">
+                {aluno.enrollments!.map((enrollment, index) => (
+                  <div key={`${enrollment.classroom?.name ?? 'turma'}-${index}`} className="grid grid-cols-3 gap-3 px-3 py-2 text-sm text-slate-700">
+                    <span>{enrollment.classroom?.name ?? 'Turma não informada'}</span>
+                    <span>{formatarData(enrollment.enrollmentDate)}</span>
+                    <span className="font-medium">{enrollment.status}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Secao>
 
         {/* ── SEÇÃO 3 — Filiação ────────────────────────────────────────── */}
@@ -576,6 +590,14 @@ export default function FichaAlunoPage() {
 
         {/* ── SEÇÃO 12 — Ocorrências recentes ───────────────────────────── */}
         <Secao titulo="12. Ocorrências e registros recentes">
+          <div className="no-print mb-3 flex justify-end">
+            <button
+              onClick={() => navigate('/app/professor/diario')}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Nova ocorrência
+            </button>
+          </div>
           {ocorrencias.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhuma ocorrência recente localizada no diário do aluno.</p>
           ) : (
