@@ -115,6 +115,19 @@ export class ChildrenController {
   }
 
   /**
+   * Atualizar matrícula ativa da criança (trocar turma ou data)
+   * PUT /children/:id/enrollment/active
+   */
+  @Put(':id/enrollment/active')
+  async updateActiveEnrollment(
+    @Param('id') id: string,
+    @Body() body: { classroomId?: string; enrollmentDate?: string; enrollmentId?: string },
+    @Request() req,
+  ) {
+    return this.childrenService.updateActiveEnrollment(id, body, req.user);
+  }
+
+  /**
    * Listar matrículas da criança
    */
   @Get(':id/enrollments')

@@ -389,6 +389,64 @@ export class ChildrenService {
   }
 
   /**
+   * Atualizar matrícula ativa da criança (trocar turma ou data)
+   * Chamado pelo frontend após salvar os dados do aluno em modo edição.
+   *
+   * Lógica:
+   * 1. Se vier enrollmentId específico → atualiza esse enrollment
+   * 2. Senão → busca o enrollment ATIVA mais recente e atualiza
+   * 3. Se não existir nenhum ATIVO e vier classroomId → cria novo enrollment
+   */
+  async updateActiveEnrollment(
+    id: string,
+    data: { classroomId?: string; enrollmentDate?: string; enrollmentId?: string },
+    user: any,
+  ) {
+    await this.findOne(id, user); // valida acesso
+
+    // Sanitizar data
+    const enrollmentDate = data.enrollmentDate && data.enrollmentDate.length >= 10
+      ? new Date(data.enrollmentDate.length === 10
+          ? data.enrollmentDate + 'T00:00:00.000Z'
+          : data.enrollmentDate)
+      : undefined;
+
+    // Buscar enrollment para atualizar
+    let enrollment = data.enrollmentId
+      ? await this.prisma.enrollment.findFirst({ where: { id: data.enrollmentId, childId: id } })
+      : await this.prisma.enrollment.findFirst({
+          where: { childId: id, status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+        });
+
+    if (enrollment) {
+      // Atualizar enrollment existente
+      const updateData: any = {};
+      if (data.classroomId) updateData.classroomId = data.classroomId;
+      if (enrollmentDate) updateData.enrollmentDate = enrollmentDate;
+
+      return this.prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: updateData,
+        include: { classroom: { select: { id: true, name: true } } },
+      });
+    } else if (data.classroomId) {
+      // Criar novo enrollment se não existe ativo
+      return this.prisma.enrollment.create({
+        data: {
+          childId: id,
+          classroomId: data.classroomId,
+          status: 'ATIVA',
+          enrollmentDate: enrollmentDate ?? new Date(),
+        },
+        include: { classroom: { select: { id: true, name: true } } },
+      });
+    }
+
+    return { message: 'Nenhuma alteração realizada.' };
+  }
+
+  /**
    * Listar matrículas da criança
    */
   async getEnrollments(id: string, user: any) {
