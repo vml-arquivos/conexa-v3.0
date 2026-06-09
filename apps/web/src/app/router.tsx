@@ -606,7 +606,7 @@ export const router = createBrowserRouter([
       {
         path: 'secretaria/matriculas/:id/ficha',
         element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_NUTRICIONISTA', 'UNIDADE', 'STAFF_CENTRAL', 'STAFF_CENTRAL_PEDAGOGICO', 'MANTENEDORA', 'DEVELOPER']}>
             <FichaAlunoPage />
           </RoleProtectedRoute>
         ),

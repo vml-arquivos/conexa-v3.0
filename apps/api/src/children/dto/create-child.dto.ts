@@ -164,4 +164,31 @@ export class CreateChildDto {
   @IsObject()
   @IsOptional()
   fichaAdministrativa?: Record<string, unknown>;
+
+  // ── Campos extras enviados pelo frontend que faltavam no DTO ──────────────
+  // A ausência desses campos com forbidNonWhitelisted: true causava 500.
+
+  @IsString()
+  @IsOptional()
+  altura?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  genitor?: boolean;
+
+  @IsString()
+  @IsOptional()
+  intolerancias?: string;
+
+  @IsString()
+  @IsOptional()
+  nomeTransporte?: string;
+
+  @IsString()
+  @IsOptional()
+  observacoesSecretaria?: string;
+
+  @IsString()
+  @IsOptional()
+  serieAnterior?: string;
 }
