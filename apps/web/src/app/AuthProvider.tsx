@@ -3,6 +3,13 @@ import type { ReactNode } from 'react';
 import { login as apiLogin, loadMe } from '../api/auth';
 import type { User } from '../api/auth';
 import { isAuthExpiredError } from '../api/http';
+import {
+  getAccessToken,
+  setAccessToken,
+  setRefreshToken,
+  clearSession as clearTokenSession,
+  migrateLegacyLocalStorageTokens,
+} from '../api/tokenStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -34,7 +41,7 @@ const ROLE_PRIORITY: Record<string, number> = {
  */
 function decodeAccessTokenPayload(): Record<string, unknown> | null {
   try {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (!token) return null;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -65,10 +72,7 @@ function hasLegacyToken(): boolean {
  * Centralizado aqui para garantir consistência em todos os casos de logout.
  */
 function clearLocalSession() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  sessionStorage.clear();
-  document.cookie = 'access_token=; Max-Age=0; path=/';
+  clearTokenSession();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -76,7 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+    // Migração única: mover tokens antigos de localStorage → sessionStorage.
+    // A partir daqui a sessão obedece a regra de "fechar navegador = logout".
+    migrateLegacyLocalStorageTokens();
+
+    const token = getAccessToken();
     if (!token) {
       setLoading(false);
       return;
@@ -124,9 +132,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const { accessToken, refreshToken } = await apiLogin(email, password);
-    localStorage.setItem('accessToken', accessToken);
+    setAccessToken(accessToken);
     if (refreshToken) {
-      localStorage.setItem('refreshToken', refreshToken);
+      setRefreshToken(refreshToken);
     }
 
     // Carregar dados do usuário via /auth/me (retorna roles atuais do banco)
@@ -141,26 +149,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // SESSÃO PERMANENTE — SEM DESCONEXÃO POR INATIVIDADE
+  // SESSÃO PERSISTENTE NA ABA — SEM DESCONEXÃO POR INATIVIDADE
   //
-  // Regra de negócio: enquanto o navegador estiver aberto e o usuário na
-  // página, a sessão NUNCA expira por ociosidade.
+  // Regra de negócio: enquanto a aba do navegador estiver aberta, a sessão
+  // NUNCA expira por ociosidade — mesmo após 2 dias com o PC ligado.
   //
-  // O que desconecta o usuário:
+  // O que DESCONECTA o usuário:
   //   1. Clicar em "Sair" (logout explícito)
-  //   2. Fechar o navegador / encerrar o app (localStorage é preservado
-  //      em reaberturas — o usuário volta autenticado)
-  //   3. Refresh token expirar após longo período sem abrir o sistema
-  //      (configurável via JWT_REFRESH_EXPIRES_IN no backend)
+  //   2. FECHAR o navegador / a aba / desligar o PC
+  //      (o token fica em sessionStorage, que o navegador apaga ao fechar)
+  //   3. Refresh token expirar (configurável via JWT_REFRESH_EXPIRES_IN no backend)
   //   4. Falha ao validar sessão em /auth/me na reabertura (ex: role desativada)
   //
   // O que NÃO desconecta:
   //   ✗ Inatividade (mouse parado, sem cliques)
-  //   ✗ Tempo na mesma página
+  //   ✗ Tempo na mesma página/aba aberta
   //   ✗ Qualquer temporizador interno
   //
-  // O access token (curto) é renovado silenciosamente pelo interceptor
-  // HTTP sempre que uma requisição retorna 401. O usuário não percebe.
+  // O access token (curto) é renovado silenciosamente pelo interceptor HTTP
+  // sempre que uma requisição retorna 401. O usuário não percebe.
   // ─────────────────────────────────────────────────────────────────────────
 
   return (

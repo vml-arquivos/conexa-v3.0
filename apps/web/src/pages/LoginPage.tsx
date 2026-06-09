@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { getRedirectPathByRoles } from '../hooks/useRedirectByRole';
 import { getErrorMessage } from '../utils/errorMessage';
+import { getAccessToken } from '../api/tokenStorage';
 import { Eye, EyeOff, BookOpen, Sparkles } from 'lucide-react';
 
 export function LoginPage() {
@@ -25,7 +26,7 @@ export function LoginPage() {
       await login(email, password);
       let redirectPath = '/app/dashboard';
       try {
-        const token = localStorage.getItem('accessToken');
+        const token = getAccessToken();
         if (token) {
           const parts = token.split('.');
           const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as {
