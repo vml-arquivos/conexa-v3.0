@@ -49,6 +49,145 @@ function normalizeChildJsonFields(
   } as Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput>;
 }
 
+function normalizeDateOfBirthForPrisma(value: unknown): Date | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw new BadRequestException('Data de nascimento inválida');
+    }
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const dateOnlyMatch = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+    const parsed = dateOnlyMatch
+      ? new Date(`${trimmed}T00:00:00.000Z`)
+      : new Date(trimmed);
+
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Data de nascimento inválida');
+    }
+
+    return parsed;
+  }
+
+  throw new BadRequestException('Data de nascimento inválida');
+}
+
+function normalizeChildBaseDataForPrisma<T extends Record<string, unknown>>(dto: T): T {
+  const data: Record<string, unknown> = { ...dto };
+
+  if (Object.prototype.hasOwnProperty.call(data, 'dateOfBirth')) {
+    const normalized = normalizeDateOfBirthForPrisma(data.dateOfBirth);
+
+    if (normalized === undefined) {
+      delete data.dateOfBirth;
+    } else {
+      data.dateOfBirth = normalized;
+    }
+  }
+
+  return data as T;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasMeaningfulJsonValue(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  if (isPlainRecord(value)) {
+    return Object.keys(value).length > 0;
+  }
+
+  return true;
+}
+
+function mergeAdministrativeJson(existing: unknown, incoming: unknown): unknown {
+  if (incoming === undefined) {
+    return undefined;
+  }
+
+  if (!hasMeaningfulJsonValue(incoming) && hasMeaningfulJsonValue(existing)) {
+    return existing;
+  }
+
+  if (Array.isArray(incoming)) {
+    if (incoming.length === 0 && Array.isArray(existing) && existing.length > 0) {
+      return existing;
+    }
+
+    return incoming;
+  }
+
+  if (isPlainRecord(existing) && isPlainRecord(incoming)) {
+    if (Object.keys(incoming).length === 0 && Object.keys(existing).length > 0) {
+      return existing;
+    }
+
+    const merged: Record<string, unknown> = { ...existing };
+
+    for (const [key, incomingValue] of Object.entries(incoming)) {
+      const existingValue = existing[key];
+
+      if (isPlainRecord(existingValue) && isPlainRecord(incomingValue)) {
+        merged[key] = mergeAdministrativeJson(existingValue, incomingValue);
+      } else if (Array.isArray(existingValue) && Array.isArray(incomingValue)) {
+        merged[key] = incomingValue.length === 0 && existingValue.length > 0
+          ? existingValue
+          : incomingValue;
+      } else if (incomingValue === undefined) {
+        merged[key] = existingValue;
+      } else {
+        merged[key] = incomingValue;
+      }
+    }
+
+    return merged;
+  }
+
+  return incoming;
+}
+
+function normalizeChildJsonFieldsForUpdate(
+  existing: Partial<Record<ChildAdministrativeJsonFieldName, unknown>>,
+  incoming: Partial<Record<ChildAdministrativeJsonFieldName, unknown>>,
+): Partial<Prisma.ChildUncheckedUpdateInput> {
+  const merged: Partial<Record<ChildAdministrativeJsonFieldName, unknown>> = {};
+
+  for (const field of [
+    'dadosResponsaveis',
+    'documentosMatricula',
+    'autorizadosRetirada',
+    'transporteEscolar',
+    'fichaAdministrativa',
+  ] as ChildAdministrativeJsonFieldName[]) {
+    const value = mergeAdministrativeJson(existing[field], incoming[field]);
+
+    if (value !== undefined) {
+      merged[field] = value;
+    }
+  }
+
+  return normalizeChildJsonFields(merged) as Partial<Prisma.ChildUncheckedUpdateInput>;
+}
+
 @Injectable()
 export class ChildrenService {
   constructor(private prisma: PrismaService) {}
@@ -72,7 +211,7 @@ export class ChildrenService {
     } = createChildDto;
 
     const data: Prisma.ChildUncheckedCreateInput = {
-      ...childBaseDto,
+      ...(normalizeChildBaseDataForPrisma(childBaseDto as Record<string, unknown>) as Prisma.ChildUncheckedCreateInput),
       mantenedoraId: user.mantenedoraId,
       ...normalizeChildJsonFields({
         dadosResponsaveis,
@@ -218,14 +357,23 @@ export class ChildrenService {
     } = updateChildDto;
 
     const data: Prisma.ChildUncheckedUpdateInput = {
-      ...childBaseUpdateDto,
-      ...normalizeChildJsonFields({
-        dadosResponsaveis,
-        documentosMatricula,
-        autorizadosRetirada,
-        transporteEscolar,
-        fichaAdministrativa,
-      }),
+      ...(normalizeChildBaseDataForPrisma(childBaseUpdateDto as Record<string, unknown>) as Prisma.ChildUncheckedUpdateInput),
+      ...normalizeChildJsonFieldsForUpdate(
+        {
+          dadosResponsaveis: (child as any).dadosResponsaveis,
+          documentosMatricula: (child as any).documentosMatricula,
+          autorizadosRetirada: (child as any).autorizadosRetirada,
+          transporteEscolar: (child as any).transporteEscolar,
+          fichaAdministrativa: (child as any).fichaAdministrativa,
+        },
+        {
+          dadosResponsaveis,
+          documentosMatricula,
+          autorizadosRetirada,
+          transporteEscolar,
+          fichaAdministrativa,
+        },
+      ),
     };
 
     const updated = await this.prisma.child.update({

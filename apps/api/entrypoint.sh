@@ -243,29 +243,7 @@ if [ -f /app/scripts/seed-alimentos.js ]; then
   node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
 fi
 
-# ── Passo 6.5: Importar dados de responsáveis das planilhas (idempotente) ─────
-# Preenche dados_responsaveis (CPF, celular, telefone, endereço da mãe/pai/resp),
-# além de tipo sanguíneo/endereço/CEP da criança quando vazios.
-# É idempotente: nunca sobrescreve dados já preenchidos, pode rodar a cada deploy.
-# Controlável por RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY (default: true).
-if [ "${RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY:-true}" = "true" ]; then
-  IMPORT_SCRIPT=""
-  if [ -f /app/dist/src/scripts/import-dados-responsaveis.js ]; then
-    IMPORT_SCRIPT=/app/dist/src/scripts/import-dados-responsaveis.js
-  elif [ -f /app/dist/scripts/import-dados-responsaveis.js ]; then
-    IMPORT_SCRIPT=/app/dist/scripts/import-dados-responsaveis.js
-  fi
-  if [ -n "$IMPORT_SCRIPT" ]; then
-    echo "📋 Importando dados de responsáveis (idempotente)..."
-    node "$IMPORT_SCRIPT" || echo "⚠️  Import de responsáveis falhou (não crítico — aplicação continuará)."
-  else
-    echo "ℹ️  Script de import de responsáveis não encontrado em dist — pulando."
-  fi
-else
-  echo "ℹ️  Import de responsáveis desativado por RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY."
-fi
-
-# ── Passo 7: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 6: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js

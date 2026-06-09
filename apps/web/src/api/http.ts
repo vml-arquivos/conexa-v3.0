@@ -1,11 +1,5 @@
 import axios, { AxiosHeaders } from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import {
-  getAccessToken,
-  getRefreshToken,
-  setAccessToken,
-  clearSession as clearTokenSession,
-} from './tokenStorage';
 
 // Validar VITE_API_URL obrigatório
 const baseURL = import.meta.env.VITE_API_URL;
@@ -43,7 +37,10 @@ const refreshClient = axios.create({
 let refreshPromise: Promise<RefreshAccessTokenResult> | null = null;
 
 function clearSession() {
-  clearTokenSession();
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  sessionStorage.clear();
+  document.cookie = 'access_token=; Max-Age=0; path=/';
 }
 
 function redirectToLogin() {
@@ -58,7 +55,7 @@ function isSessionExpiredStatus(status?: number): boolean {
 }
 
 async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
-  const refreshToken = getRefreshToken();
+  const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) {
     return { accessToken: null, shouldLogout: true };
   }
@@ -74,7 +71,7 @@ async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
           clearSession();
           return { accessToken: null, shouldLogout: true };
         }
-        setAccessToken(newAccessToken);
+        localStorage.setItem('accessToken', newAccessToken);
         return { accessToken: newAccessToken as string, shouldLogout: false };
       })
       .catch((refreshError) => {
@@ -96,7 +93,7 @@ async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
 // Request interceptor: adiciona Bearer token
 http.interceptors.request.use(
   (config) => {
-    const token = getAccessToken();
+    const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
