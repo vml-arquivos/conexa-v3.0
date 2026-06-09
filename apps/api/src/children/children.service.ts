@@ -217,8 +217,22 @@ export class ChildrenService {
       ...childBaseUpdateDto
     } = updateChildDto;
 
+    // FIX: Prisma rejeita string vazia em campos DateTime com "premature end of input".
+    // Se dateOfBirth vier vazio ou inválido, remover do payload — mantém o valor atual no banco.
+    const sanitizedBase = { ...childBaseUpdateDto } as Record<string, unknown>;
+    const dateFields: string[] = ['dateOfBirth'];
+    for (const field of dateFields) {
+      const val = sanitizedBase[field];
+      if (val === '' || val === null || val === undefined) {
+        delete sanitizedBase[field];
+      } else if (typeof val === 'string' && val.length === 10) {
+        // Converter "YYYY-MM-DD" → "YYYY-MM-DDT00:00:00.000Z" para o Prisma aceitar
+        sanitizedBase[field] = new Date(val + 'T00:00:00.000Z');
+      }
+    }
+
     const data: Prisma.ChildUncheckedUpdateInput = {
-      ...childBaseUpdateDto,
+      ...(sanitizedBase as Prisma.ChildUncheckedUpdateInput),
       ...normalizeChildJsonFields({
         dadosResponsaveis,
         documentosMatricula,
