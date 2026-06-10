@@ -80,7 +80,7 @@ export function UnitScopeProvider({ children }: { children: ReactNode }) {
   const getInitialUnitId = (): string | null => {
     const fromUrl = searchParams.get('unitId');
     if (fromUrl) return fromUrl;
-    return localStorage.getItem(LS_KEY) ?? null;
+    return sessionStorage.getItem(LS_KEY) ?? null;
   };
 
   const [selectedUnitId, setSelectedUnitIdState] = useState<string | null>(getInitialUnitId);
@@ -99,7 +99,7 @@ export function UnitScopeProvider({ children }: { children: ReactNode }) {
           const valid = units.some((u) => u.id === selectedUnitId);
           if (!valid) {
             setSelectedUnitIdState(null);
-            localStorage.removeItem(LS_KEY);
+            sessionStorage.removeItem(LS_KEY);
           }
         }
       })
@@ -142,7 +142,7 @@ export function UnitScopeProvider({ children }: { children: ReactNode }) {
     const fromUrl = searchParams.get('unitId');
     if (fromUrl && fromUrl !== selectedUnitId) {
       setSelectedUnitIdState(fromUrl);
-      localStorage.setItem(LS_KEY, fromUrl);
+      sessionStorage.setItem(LS_KEY, fromUrl);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -151,14 +151,14 @@ export function UnitScopeProvider({ children }: { children: ReactNode }) {
   const setUnit = useCallback((unitId: string | null) => {
     setSelectedUnitIdState(unitId);
     if (unitId) {
-      localStorage.setItem(LS_KEY, unitId);
+      sessionStorage.setItem(LS_KEY, unitId);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('unitId', unitId);
         return next;
       }, { replace: true });
     } else {
-      localStorage.removeItem(LS_KEY);
+      sessionStorage.removeItem(LS_KEY);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.delete('unitId');
