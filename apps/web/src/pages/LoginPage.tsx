@@ -4,7 +4,16 @@ import { useAuth } from '../app/AuthProvider';
 import { getRedirectPathByRoles } from '../hooks/useRedirectByRole';
 import { getErrorMessage } from '../utils/errorMessage';
 import { getAccessToken } from '../api/tokenStorage';
-import { Eye, EyeOff, BookOpen, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, Sparkles, Smartphone } from 'lucide-react';
+
+// Detecta se o app está rodando como PWA instalado
+function isPWAMode(): boolean {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    (window.navigator as any).standalone === true
+  );
+}
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,8 +24,10 @@ export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent | React.MouseEvent) => {
+    if (e && typeof (e as React.FormEvent).preventDefault === 'function') {
+      (e as React.FormEvent).preventDefault();
+    }
     setError('');
     setLoading(true);
     try {
@@ -45,6 +56,150 @@ export function LoginPage() {
       setLoading(false);
     }
   };
+
+  // ── Login PWA: tela limpa para celular ─────────────────────────────────
+  if (isPWAMode()) {
+    return (
+      <div style={{
+        minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+        background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+        fontFamily: '"Inter","system-ui",sans-serif',
+        padding: '0 24px',
+        paddingTop: 'max(48px, env(safe-area-inset-top))',
+        paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
+        justifyContent: 'space-between',
+      }}>
+
+        {/* Topo: logo e título */}
+        <div style={{ textAlign: 'center', color: '#fff' }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: 22, background: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)', margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid rgba(255,255,255,0.2)',
+          }}>
+            <img
+              src="/branding/cocris/logo-cocris.png"
+              alt="COCRIS"
+              style={{ width: 48, height: 48, objectFit: 'contain' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
+              }}
+            />
+            <span style={{ display: 'none', fontSize: 28, fontWeight: 800, color: '#fff' }}>C</span>
+          </div>
+          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>
+            COCRIS Pedagógico
+          </h1>
+          <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+            Gestão de educação infantil
+          </p>
+        </div>
+
+        {/* Formulário */}
+        <div style={{
+          background: '#fff', borderRadius: 24, padding: 24,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600, color: '#0f172a' }}>
+            Entrar
+          </h2>
+
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 12, marginBottom: 16,
+              background: '#fef2f2', border: '0.5px solid #fecaca',
+              fontSize: 13, color: '#dc2626',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Email */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 6 }}>
+              E-mail
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              style={{
+                width: '100%', padding: '13px 14px', borderRadius: 12, boxSizing: 'border-box',
+                border: '0.5px solid #e2e8f0', background: '#f8fafc',
+                fontSize: 16, color: '#0f172a', outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Senha */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 6 }}>
+              Senha
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e as any)}
+                style={{
+                  width: '100%', padding: '13px 44px 13px 14px', borderRadius: 12, boxSizing: 'border-box',
+                  border: '0.5px solid #e2e8f0', background: '#f8fafc',
+                  fontSize: 16, color: '#0f172a', outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4,
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Botão entrar */}
+          <button
+            onClick={handleSubmit as any}
+            disabled={loading || !email || !password}
+            style={{
+              width: '100%', padding: '14px', borderRadius: 14, border: 'none',
+              background: loading ? '#818cf8' : '#4f46e5',
+              color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: (!email || !password) ? 0.6 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            {loading ? (
+              <>
+                <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                Entrando...
+              </>
+            ) : 'Entrar'}
+          </button>
+        </div>
+
+        {/* Rodapé */}
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <Smartphone size={12} /> App instalado
+          </p>
+        </div>
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1d4ed8 100%)' }}>

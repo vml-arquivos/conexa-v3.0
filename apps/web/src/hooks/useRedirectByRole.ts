@@ -39,7 +39,12 @@ export function useRedirectByRole() {
 export function getRedirectPathByRoles(levels: string[], types: string[] = []): string {
   // ── Nível Professor ────────────────────────────────────────────────────
   if (levels.includes('PROFESSOR') || levels.includes('PROFESSOR_AUXILIAR')) {
-    return '/app/teacher-dashboard';
+    // Se rodando como PWA instalado (standalone/fullscreen), vai direto para o mobile
+    const isPWA = typeof window !== 'undefined' &&
+      (window.matchMedia('(display-mode: standalone)').matches ||
+       window.matchMedia('(display-mode: fullscreen)').matches ||
+       (window.navigator as any).standalone === true);
+    return isPWA ? '/app/mobile' : '/app/teacher-dashboard';
   }
 
   // ── Tipos de papel dentro de UNIDADE (mais específico primeiro) ────────

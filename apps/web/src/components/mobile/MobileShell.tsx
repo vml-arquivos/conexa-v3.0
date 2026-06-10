@@ -1,48 +1,136 @@
 /**
- * MobileShell — Layout base do PWA mobile
- * Bottom navigation com 5 módulos principais
- * Design: clean, touch-first, contraste alto
+ * MobileShell — Layout PWA mobile-first
+ *
+ * - Header compacto com nome do usuário e botão de logout
+ * - Bottom navigation com 5 módulos
+ * - Banner de status offline
+ * - Design limpo, sem nada do desktop
  */
 
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { ClipboardList, BookOpen, Eye, HeartPulse, Package, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import {
+  ClipboardList, BookOpen, Eye, HeartPulse, Package,
+  Wifi, WifiOff, RefreshCw, LogOut, Monitor,
+} from 'lucide-react';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { useAuth } from '../../app/AuthProvider';
 
-const NAV_ITEMS = [
-  { path: '/app/mobile/chamada',    label: 'Chamada',    Icon: ClipboardList },
-  { path: '/app/mobile/diario',     label: 'Diário',     Icon: BookOpen      },
-  { path: '/app/mobile/observacao', label: 'Observação', Icon: Eye           },
-  { path: '/app/mobile/ocorrencia', label: 'Ocorrência', Icon: HeartPulse    },
-  { path: '/app/mobile/material',   label: 'Material',   Icon: Package       },
+const NAV = [
+  { path: '/app/mobile/chamada',    label: 'Chamada',    Icon: ClipboardList, cor: '#4f46e5' },
+  { path: '/app/mobile/diario',     label: 'Diário',     Icon: BookOpen,      cor: '#0284c7' },
+  { path: '/app/mobile/observacao', label: 'Observação', Icon: Eye,           cor: '#7c3aed' },
+  { path: '/app/mobile/ocorrencia', label: 'Ocorrência', Icon: HeartPulse,    cor: '#dc2626' },
+  { path: '/app/mobile/material',   label: 'Material',   Icon: Package,       cor: '#d97706' },
 ];
 
 export default function MobileShell() {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { user, logout } = useAuth();
   const { isOnline, queueCount, isSyncing, syncNow } = useOfflineSync();
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--color-background-tertiary)' }}>
+  const nomeUsuario = (user as any)?.nome?.split(' ')[0]
+    ?? (user as any)?.firstName
+    ?? (user as any)?.email?.split('@')[0]
+    ?? 'Professor(a)';
 
-      {/* Status bar: offline/sync indicator */}
+  const ativaIdx = NAV.findIndex(n => n.path === location.pathname);
+  const corAtiva = ativaIdx >= 0 ? NAV[ativaIdx].cor : '#4f46e5';
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      height: '100dvh', background: '#f8fafc',
+      fontFamily: '"Inter","system-ui",sans-serif',
+    }}>
+
+      {/* ── Header compacto ─────────────────────────────────────── */}
+      <header style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px',
+        paddingTop: 'max(10px, env(safe-area-inset-top))',
+        background: '#fff',
+        borderBottom: '0.5px solid #e2e8f0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        flexShrink: 0,
+      }}>
+        {/* Logo + nome */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 10,
+            background: '#4f46e5',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>C</span>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>
+              Olá, {nomeUsuario}
+            </p>
+            <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', lineHeight: 1.2 }}>
+              COCRIS Pedagógico
+            </p>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {/* Botão versão desktop */}
+          <button
+            onClick={() => navigate('/app/teacher-dashboard')}
+            title="Versão desktop"
+            style={{
+              width: 34, height: 34, borderRadius: 10, border: '0.5px solid #e2e8f0',
+              background: '#f8fafc', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#94a3b8',
+            }}
+          >
+            <Monitor size={16} />
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={() => { logout?.(); navigate('/login'); }}
+            title="Sair"
+            style={{
+              width: 34, height: 34, borderRadius: 10, border: '0.5px solid #fecaca',
+              background: '#fef2f2', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#dc2626',
+            }}
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Banner offline/sync ──────────────────────────────────── */}
       {(!isOnline || queueCount > 0) && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '6px 16px',
-          background: isOnline ? 'var(--color-background-warning)' : 'var(--color-background-danger)',
-          fontSize: 12, color: isOnline ? 'var(--color-text-warning)' : 'var(--color-text-danger)',
+          padding: '7px 16px', flexShrink: 0,
+          background: isOnline ? '#fffbeb' : '#fef2f2',
+          borderBottom: `0.5px solid ${isOnline ? '#fde68a' : '#fecaca'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-            <span>
+            {isOnline
+              ? <Wifi size={13} color="#d97706" />
+              : <WifiOff size={13} color="#dc2626" />}
+            <span style={{ fontSize: 12, color: isOnline ? '#92400e' : '#991b1b' }}>
               {isOnline
                 ? `${queueCount} ação${queueCount !== 1 ? 'ões' : ''} aguardando envio`
-                : `Sem conexão · ${queueCount} ação${queueCount !== 1 ? 'ões' : ''} salva${queueCount !== 1 ? 's' : ''} localmente`}
+                : `Sem conexão · ${queueCount} salva${queueCount !== 1 ? 's' : ''} localmente`}
             </span>
           </div>
           {isOnline && queueCount > 0 && (
-            <button onClick={syncNow} disabled={isSyncing}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: 'inherit', fontSize: 12 }}>
+            <button onClick={syncNow} disabled={isSyncing} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
+              color: '#d97706', fontSize: 12, fontWeight: 500,
+              opacity: isSyncing ? 0.6 : 1,
+            }}>
               <RefreshCw size={12} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
               Sincronizar
             </button>
@@ -50,35 +138,55 @@ export default function MobileShell() {
         </div>
       )}
 
-      {/* Conteúdo da página */}
+      {/* ── Conteúdo da página ───────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <Outlet />
       </div>
 
-      {/* Bottom navigation */}
+      {/* ── Bottom navigation ────────────────────────────────────── */}
       <nav style={{
         display: 'flex',
-        background: 'var(--color-background-primary)',
-        borderTop: '0.5px solid var(--color-border-tertiary)',
+        background: '#fff',
+        borderTop: '0.5px solid #e2e8f0',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        boxShadow: '0 -1px 8px rgba(0,0,0,0.06)',
+        flexShrink: 0,
       }}>
-        {NAV_ITEMS.map(({ path, label, Icon }) => {
+        {NAV.map(({ path, label, Icon, cor }) => {
           const active = location.pathname === path;
           return (
-            <button
-              key={path}
-              onClick={() => navigate(path)}
-              style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                gap: 3, padding: '8px 4px',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: active ? 'var(--color-text-info)' : 'var(--color-text-tertiary)',
-                transition: 'color 0.15s',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 400, letterSpacing: 0.2 }}>
+            <button key={path} onClick={() => navigate(path)} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 2, padding: '9px 4px 8px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              position: 'relative',
+            }}>
+              {/* Indicador ativo */}
+              {active && (
+                <div style={{
+                  position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+                  width: 32, height: 2.5, borderRadius: '0 0 4px 4px',
+                  background: cor,
+                }} />
+              )}
+              <div style={{
+                width: 36, height: 36, borderRadius: 12,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: active ? `${cor}14` : 'transparent',
+                transition: 'background 0.15s',
+              }}>
+                <Icon
+                  size={20}
+                  strokeWidth={active ? 2.5 : 1.8}
+                  color={active ? cor : '#94a3b8'}
+                />
+              </div>
+              <span style={{
+                fontSize: 10, fontWeight: active ? 600 : 400,
+                color: active ? cor : '#94a3b8',
+                letterSpacing: 0.1, lineHeight: 1,
+              }}>
                 {label}
               </span>
             </button>
@@ -86,9 +194,7 @@ export default function MobileShell() {
         })}
       </nav>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
