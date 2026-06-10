@@ -427,19 +427,17 @@ export default function DashboardCoordenacaoGeralPage() {
         <UnitScopeSelector showNetworkOption placeholder="Toda a rede" compact />
       </div>
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 overflow-x-auto">
+      <div className="ds-tab-bar mb-5">
         {ABAS.map(a => (
           <button
             key={a.id}
             onClick={() => setAbaAtiva(a.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-              abaAtiva === a.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`ds-tab ${abaAtiva === a.id ? 'ds-tab-active' : ''}`}
           >
             {a.icon}{a.label}
           </button>
         ))}
-        <button onClick={() => setRefreshKey(k => k + 1)} className="ml-auto p-2 text-gray-400 hover:text-gray-600 rounded-lg" title="Atualizar">
+        <button onClick={() => setRefreshKey(k => k + 1)} className="ml-auto ds-btn ds-btn-ghost p-1.5" title="Atualizar">
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
       </div>

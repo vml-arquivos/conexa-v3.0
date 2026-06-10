@@ -7,6 +7,7 @@ import {
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
   Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle, UserPlus, Bell, FolderCheck, Bus, Stethoscope,
+  Smartphone,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -23,6 +24,7 @@ interface MenuItem {
 // PROFESSOR / PROFESSOR_AUXILIAR ──────────────────────────────────────────────
 const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/teacher-dashboard', label: 'Painel do Professor', icon: <GraduationCap className="h-4 w-4" /> },
+  { path: '/app/mobile',            label: 'App Mobile (PWA)',    icon: <Smartphone className="h-4 w-4" />, badge: 'Mobile' },
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [

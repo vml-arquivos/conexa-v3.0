@@ -1,3 +1,12 @@
+/**
+ * PageShell — Layout base padronizado de todas as páginas do Conexa
+ *
+ * Uso:
+ *   <PageShell title="Título" subtitle="Descrição" headerActions={<button>...</button>}>
+ *     conteúdo
+ *   </PageShell>
+ */
+
 import React from 'react';
 import { cn } from '../../lib/utils';
 
@@ -5,13 +14,13 @@ interface PageShellProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
-  /** Alias legado usado por algumas páginas antes da padronização para inglês. */
   titulo?: string;
-  /** Alias legado usado por algumas páginas antes da padronização para inglês. */
   subtitulo?: string;
   description?: string;
   headerActions?: React.ReactNode;
   className?: string;
+  /** Remove o padding horizontal/vertical para conteúdos full-bleed */
+  flush?: boolean;
 }
 
 export function PageShell({
@@ -23,33 +32,43 @@ export function PageShell({
   description,
   headerActions,
   className,
+  flush = false,
 }: PageShellProps) {
-  const resolvedTitle = title ?? titulo;
-  const resolvedSubtitle = subtitle ?? subtitulo;
+  const resolvedTitle    = title ?? titulo;
+  const resolvedSubtitle = subtitle ?? subtitulo ?? description;
 
   return (
-    <div className={cn("flex flex-col gap-6 p-4 md:p-6 max-w-7xl mx-auto w-full", className)}>
-      {(resolvedTitle || resolvedSubtitle || description || headerActions) && (
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
+    <div className={cn(
+      'flex flex-col w-full max-w-[var(--content-max-w)] mx-auto',
+      flush ? '' : 'px-4 md:px-6 py-5 gap-5',
+      className,
+    )}>
+
+      {/* ── Header ── */}
+      {(resolvedTitle || resolvedSubtitle || headerActions) && (
+        <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
             {resolvedTitle && (
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 leading-snug">
+              <h1 className="text-[1.15rem] font-semibold tracking-tight leading-snug text-[var(--text-primary)] truncate">
                 {resolvedTitle}
               </h1>
             )}
             {resolvedSubtitle && (
-              <p className="text-sm text-slate-500 font-normal">{resolvedSubtitle}</p>
-            )}
-            {description && (
-              <p className="text-sm text-slate-400 font-normal">{description}</p>
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                {resolvedSubtitle}
+              </p>
             )}
           </div>
           {headerActions && (
-            <div className="flex items-center gap-2 flex-shrink-0">{headerActions}</div>
+            <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+              {headerActions}
+            </div>
           )}
         </header>
       )}
-      <main className="flex-1">
+
+      {/* ── Content ── */}
+      <main className="flex-1 min-w-0">
         {children}
       </main>
     </div>
