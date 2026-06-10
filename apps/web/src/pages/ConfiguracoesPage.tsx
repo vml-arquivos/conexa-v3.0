@@ -249,7 +249,7 @@ export default function ConfiguracoesPage() {
     }
     setSaving(true);
     try {
-      await http.post('/users', novoUsuario);
+      await http.post('/admin/users', novoUsuario);
       toast.success('Usuário criado com sucesso!');
       setShowNovoUsuario(false);
       setNovoUsuario({ nome: '', email: '', role: 'PROFESSOR', senha: '' });

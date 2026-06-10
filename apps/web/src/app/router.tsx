@@ -16,6 +16,14 @@ import DashboardCoordenacaoPedagogicaPage from '../pages/DashboardCoordenacaoPed
 import DashboardCoordenacaoGeralPage from '../pages/DashboardCoordenacaoGeralPage';
 import ControleFaltasPage from '../pages/ControleFaltasPage';
 import RdxPage from '../pages/RdxPage';
+
+// ─── Módulo Mobile PWA ────────────────────────────────────────────────────────
+import MobileShell from '../components/mobile/MobileShell';
+import MobileChamadaPage from '../pages/mobile/MobileChamadaPage';
+import MobileDiarioPage from '../pages/mobile/MobileDiarioPage';
+import MobileObservacaoPage from '../pages/mobile/MobileObservacaoPage';
+import MobileOcorrenciaPage from '../pages/mobile/MobileOcorrenciaPage';
+import MobileMaterialPage from '../pages/mobile/MobileMaterialPage';
 // ─── Novas páginas implementadas ─────────────────────────────────────────────
 import PlanejamentosPage from '../pages/PlanejamentosPage';
 import RdicRiaPage from '../pages/RdicRiaPage';
@@ -692,6 +700,19 @@ export const router = createBrowserRouter([
       { path:'crianca/:childId/timeline', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><TimelineCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/observacoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><ObservacaoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'inteligencia', element:(<RoleProtectedRoute allowedRoles={['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelInteligenciaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
+    ],
+  },
+  // ─── PWA Mobile — layout próprio, sem AppLayout desktop ────────────────────
+  {
+    path: '/app/mobile',
+    element: <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_NUTRICIONISTA', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}><MobileShell /></RoleProtectedRoute>,
+    children: [
+      { index: true, element: <Navigate to="/app/mobile/chamada" replace /> },
+      { path: 'chamada',    element: <MobileChamadaPage /> },
+      { path: 'diario',     element: <MobileDiarioPage /> },
+      { path: 'observacao', element: <MobileObservacaoPage /> },
+      { path: 'ocorrencia', element: <MobileOcorrenciaPage /> },
+      { path: 'material',   element: <MobileMaterialPage /> },
     ],
   },
 ]);
