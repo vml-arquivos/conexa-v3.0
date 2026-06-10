@@ -185,9 +185,18 @@ export default function DashboardCoordenacaoGeralPage() {
   const [funil, setFunil] = useState<GovernanceFunnel | null>(null);
   const [coverageFields, setCoverageFields] = useState<Array<{ field: string; pct: number }>>([]);
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'requisicoes' | 'reunioes' | 'ocorrencias'>('visao');
+  const [abaAtiva, setAbaAtiva] = useState<'visao' | 'unidades' | 'pedagogico' | 'desenvolvimento' | 'saude' | 'requisicoes' | 'reunioes' | 'ocorrencias'>('visao');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'otimo' | 'atencao' | 'critico'>('todas');
   const [refreshKey, setRefreshKey] = useState(0);
+  // Estado das novas abas
+  const [devObservacoes, setDevObservacoes] = useState<Array<{
+    unidadeNome: string; totalObs: number; mediaObs: number;
+    camposCobertura: Array<{ campo: string; pct: number }>; laudados: number; totalAlunos: number;
+  }>>([]);
+  const [saudeAlertas, setSaudeAlertas] = useState<Array<{
+    id: string; titulo: string; severidade: string; tipo: string; unidadeNome?: string; criadoEm: string;
+  }>>([]);
+  const [loadingDev, setLoadingDev] = useState(false);
   const [rdicRede, setRdicRede] = useState<Array<{
     unidadeNome: string;
     total: number;
@@ -239,6 +248,48 @@ export default function DashboardCoordenacaoGeralPage() {
   }, [refreshKey]); // eslint-disable-line
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ─── Carregar dados de desenvolvimento quando aba abre ────────────────────
+  useEffect(() => {
+    if (abaAtiva !== 'desenvolvimento' && abaAtiva !== 'saude') return;
+    if (abaAtiva === 'desenvolvimento' && devObservacoes.length > 0) return;
+    if (abaAtiva === 'saude' && saudeAlertas.length > 0) return;
+    setLoadingDev(true);
+    Promise.allSettled([
+      http.get('/alertas', { params: { limit: 50, severidade: 'ALTA,CRITICA,MEDIA' } }),
+      http.get('/development-observations', { params: { limit: 100 } }),
+    ]).then(([alertasRes, devRes]) => {
+      if (alertasRes.status === 'fulfilled') {
+        const d = alertasRes.value.data;
+        const lista = Array.isArray(d?.alertas) ? d.alertas : Array.isArray(d) ? d : [];
+        setSaudeAlertas(lista.map((a: any) => ({
+          id: a.id, titulo: a.titulo ?? a.title ?? 'Alerta', severidade: a.severidade ?? a.severity ?? 'MEDIA',
+          tipo: a.tipo ?? a.type ?? 'GERAL', unidadeNome: a.unidade?.nome ?? a.unitName ?? '',
+          criadoEm: a.criadoEm ?? a.createdAt ?? new Date().toISOString(),
+        })));
+      }
+      if (devRes.status === 'fulfilled') {
+        const obs = Array.isArray(devRes.value.data) ? devRes.value.data : devRes.value.data?.data ?? [];
+        // Agregar por unidade
+        const porUnidade: Record<string, { nome: string; obs: any[] }> = {};
+        obs.forEach((o: any) => {
+          const uid = o.unitId ?? o.classroomId ?? 'geral';
+          const nome = o.unitName ?? o.unidadeNome ?? 'Sem unidade';
+          if (!porUnidade[uid]) porUnidade[uid] = { nome, obs: [] };
+          porUnidade[uid].obs.push(o);
+        });
+        const CAMPOS = ['O_EU_O_OUTRO_E_NOS', 'CORPO_GESTOS_E_MOVIMENTOS', 'TRACOS_SONS_CORES_E_FORMAS', 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO', 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES'];
+        const resumo = Object.values(porUnidade).map(({ nome, obs: uObs }) => {
+          const camposCobertura = CAMPOS.map((c) => ({
+            campo: c.replace(/_/g, ' ').toLowerCase(),
+            pct: Math.round((uObs.filter((o) => o.category === c).length / Math.max(uObs.length, 1)) * 100),
+          }));
+          return { unidadeNome: nome, totalObs: uObs.length, mediaObs: Math.round(uObs.length / Math.max(1, uObs.length)), camposCobertura, laudados: 0, totalAlunos: 0 };
+        });
+        setDevObservacoes(resumo);
+      }
+    }).finally(() => setLoadingDev(false));
+  }, [abaAtiva]);
 
   // ─── Carregar RDIC e diários por unidade quando aba pedagógico abre ──────────
   useEffect(() => {
@@ -330,12 +381,14 @@ export default function DashboardCoordenacaoGeralPage() {
 
   // ─── Abas ────────────────────────────────────────────────────────────────
   const ABAS = [
-    { id: 'visao',       label: 'Visão Geral',   icon: <BarChart2 className="h-3.5 w-3.5" /> },
-    { id: 'unidades',    label: 'Unidades',       icon: <Building2 className="h-3.5 w-3.5" /> },
-    { id: 'pedagogico',  label: 'Pedagógico',     icon: <Brain className="h-3.5 w-3.5" /> },
-    { id: 'requisicoes', label: `Requisições${reqPendentes > 0 ? ` (${reqPendentes})` : ''}`, icon: <ShoppingCart className="h-3.5 w-3.5" /> },
-    { id: 'reunioes',    label: 'Reuniões',        icon: <Calendar className="h-3.5 w-3.5" /> },
-    { id: 'ocorrencias', label: 'Ocorrências',      icon: <TriangleAlert className="h-3.5 w-3.5" /> },
+    { id: 'visao',          label: 'Visão Geral',    icon: <BarChart2 className="h-3.5 w-3.5" /> },
+    { id: 'unidades',       label: 'Unidades',        icon: <Building2 className="h-3.5 w-3.5" /> },
+    { id: 'pedagogico',     label: 'Pedagógico',      icon: <Brain className="h-3.5 w-3.5" /> },
+    { id: 'desenvolvimento', label: 'Desenvolvimento', icon: <Sparkles className="h-3.5 w-3.5" /> },
+    { id: 'saude',          label: 'Saúde',           icon: <Activity className="h-3.5 w-3.5" /> },
+    { id: 'requisicoes',    label: `Materiais${reqPendentes > 0 ? ` (${reqPendentes})` : ''}`, icon: <ShoppingCart className="h-3.5 w-3.5" /> },
+    { id: 'reunioes',       label: 'Reuniões',        icon: <Calendar className="h-3.5 w-3.5" /> },
+    { id: 'ocorrencias',    label: 'Ocorrências',     icon: <TriangleAlert className="h-3.5 w-3.5" /> },
   ] as const;
 
   return (
@@ -856,6 +909,241 @@ export default function DashboardCoordenacaoGeralPage() {
       {abaAtiva === 'ocorrencias' && (
         <div className="space-y-4">
           <OcorrenciasPanel titulo="Ocorrências da Rede" />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: DESENVOLVIMENTO & PSICOSSOCIAL
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'desenvolvimento' && (
+        <div className="space-y-5">
+          {/* Cabeçalho explicativo */}
+          <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-purple-100 rounded-xl flex-shrink-0">
+                <Sparkles className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-purple-800">Desenvolvimento infantil e psicossocial</p>
+                <p className="text-xs text-purple-600 mt-0.5">
+                  Observações registradas pelos professores agrupadas pelos 5 campos de experiência da BNCC.
+                  Dados construídos dia a dia na sala de aula.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Campos de experiência BNCC */}
+          {loadingDev ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-32 bg-slate-100 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+                  Campos de experiência BNCC — cobertura de observações
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { id: 'O_EU_O_OUTRO_E_NOS', label: 'O eu, o outro e o nós', emoji: '🤝', color: 'bg-violet-50 border-violet-100', bar: 'bg-violet-400' },
+                    { id: 'CORPO_GESTOS_E_MOVIMENTOS', label: 'Corpo, gestos e movimentos', emoji: '🏃', color: 'bg-blue-50 border-blue-100', bar: 'bg-blue-400' },
+                    { id: 'TRACOS_SONS_CORES_E_FORMAS', label: 'Traços, sons, cores e formas', emoji: '🎨', color: 'bg-rose-50 border-rose-100', bar: 'bg-rose-400' },
+                    { id: 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO', label: 'Escuta, fala, pensamento e imaginação', emoji: '💬', color: 'bg-emerald-50 border-emerald-100', bar: 'bg-emerald-400' },
+                    { id: 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES', label: 'Espaços, tempos, quantidades e transformações', emoji: '🔢', color: 'bg-amber-50 border-amber-100', bar: 'bg-amber-400' },
+                  ].map((campo) => {
+                    const totalObs = devObservacoes.reduce((s, u) => s + u.totalObs, 0);
+                    const obsNoCampo = devObservacoes.reduce((s, u) => {
+                      const c = u.camposCobertura.find((c) => c.campo === campo.id.replace(/_/g, ' ').toLowerCase());
+                      return s + (c ? Math.round((c.pct / 100) * u.totalObs) : 0);
+                    }, 0);
+                    const pct = totalObs > 0 ? Math.round((obsNoCampo / totalObs) * 100) : 0;
+                    return (
+                      <div key={campo.id} className={`border rounded-2xl p-4 ${campo.color}`}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xl">{campo.emoji}</span>
+                          <p className="text-xs font-semibold text-slate-700 leading-tight">{campo.label}</p>
+                        </div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-slate-500">{obsNoCampo} observações</span>
+                          <span className="text-xs font-semibold text-slate-700">{pct}%</span>
+                        </div>
+                        <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                          <div className={`h-full ${campo.bar} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Por unidade */}
+              {devObservacoes.length > 0 ? (
+                <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-ds-sm">
+                  <div className="px-4 py-3 border-b border-slate-50">
+                    <p className="text-sm font-semibold text-slate-800">Observações por unidade</p>
+                    <p className="text-xs text-slate-400">Total de registros de desenvolvimento nos últimos 30 dias</p>
+                  </div>
+                  <div className="divide-y divide-slate-50">
+                    {devObservacoes.map((u, i) => (
+                      <div key={i} className="px-4 py-3 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-purple-700">{u.unidadeNome.slice(0, 2).toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{u.unidadeNome}</p>
+                          <p className="text-xs text-slate-400">{u.totalObs} observações registradas</p>
+                        </div>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${u.totalObs >= 20 ? 'bg-emerald-100 text-emerald-700' : u.totalObs >= 5 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                          {u.totalObs >= 20 ? 'Ativo' : u.totalObs >= 5 ? 'Moderado' : 'Baixo'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white border border-slate-100 rounded-2xl p-8 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles className="h-6 w-6 text-purple-400" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-600 mb-1">Sem observações de desenvolvimento registradas</p>
+                  <p className="text-xs text-slate-400">Os professores registram observações individuais pelo painel da turma</p>
+                  <button onClick={() => navigate('/app/desenvolvimento-infantil')}
+                    className="mt-4 text-xs text-blue-600 underline">
+                    Ver painel de desenvolvimento
+                  </button>
+                </div>
+              )}
+
+              {/* Navegação rápida para criança */}
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl p-4">
+                <p className="text-sm font-semibold text-purple-800 mb-1">Análise individual</p>
+                <p className="text-xs text-purple-600 mb-3">Acesse o painel analítico de cada criança para ver evolução detalhada por campo de experiência, linha do tempo e observações.</p>
+                <button onClick={() => navigate('/app/secretaria/matriculas')}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-purple-200 rounded-xl text-xs font-medium text-purple-700 hover:bg-purple-50 transition-colors">
+                  <Eye className="h-3.5 w-3.5" /> Buscar criança
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ABA: SAÚDE
+      ══════════════════════════════════════════════════════════════════ */}
+      {abaAtiva === 'saude' && (
+        <div className="space-y-5">
+          {/* KPIs de saúde */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-red-50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-1.5 bg-white/60 rounded-lg"><HeartPulse className="h-4 w-4 text-red-500" /></div>
+              </div>
+              <p className="text-2xl font-semibold text-red-700 tabular-nums">
+                {saudeAlertas.filter((a) => a.severidade === 'ALTA' || a.severidade === 'CRITICA').length}
+              </p>
+              <p className="text-xs text-red-500 mt-1 font-medium">Alertas críticos</p>
+            </div>
+            <div className="bg-amber-50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-1.5 bg-white/60 rounded-lg"><AlertTriangle className="h-4 w-4 text-amber-500" /></div>
+              </div>
+              <p className="text-2xl font-semibold text-amber-700 tabular-nums">
+                {saudeAlertas.filter((a) => a.severidade === 'MEDIA').length}
+              </p>
+              <p className="text-xs text-amber-500 mt-1 font-medium">Atenção moderada</p>
+            </div>
+            <div className="bg-blue-50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-1.5 bg-white/60 rounded-lg"><Users className="h-4 w-4 text-blue-500" /></div>
+              </div>
+              <p className="text-2xl font-semibold text-blue-700 tabular-nums">
+                {unidades.reduce((s, u) => s + (u.totalAlunos || 0), 0)}
+              </p>
+              <p className="text-xs text-blue-500 mt-1 font-medium">Alunos monitorados</p>
+            </div>
+            <div className="bg-emerald-50 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="p-1.5 bg-white/60 rounded-lg"><CheckCircle className="h-4 w-4 text-emerald-500" /></div>
+              </div>
+              <p className="text-2xl font-semibold text-emerald-700 tabular-nums">
+                {saudeAlertas.length === 0 ? '100' : Math.max(0, 100 - saudeAlertas.filter((a) => a.severidade === 'ALTA' || a.severidade === 'CRITICA').length * 5)}%
+              </p>
+              <p className="text-xs text-emerald-500 mt-1 font-medium">Score de saúde</p>
+            </div>
+          </div>
+
+          {/* Lista de alertas de saúde */}
+          {loadingDev ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />)}
+            </div>
+          ) : saudeAlertas.length > 0 ? (
+            <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-ds-sm">
+              <div className="px-4 py-3 border-b border-slate-50 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Alertas ativos de saúde</p>
+                  <p className="text-xs text-slate-400">{saudeAlertas.length} alertas no total</p>
+                </div>
+                <button onClick={() => navigate('/app/secretaria/ocorrencias')}
+                  className="text-xs text-blue-600 font-medium hover:underline">
+                  Ver todos <ChevronRight className="inline h-3 w-3" />
+                </button>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {saudeAlertas.slice(0, 10).map((alerta) => {
+                  const isCritico = alerta.severidade === 'ALTA' || alerta.severidade === 'CRITICA';
+                  return (
+                    <div key={alerta.id} className="px-4 py-3 flex items-start gap-3">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isCritico ? 'bg-red-500' : alerta.severidade === 'MEDIA' ? 'bg-amber-500' : 'bg-blue-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 truncate">{alerta.titulo}</p>
+                        <p className="text-xs text-slate-400">{alerta.unidadeNome || 'Rede geral'} · {alerta.tipo}</p>
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${isCritico ? 'bg-red-100 text-red-700' : alerta.severidade === 'MEDIA' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {alerta.severidade}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-100 rounded-2xl p-8 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle className="h-6 w-6 text-emerald-400" />
+              </div>
+              <p className="text-sm font-medium text-slate-600 mb-1">Nenhum alerta de saúde ativo</p>
+              <p className="text-xs text-slate-400">Todas as unidades estão sem ocorrências pendentes</p>
+            </div>
+          )}
+
+          {/* Painel de nutrição */}
+          <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-ds-sm">
+            <div className="px-4 py-3 border-b border-slate-50">
+              <p className="text-sm font-semibold text-slate-800">Nutrição e alimentação especial</p>
+              <p className="text-xs text-slate-400">Crianças com restrições alimentares e alergias</p>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {unidades.slice(0, 6).map((u, i) => (
+                  <div key={i} className="p-3 bg-orange-50 border border-orange-100 rounded-xl">
+                    <p className="text-xs font-semibold text-orange-800 truncate">{u.nome}</p>
+                    <button onClick={() => navigate('/app/acompanhamento-nutricional')}
+                      className="text-xs text-orange-600 mt-1 hover:underline">
+                      Ver cardápio →
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {unidades.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">Nenhuma unidade disponível</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </PageShell>
