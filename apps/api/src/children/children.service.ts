@@ -856,7 +856,15 @@ export class ChildrenService {
     });
 
     if (!child) {
-      throw new Error('Criança não encontrada');
+      throw new NotFoundException('Criança não encontrada');
+    }
+
+    // Escopo de acesso: mesma mantenedora e unidade permitida (igual ao findOne)
+    if ((child as any).mantenedoraId !== user.mantenedoraId) {
+      throw new ForbiddenException('Você não tem acesso a esta criança');
+    }
+    if (!canAccessUnit(user, child.unitId)) {
+      throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
     // Buscar atendimentos aos pais

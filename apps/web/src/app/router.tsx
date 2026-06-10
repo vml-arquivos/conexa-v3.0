@@ -24,6 +24,8 @@ import MobileDiarioPage from '../pages/mobile/MobileDiarioPage';
 import MobileObservacaoPage from '../pages/mobile/MobileObservacaoPage';
 import MobileOcorrenciaPage from '../pages/mobile/MobileOcorrenciaPage';
 import MobileMaterialPage from '../pages/mobile/MobileMaterialPage';
+import MobileAlunosPage from '../pages/mobile/MobileAlunosPage';
+import MobileFichaAlunoPage from '../pages/mobile/MobileFichaAlunoPage';
 // ─── Novas páginas implementadas ─────────────────────────────────────────────
 import PlanejamentosPage from '../pages/PlanejamentosPage';
 import RdicRiaPage from '../pages/RdicRiaPage';
@@ -713,6 +715,8 @@ export const router = createBrowserRouter([
       { path: 'observacao', element: <MobileObservacaoPage /> },
       { path: 'ocorrencia', element: <MobileOcorrenciaPage /> },
       { path: 'material',   element: <MobileMaterialPage /> },
+      { path: 'alunos',              element: <MobileAlunosPage /> },
+      { path: 'alunos/:childId',     element: <MobileFichaAlunoPage /> },
     ],
   },
 ]);

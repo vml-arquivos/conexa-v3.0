@@ -4,6 +4,13 @@ import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Carimbo de build: injeta a data/hora do build para verificação visual no PWA.
+  // Permite confirmar EXATAMENTE qual build está no ar (resolve "fiz deploy e não vejo mudança").
+  define: {
+    __BUILD_ID__: JSON.stringify(
+      new Date().toISOString().slice(0, 16).replace('T', ' ')
+    ),
+  },
   plugins: [
     react(),
     VitePWA({
