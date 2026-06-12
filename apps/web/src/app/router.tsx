@@ -52,7 +52,6 @@ import CentralRdicCriancaPage from '../pages/CentralRdicCriancaPage';
 import PainelAnaliticoCriancaPage from '../pages/PainelAnaliticoCriancaPage';
 import PainelTurmaPage from '../pages/PainelTurmaPage';
 import PainelInteligenciaPage from '../pages/PainelInteligenciaPage';
-import MissoesInteligentesPage from '../pages/MissoesInteligentesPage';
 import ConferenciaPlanejamentoPage from '../pages/ConferenciaPlanejamentoPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
@@ -703,7 +702,6 @@ export const router = createBrowserRouter([
       { path:'crianca/:childId/timeline', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><TimelineCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/observacoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><ObservacaoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'inteligencia', element:(<RoleProtectedRoute allowedRoles={['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelInteligenciaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-      { path:'inteligencia/missoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><MissoesInteligentesPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
     ],
   },
   // ─── PWA Mobile — layout próprio, sem AppLayout desktop ────────────────────

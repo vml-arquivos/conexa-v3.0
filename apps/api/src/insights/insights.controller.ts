@@ -44,6 +44,28 @@ export class InsightsController {
     return this.insightsService.getChildSummary(childId, user);
   }
 
+
+
+  /**
+   * GET /insights/ai/system-diagnosis?unitId=&periodDays=30
+   * Diagnóstico operacional com IA, somente leitura e com dados agregados.
+   * Não altera matriz, planejamento, diário, RDIC ou dados históricos.
+   */
+  @Get('ai/system-diagnosis')
+  @RequireRoles(
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
+  getAiSystemDiagnosis(
+    @CurrentUser() user: JwtPayload,
+    @Query('unitId') unitId?: string,
+    @Query('periodDays') periodDays?: string,
+  ) {
+    return this.insightsService.getAiSystemDiagnosis(user, { unitId, periodDays });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // GOVERNANÇA PEDAGÓGICA
   // ─────────────────────────────────────────────────────────────────────────
@@ -114,30 +136,5 @@ export class InsightsController {
       throw new BadRequestException('classroomId e mes (YYYY-MM) são obrigatórios');
     }
     return this.insightsService.getClassroomScore(classroomId, mes, req.user);
-  }
-
-  @Get('missions')
-  @UseGuards(JwtAuthGuard)
-  getMissions(
-    @Request() req: any,
-    @Query('unitId') unitId?: string,
-    @Query('classroomId') classroomId?: string,
-    @Query('childId') childId?: string,
-    @Query('priority') priority?: string,
-    @Query('periodDays') periodDays?: string,
-  ) {
-    return this.insightsService.getMissions(req.user, {
-      unitId, classroomId, childId, priority,
-      periodDays: periodDays ? parseInt(periodDays, 10) : undefined,
-    });
-  }
-
-  @Get('missions/summary')
-  @UseGuards(JwtAuthGuard)
-  getMissionsSummary(
-    @Request() req: any,
-    @Query('unitId') unitId?: string,
-  ) {
-    return this.insightsService.getMissionsSummary(req.user, { unitId });
   }
 }

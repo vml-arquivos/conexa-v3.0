@@ -27,7 +27,7 @@ import {
   TrendingUp, Calendar, Network, RefreshCw, ChevronRight,
   Building2, GraduationCap, Bell, Star, Activity, BarChart2, Brain,
   FileText, Clock, ArrowRight, Zap, Target, Shield, Eye, Layers, Sparkles,
-  TriangleAlert,
+  TriangleAlert, HeartPulse, AlertTriangle,
 } from 'lucide-react';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';

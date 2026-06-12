@@ -510,8 +510,7 @@ export class IntelligenceCoreService {
   }
 
   async getClassroomOverview(classroomId: string, user: JwtPayload, params: PeriodParams) {
-    // classroomCtx tem mantenedoraId injetado via assertClassroomAccess
-    const classroomCtx = await this.assertClassroomAccess(classroomId, user);
+    const classroom = await this.assertClassroomAccess(classroomId, user);
     const { start, end } = parsePeriod(params, 30);
 
     const enrollments = await this.prisma.enrollment.findMany({
@@ -522,11 +521,11 @@ export class IntelligenceCoreService {
 
     const [attendance, diaryEvents, observations, rdics, restrictions, alerts] = await Promise.all([
       this.prisma.attendance.findMany({
-        where: { classroomId, mantenedoraId: classroomCtx.mantenedoraId, unitId: classroomCtx.unitId, date: { gte: start, lte: end } },
+        where: { classroomId, mantenedoraId: classroom.mantenedoraId, unitId: classroom.unitId, date: { gte: start, lte: end } },
         select: { childId: true, status: true, date: true },
       }),
       this.prisma.diaryEvent.findMany({
-        where: { classroomId, mantenedoraId: classroomCtx.mantenedoraId, unitId: classroomCtx.unitId, eventDate: { gte: start, lte: end } },
+        where: { classroomId, mantenedoraId: classroom.mantenedoraId, unitId: classroom.unitId, eventDate: { gte: start, lte: end } },
         select: { childId: true, status: true, eventDate: true, planningId: true },
       }),
       this.prisma.developmentObservation.findMany({
@@ -534,7 +533,7 @@ export class IntelligenceCoreService {
         select: { childId: true, date: true, developmentAlerts: true, healthNotes: true, dietaryNotes: true, psychologicalNotes: true },
       }),
       this.prisma.rDIXInstancia.findMany({
-        where: { classroomId, mantenedoraId: classroomCtx.mantenedoraId, unitId: classroomCtx.unitId },
+        where: { classroomId, mantenedoraId: classroom.mantenedoraId, unitId: classroom.unitId },
         select: { childId: true, status: true, periodo: true, anoLetivo: true },
       }),
       this.prisma.dietaryRestriction.findMany({
@@ -542,7 +541,7 @@ export class IntelligenceCoreService {
         select: { childId: true, severity: true },
       }),
       this.prisma.alertaOperacional.findMany({
-        where: { classroomId, mantenedoraId: classroomCtx.mantenedoraId, resolvido: false },
+        where: { classroomId, mantenedoraId: classroom.mantenedoraId, resolvido: false },
         take: 50,
         orderBy: { criadoEm: 'desc' },
         select: { id: true, childId: true, tipo: true, severidade: true, titulo: true, criadoEm: true },
@@ -585,7 +584,7 @@ export class IntelligenceCoreService {
     return {
       module: 'Zelare Intelligence Core',
       readonly: true,
-      classroom: { id: classroomCtx.id, name: classroomCtx.name, unitId: classroomCtx.unitId },
+      classroom: { id: classroom.id, name: classroom.name, unitId: classroom.unitId },
       period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) },
       metrics: {
         children: childIds.length,

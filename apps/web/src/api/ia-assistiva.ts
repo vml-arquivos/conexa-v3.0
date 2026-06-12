@@ -1,17 +1,42 @@
-import http from './http';
+import http from "./http";
 
-export type FaixaEtaria = 'EI01' | 'EI02' | 'EI03';
+function extractIaError(error: unknown): Error {
+  const candidate = error as {
+    message?: string;
+    response?: {
+      data?: {
+        message?: string | string[];
+        code?: string;
+        model?: string;
+      };
+    };
+  };
+
+  const responseData = candidate?.response?.data;
+  const rawMessage = responseData?.message;
+  const message = Array.isArray(rawMessage)
+    ? rawMessage.join(" ")
+    : rawMessage || candidate?.message || "Erro ao acessar o serviço de IA.";
+
+  const details = [responseData?.code, responseData?.model]
+    .filter(Boolean)
+    .join(" · ");
+
+  return new Error(details ? `${message} (${details})` : message);
+}
+
+export type FaixaEtaria = "EI01" | "EI02" | "EI03";
 export type TipoAtividade =
-  | 'RODA_DE_CONVERSA'
-  | 'EXPLORACAO_SENSORIAL'
-  | 'ATIVIDADE_PLASTICA'
-  | 'BRINCADEIRA_DIRIGIDA'
-  | 'LEITURA_COMPARTILHADA'
-  | 'MUSICA_E_MOVIMENTO'
-  | 'JOGO_SIMBOLICO'
-  | 'INVESTIGACAO'
-  | 'SEQUENCIA_DIDATICA'
-  | 'LIVRE';
+  | "RODA_DE_CONVERSA"
+  | "EXPLORACAO_SENSORIAL"
+  | "ATIVIDADE_PLASTICA"
+  | "BRINCADEIRA_DIRIGIDA"
+  | "LEITURA_COMPARTILHADA"
+  | "MUSICA_E_MOVIMENTO"
+  | "JOGO_SIMBOLICO"
+  | "INVESTIGACAO"
+  | "SEQUENCIA_DIDATICA"
+  | "LIVRE";
 
 export interface GerarAtividadeDto {
   campoDeExperiencia: string;
@@ -57,8 +82,30 @@ export interface RelatorioAlunoGerado {
 export async function gerarAtividade(
   dto: GerarAtividadeDto,
 ): Promise<AtividadeGerada> {
-  const response = await http.post('/ia/gerar-atividade', dto);
-  return response.data;
+  try {
+    const response = await http.post("/ia/gerar-atividade", dto);
+    return response.data;
+  } catch (error) {
+    throw extractIaError(error);
+  }
+}
+
+export interface IaStatus {
+  configured: boolean;
+  provider: "GEMINI" | "OPENAI" | "NONE";
+  model: string | null;
+  test: "OK";
+  response: string;
+}
+
+/** Executa teste real do provedor configurado, sem dados pessoais. */
+export async function verificarStatusIA(): Promise<IaStatus> {
+  try {
+    const response = await http.get("/ia/status");
+    return response.data;
+  } catch (error) {
+    throw extractIaError(error);
+  }
 }
 
 /**
@@ -70,8 +117,12 @@ export async function gerarMicrogestos(params: {
   observacoes: string;
   campoDeExperiencia: string;
 }): Promise<MicrogesTosGerados> {
-  const response = await http.post('/ia/microgestos', params);
-  return response.data;
+  try {
+    const response = await http.post("/ia/microgestos", params);
+    return response.data;
+  } catch (error) {
+    throw extractIaError(error);
+  }
 }
 
 /**
@@ -83,26 +134,30 @@ export async function gerarRelatorioAluno(params: {
   observacoes: string[];
   periodo: string;
 }): Promise<RelatorioAlunoGerado> {
-  const response = await http.post('/ia/relatorio-aluno', params);
-  return response.data;
+  try {
+    const response = await http.post("/ia/relatorio-aluno", params);
+    return response.data;
+  } catch (error) {
+    throw extractIaError(error);
+  }
 }
 
 // Labels em PT-BR
 export const LABELS_FAIXA_ETARIA: Record<FaixaEtaria, string> = {
-  EI01: 'Bebês (0 a 1 ano e 6 meses)',
-  EI02: 'Crianças Bem Pequenas (1a7m a 3a11m)',
-  EI03: 'Crianças Pequenas (4 a 5 anos e 11 meses)',
+  EI01: "Bebês (0 a 1 ano e 6 meses)",
+  EI02: "Crianças Bem Pequenas (1a7m a 3a11m)",
+  EI03: "Crianças Pequenas (4 a 5 anos e 11 meses)",
 };
 
 export const LABELS_TIPO_ATIVIDADE: Record<TipoAtividade, string> = {
-  RODA_DE_CONVERSA: 'Roda de Conversa',
-  EXPLORACAO_SENSORIAL: 'Exploração Sensorial',
-  ATIVIDADE_PLASTICA: 'Atividade Plástica',
-  BRINCADEIRA_DIRIGIDA: 'Brincadeira Dirigida',
-  LEITURA_COMPARTILHADA: 'Leitura Compartilhada',
-  MUSICA_E_MOVIMENTO: 'Música e Movimento',
-  JOGO_SIMBOLICO: 'Jogo Simbólico',
-  INVESTIGACAO: 'Investigação',
-  SEQUENCIA_DIDATICA: 'Sequência Didática',
-  LIVRE: 'Livre',
+  RODA_DE_CONVERSA: "Roda de Conversa",
+  EXPLORACAO_SENSORIAL: "Exploração Sensorial",
+  ATIVIDADE_PLASTICA: "Atividade Plástica",
+  BRINCADEIRA_DIRIGIDA: "Brincadeira Dirigida",
+  LEITURA_COMPARTILHADA: "Leitura Compartilhada",
+  MUSICA_E_MOVIMENTO: "Música e Movimento",
+  JOGO_SIMBOLICO: "Jogo Simbólico",
+  INVESTIGACAO: "Investigação",
+  SEQUENCIA_DIDATICA: "Sequência Didática",
+  LIVRE: "Livre",
 };

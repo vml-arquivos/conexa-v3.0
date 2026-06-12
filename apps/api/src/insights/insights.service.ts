@@ -1,7 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RoleLevel, AttendanceStatus } from '@prisma/client';
+import { RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { GeminiService } from '../ai/services/gemini.service';
 
 function canAccessUnitInternal(user: JwtPayload, unitId: string): boolean {
   if (!unitId) return false;
@@ -44,7 +45,10 @@ function resolveUnitScope(
 
 @Injectable()
 export class InsightsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly geminiService?: GeminiService,
+  ) {}
 
   /**
    * GET /insights/teacher/today
@@ -598,9 +602,12 @@ export class InsightsService {
     const classroomId = activeEnrollment?.classroomId ?? null;
     const userRoles = Array.isArray(user.roles) ? user.roles : [];
     const roleLevels = userRoles.map((role) => role.level);
-    const hasCentralAccess = roleLevels.some((level) =>
-      ([RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[]).includes(level),
-    );
+    const centralAccessLevels: RoleLevel[] = [
+      RoleLevel.DEVELOPER,
+      RoleLevel.MANTENEDORA,
+      RoleLevel.STAFF_CENTRAL,
+    ];
+    const hasCentralAccess = roleLevels.some((level) => centralAccessLevels.includes(level));
     const hasUnitAccess = roleLevels.includes(RoleLevel.UNIDADE);
     const hasTeacherAccess = roleLevels.includes(RoleLevel.PROFESSOR);
 
@@ -886,118 +893,251 @@ export class InsightsService {
     };
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CENTRO DE MISSÕES INTELIGENTES
-  // Gera tarefas acionáveis determinísticas. Somente leitura. Multi-tenant.
-  // ═══════════════════════════════════════════════════════════════════════════
 
-  async getMissions(
+  /**
+   * GET /insights/ai/system-diagnosis
+   * Diagnóstico operacional com IA, somente leitura.
+   * Não altera matriz, planejamentos, diário, RDIC ou dados históricos.
+   * O resumo enviado à IA é agregado e não contém nomes de crianças.
+   */
+  async getAiSystemDiagnosis(
     user: JwtPayload,
-    params: { unitId?: string; classroomId?: string; childId?: string; priority?: string; periodDays?: number },
+    params: { unitId?: string; periodDays?: string | number } = {},
   ) {
-    const { unitId: resolvedUnit, mantenedoraId } = resolveUnitScope(user, params.unitId);
-    const periodDays = params.periodDays ?? 14;
-    const since = new Date(); since.setDate(since.getDate() - periodDays);
-    type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-    type Mission = { id: string; type: string; title: string; description: string; priority: Priority; profile: string[]; evidence: Array<{ source: string; sourceId?: string; label: string; date?: string; value?: string | number }>; suggestedAction: string; targetRoute?: string; requiresHumanReview: true; generatedAt: string; tenantScope: { mantenedoraId?: string; unitId?: string }; };
-    const missions: Mission[] = [];
-    const prioOrder: Record<Priority, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    const tenantWhere = { mantenedoraId, ...(resolvedUnit ? { unitId: resolvedUnit } : {}) };
+    const { unitId, mantenedoraId } = resolveUnitScope(user, params.unitId);
+    const periodDays = this.normalizePeriodDays(params.periodDays);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - periodDays);
 
-    const add = (m: Omit<Mission, 'requiresHumanReview' | 'generatedAt' | 'tenantScope'>) => {
-      if (params.priority && m.priority !== params.priority) return;
-      missions.push({ ...m, requiresHumanReview: true, generatedAt: new Date().toISOString(), tenantScope: { mantenedoraId, unitId: resolvedUnit ?? undefined } });
+    const scopeWhere = unitId ? { mantenedoraId, unitId } : { mantenedoraId };
+    const classroomWhere = unitId
+      ? { unitId, isActive: true }
+      : { unit: { mantenedoraId }, isActive: true };
+    const childWhere = unitId
+      ? { mantenedoraId, unitId, isActive: true }
+      : { mantenedoraId, isActive: true };
+
+    const [
+      activeChildren,
+      activeClassrooms,
+      diaryEvents,
+      observations,
+      observationsWithAlerts,
+      rdicTotal,
+      rdicPending,
+      planningsTotal,
+      planningsPending,
+      attendancePresent,
+      attendanceAbsent,
+      dietaryRestrictions,
+      openOperationalAlerts,
+      materialRequestsPending,
+    ] = await Promise.all([
+      this.prisma.child.count({ where: childWhere as any }),
+      this.prisma.classroom.count({ where: classroomWhere as any }),
+      this.prisma.diaryEvent.count({ where: { ...scopeWhere, eventDate: { gte: startDate } } as any }),
+      this.prisma.developmentObservation.count({
+        where: { child: childWhere, date: { gte: startDate } } as any,
+      }),
+      this.prisma.developmentObservation.count({
+        where: {
+          child: childWhere,
+          date: { gte: startDate },
+          developmentAlerts: { not: null },
+        } as any,
+      }),
+      this.prisma.rDIXInstancia.count({ where: { ...scopeWhere, criadoEm: { gte: startDate } } as any }),
+      this.prisma.rDIXInstancia.count({
+        where: {
+          ...scopeWhere,
+          status: { in: ['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'] },
+        } as any,
+      }),
+      this.prisma.planning.count({ where: { ...scopeWhere, createdAt: { gte: startDate } } as any }),
+      this.prisma.planning.count({
+        where: {
+          ...scopeWhere,
+          status: { in: ['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'] },
+        } as any,
+      }),
+      this.prisma.attendance.count({
+        where: { ...scopeWhere, date: { gte: startDate }, status: 'PRESENTE' } as any,
+      }),
+      this.prisma.attendance.count({
+        where: { ...scopeWhere, date: { gte: startDate }, status: { not: 'PRESENTE' } } as any,
+      }),
+      this.prisma.dietaryRestriction.count({ where: { child: childWhere } as any }),
+      this.prisma.alertaOperacional.count({ where: { ...scopeWhere, resolvido: false } as any }),
+      this.prisma.materialRequest.count({
+        where: { ...scopeWhere, status: { in: ['RASCUNHO', 'SOLICITADO'] } } as any,
+      }),
+    ]);
+
+    const attendanceTotal = attendancePresent + attendanceAbsent;
+    const attendancePresenceRate = attendanceTotal > 0
+      ? Number(((attendancePresent / attendanceTotal) * 100).toFixed(1))
+      : null;
+
+    const indicators = {
+      scope: {
+        mantenedoraId,
+        unitId,
+        periodDays,
+        generatedAt: new Date().toISOString(),
+      },
+      structure: {
+        activeChildren,
+        activeClassrooms,
+      },
+      pedagogical: {
+        diaryEvents,
+        observations,
+        observationsWithAlerts,
+        rdicTotal,
+        rdicPending,
+        planningsTotal,
+        planningsPending,
+      },
+      attendance: {
+        present: attendancePresent,
+        absentOrNotPresent: attendanceAbsent,
+        total: attendanceTotal,
+        presenceRate: attendancePresenceRate,
+      },
+      care: {
+        dietaryRestrictions,
+        openOperationalAlerts,
+        materialRequestsPending,
+      },
     };
 
-    // 1. Alertas operacionais abertos
-    const alertas = await this.prisma.alertaOperacional.findMany({
-      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), resolvido: false },
-      orderBy: { criadoEm: 'desc' }, take: 20,
-      select: { id: true, tipo: true, titulo: true, severidade: true, criadoEm: true },
-    });
-    for (const a of alertas) {
-      add({ id: `alerta-${a.id}`, type: 'ALERTA_OPERACIONAL', title: a.titulo ?? `Alerta ${a.tipo}`,
-        description: `Alerta operacional "${a.tipo}" em aberto.`,
-        priority: (a.severidade === 'CRITICA' || a.severidade === 'ALTA') ? 'CRITICAL' : 'HIGH',
-        profile: ['COORDENACAO_PEDAGOGICA', 'DIRETOR', 'STAFF_CENTRAL'],
-        evidence: [{ source: 'AlertaOperacional', sourceId: a.id, label: a.tipo, date: a.criadoEm?.toISOString() }],
-        suggestedAction: 'Revisar e resolver na tela de ocorrências.', targetRoute: '/app/secretaria/ocorrencias' });
-    }
+    const automaticFindings = this.buildAutomaticFindings(indicators);
+    const aiDiagnosis = await this.generateAiDiagnosisSafely(indicators, automaticFindings);
 
-    // 2. RDICs pendentes / devolvidos
-    const rdics = await this.prisma.rDIXInstancia.findMany({
-      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), status: { in: ['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'] as any } },
-      select: { id: true, status: true, periodo: true, anoLetivo: true }, take: 30,
-    });
-    for (const r of rdics) {
-      const dev = r.status === 'DEVOLVIDO';
-      add({ id: `rdic-${r.id}`, type: 'RDIC_PENDENTE', title: `RDIC ${dev ? 'devolvido' : 'pendente'}`,
-        description: `RDIC ${r.periodo ?? ''} (${r.anoLetivo ?? ''}) — ${r.status}.`,
-        priority: dev ? 'HIGH' : 'MEDIUM', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA'],
-        evidence: [{ source: 'RDIXInstancia', sourceId: r.id, label: 'Status', value: r.status }],
-        suggestedAction: dev ? 'Revisar e reenviar.' : 'Finalizar e publicar.', targetRoute: '/app/rdic' });
-    }
-
-    // 3. Baixa frequência (< 75%) — usar findMany e agregar em memória (evita tipo _count problemático)
-    const attWhere = { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since } };
-    const [attPresente, attTotal] = await Promise.all([
-      this.prisma.attendance.findMany({ where: { ...attWhere, status: AttendanceStatus.PRESENTE }, select: { childId: true } }),
-      this.prisma.attendance.findMany({ where: attWhere, select: { childId: true } }),
-    ]);
-    const pmMap = new Map<string, number>();
-    for (const a of attPresente) pmMap.set(a.childId, (pmMap.get(a.childId) ?? 0) + 1);
-    const tmMap = new Map<string, number>();
-    for (const a of attTotal) tmMap.set(a.childId, (tmMap.get(a.childId) ?? 0) + 1);
-    for (const [childId, total] of tmMap.entries()) {
-      if (total < 3) continue;
-      const taxa = (pmMap.get(childId) ?? 0) / total;
-      if (taxa < 0.75) {
-        add({ id: `freq-${childId}`, type: 'BAIXA_FREQUENCIA', title: 'Frequência abaixo de 75%',
-          description: `Frequência de ${Math.round(taxa * 100)}% nos últimos ${periodDays} dias.`,
-          priority: taxa < 0.5 ? 'CRITICAL' : 'HIGH', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA', 'SECRETARIA'],
-          evidence: [{ source: 'Attendance', label: 'Taxa', value: `${Math.round(taxa * 100)}%` }],
-          suggestedAction: 'Contactar responsável e registrar justificativas.', targetRoute: '/app/secretaria/faltas' });
-      }
-    }
-
-    // 4. Observações com alertas de desenvolvimento
-    const obsAlertas = await this.prisma.developmentObservation.findMany({
-      where: { ...(resolvedUnit ? { classroom: { unit: { id: resolvedUnit } } } : {}), ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since }, developmentAlerts: { not: null } },
-      select: { id: true, date: true, psychologicalNotes: true }, take: 20,
-    });
-    for (const o of obsAlertas) {
-      const hp = !!o.psychologicalNotes;
-      add({ id: `obs-${o.id}`, type: 'OBSERVACAO_DESENVOLVIMENTO', title: 'Alerta de desenvolvimento',
-        description: `Observação com indicadores de atenção${hp ? ' e notas psicológicas' : ''}.`,
-        priority: hp ? 'HIGH' : 'MEDIUM', profile: hp ? ['PSICOLOGA', 'COORDENACAO_PEDAGOGICA'] : ['COORDENACAO_PEDAGOGICA', 'PROFESSOR'],
-        evidence: [{ source: 'DevelopmentObservation', sourceId: o.id, label: 'Alerta', date: o.date?.toISOString() }],
-        suggestedAction: hp ? 'Agendar avaliação com equipe de apoio.' : 'Acompanhar evolução.', targetRoute: '/app/observacao-crianca' });
-    }
-
-    // 5. Restrições alimentares críticas
-    const restricoes = await this.prisma.dietaryRestriction.findMany({
-      where: { isActive: true, severity: { in: ['ALTA', 'CRITICA'] }, child: { enrollments: { some: { status: 'ATIVA', classroom: { unit: { mantenedoraId, ...(resolvedUnit ? { id: resolvedUnit } : {}) } } } } }, ...(params.childId ? { childId: params.childId } : {}) },
-      select: { id: true, severity: true, description: true }, take: 20,
-    });
-    for (const r of restricoes) {
-      add({ id: `rest-${r.id}`, type: 'RESTRICAO_ALIMENTAR_CRITICA', title: `Restrição alimentar ${r.severity}`,
-        description: r.description ?? 'Criança com restrição alimentar de alta severidade.',
-        priority: r.severity === 'CRITICA' ? 'CRITICAL' : 'HIGH', profile: ['NUTRICIONISTA', 'PROFESSOR'],
-        evidence: [{ source: 'DietaryRestriction', sourceId: r.id, label: 'Severidade', value: r.severity ?? undefined }],
-        suggestedAction: 'Verificar cardápio e orientar equipe.', targetRoute: '/app/painel-alergias' });
-    }
-
-    missions.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
     return {
-      total: missions.length,
-      summary: { CRITICAL: missions.filter((m) => m.priority === 'CRITICAL').length, HIGH: missions.filter((m) => m.priority === 'HIGH').length, MEDIUM: missions.filter((m) => m.priority === 'MEDIUM').length, LOW: missions.filter((m) => m.priority === 'LOW').length },
-      missions,
+      mode: 'READ_ONLY_DIAGNOSTIC',
+      safety: {
+        writesData: false,
+        changesCurriculum: false,
+        changesPlanning: false,
+        sendsChildNamesToAi: false,
+        requiresHumanReview: true,
+      },
+      indicators,
+      automaticFindings,
+      ai: aiDiagnosis,
+      nextActions: this.buildSuggestedNextActions(indicators),
     };
   }
 
-  async getMissionsSummary(user: JwtPayload, params: { unitId?: string }) {
-    const r = await this.getMissions(user, { ...params, periodDays: 14 });
-    return { total: r.total, summary: r.summary, topMissions: r.missions.slice(0, 5) };
+  private normalizePeriodDays(value?: string | number): number {
+    const parsed = Number(value ?? 30);
+    if (!Number.isFinite(parsed)) return 30;
+    return Math.min(120, Math.max(7, Math.floor(parsed)));
+  }
+
+  private buildAutomaticFindings(indicators: any) {
+    const findings: Array<{ type: string; severity: 'BAIXA' | 'MEDIA' | 'ALTA'; message: string }> = [];
+
+    if (indicators.attendance.presenceRate !== null && indicators.attendance.presenceRate < 85) {
+      findings.push({
+        type: 'FREQUENCIA',
+        severity: 'ALTA',
+        message: `Presença agregada em ${indicators.attendance.presenceRate}% no período. Verificar faltas recorrentes por turma/criança.`,
+      });
+    }
+
+    if (indicators.pedagogical.observationsWithAlerts > 0) {
+      findings.push({
+        type: 'DESENVOLVIMENTO',
+        severity: 'ALTA',
+        message: `${indicators.pedagogical.observationsWithAlerts} observação(ões) com alerta de desenvolvimento no período. Revisão humana recomendada.`,
+      });
+    }
+
+    if (indicators.pedagogical.rdicPending > 0) {
+      findings.push({
+        type: 'RDIC',
+        severity: 'MEDIA',
+        message: `${indicators.pedagogical.rdicPending} RDIC(s) pendente(s) de conclusão/revisão.`,
+      });
+    }
+
+    if (indicators.pedagogical.planningsPending > 0) {
+      findings.push({
+        type: 'PLANEJAMENTO',
+        severity: 'MEDIA',
+        message: `${indicators.pedagogical.planningsPending} planejamento(s) em rascunho, revisão ou devolvido(s).`,
+      });
+    }
+
+    if (indicators.care.openOperationalAlerts > 0) {
+      findings.push({
+        type: 'ALERTA_OPERACIONAL',
+        severity: 'ALTA',
+        message: `${indicators.care.openOperationalAlerts} alerta(s) operacional(is) aberto(s).`,
+      });
+    }
+
+    if (findings.length === 0) {
+      findings.push({
+        type: 'GERAL',
+        severity: 'BAIXA',
+        message: 'Nenhum ponto crítico automático encontrado nos indicadores agregados do período.',
+      });
+    }
+
+    return findings;
+  }
+
+  private async generateAiDiagnosisSafely(indicators: any, findings: any[]) {
+    if (!this.geminiService?.isEnabled()) {
+      return {
+        enabled: false,
+        provider: null,
+        diagnosis: null,
+        note: 'GEMINI_API_KEY não configurada. O diagnóstico automático determinístico foi retornado sem chamada externa de IA.',
+      };
+    }
+
+    const systemInstruction = [
+      'Você é uma IA assistiva para gestão de creches e educação infantil.',
+      'Nunca dê diagnóstico clínico definitivo.',
+      'Nunca invente dados.',
+      'Use apenas os indicadores agregados recebidos.',
+      'Não peça nomes de crianças e não mencione identidade individual.',
+      'Retorne recomendações operacionais revisáveis por humanos.',
+    ].join(' ');
+
+    const prompt = `Analise os indicadores agregados do sistema Conexa e gere um diagnóstico operacional curto, em português, com prioridades, riscos e próximas ações.\n\nIndicadores:\n${JSON.stringify(indicators, null, 2)}\n\nAchados automáticos:\n${JSON.stringify(findings, null, 2)}\n\nFormato desejado:\n1. Diagnóstico geral\n2. Riscos principais\n3. Ações imediatas\n4. Ações dos próximos 7 dias\n5. Observações de segurança/LGPD`;
+
+    try {
+      const diagnosis = await this.geminiService.generateText(prompt, systemInstruction);
+      return {
+        enabled: true,
+        provider: 'gemini',
+        diagnosis,
+        note: 'IA executada com dados agregados e sem nomes de crianças.',
+      };
+    } catch (error) {
+      return {
+        enabled: false,
+        provider: 'gemini',
+        diagnosis: null,
+        note: 'Falha ao consultar IA. Indicadores e achados automáticos permanecem disponíveis.',
+      };
+    }
+  }
+
+  private buildSuggestedNextActions(indicators: any): string[] {
+    const actions: string[] = [];
+    if (indicators.care.openOperationalAlerts > 0) actions.push('Revisar alertas operacionais abertos por unidade/turma.');
+    if (indicators.pedagogical.observationsWithAlerts > 0) actions.push('Encaminhar observações com alerta para coordenação/psicologia.');
+    if (indicators.pedagogical.rdicPending > 0) actions.push('Priorizar RDICs pendentes de revisão/conclusão.');
+    if (indicators.pedagogical.planningsPending > 0) actions.push('Revisar planejamentos em rascunho, revisão ou devolvidos.');
+    if (indicators.attendance.presenceRate !== null && indicators.attendance.presenceRate < 85) actions.push('Verificar crianças com faltas recorrentes no período.');
+    if (actions.length === 0) actions.push('Manter rotina de acompanhamento e revisar indicadores semanalmente.');
+    return actions;
   }
 
 }

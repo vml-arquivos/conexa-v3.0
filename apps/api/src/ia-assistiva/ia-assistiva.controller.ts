@@ -1,21 +1,32 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
   HttpCode,
   HttpStatus,
   UseGuards,
-} from '@nestjs/common';
-import { IaAssistivaService } from './ia-assistiva.service';
-import { GerarAtividadeDto } from './dto/gerar-atividade.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+} from "@nestjs/common";
+import { IaAssistivaService } from "./ia-assistiva.service";
+import { GerarAtividadeDto } from "./dto/gerar-atividade.dto";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import type { JwtPayload } from "../auth/interfaces/jwt-payload.interface";
 
-@Controller('ia')
+@Controller("ia")
 @UseGuards(JwtAuthGuard)
 export class IaAssistivaController {
   constructor(private readonly iaService: IaAssistivaService) {}
+
+  /**
+   * GET /ia/status
+   * Executa um teste real e curto no provedor configurado, sem dados pessoais.
+   */
+  @Get("status")
+  @HttpCode(HttpStatus.OK)
+  status() {
+    return this.iaService.status();
+  }
 
   /**
    * POST /ia/gerar-atividade
@@ -26,7 +37,7 @@ export class IaAssistivaController {
    * REGRA: O Campo de Experiência e os Objetivos (BNCC + Currículo) são FIXOS
    * e devem vir da Sequência Piloto. A IA apenas cria a atividade.
    */
-  @Post('gerar-atividade')
+  @Post("gerar-atividade")
   @HttpCode(HttpStatus.OK)
   gerarAtividade(
     @Body() dto: GerarAtividadeDto,
@@ -41,7 +52,7 @@ export class IaAssistivaController {
    *
    * Acesso: Professor, Unidade, Mantenedora, Developer
    */
-  @Post('microgestos')
+  @Post("microgestos")
   @HttpCode(HttpStatus.OK)
   gerarMicrogestos(
     @Body()
@@ -62,7 +73,7 @@ export class IaAssistivaController {
    *
    * Acesso: Professor, Unidade, Mantenedora, Developer
    */
-  @Post('relatorio-aluno')
+  @Post("relatorio-aluno")
   @HttpCode(HttpStatus.OK)
   gerarRelatorioAluno(
     @Body()
@@ -82,7 +93,7 @@ export class IaAssistivaController {
    * Gera relatório consolidado com anonimização LGPD.
    * Busca dados reais do banco e envia apenas dados anonimizados para a IA.
    */
-  @Post('relatorio-consolidado-lgpd')
+  @Post("relatorio-consolidado-lgpd")
   @HttpCode(HttpStatus.OK)
   gerarRelatorioConsolidadoLGPD(
     @Body() body: { childId: string; periodo: string },
