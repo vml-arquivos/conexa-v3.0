@@ -1,185 +1,149 @@
-/**
- * MobileMaterialPage — Requisição de material mobile
- * Professor solicita material pedagógico ou de higiene em poucos toques
- */
-
 import { useState } from 'react';
-import { Package, Loader2, Send } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { MobilePageHeader, MobileField, MobileSaveBar, MobileTextarea, ChipGroup, M } from '../../components/mobile/mobileUI';
 
-const CATEGORIAS = [
-  { id: 'pedagogico', label: 'Pedagógico', emoji: '📚', itens: ['Cola', 'Tesoura', 'Tinta guache', 'Papel sulfite', 'EVA', 'Massinha', 'Canetinha', 'Lápis de cor', 'Cartolina', 'Pincel'] },
-  { id: 'higiene', label: 'Higiene pessoal', emoji: '🧴', itens: ['Sabonete líquido', 'Álcool gel', 'Papel toalha', 'Fralda', 'Lenço umedecido', 'Xampu', 'Condicionador', 'Pente'] },
-  { id: 'limpeza', label: 'Limpeza', emoji: '🧹', itens: ['Papel higiênico', 'Detergente', 'Desinfetante', 'Saco de lixo', 'Esponja'] },
+const CATS = [
+  { id: 'pedagogico', label: 'Pedagógico', emoji: '📚',
+    itens: [
+      { id: 'Cola', label: 'Cola', emoji: '🔧' },
+      { id: 'Tesoura', label: 'Tesoura', emoji: '✂️' },
+      { id: 'Tinta guache', label: 'Tinta guache', emoji: '🎨' },
+      { id: 'Papel sulfite', label: 'Papel sulfite', emoji: '📄' },
+      { id: 'EVA', label: 'EVA', emoji: '🟢' },
+      { id: 'Massinha', label: 'Massinha', emoji: '🟤' },
+      { id: 'Canetinha', label: 'Canetinha', emoji: '🖊️' },
+      { id: 'Lápis de cor', label: 'Lápis de cor', emoji: '✏️' },
+      { id: 'Cartolina', label: 'Cartolina', emoji: '📋' },
+      { id: 'Pincel', label: 'Pincel', emoji: '🖌️' },
+    ],
+  },
+  { id: 'higiene', label: 'Higiene', emoji: '🧴',
+    itens: [
+      { id: 'Sabonete líquido', label: 'Sabonete', emoji: '🧼' },
+      { id: 'Álcool gel', label: 'Álcool gel', emoji: '🧴' },
+      { id: 'Papel toalha', label: 'Papel toalha', emoji: '🗒️' },
+      { id: 'Fralda', label: 'Fralda', emoji: '👶' },
+      { id: 'Lenço umedecido', label: 'Lenço', emoji: '💧' },
+    ],
+  },
+  { id: 'limpeza', label: 'Limpeza', emoji: '🧹',
+    itens: [
+      { id: 'Papel higiênico', label: 'Papel higiênico', emoji: '🧻' },
+      { id: 'Desinfetante', label: 'Desinfetante', emoji: '🧪' },
+      { id: 'Saco de lixo', label: 'Saco de lixo', emoji: '🗑️' },
+    ],
+  },
   { id: 'outro', label: 'Outro', emoji: '📦', itens: [] },
 ];
 
-const PRIORIDADES = [
-  { id: 'LOW', label: 'Baixa', color: '#6b7280' },
+const PRIOS = [
+  { id: 'LOW',    label: 'Baixa',  color: M.color.textMuted },
   { id: 'MEDIUM', label: 'Normal', color: '#3b82f6' },
-  { id: 'HIGH', label: 'Urgente', color: '#f59e0b' },
+  { id: 'HIGH',   label: 'Urgente', color: M.color.warning },
 ];
 
 export default function MobileMaterialPage() {
   const { isOnline, postOfflineSafe } = useOfflineSync();
-  const [categoria, setCategoria] = useState('');
-  const [itensSelecionados, setItensSelecionados] = useState<string[]>([]);
-  const [itemCustom, setItemCustom] = useState('');
-  const [prioridade, setPrioridade] = useState('MEDIUM');
-  const [observacao, setObservacao] = useState('');
+  const [cat, setCat] = useState('');
+  const [itens, setItens] = useState<string[]>([]);
+  const [custom, setCustom] = useState('');
+  const [prio, setPrio] = useState('MEDIUM');
+  const [obs, setObs] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const catInfo = CATEGORIAS.find((c) => c.id === categoria);
-
-  const toggleItem = (item: string) => {
-    setItensSelecionados((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item],
-    );
-    setSaved(false);
-  };
+  const catInfo = CATS.find(c => c.id === cat);
+  const toggleItem = (id: string) => setItens(p => p.includes(id) ? p.filter(i => i !== id) : [...p, id]);
+  const todos = [...itens, ...(custom.trim() ? [custom.trim()] : [])];
 
   const salvar = async () => {
-    const todos = [...itensSelecionados, ...(itemCustom.trim() ? [itemCustom.trim()] : [])];
-    if (!categoria || todos.length === 0) return;
+    if (!cat || todos.length === 0) return;
     setSaving(true);
     try {
-      const payload = {
+      await postOfflineSafe('requisicao', '/material-requests', 'POST', {
         title: todos.length === 1 ? todos[0] : `${todos.length} itens — ${catInfo?.label}`,
-        description: todos.join(', ') + (observacao ? `\n${observacao}` : ''),
-        category: categoria,
-        priority: prioridade,
-        items: todos.map((nome) => ({ nome, quantidade: 1 })),
-        requestedDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-      };
-      await postOfflineSafe('requisicao', '/material-requests', 'POST', payload);
+        description: todos.join(', ') + (obs ? `\n${obs}` : ''),
+        category: cat, priority: prio,
+        items: todos.map(n => ({ nome: n, quantidade: 1 })),
+      });
       setSaved(true);
-      setCategoria(''); setItensSelecionados([]); setItemCustom(''); setObservacao('');
+      setCat(''); setItens([]); setCustom(''); setObs('');
       setTimeout(() => setSaved(false), 3000);
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <div style={{ padding: '16px 16px 120px' }}>
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 500, margin: '0 0 2px', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Package size={20} /> Requisição
-        </h1>
-        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>
-          Solicitar materiais · {isOnline ? '🟢' : '🔴 offline'}
-        </p>
-      </div>
+    <div style={{ padding: '16px 16px 90px', minHeight: '100%', background: M.color.page }}>
+      <MobilePageHeader title="Requisição" subtitle="Solicitar materiais" icon={Package} color={M.color.warning} />
 
       {/* Categorias */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
-        {CATEGORIAS.map((cat) => (
-          <button key={cat.id} onClick={() => { setCategoria(cat.id); setItensSelecionados([]); }}
-            style={{
-              padding: '14px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'center',
-              border: `0.5px solid ${categoria === cat.id ? '#4f46e5' : 'var(--color-border-tertiary)'}`,
-              background: categoria === cat.id ? '#eef2ff' : 'var(--color-background-primary)',
+      <MobileField label="Categoria">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {CATS.map(c => (
+            <button key={c.id} onClick={() => { setCat(c.id); setItens([]); }} style={{
+              padding: '14px 10px', borderRadius: M.radius.lg, cursor: 'pointer', textAlign: 'center',
+              border: `0.5px solid ${cat === c.id ? M.color.warning : M.color.border}`,
+              background: cat === c.id ? M.color.warningBg : M.color.surface,
               WebkitTapHighlightColor: 'transparent',
             }}>
-            <div style={{ fontSize: 28, marginBottom: 4 }}>{cat.emoji}</div>
-            <p style={{ fontSize: 13, fontWeight: 500, margin: 0, color: categoria === cat.id ? '#4338ca' : 'var(--color-text-primary)' }}>{cat.label}</p>
-          </button>
-        ))}
-      </div>
+              <div style={{ fontSize: 28, marginBottom: 5 }}>{c.emoji}</div>
+              <p style={{ fontSize: M.font.md, fontWeight: 500, margin: 0, color: cat === c.id ? '#92400e' : M.color.text }}>{c.label}</p>
+            </button>
+          ))}
+        </div>
+      </MobileField>
 
-      {categoria && catInfo && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Itens */}
+      {cat && catInfo && (
+        <>
           {catInfo.itens.length > 0 && (
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 8 }}>Selecione os itens *</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {catInfo.itens.map((item) => (
-                  <button key={item} onClick={() => toggleItem(item)}
-                    style={{
-                      padding: '8px 14px', borderRadius: 20, fontSize: 13, cursor: 'pointer',
-                      border: `0.5px solid ${itensSelecionados.includes(item) ? '#4f46e5' : 'var(--color-border-tertiary)'}`,
-                      background: itensSelecionados.includes(item) ? '#eef2ff' : 'var(--color-background-primary)',
-                      color: itensSelecionados.includes(item) ? '#4338ca' : 'var(--color-text-primary)',
-                      fontWeight: itensSelecionados.includes(item) ? 500 : 400,
-                      WebkitTapHighlightColor: 'transparent',
-                    }}>
-                    {itensSelecionados.includes(item) ? '✓ ' : ''}{item}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MobileField label="Itens">
+              <ChipGroup options={catInfo.itens} selected={itens} onToggle={toggleItem} multi color={M.color.warning} />
+            </MobileField>
           )}
 
-          {/* Item customizado */}
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 6 }}>
-              {catInfo.itens.length > 0 ? 'Ou descreva outro item' : 'Descreva o item necessário *'}
-            </label>
-            <input value={itemCustom} onChange={(e) => setItemCustom(e.target.value)}
-              placeholder="Ex.: Caneta permanente azul, quantidade: 10"
-              style={{ width: '100%', padding: '12px 14px', fontSize: 15, border: '0.5px solid var(--color-border-secondary)', borderRadius: 12, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', boxSizing: 'border-box' }} />
-          </div>
+          <MobileField label={catInfo.itens.length > 0 ? 'Ou descreva outro item' : 'Descreva o item *'}>
+            <input
+              value={custom}
+              onChange={e => setCustom(e.target.value)}
+              placeholder="Ex.: Caneta permanente azul, 10 unidades"
+              style={{
+                width: '100%', boxSizing: 'border-box', padding: '13px 14px', fontSize: 15,
+                border: `0.5px solid ${M.color.border}`, borderRadius: M.radius.md,
+                background: M.color.surface, color: M.color.text, outline: 'none',
+              }}
+            />
+          </MobileField>
 
-          {/* Prioridade */}
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 8 }}>Prioridade</label>
+          <MobileField label="Prioridade">
             <div style={{ display: 'flex', gap: 8 }}>
-              {PRIORIDADES.map((p) => (
-                <button key={p.id} onClick={() => setPrioridade(p.id)}
-                  style={{
-                    flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-                    border: `0.5px solid ${prioridade === p.id ? p.color : 'var(--color-border-tertiary)'}`,
-                    background: prioridade === p.id ? `${p.color}18` : 'var(--color-background-primary)',
-                    color: prioridade === p.id ? p.color : 'var(--color-text-secondary)',
-                    fontSize: 13, fontWeight: prioridade === p.id ? 600 : 400,
-                  }}>
-                  {p.label}
-                </button>
+              {PRIOS.map(p => (
+                <button key={p.id} onClick={() => setPrio(p.id)} style={{
+                  flex: 1, padding: 10, borderRadius: M.radius.md, cursor: 'pointer',
+                  border: `0.5px solid ${prio === p.id ? p.color : M.color.border}`,
+                  background: prio === p.id ? `${p.color}14` : M.color.surface,
+                  color: prio === p.id ? p.color : M.color.textSoft,
+                  fontSize: M.font.md, fontWeight: prio === p.id ? 600 : 400,
+                  WebkitTapHighlightColor: 'transparent',
+                }}>{p.label}</button>
               ))}
             </div>
-          </div>
+          </MobileField>
 
-          {/* Observação */}
-          <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 6 }}>Observação (opcional)</label>
-            <textarea value={observacao} onChange={(e) => setObservacao(e.target.value)}
-              placeholder="Quantidade específica, prazo, substitutos aceitáveis..."
-              rows={3}
-              style={{ width: '100%', padding: '12px 14px', fontSize: 15, border: '0.5px solid var(--color-border-secondary)', borderRadius: 12, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-          </div>
+          <MobileField label="Observação">
+            <MobileTextarea value={obs} onChange={setObs} placeholder="Quantidade, prazo, substitutos aceitáveis..." rows={3} />
+          </MobileField>
 
-          {/* Resumo */}
-          {(itensSelecionados.length > 0 || itemCustom.trim()) && (
-            <div style={{ padding: '12px 14px', background: 'var(--color-background-secondary)', borderRadius: 12, border: '0.5px solid var(--color-border-tertiary)' }}>
-              <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', margin: '0 0 4px' }}>Resumo do pedido:</p>
-              <p style={{ fontSize: 14, color: 'var(--color-text-primary)', margin: 0 }}>
-                {[...itensSelecionados, itemCustom.trim()].filter(Boolean).join(', ')}
-              </p>
+          {todos.length > 0 && (
+            <div style={{ padding: '10px 14px', background: M.color.warningBg, borderRadius: M.radius.md, border: `0.5px solid #fde68a`, marginBottom: 14 }}>
+              <p style={{ fontSize: M.font.sm, color: '#92400e', margin: '0 0 3px', fontWeight: 600 }}>Pedido:</p>
+              <p style={{ fontSize: M.font.md, color: M.color.text, margin: 0 }}>{todos.join(', ')}</p>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Botão enviar */}
-      {categoria && (
-        <div style={{ position: 'fixed', bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))', left: 0, right: 0, padding: '12px 16px', background: 'var(--color-background-primary)', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-          <button onClick={salvar}
-            disabled={saving || (itensSelecionados.length === 0 && !itemCustom.trim())}
-            style={{
-              width: '100%', padding: '14px', borderRadius: 14, border: 'none',
-              background: saved ? '#10b981' : '#4f46e5', color: '#fff',
-              fontSize: 15, fontWeight: 500, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              opacity: (saving || (itensSelecionados.length === 0 && !itemCustom.trim())) ? 0.6 : 1,
-            }}>
-            {saving ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={18} />}
-            {saved ? '✓ Requisição enviada' : isOnline ? 'Enviar requisição' : 'Salvar offline'}
-          </button>
-        </div>
+          <MobileSaveBar label="Enviar requisição" labelDone="✓ Requisição enviada" onClick={salvar} disabled={todos.length === 0} saving={saving} saved={saved} isOnline={isOnline} color={M.color.warning} />
+        </>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -3,13 +3,11 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const BUILD_ID = `${Date.now()}`;
+
 export default defineConfig({
-  // Carimbo de build: injeta a data/hora do build para verificação visual no PWA.
-  // Permite confirmar EXATAMENTE qual build está no ar (resolve "fiz deploy e não vejo mudança").
   define: {
-    __BUILD_ID__: JSON.stringify(
-      new Date().toISOString().slice(0, 16).replace('T', ' ')
-    ),
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
   },
   plugins: [
     react(),

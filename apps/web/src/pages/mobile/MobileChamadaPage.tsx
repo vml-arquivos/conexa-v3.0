@@ -1,296 +1,185 @@
-/**
- * MobileChamadaPage — Chamada mobile-first com suporte offline
- *
- * Fluxo:
- * 1. Carrega alunos do IndexedDB (offline) ou da API (online)
- * 2. Professor toca em cada aluno para marcar presença/falta
- * 3. Salva localmente e envia (ou enfileira se offline)
- */
-
 import { useState, useEffect, useCallback } from 'react';
-import { Check, X, ChevronDown, Loader2, RefreshCw, Send } from 'lucide-react';
+import { ClipboardList, Loader2 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import http from '../../api/http';
 import { childrenCache, classroomsCache, type CachedChild, type CachedClassroom } from '../../services/offlineDB';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
+import { MobilePageHeader, MobileSelect, MobileSaveBar, AlunoCard, M } from '../../components/mobile/mobileUI';
 
 type Status = 'P' | 'F' | null;
-
-function hojeISO() { return new Date().toISOString().slice(0, 10); }
+const hojeISO = () => new Date().toISOString().slice(0, 10);
 
 export default function MobileChamadaPage() {
   const { user } = useAuth();
   const { isOnline, postOfflineSafe } = useOfflineSync();
-
   const [classrooms, setClassrooms] = useState<CachedClassroom[]>([]);
-  const [selectedClassroom, setSelectedClassroom] = useState<string>('');
+  const [selected, setSelected] = useState('');
   const [children, setChildren] = useState<CachedChild[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, Status>>({});
+  const [att, setAtt] = useState<Record<string, Status>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Carregar turmas (online ou cache)
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
         if (isOnline) {
-          const res = await http.get('/lookup/classrooms/accessible');
-          const list = Array.isArray(res.data) ? res.data : res.data?.classrooms ?? [];
+          const r = await http.get('/lookup/classrooms/accessible');
+          const list = Array.isArray(r.data) ? r.data : r.data?.classrooms ?? [];
           await classroomsCache.saveAll(list);
           setClassrooms(list);
-          if (list.length === 1) setSelectedClassroom(list[0].id);
+          if (list.length === 1) setSelected(list[0].id);
         } else {
-          const cached = await classroomsCache.getAll();
-          setClassrooms(cached);
-          if (cached.length === 1) setSelectedClassroom(cached[0].id);
+          const c = await classroomsCache.getAll();
+          setClassrooms(c);
+          if (c.length === 1) setSelected(c[0].id);
         }
-      } catch {
-        const cached = await classroomsCache.getAll();
-        setClassrooms(cached);
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     }
     load();
   }, [isOnline]);
 
-  // Carregar alunos da turma selecionada
   useEffect(() => {
-    if (!selectedClassroom) return;
+    if (!selected) return;
+    setAtt({}); setSaved(false);
     async function loadChildren() {
       setLoading(true);
-      setAttendance({});
       try {
         if (isOnline) {
-          const [childRes, chamadaRes] = await Promise.all([
-            http.get('/children', { params: { limit: 200 } }),
-            http.get('/attendance/today', { params: { classroomId: selectedClassroom, date: hojeISO() } }),
+          const [cr, ar] = await Promise.all([
+            http.get('/children', { params: { limit: 300 } }),
+            http.get('/attendance/today', { params: { classroomId: selected, date: hojeISO() } }).catch(() => null),
           ]);
-          const all = Array.isArray(childRes.data) ? childRes.data : childRes.data?.data ?? childRes.data?.children ?? [];
-          const da = all.filter((c: any) => c.enrollments?.some((e: any) => e.classroomId === selectedClassroom && e.status === 'ATIVA'));
+          const all = Array.isArray(cr.data) ? cr.data : cr.data?.data ?? cr.data?.children ?? [];
+          const da = all.filter((c: any) => c.enrollments?.some((e: any) => e.classroomId === selected && e.status === 'ATIVA'));
           setChildren(da);
-          // Preencher chamada já feita hoje
-          const chamada = chamadaRes.data?.records ?? chamadaRes.data ?? [];
-          if (Array.isArray(chamada)) {
-            const map: Record<string, Status> = {};
-            chamada.forEach((r: any) => { map[r.childId] = r.status === 'P' ? 'P' : 'F'; });
-            setAttendance(map);
+          if (ar?.data) {
+            const records = ar.data?.records ?? ar.data ?? [];
+            if (Array.isArray(records)) {
+              const map: Record<string, Status> = {};
+              records.forEach((r: any) => { map[r.childId] = r.status === 'P' ? 'P' : 'F'; });
+              setAtt(map);
+            }
           }
         } else {
-          const cached = await childrenCache.getByClassroom(selectedClassroom);
-          setChildren(cached);
+          setChildren(await childrenCache.getByClassroom(selected));
         }
-      } catch {
-        const cached = await childrenCache.getByClassroom(selectedClassroom);
-        setChildren(cached);
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     }
     loadChildren();
-  }, [selectedClassroom, isOnline]);
+  }, [selected, isOnline]);
 
   const toggle = useCallback((id: string) => {
-    setAttendance((prev) => {
-      const current = prev[id];
-      return { ...prev, [id]: current === 'P' ? 'F' : current === 'F' ? null : 'P' };
-    });
+    setAtt(p => ({ ...p, [id]: p[id] === 'P' ? 'F' : p[id] === 'F' ? null : 'P' }));
     setSaved(false);
   }, []);
 
-  const marcarTodos = (status: Status) => {
-    const map: Record<string, Status> = {};
-    children.forEach((c) => { map[c.id] = status; });
-    setAttendance(map);
-    setSaved(false);
-  };
+  const presentes = children.filter(c => att[c.id] === 'P').length;
+  const faltas    = children.filter(c => att[c.id] === 'F').length;
+  const pendente  = children.filter(c => !att[c.id]).length;
 
   const salvar = async () => {
-    if (!selectedClassroom) return;
-    setSaving(true);
-    setErro(null);
+    if (!selected) return;
+    setSaving(true); setErro(null);
     try {
-      const records = children.map((c) => ({
-        childId: c.id,
-        status: attendance[c.id] ?? 'P',
-        date: hojeISO(),
-      }));
-      const payload = { classroomId: selectedClassroom, date: hojeISO(), records };
-      const result = await postOfflineSafe('chamada', '/attendance/register', 'POST', payload);
+      const records = children.map(c => ({ childId: c.id, status: att[c.id] ?? 'P', date: hojeISO() }));
+      await postOfflineSafe('chamada', '/attendance/register', 'POST', { classroomId: selected, date: hojeISO(), records });
       setSaved(true);
-      if (!result.synced && !isOnline) {
-        // Feedback visual: salvo offline
-      }
-    } catch (e) {
-      setErro('Erro ao salvar. Verifique a conexão.');
-    } finally {
-      setSaving(false);
-    }
+    } catch { setErro('Erro ao salvar.'); } finally { setSaving(false); }
   };
 
-  const presentes = children.filter((c) => attendance[c.id] === 'P').length;
-  const faltas = children.filter((c) => attendance[c.id] === 'F').length;
-  const naoBatidos = children.filter((c) => !attendance[c.id]).length;
-
   return (
-    <div style={{ padding: '16px 16px 0' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 500, margin: '0 0 2px', color: 'var(--color-text-primary)' }}>Chamada</h1>
-        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0 }}>
-          {hojeISO().split('-').reverse().join('/')} · {isOnline ? '🟢 online' : '🔴 offline'}
-        </p>
+    <div style={{ padding: '16px 16px 90px', minHeight: '100%', background: M.color.page }}>
+      <MobilePageHeader
+        title="Chamada"
+        subtitle={`${hojeISO().split('-').reverse().join('/')} · ${isOnline ? 'online' : 'offline'}`}
+        icon={ClipboardList}
+        color={M.color.brand}
+      />
+
+      <div style={{ marginBottom: 14 }}>
+        <MobileSelect
+          value={selected}
+          onChange={setSelected}
+          options={classrooms.map(c => ({ id: c.id, label: c.name }))}
+          placeholder="Selecionar turma"
+        />
       </div>
 
-      {/* Seletor de turma */}
-      <div style={{ position: 'relative', marginBottom: 16 }}>
-        <select
-          value={selectedClassroom}
-          onChange={(e) => setSelectedClassroom(e.target.value)}
-          style={{
-            width: '100%', padding: '12px 40px 12px 14px', fontSize: 15,
-            border: '0.5px solid var(--color-border-secondary)',
-            borderRadius: 12, background: 'var(--color-background-primary)',
-            color: 'var(--color-text-primary)', appearance: 'none',
-          }}
-        >
-          <option value="">Selecionar turma</option>
-          {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <ChevronDown size={16} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--color-text-secondary)' }} />
-      </div>
+      {loading && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+          <Loader2 size={26} color={M.color.textMuted} style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      )}
 
-      {selectedClassroom && !loading && children.length > 0 && (
+      {selected && !loading && children.length > 0 && (
         <>
           {/* Resumo */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
             {[
-              { label: 'Presentes', value: presentes, color: '#10b981' },
-              { label: 'Faltas', value: faltas, color: '#ef4444' },
-              { label: 'Pendente', value: naoBatidos, color: '#f59e0b' },
-            ].map((item) => (
+              { label: 'Presentes', value: presentes, color: M.color.success },
+              { label: 'Faltas',    value: faltas,    color: M.color.error   },
+              { label: 'Pendente',  value: pendente,  color: M.color.warning },
+            ].map(item => (
               <div key={item.label} style={{
-                background: 'var(--color-background-primary)', borderRadius: 12,
-                padding: '10px 12px', border: '0.5px solid var(--color-border-tertiary)', textAlign: 'center',
+                background: M.color.surface, borderRadius: M.radius.lg,
+                padding: '10px 8px', border: `0.5px solid ${M.color.borderSoft}`, textAlign: 'center',
               }}>
-                <p style={{ fontSize: 22, fontWeight: 500, margin: 0, color: item.color }}>{item.value}</p>
-                <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: 0 }}>{item.label}</p>
+                <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: item.color, letterSpacing: -0.5 }}>{item.value}</p>
+                <p style={{ fontSize: M.font.xs, color: M.color.textMuted, margin: 0 }}>{item.label}</p>
               </div>
             ))}
           </div>
 
           {/* Ações rápidas */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onClick={() => marcarTodos('P')} style={{
-              flex: 1, padding: '10px', borderRadius: 10, border: '0.5px solid #10b981',
-              background: '#f0fdf4', color: '#065f46', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            }}>
-              ✓ Todos presentes
-            </button>
-            <button onClick={() => marcarTodos(null)} style={{
-              flex: 1, padding: '10px', borderRadius: 10, border: '0.5px solid var(--color-border-secondary)',
-              background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 13, cursor: 'pointer',
-            }}>
-              ↺ Limpar
-            </button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <button onClick={() => { const m: Record<string, Status> = {}; children.forEach(c => { m[c.id] = 'P'; }); setAtt(m); setSaved(false); }} style={{
+              flex: 1, padding: 10, borderRadius: M.radius.md, cursor: 'pointer',
+              border: `0.5px solid ${M.color.success}`, background: M.color.successBg,
+              color: '#065f46', fontSize: M.font.md, fontWeight: 500,
+              WebkitTapHighlightColor: 'transparent',
+            }}>✓ Todos presentes</button>
+            <button onClick={() => { setAtt({}); setSaved(false); }} style={{
+              flex: 1, padding: 10, borderRadius: M.radius.md, cursor: 'pointer',
+              border: `0.5px solid ${M.color.border}`, background: M.color.surface,
+              color: M.color.textSoft, fontSize: M.font.md,
+              WebkitTapHighlightColor: 'transparent',
+            }}>↺ Limpar</button>
           </div>
 
-          {/* Lista de alunos */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 100 }}>
-            {children.map((child) => {
-              const status = attendance[child.id];
-              return (
-                <button
-                  key={child.id}
-                  onClick={() => toggle(child.id)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 14,
-                    border: `0.5px solid ${status === 'P' ? '#10b981' : status === 'F' ? '#ef4444' : 'var(--color-border-tertiary)'}`,
-                    background: status === 'P' ? '#f0fdf4' : status === 'F' ? '#fef2f2' : 'var(--color-background-primary)',
-                    cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {/* Avatar */}
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                    background: status === 'P' ? '#d1fae5' : status === 'F' ? '#fee2e2' : 'var(--color-background-secondary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 500,
-                    color: status === 'P' ? '#065f46' : status === 'F' ? '#991b1b' : 'var(--color-text-secondary)',
-                  }}>
-                    {status === 'P' ? <Check size={18} /> : status === 'F' ? <X size={18} /> : `${child.firstName[0]}${child.lastName?.[0] ?? ''}`}
-                  </div>
-
-                  {/* Nome */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 15, fontWeight: 500, margin: 0, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-                      {child.firstName} {child.lastName}
-                    </p>
-                    {child.allergies && (
-                      <p style={{ fontSize: 11, color: '#d97706', margin: 0 }}>⚠ {child.allergies.slice(0, 30)}</p>
-                    )}
-                  </div>
-
-                  {/* Status badge */}
-                  <span style={{
-                    fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 20,
-                    background: status === 'P' ? '#d1fae5' : status === 'F' ? '#fee2e2' : 'var(--color-background-secondary)',
-                    color: status === 'P' ? '#065f46' : status === 'F' ? '#991b1b' : 'var(--color-text-tertiary)',
-                    flexShrink: 0,
-                  }}>
-                    {status === 'P' ? 'Presente' : status === 'F' ? 'Falta' : '—'}
-                  </span>
-                </button>
-              );
-            })}
+          {/* Lista */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {children.map(c => (
+              <AlunoCard
+                key={c.id}
+                nome={`${c.firstName} ${c.lastName ?? ''}`.trim()}
+                iniciais={`${c.firstName?.[0] ?? ''}${c.lastName?.[0] ?? ''}`}
+                status={att[c.id] ?? null}
+                alerta={c.allergies?.slice(0, 30)}
+                onClick={() => toggle(c.id)}
+              />
+            ))}
           </div>
         </>
       )}
 
-      {loading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--color-text-tertiary)' }} />
-        </div>
-      )}
+      {erro && <div style={{ padding: '10px 14px', background: M.color.errorBg, borderRadius: M.radius.md, marginTop: 12, fontSize: M.font.md, color: M.color.error }}>{erro}</div>}
 
-      {erro && (
-        <div style={{ padding: '10px 14px', background: 'var(--color-background-danger)', borderRadius: 10, marginBottom: 12, fontSize: 13, color: 'var(--color-text-danger)' }}>
-          {erro}
-        </div>
+      {selected && children.length > 0 && (
+        <MobileSaveBar
+          label="Salvar chamada"
+          labelDone="✓ Chamada salva"
+          onClick={salvar}
+          disabled={pendente === children.length}
+          saving={saving}
+          saved={saved}
+          isOnline={isOnline}
+          color={M.color.brand}
+        />
       )}
-
-      {/* Botão salvar fixo */}
-      {selectedClassroom && children.length > 0 && (
-        <div style={{
-          position: 'fixed', bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
-          left: 0, right: 0, padding: '12px 16px',
-          background: 'var(--color-background-primary)',
-          borderTop: '0.5px solid var(--color-border-tertiary)',
-        }}>
-          <button
-            onClick={salvar}
-            disabled={saving || naoBatidos === children.length}
-            style={{
-              width: '100%', padding: '14px', borderRadius: 14, border: 'none',
-              background: saved ? '#10b981' : '#4f46e5', color: '#fff',
-              fontSize: 15, fontWeight: 500, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              opacity: (saving || naoBatidos === children.length) ? 0.6 : 1,
-              transition: 'all 0.2s',
-            }}
-          >
-            {saving ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={18} />}
-            {saved ? '✓ Chamada salva' : isOnline ? 'Salvar chamada' : 'Salvar offline'}
-          </button>
-        </div>
-      )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
