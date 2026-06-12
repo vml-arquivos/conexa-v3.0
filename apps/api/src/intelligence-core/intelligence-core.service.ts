@@ -16,7 +16,8 @@ type AttentionPoint = {
   allowedForFamilyReport: boolean;
 };
 
-const CENTRAL_LEVELS = [RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL];
+// FIX: usar 'as const' + cast para evitar erro TS2345 com arrays de enum literal
+const CENTRAL_LEVELS = [RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[];
 const CARE_RESTRICTED_ROLES = [
   RoleType.UNIDADE_DIRETOR,
   RoleType.UNIDADE_COORDENADOR_PEDAGOGICO,
@@ -25,10 +26,10 @@ const CARE_RESTRICTED_ROLES = [
   RoleType.STAFF_CENTRAL_PEDAGOGICO,
   RoleType.MANTENEDORA_ADMIN,
   RoleType.DEVELOPER,
-];
+] as RoleType[];
 
 function hasCentralAccess(user: JwtPayload): boolean {
-  return user.roles?.some((role) => CENTRAL_LEVELS.includes(role.level)) ?? false;
+  return user.roles?.some((role) => CENTRAL_LEVELS.includes(role.level as RoleLevel)) ?? false;
 }
 
 function hasRoleLevel(user: JwtPayload, level: RoleLevel): boolean {
@@ -36,7 +37,7 @@ function hasRoleLevel(user: JwtPayload, level: RoleLevel): boolean {
 }
 
 function hasCareRestrictedAccess(user: JwtPayload): boolean {
-  return user.roles?.some((role) => CARE_RESTRICTED_ROLES.includes(role.type)) ?? false;
+  return user.roles?.some((role) => CARE_RESTRICTED_ROLES.includes(role.type as RoleType)) ?? false;
 }
 
 function parsePeriod(params: PeriodParams, fallbackDays = 180) {
@@ -135,24 +136,28 @@ export class IntelligenceCoreService {
     if (!classroomId) throw new ForbiddenException('Turma inválida');
     if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
 
+    // FIX: Classroom não tem mantenedoraId — filtrar via unit.mantenedoraId
     const classroom = await this.prisma.classroom.findFirst({
-      where: { id: classroomId, mantenedoraId: user.mantenedoraId },
-      select: { id: true, name: true, unitId: true, mantenedoraId: true },
+      where: { id: classroomId, unit: { mantenedoraId: user.mantenedoraId } },
+      select: { id: true, name: true, unitId: true, unit: { select: { mantenedoraId: true } } },
     });
     if (!classroom) throw new NotFoundException('Turma não encontrada');
+
+    // Expor mantenedoraId via unit para uso posterior no serviço
+    const classroomWithMeta = { ...classroom, mantenedoraId: classroom.unit.mantenedoraId };
 
     const roleUnitScopes = user.roles?.flatMap((role) => role.unitScopes ?? []) ?? [];
     if (hasCentralAccess(user)) {
       if (roleUnitScopes.length > 0 && !roleUnitScopes.includes(classroom.unitId)) {
         throw new ForbiddenException('Usuário sem acesso à unidade da turma');
       }
-      return classroom;
+      return classroomWithMeta;
     }
     if (hasRoleLevel(user, RoleLevel.UNIDADE)) {
       if (!user.unitId || user.unitId !== classroom.unitId) {
         throw new ForbiddenException('Usuário sem acesso à unidade da turma');
       }
-      return classroom;
+      return classroomWithMeta;
     }
     if (hasRoleLevel(user, RoleLevel.PROFESSOR)) {
       const link = await this.prisma.classroomTeacher.findFirst({
@@ -160,7 +165,7 @@ export class IntelligenceCoreService {
         select: { id: true },
       });
       if (!link) throw new ForbiddenException('Professor sem vínculo com a turma');
-      return classroom;
+      return classroomWithMeta;
     }
     throw new ForbiddenException('Perfil sem acesso ao núcleo de inteligência');
   }
