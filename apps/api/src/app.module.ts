@@ -50,6 +50,7 @@ import { AlertasModule } from './alertas/alertas.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
 import { EmpresasTransporteModule } from './empresas-transporte/empresas-transporte.module';
+import { IntelligenceCoreModule } from './intelligence-core/intelligence-core.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { EmpresasTransporteModule } from './empresas-transporte/empresas-transpo
     AlertasModule,
     AuditLogModule,
     EmpresasTransporteModule,
+    IntelligenceCoreModule,
   ],
   controllers: [AppController],
   providers: [
