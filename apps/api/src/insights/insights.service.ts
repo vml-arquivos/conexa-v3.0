@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, AttendanceStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 function canAccessUnitInternal(user: JwtPayload, unitId: string): boolean {
@@ -926,7 +926,7 @@ export class InsightsService {
 
     // 2. RDICs pendentes / devolvidos
     const rdics = await this.prisma.rDIXInstancia.findMany({
-      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), status: { in: ['RASCUNHO', 'PENDENTE', 'DEVOLVIDO'] } },
+      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), status: { in: ['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'] as any } },
       select: { id: true, status: true, periodo: true, anoLetivo: true }, take: 30,
     });
     for (const r of rdics) {
@@ -938,17 +938,21 @@ export class InsightsService {
         suggestedAction: dev ? 'Revisar e reenviar.' : 'Finalizar e publicar.', targetRoute: '/app/rdic' });
     }
 
-    // 3. Baixa frequência (< 75%)
-    const [presMap, totalAtt] = await Promise.all([
-      this.prisma.attendance.groupBy({ by: ['childId'], where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since }, status: 'P' }, _count: { childId: true } }),
-      this.prisma.attendance.groupBy({ by: ['childId'], where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since } }, _count: { childId: true } }),
+    // 3. Baixa frequência (< 75%) — usar findMany e agregar em memória (evita tipo _count problemático)
+    const attWhere = { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since } };
+    const [attPresente, attTotal] = await Promise.all([
+      this.prisma.attendance.findMany({ where: { ...attWhere, status: AttendanceStatus.PRESENTE }, select: { childId: true } }),
+      this.prisma.attendance.findMany({ where: attWhere, select: { childId: true } }),
     ]);
-    const pmMap = new Map(presMap.map((a) => [a.childId, a._count.childId]));
-    for (const t of totalAtt) {
-      if (t._count.childId < 3) continue;
-      const taxa = (pmMap.get(t.childId) ?? 0) / t._count.childId;
+    const pmMap = new Map<string, number>();
+    for (const a of attPresente) pmMap.set(a.childId, (pmMap.get(a.childId) ?? 0) + 1);
+    const tmMap = new Map<string, number>();
+    for (const a of attTotal) tmMap.set(a.childId, (tmMap.get(a.childId) ?? 0) + 1);
+    for (const [childId, total] of tmMap.entries()) {
+      if (total < 3) continue;
+      const taxa = (pmMap.get(childId) ?? 0) / total;
       if (taxa < 0.75) {
-        add({ id: `freq-${t.childId}`, type: 'BAIXA_FREQUENCIA', title: 'Frequência abaixo de 75%',
+        add({ id: `freq-${childId}`, type: 'BAIXA_FREQUENCIA', title: 'Frequência abaixo de 75%',
           description: `Frequência de ${Math.round(taxa * 100)}% nos últimos ${periodDays} dias.`,
           priority: taxa < 0.5 ? 'CRITICAL' : 'HIGH', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA', 'SECRETARIA'],
           evidence: [{ source: 'Attendance', label: 'Taxa', value: `${Math.round(taxa * 100)}%` }],
@@ -979,7 +983,7 @@ export class InsightsService {
       add({ id: `rest-${r.id}`, type: 'RESTRICAO_ALIMENTAR_CRITICA', title: `Restrição alimentar ${r.severity}`,
         description: r.description ?? 'Criança com restrição alimentar de alta severidade.',
         priority: r.severity === 'CRITICA' ? 'CRITICAL' : 'HIGH', profile: ['NUTRICIONISTA', 'PROFESSOR'],
-        evidence: [{ source: 'DietaryRestriction', sourceId: r.id, label: 'Severidade', value: r.severity }],
+        evidence: [{ source: 'DietaryRestriction', sourceId: r.id, label: 'Severidade', value: r.severity ?? undefined }],
         suggestedAction: 'Verificar cardápio e orientar equipe.', targetRoute: '/app/painel-alergias' });
     }
 
