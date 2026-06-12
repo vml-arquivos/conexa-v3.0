@@ -115,4 +115,29 @@ export class InsightsController {
     }
     return this.insightsService.getClassroomScore(classroomId, mes, req.user);
   }
+
+  @Get('missions')
+  @UseGuards(JwtAuthGuard)
+  getMissions(
+    @Request() req: any,
+    @Query('unitId') unitId?: string,
+    @Query('classroomId') classroomId?: string,
+    @Query('childId') childId?: string,
+    @Query('priority') priority?: string,
+    @Query('periodDays') periodDays?: string,
+  ) {
+    return this.insightsService.getMissions(req.user, {
+      unitId, classroomId, childId, priority,
+      periodDays: periodDays ? parseInt(periodDays, 10) : undefined,
+    });
+  }
+
+  @Get('missions/summary')
+  @UseGuards(JwtAuthGuard)
+  getMissionsSummary(
+    @Request() req: any,
+    @Query('unitId') unitId?: string,
+  ) {
+    return this.insightsService.getMissionsSummary(req.user, { unitId });
+  }
 }

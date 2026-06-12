@@ -886,4 +886,114 @@ export class InsightsService {
     };
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CENTRO DE MISSÕES INTELIGENTES
+  // Gera tarefas acionáveis determinísticas. Somente leitura. Multi-tenant.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getMissions(
+    user: JwtPayload,
+    params: { unitId?: string; classroomId?: string; childId?: string; priority?: string; periodDays?: number },
+  ) {
+    const { unitId: resolvedUnit, mantenedoraId } = resolveUnitScope(user, params.unitId);
+    const periodDays = params.periodDays ?? 14;
+    const since = new Date(); since.setDate(since.getDate() - periodDays);
+    type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    type Mission = { id: string; type: string; title: string; description: string; priority: Priority; profile: string[]; evidence: Array<{ source: string; sourceId?: string; label: string; date?: string; value?: string | number }>; suggestedAction: string; targetRoute?: string; requiresHumanReview: true; generatedAt: string; tenantScope: { mantenedoraId?: string; unitId?: string }; };
+    const missions: Mission[] = [];
+    const prioOrder: Record<Priority, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+    const tenantWhere = { mantenedoraId, ...(resolvedUnit ? { unitId: resolvedUnit } : {}) };
+
+    const add = (m: Omit<Mission, 'requiresHumanReview' | 'generatedAt' | 'tenantScope'>) => {
+      if (params.priority && m.priority !== params.priority) return;
+      missions.push({ ...m, requiresHumanReview: true, generatedAt: new Date().toISOString(), tenantScope: { mantenedoraId, unitId: resolvedUnit ?? undefined } });
+    };
+
+    // 1. Alertas operacionais abertos
+    const alertas = await this.prisma.alertaOperacional.findMany({
+      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), resolvido: false },
+      orderBy: { criadoEm: 'desc' }, take: 20,
+      select: { id: true, tipo: true, titulo: true, severidade: true, criadoEm: true },
+    });
+    for (const a of alertas) {
+      add({ id: `alerta-${a.id}`, type: 'ALERTA_OPERACIONAL', title: a.titulo ?? `Alerta ${a.tipo}`,
+        description: `Alerta operacional "${a.tipo}" em aberto.`,
+        priority: (a.severidade === 'CRITICA' || a.severidade === 'ALTA') ? 'CRITICAL' : 'HIGH',
+        profile: ['COORDENACAO_PEDAGOGICA', 'DIRETOR', 'STAFF_CENTRAL'],
+        evidence: [{ source: 'AlertaOperacional', sourceId: a.id, label: a.tipo, date: a.criadoEm?.toISOString() }],
+        suggestedAction: 'Revisar e resolver na tela de ocorrências.', targetRoute: '/app/secretaria/ocorrencias' });
+    }
+
+    // 2. RDICs pendentes / devolvidos
+    const rdics = await this.prisma.rDIXInstancia.findMany({
+      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), status: { in: ['RASCUNHO', 'PENDENTE', 'DEVOLVIDO'] } },
+      select: { id: true, status: true, periodo: true, anoLetivo: true }, take: 30,
+    });
+    for (const r of rdics) {
+      const dev = r.status === 'DEVOLVIDO';
+      add({ id: `rdic-${r.id}`, type: 'RDIC_PENDENTE', title: `RDIC ${dev ? 'devolvido' : 'pendente'}`,
+        description: `RDIC ${r.periodo ?? ''} (${r.anoLetivo ?? ''}) — ${r.status}.`,
+        priority: dev ? 'HIGH' : 'MEDIUM', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA'],
+        evidence: [{ source: 'RDIXInstancia', sourceId: r.id, label: 'Status', value: r.status }],
+        suggestedAction: dev ? 'Revisar e reenviar.' : 'Finalizar e publicar.', targetRoute: '/app/rdic' });
+    }
+
+    // 3. Baixa frequência (< 75%)
+    const [presMap, totalAtt] = await Promise.all([
+      this.prisma.attendance.groupBy({ by: ['childId'], where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since }, status: 'P' }, _count: { childId: true } }),
+      this.prisma.attendance.groupBy({ by: ['childId'], where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since } }, _count: { childId: true } }),
+    ]);
+    const pmMap = new Map(presMap.map((a) => [a.childId, a._count.childId]));
+    for (const t of totalAtt) {
+      if (t._count.childId < 3) continue;
+      const taxa = (pmMap.get(t.childId) ?? 0) / t._count.childId;
+      if (taxa < 0.75) {
+        add({ id: `freq-${t.childId}`, type: 'BAIXA_FREQUENCIA', title: 'Frequência abaixo de 75%',
+          description: `Frequência de ${Math.round(taxa * 100)}% nos últimos ${periodDays} dias.`,
+          priority: taxa < 0.5 ? 'CRITICAL' : 'HIGH', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA', 'SECRETARIA'],
+          evidence: [{ source: 'Attendance', label: 'Taxa', value: `${Math.round(taxa * 100)}%` }],
+          suggestedAction: 'Contactar responsável e registrar justificativas.', targetRoute: '/app/secretaria/faltas' });
+      }
+    }
+
+    // 4. Observações com alertas de desenvolvimento
+    const obsAlertas = await this.prisma.developmentObservation.findMany({
+      where: { ...(resolvedUnit ? { classroom: { unit: { id: resolvedUnit } } } : {}), ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since }, developmentAlerts: { not: null } },
+      select: { id: true, date: true, psychologicalNotes: true }, take: 20,
+    });
+    for (const o of obsAlertas) {
+      const hp = !!o.psychologicalNotes;
+      add({ id: `obs-${o.id}`, type: 'OBSERVACAO_DESENVOLVIMENTO', title: 'Alerta de desenvolvimento',
+        description: `Observação com indicadores de atenção${hp ? ' e notas psicológicas' : ''}.`,
+        priority: hp ? 'HIGH' : 'MEDIUM', profile: hp ? ['PSICOLOGA', 'COORDENACAO_PEDAGOGICA'] : ['COORDENACAO_PEDAGOGICA', 'PROFESSOR'],
+        evidence: [{ source: 'DevelopmentObservation', sourceId: o.id, label: 'Alerta', date: o.date?.toISOString() }],
+        suggestedAction: hp ? 'Agendar avaliação com equipe de apoio.' : 'Acompanhar evolução.', targetRoute: '/app/observacao-crianca' });
+    }
+
+    // 5. Restrições alimentares críticas
+    const restricoes = await this.prisma.dietaryRestriction.findMany({
+      where: { isActive: true, severity: { in: ['ALTA', 'CRITICA'] }, child: { enrollments: { some: { status: 'ATIVA', classroom: { unit: { mantenedoraId, ...(resolvedUnit ? { id: resolvedUnit } : {}) } } } } }, ...(params.childId ? { childId: params.childId } : {}) },
+      select: { id: true, severity: true, description: true }, take: 20,
+    });
+    for (const r of restricoes) {
+      add({ id: `rest-${r.id}`, type: 'RESTRICAO_ALIMENTAR_CRITICA', title: `Restrição alimentar ${r.severity}`,
+        description: r.description ?? 'Criança com restrição alimentar de alta severidade.',
+        priority: r.severity === 'CRITICA' ? 'CRITICAL' : 'HIGH', profile: ['NUTRICIONISTA', 'PROFESSOR'],
+        evidence: [{ source: 'DietaryRestriction', sourceId: r.id, label: 'Severidade', value: r.severity }],
+        suggestedAction: 'Verificar cardápio e orientar equipe.', targetRoute: '/app/painel-alergias' });
+    }
+
+    missions.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
+    return {
+      total: missions.length,
+      summary: { CRITICAL: missions.filter((m) => m.priority === 'CRITICAL').length, HIGH: missions.filter((m) => m.priority === 'HIGH').length, MEDIUM: missions.filter((m) => m.priority === 'MEDIUM').length, LOW: missions.filter((m) => m.priority === 'LOW').length },
+      missions,
+    };
+  }
+
+  async getMissionsSummary(user: JwtPayload, params: { unitId?: string }) {
+    const r = await this.getMissions(user, { ...params, periodDays: 14 });
+    return { total: r.total, summary: r.summary, topMissions: r.missions.slice(0, 5) };
+  }
+
 }
