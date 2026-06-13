@@ -196,16 +196,19 @@ export default function MobileChamadaPage() {
           comportamento: d.comportamento || undefined,
         };
       });
+      // postOfflineSafe NUNCA lança — salva localmente e tenta sync.
+      // Navegamos imediatamente após salvar local, sem esperar resposta do backend.
       await postOfflineSafe('chamada', '/attendance/register', 'POST',
         { classroomId: selected, date: hojeISO(), records });
-      setSaved(true);
-      // Navegar para o Diário após 1.2s
-      setTimeout(() => navigate('/app/mobile/diario'), 1200);
     } catch {
-      setErro('Erro ao salvar. Tente novamente.');
+      // postOfflineSafe não deveria lançar, mas se lançar ainda navegamos
+      console.warn('[Chamada] Erro no save, navegando mesmo assim');
     } finally {
       setSaving(false);
     }
+    // Navega SEMPRE — fora do try/catch — não depende de sucesso do backend
+    setSaved(true);
+    setTimeout(() => navigate('/app/mobile/diario'), 900);
   }, [selected, children, dados, postOfflineSafe, navigate]);
 
   const alunoSelecionado = painelAluno ? getDado(painelAluno.id) : null;

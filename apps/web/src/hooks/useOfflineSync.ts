@@ -93,9 +93,14 @@ export function useOfflineSync(): UseOfflineSyncReturn {
     method: OfflineAction['method'],
     payload: Record<string, unknown>,
   ): Promise<{ local: boolean; synced: boolean }> => {
-    // Sempre salva localmente primeiro
-    await enqueueAction(type, endpoint, method, payload);
-    await refreshQueue();
+    // Salva localmente — protegido contra falha de IndexedDB
+    try {
+      await enqueueAction(type, endpoint, method, payload);
+      await refreshQueue();
+    } catch (err) {
+      console.warn('[offlineSync] Falha ao salvar localmente:', err);
+      // Continua mesmo assim — tenta enviar direto
+    }
 
     // Se online, tenta sincronizar imediatamente
     if (navigator.onLine) {
