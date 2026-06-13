@@ -1,25 +1,43 @@
+/**
+ * MobileOcorrenciaPage — Registro de ocorrências (PWA)
+ * Zero emoji — ícones Lucide exclusivamente.
+ */
+
 import { useState, useEffect } from 'react';
-import { HeartPulse, AlertTriangle, Search } from 'lucide-react';
+import { HeartPulse, AlertTriangle, Search, X, Loader2, Send, Check,
+  Thermometer, Activity, AlertOctagon, ShieldAlert, Frown, Pill, ClipboardList, Wind,
+  Zap, Heart } from 'lucide-react';
 import http from '../../api/http';
 import { childrenCache, classroomsCache, type CachedChild, type CachedClassroom } from '../../services/offlineDB';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
-import {
-  MobilePageHeader, MobileField, MobileSelect, MobileTextarea,
-  MobileSaveBar, PhotoCapture, type CapturedPhoto, inputStyle, M,
-} from '../../components/mobile/mobileUI';
+import { resolveChildPhotoUrl } from '../../components/children/ChildAvatar';
+import { MobileField, MobileSelect, MobileTextarea, MobileSaveBar, PhotoCapture, type CapturedPhoto, inputStyle, M } from '../../components/mobile/mobileUI';
 
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 
+// Tipos de ocorrência — ícones Lucide
 const TIPOS = [
-  { id: 'MAL_ESTAR', label: 'Mal-estar', emoji: '🤒', cor: M.color.warning, urgente: false },
-  { id: 'QUEDA_ACIDENTE', label: 'Queda/acidente', emoji: '🩹', cor: M.color.error, urgente: true },
-  { id: 'ALERGIA', label: 'Alergia', emoji: '⚠️', cor: '#dc2626', urgente: true },
-  { id: 'VOMITO', label: 'Vômito', emoji: '🤢', cor: M.color.warning, urgente: false },
-  { id: 'FEBRE', label: 'Febre', emoji: '🌡️', cor: M.color.error, urgente: true },
-  { id: 'CHORO', label: 'Choro excessivo', emoji: '😢', cor: '#3b82f6', urgente: false },
-  { id: 'MEDICACAO', label: 'Medicação', emoji: '💊', cor: '#8b5cf6', urgente: false },
-  { id: 'OUTRO', label: 'Outro', emoji: '📋', cor: M.color.textMuted, urgente: false },
+  { id: 'MAL_ESTAR',      label: 'Mal-estar',        Icon: Frown,        cor: M.color.warning, urgente: false },
+  { id: 'QUEDA_ACIDENTE', label: 'Queda / Acidente',  Icon: AlertTriangle,cor: M.color.error,   urgente: true  },
+  { id: 'ALERGIA',        label: 'Alergia',            Icon: ShieldAlert,  cor: '#dc2626',       urgente: true  },
+  { id: 'VOMITO',         label: 'Vômito',             Icon: Wind,         cor: M.color.warning, urgente: false },
+  { id: 'FEBRE',          label: 'Febre',              Icon: Thermometer,  cor: M.color.error,   urgente: true  },
+  { id: 'CHORO',          label: 'Choro excessivo',    Icon: Heart,        cor: '#3b82f6',       urgente: false },
+  { id: 'MEDICACAO',      label: 'Medicação',          Icon: Pill,         cor: '#8b5cf6',       urgente: false },
+  { id: 'OUTRO',          label: 'Outro',              Icon: ClipboardList,cor: M.color.textMuted,urgente: false },
 ];
+
+function Avatar({ child, size = 36 }: { child: CachedChild; size?: number }) {
+  const foto = resolveChildPhotoUrl(child as any);
+  const ini  = `${child.firstName?.[0] ?? ''}${child.lastName?.[0] ?? ''}`.toUpperCase();
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: '#fee2e2', border: '1.5px solid #fecaca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {foto
+        ? <img src={foto} alt={ini} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+        : <span style={{ fontSize: size * 0.35, fontWeight: 700, color: M.color.error }}>{ini}</span>}
+    </div>
+  );
+}
 
 export default function MobileOcorrenciaPage() {
   const { isOnline, postOfflineSafe } = useOfflineSync();
@@ -44,11 +62,7 @@ export default function MobileOcorrenciaPage() {
           await classroomsCache.saveAll(list);
           setClassrooms(list);
           if (list.length === 1) setTurma(list[0].id);
-        } else {
-          const c = await classroomsCache.getAll();
-          setClassrooms(c);
-          if (c.length === 1) setTurma(c[0].id);
-        }
+        } else { const c = await classroomsCache.getAll(); setClassrooms(c); if (c.length === 1) setTurma(c[0].id); }
       } catch { setClassrooms(await classroomsCache.getAll()); }
     }
     load();
@@ -62,13 +76,11 @@ export default function MobileOcorrenciaPage() {
         const all = Array.isArray(r.data) ? r.data : r.data?.data ?? r.data?.children ?? [];
         setChildren(all.filter((c: any) => c.enrollments?.some((e: any) => e.classroomId === turma && e.status === 'ATIVA')));
       }).catch(async () => setChildren(await childrenCache.getByClassroom(turma)));
-    } else {
-      childrenCache.getByClassroom(turma).then(setChildren);
-    }
+    } else { childrenCache.getByClassroom(turma).then(setChildren); }
   }, [turma, isOnline]);
 
   const tipoInfo = TIPOS.find(t => t.id === tipo);
-  const urgente = tipoInfo?.urgente ?? false;
+  const urgente  = tipoInfo?.urgente ?? false;
   const filtrados = children.filter(c => `${c.firstName} ${c.lastName ?? ''}`.toLowerCase().includes(busca.toLowerCase()));
 
   const salvar = async () => {
@@ -82,8 +94,8 @@ export default function MobileOcorrenciaPage() {
         status: 'PUBLICADO', tags: ['ocorrencia'],
         contatoPaisRealizado: contatoPais,
       };
-      if (fotos.length > 0) payload.attachments = fotos.map(f => ({ base64: f.base64, mimeType: f.mimeType, fileName: f.fileName }));
-      await postOfflineSafe('ocorrencia', '/diary-events', 'POST', payload);
+      if (isOnline) { await http.post('/diary-events', payload); }
+      else { await postOfflineSafe('ocorrencia', '/diary-events', 'POST', payload); }
       setSaved(true);
       setTipo(''); setDescricao(''); setContatoPais(false); setFotos([]); setCrianca(null);
       setTimeout(() => setSaved(false), 3000);
@@ -92,12 +104,18 @@ export default function MobileOcorrenciaPage() {
 
   return (
     <div style={{ padding: '16px 16px 90px', minHeight: '100%', background: M.color.page }}>
-      <MobilePageHeader title="Ocorrência" subtitle="Saúde e acidentes" icon={HeartPulse} color={M.color.error} />
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <HeartPulse size={18} color={M.color.error} strokeWidth={2} />
+        <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: M.color.text }}>Ocorrência</h1>
+      </div>
+      <p style={{ fontSize: 12, color: M.color.textMuted, margin: '0 0 16px' }}>Saúde, acidentes e situações especiais</p>
 
+      {/* Banner urgente */}
       {urgente && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 14px', background: M.color.errorBg, border: `0.5px solid #fca5a5`, borderRadius: M.radius.lg, marginBottom: 14 }}>
-          <AlertTriangle size={16} color={M.color.error} />
-          <p style={{ margin: 0, fontSize: M.font.md, color: '#991b1b', fontWeight: 500 }}>Caso urgente — notifique a secretaria</p>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 14px', background: '#fef2f2', border: '0.5px solid #fca5a5', borderRadius: M.radius.lg, marginBottom: 14 }}>
+          <AlertTriangle size={16} color={M.color.error} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 13, color: '#991b1b', fontWeight: 500 }}>Caso urgente — notifique imediatamente a secretaria e a coordenação</p>
         </div>
       )}
 
@@ -105,73 +123,91 @@ export default function MobileOcorrenciaPage() {
         <MobileSelect value={turma} onChange={setTurma} options={classrooms.map(c => ({ id: c.id, label: c.name }))} placeholder="Selecionar turma" />
       </MobileField>
 
-      {turma && !crianca && (
-        <MobileField label="Criança (opcional)">
+      {/* Tipo de ocorrência */}
+      {turma && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #fecaca' }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Activity size={13} color={M.color.error} strokeWidth={2} />
+            </div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: M.color.error, margin: 0, letterSpacing: 0.6, textTransform: 'uppercase' }}>Tipo de ocorrência</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {TIPOS.map(t => {
+              const active = tipo === t.id;
+              return (
+                <button key={t.id} onClick={() => setTipo(active ? '' : t.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 12px', borderRadius: M.radius.md, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: `0.5px solid ${active ? t.cor : M.color.border}`, background: active ? `${t.cor}12` : M.color.surface, transition: 'all 0.12s' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: active ? `${t.cor}20` : M.color.page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <t.Icon size={15} color={active ? t.cor : M.color.textMuted} strokeWidth={1.8} />
+                  </div>
+                  <span style={{ fontSize: 13, color: active ? t.cor : M.color.textSoft, fontWeight: active ? 600 : 400, lineHeight: 1.2 }}>{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Criança (opcional) */}
+      {turma && tipo && !crianca && (
+        <MobileField label="Criança envolvida (opcional)">
           <div style={{ position: 'relative', marginBottom: 8 }}>
             <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: M.color.textMuted }} />
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar ou deixar sem criança específica..." style={{ ...inputStyle, paddingLeft: 36 }} />
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar criança..."
+              style={{ ...inputStyle, paddingLeft: 36 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-            <button onClick={() => setCrianca(null as any)} style={{ padding: '9px 14px', borderRadius: M.radius.md, border: `0.5px solid ${M.color.border}`, background: M.color.surface, color: M.color.textSoft, fontSize: M.font.md, cursor: 'pointer', textAlign: 'left' }}>
-              📋 Ocorrência geral da turma
+            <button onClick={() => setCrianca({} as CachedChild)} style={{ padding: '10px 14px', borderRadius: M.radius.md, border: `0.5px solid ${M.color.border}`, background: M.color.surface, color: M.color.textSoft, fontSize: 13, cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
+              Ocorrência geral da turma
             </button>
             {filtrados.slice(0, 8).map(c => (
-              <button key={c.id} onClick={() => setCrianca(c)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: M.radius.md, border: `0.5px solid ${M.color.borderSoft}`, background: M.color.surface, cursor: 'pointer', textAlign: 'left' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: M.color.errorBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: M.color.error, flexShrink: 0 }}>
-                  {c.firstName?.[0]}{c.lastName?.[0] ?? ''}
-                </div>
-                <span style={{ fontSize: M.font.md, color: M.color.text }}>{c.firstName} {c.lastName}</span>
+              <button key={c.id} onClick={() => setCrianca(c)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: M.radius.md, border: `0.5px solid ${M.color.borderSoft}`, background: M.color.surface, cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
+                <Avatar child={c} size={34} />
+                <span style={{ fontSize: 13, color: M.color.text }}>{c.firstName} {c.lastName}</span>
               </button>
             ))}
           </div>
         </MobileField>
       )}
 
-      {turma && (crianca !== undefined) && (
-        <>
-          {crianca && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: M.radius.lg, background: M.color.errorBg, border: `0.5px solid #fca5a5`, marginBottom: 14 }}>
-              <span style={{ fontSize: 18 }}>👤</span>
-              <p style={{ flex: 1, margin: 0, fontSize: M.font.base, fontWeight: 600, color: '#991b1b' }}>{crianca.firstName} {crianca.lastName}</p>
-              <button onClick={() => setCrianca(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: M.color.error, fontSize: M.font.sm }}>Trocar</button>
-            </div>
-          )}
+      {/* Criança selecionada */}
+      {crianca && crianca.id && tipo && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: M.radius.lg, background: '#fef2f2', border: '0.5px solid #fca5a5', marginBottom: 16 }}>
+          <Avatar child={crianca} size={36} />
+          <p style={{ flex: 1, margin: 0, fontSize: 13, fontWeight: 600, color: '#991b1b' }}>{crianca.firstName} {crianca.lastName}</p>
+          <button onClick={() => setCrianca(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: M.color.error, display: 'flex', alignItems: 'center' }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
-          <MobileField label="Tipo de ocorrência" required>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {TIPOS.map(t => (
-                <button key={t.id} onClick={() => setTipo(t.id === tipo ? '' : t.id)} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '11px 10px', borderRadius: M.radius.md, cursor: 'pointer',
-                  border: `0.5px solid ${tipo === t.id ? t.cor : M.color.border}`,
-                  background: tipo === t.id ? `${t.cor}14` : M.color.surface,
-                  WebkitTapHighlightColor: 'transparent',
-                }}>
-                  <span style={{ fontSize: 18 }}>{t.emoji}</span>
-                  <span style={{ fontSize: 12, color: tipo === t.id ? t.cor : M.color.textSoft, fontWeight: tipo === t.id ? 600 : 400, lineHeight: 1.2 }}>{t.label}</span>
-                </button>
-              ))}
-            </div>
+      {/* Descrição */}
+      {tipo && (
+        <>
+          <MobileField label="O que aconteceu?" required>
+            <MobileTextarea value={descricao} onChange={setDescricao}
+              placeholder="Descreva o que aconteceu, quando, como foi atendido, estado atual..." rows={4} />
           </MobileField>
 
-          {tipo && (
-            <>
-              <MobileField label="O que aconteceu?" required>
-                <MobileTextarea value={descricao} onChange={setDescricao} placeholder="Descreva o que aconteceu, quando, como foi atendido, estado atual da criança..." rows={4} />
-              </MobileField>
+          <MobileField label="Foto da ocorrência">
+            <PhotoCapture photos={fotos} onAdd={p => setFotos(prev => [...prev, p])} onRemove={i => setFotos(prev => prev.filter((_, idx) => idx !== i))} maxPhotos={2} label="foto" />
+          </MobileField>
 
-              <MobileField label="Foto da ocorrência">
-                <PhotoCapture photos={fotos} onAdd={p => setFotos(prev => [...prev, p])} onRemove={i => setFotos(prev => prev.filter((_, idx) => idx !== i))} maxPhotos={2} label="foto" />
-              </MobileField>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: M.radius.lg, border: `0.5px solid ${M.color.border}`, background: M.color.surface, cursor: 'pointer', marginBottom: 14 }}>
-                <input type="checkbox" checked={contatoPais} onChange={e => setContatoPais(e.target.checked)} style={{ width: 18, height: 18, accentColor: M.color.brand }} />
-                <span style={{ fontSize: M.font.base, color: M.color.text }}>Responsável já foi contactado</span>
-              </label>
-            </>
-          )}
-
-          <MobileSaveBar label="Registrar ocorrência" labelDone="✓ Registrado" onClick={salvar} disabled={!tipo || !descricao.trim()} saving={saving} saved={saved} isOnline={isOnline} color={urgente ? M.color.error : M.color.brand} />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: M.radius.lg, border: `0.5px solid ${M.color.border}`, background: M.color.surface, cursor: 'pointer', marginBottom: 16 }}>
+            <div style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${contatoPais ? M.color.brand : M.color.border}`, background: contatoPais ? M.color.brand : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.12s' }}
+              onClick={() => setContatoPais(p => !p)}>
+              {contatoPais && <Check size={12} color="#fff" strokeWidth={3} />}
+            </div>
+            <span style={{ fontSize: 14, color: M.color.text }}>Responsável já foi contactado</span>
+          </label>
         </>
+      )}
+
+      {tipo && (
+        <MobileSaveBar label="Registrar ocorrência" labelDone="Ocorrência registrada" onClick={salvar}
+          disabled={!tipo || !descricao.trim()} saving={saving} saved={saved} isOnline={isOnline}
+          color={urgente ? M.color.error : M.color.brand} />
       )}
     </div>
   );

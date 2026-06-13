@@ -120,8 +120,8 @@ export default function MobileShell() {
               : <WifiOff size={13} color="#dc2626" />}
             <span style={{ fontSize: 12, color: isOnline ? '#92400e' : '#991b1b' }}>
               {isOnline
-                ? `${queueCount} ação${queueCount !== 1 ? 'ões' : ''} aguardando envio`
-                : `Sem conexão · ${queueCount} salva${queueCount !== 1 ? 's' : ''} localmente`}
+                ? `${queueCount} ${queueCount === 1 ? 'ação aguardando envio' : 'ações aguardando envio'}`
+                : `Sem conexão · ${queueCount} ${queueCount === 1 ? 'ação salva localmente' : 'ações salvas localmente'}`}
             </span>
           </div>
           {isOnline && queueCount > 0 && (

@@ -1,35 +1,12 @@
-import { Injectable, Logger, OnModuleInit, Inject } from "@nestjs/common";
-import type { ConfigType } from "@nestjs/config";
+import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import {
   GoogleGenerativeAI,
   GenerativeModel,
   HarmCategory,
   HarmBlockThreshold,
-} from "@google/generative-ai";
-import geminiConfig from "../../config/gemini.config";
-
-export type GeminiProviderErrorCode =
-  | "NOT_CONFIGURED"
-  | "AUTH"
-  | "MODEL_NOT_FOUND"
-  | "RATE_LIMIT"
-  | "BAD_REQUEST"
-  | "TIMEOUT"
-  | "NETWORK"
-  | "PROVIDER_UNAVAILABLE"
-  | "INVALID_RESPONSE"
-  | "UNKNOWN";
-
-export class GeminiProviderError extends Error {
-  constructor(
-    public readonly code: GeminiProviderErrorCode,
-    message: string,
-    public readonly providerStatus?: number,
-  ) {
-    super(message);
-    this.name = "GeminiProviderError";
-  }
-}
+} from '@google/generative-ai';
+import geminiConfig from '../../config/gemini.config';
 
 @Injectable()
 export class GeminiService implements OnModuleInit {
@@ -50,14 +27,14 @@ export class GeminiService implements OnModuleInit {
     if (this.isEnabled()) {
       try {
         this.ai = new GoogleGenerativeAI(this.config.apiKey);
-        this.logger.log("GeminiService inicializado com sucesso.");
+        this.logger.log('GeminiService inicializado com sucesso.');
       } catch (error) {
-        this.logger.error("Falha ao inicializar o SDK do Gemini:", error);
+        this.logger.error('Falha ao inicializar o SDK do Gemini:', error);
         this.ai = null;
       }
     } else {
       this.logger.warn(
-        "GEMINI_API_KEY não configurada. O serviço de IA ficará inativo.",
+        'GEMINI_API_KEY não configurada. O serviço de IA ficará inativo.',
       );
     }
   }
@@ -68,137 +45,6 @@ export class GeminiService implements OnModuleInit {
    */
   isEnabled(): boolean {
     return !!this.config.apiKey && this.config.apiKey.trim().length > 0;
-  }
-
-  /** Modelo efetivamente configurado para texto/JSON. */
-  getConfiguredModel(): string {
-    return this.config.textModel;
-  }
-
-  /**
-   * Teste real, curto e sem dados pessoais. Útil para verificar chave, modelo,
-   * cota e conectividade do container com a API do Gemini.
-   */
-  async healthCheck(): Promise<{
-    ok: true;
-    provider: "GEMINI";
-    model: string;
-    response: string;
-  }> {
-    if (!this.isEnabled()) {
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "GEMINI_API_KEY não está configurada no container da API.",
-      );
-    }
-
-    const response = await this.generateText(
-      "Responda somente com a palavra OK.",
-      "Este é um teste técnico de disponibilidade. Não use markdown.",
-    );
-
-    return {
-      ok: true,
-      provider: "GEMINI",
-      model: this.config.textModel,
-      response: response.trim(),
-    };
-  }
-
-  private toProviderError(
-    error: unknown,
-    operation: string,
-  ): GeminiProviderError {
-    if (error instanceof GeminiProviderError) return error;
-
-    const raw = error as {
-      message?: string;
-      status?: number;
-      statusCode?: number;
-      code?: string;
-      response?: { status?: number };
-    };
-    const message = String(raw?.message ?? error ?? "Erro desconhecido");
-    const normalized = message.toLowerCase();
-    const status = raw?.status ?? raw?.statusCode ?? raw?.response?.status;
-
-    let code: GeminiProviderErrorCode = "UNKNOWN";
-    let friendly = "Falha inesperada ao acessar o Gemini.";
-
-    if (
-      status === 401 ||
-      status === 403 ||
-      normalized.includes("api key not valid") ||
-      normalized.includes("invalid api key") ||
-      normalized.includes("permission denied") ||
-      normalized.includes("403 forbidden")
-    ) {
-      code = "AUTH";
-      friendly =
-        "A chave GEMINI_API_KEY foi recusada pelo Google. Confirme a chave e o projeto do Google AI Studio.";
-    } else if (
-      status === 404 ||
-      normalized.includes("404 not found") ||
-      (normalized.includes("model") && normalized.includes("not found"))
-    ) {
-      code = "MODEL_NOT_FOUND";
-      friendly = `O modelo Gemini configurado não foi encontrado ou não está liberado: ${this.config.textModel}.`;
-    } else if (
-      status === 429 ||
-      normalized.includes("quota") ||
-      normalized.includes("rate limit") ||
-      normalized.includes("resource exhausted") ||
-      normalized.includes("429 too many requests")
-    ) {
-      code = "RATE_LIMIT";
-      friendly =
-        "A cota ou o limite de requisições do Gemini foi atingido. Verifique quotas e faturamento no Google AI Studio.";
-    } else if (
-      status === 400 ||
-      normalized.includes("bad request") ||
-      normalized.includes("invalid argument") ||
-      normalized.includes("400 bad request")
-    ) {
-      code = "BAD_REQUEST";
-      friendly =
-        "O Gemini recusou os parâmetros da requisição. Verifique o modelo e a configuração de geração.";
-    } else if (
-      normalized.includes("timeout") ||
-      normalized.includes("timed out") ||
-      normalized.includes("abort")
-    ) {
-      code = "TIMEOUT";
-      friendly = "A chamada ao Gemini excedeu o tempo limite.";
-    } else if (
-      normalized.includes("enotfound") ||
-      normalized.includes("eai_again") ||
-      normalized.includes("fetch failed") ||
-      normalized.includes("network")
-    ) {
-      code = "NETWORK";
-      friendly =
-        "O container da API não conseguiu acessar o serviço do Gemini. Verifique DNS, firewall e saída HTTPS da VPS.";
-    } else if (
-      (status && status >= 500) ||
-      normalized.includes("service unavailable") ||
-      normalized.includes("503 service unavailable") ||
-      normalized.includes("500 internal server error") ||
-      normalized.includes("overloaded")
-    ) {
-      code = "PROVIDER_UNAVAILABLE";
-      friendly =
-        "O serviço do Gemini está temporariamente indisponível ou sobrecarregado.";
-    } else if (normalized.includes("json")) {
-      code = "INVALID_RESPONSE";
-      friendly =
-        "O Gemini respondeu, mas o conteúdo retornado não pôde ser interpretado como JSON.";
-    }
-
-    this.logger.error(
-      `[${operation}] Gemini falhou: code=${code}; status=${status ?? "n/a"}; model=${this.config.textModel}; detail=${message}`,
-    );
-
-    return new GeminiProviderError(code, friendly, status);
   }
 
   /**
@@ -227,11 +73,7 @@ export class GeminiService implements OnModuleInit {
   }
 
   private getTextModel(): GenerativeModel {
-    if (!this.ai)
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "GeminiService não está habilitado.",
-      );
+    if (!this.ai) throw new Error('GeminiService não está habilitado.');
     if (!this.textModel) {
       this.textModel = this.ai.getGenerativeModel({
         model: this.config.textModel,
@@ -245,11 +87,7 @@ export class GeminiService implements OnModuleInit {
   }
 
   private getVisionModel(): GenerativeModel {
-    if (!this.ai)
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "GeminiService não está habilitado.",
-      );
+    if (!this.ai) throw new Error('GeminiService não está habilitado.');
     if (!this.visionModel) {
       this.visionModel = this.ai.getGenerativeModel({
         model: this.config.visionModel,
@@ -263,11 +101,7 @@ export class GeminiService implements OnModuleInit {
   }
 
   private getThinkingModel(): GenerativeModel {
-    if (!this.ai)
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "GeminiService não está habilitado.",
-      );
+    if (!this.ai) throw new Error('GeminiService não está habilitado.');
     if (!this.thinkingModel) {
       this.thinkingModel = this.ai.getGenerativeModel({
         model: this.config.thinkingModel,
@@ -288,17 +122,16 @@ export class GeminiService implements OnModuleInit {
     systemInstruction?: string,
   ): Promise<string> {
     if (!this.isEnabled()) {
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "Serviço de IA não configurado.",
-      );
+      throw new Error('Serviço de IA não configurado.');
     }
 
     try {
-      this.logger.debug(`Gerando texto. Prompt size: ${prompt.length} chars`);
-
+      this.logger.debug(
+        `Gerando texto. Prompt size: ${prompt.length} chars`,
+      );
+      
       let model = this.getTextModel();
-
+      
       // Se houver instrução de sistema, precisamos instanciar um modelo específico
       // pois a systemInstruction é passada na criação do modelo
       if (systemInstruction) {
@@ -315,7 +148,8 @@ export class GeminiService implements OnModuleInit {
       const result = await model.generateContent(prompt);
       return result.response.text();
     } catch (error) {
-      throw this.toProviderError(error, "generateText");
+      this.logger.error('Erro em generateText', error);
+      throw new Error('Falha ao gerar texto via IA.');
     }
   }
 
@@ -327,25 +161,24 @@ export class GeminiService implements OnModuleInit {
     systemInstruction?: string,
   ): Promise<T> {
     if (!this.isEnabled()) {
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "Serviço de IA não configurado.",
-      );
+      throw new Error('Serviço de IA não configurado.');
     }
 
     try {
-      this.logger.debug(`Gerando JSON. Prompt size: ${prompt.length} chars`);
+      this.logger.debug(
+        `Gerando JSON. Prompt size: ${prompt.length} chars`,
+      );
 
       // Forçamos o modelo a retornar JSON
       let model = this.ai!.getGenerativeModel({
         model: this.config.textModel,
-        systemInstruction: systemInstruction
+        systemInstruction: systemInstruction 
           ? `${systemInstruction}\nIMPORTANTE: Retorne APENAS um JSON válido, sem formatação Markdown.`
-          : "Retorne APENAS um JSON válido, sem blocos de código Markdown.",
+          : 'Retorne APENAS um JSON válido, sem blocos de código Markdown.',
         safetySettings: this.defaultSafetySettings,
         generationConfig: {
           temperature: 0.1, // Temperatura menor para JSON
-          responseMimeType: "application/json",
+          responseMimeType: 'application/json',
         },
       });
 
@@ -354,7 +187,8 @@ export class GeminiService implements OnModuleInit {
 
       return this.parseRobustJSON<T>(text);
     } catch (error) {
-      throw this.toProviderError(error, "generateJSON");
+      this.logger.error('Erro em generateJSON', error);
+      throw new Error('Falha ao gerar ou processar JSON via IA.');
     }
   }
 
@@ -371,10 +205,10 @@ export class GeminiService implements OnModuleInit {
       // Falhou. Vamos tentar extrair a substring entre o primeiro { e o último }
       // ou entre o primeiro [ e o último ]
       try {
-        const firstBrace = cleanText.indexOf("{");
-        const lastBrace = cleanText.lastIndexOf("}");
-        const firstBracket = cleanText.indexOf("[");
-        const lastBracket = cleanText.lastIndexOf("]");
+        const firstBrace = cleanText.indexOf('{');
+        const lastBrace = cleanText.lastIndexOf('}');
+        const firstBracket = cleanText.indexOf('[');
+        const lastBracket = cleanText.lastIndexOf(']');
 
         let startIndex = -1;
         let endIndex = -1;
@@ -399,8 +233,8 @@ export class GeminiService implements OnModuleInit {
         // Ignora o erro de extração e lança o erro amigável abaixo
       }
 
-      this.logger.error("Falha ao fazer parse do JSON gerado pela IA");
-      throw new Error("Resposta da IA não é um JSON válido.");
+      this.logger.error('Falha ao fazer parse do JSON gerado pela IA');
+      throw new Error('Resposta da IA não é um JSON válido.');
     }
   }
 
@@ -412,10 +246,7 @@ export class GeminiService implements OnModuleInit {
     prompt: string,
   ): Promise<string> {
     if (!this.isEnabled()) {
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "Serviço de IA não configurado.",
-      );
+      throw new Error('Serviço de IA não configurado.');
     }
 
     try {
@@ -434,7 +265,8 @@ export class GeminiService implements OnModuleInit {
       const result = await model.generateContent([prompt, imagePart]);
       return result.response.text();
     } catch (error) {
-      throw this.toProviderError(error, "analyzeImage");
+      this.logger.error('Erro em analyzeImage', error);
+      throw new Error('Falha ao analisar imagem via IA.');
     }
   }
 
@@ -443,20 +275,20 @@ export class GeminiService implements OnModuleInit {
    */
   async deepThinking(problem: string): Promise<string> {
     if (!this.isEnabled()) {
-      throw new GeminiProviderError(
-        "NOT_CONFIGURED",
-        "Serviço de IA não configurado.",
-      );
+      throw new Error('Serviço de IA não configurado.');
     }
 
     try {
-      this.logger.debug(`Deep thinking. Problem size: ${problem.length} chars`);
+      this.logger.debug(
+        `Deep thinking. Problem size: ${problem.length} chars`,
+      );
 
       const model = this.getThinkingModel();
       const result = await model.generateContent(problem);
       return result.response.text();
     } catch (error) {
-      throw this.toProviderError(error, "deepThinking");
+      this.logger.error('Erro em deepThinking', error);
+      throw new Error('Falha no raciocínio profundo via IA.');
     }
   }
 }

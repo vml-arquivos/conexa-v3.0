@@ -178,7 +178,7 @@ export function MobileSelect({
 export function ChipGroup({
   options, selected, onToggle, multi = false, color,
 }: {
-  options: { id: string; label: string; emoji?: string }[];
+  options: { id: string; label: string; Icon?: React.ElementType }[];
   selected: string | string[];
   onToggle: (id: string) => void;
   multi?: boolean;
@@ -192,23 +192,23 @@ export function ChipGroup({
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
       {options.map((o) => {
         const active = isSelected(o.id);
+        const Icon = o.Icon;
         return (
           <button
             key={o.id}
             onClick={() => onToggle(o.id)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 5,
+              display: 'flex', alignItems: 'center', gap: 6,
               padding: '8px 13px', borderRadius: M.radius.full,
               border: `0.5px solid ${active ? cor : M.color.border}`,
               background: active ? `${cor}14` : M.color.surface,
               color: active ? cor : M.color.textSoft,
               fontSize: M.font.md, fontWeight: active ? 600 : 400,
               cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              transition: 'all 0.12s',
-              flexShrink: 0,
+              transition: 'all 0.12s', flexShrink: 0, fontFamily: 'inherit',
             }}
           >
-            {o.emoji && <span style={{ fontSize: 16 }}>{o.emoji}</span>}
+            {Icon && <Icon size={13} strokeWidth={active ? 2.5 : 1.8} />}
             {o.label}
           </button>
         );
