@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { imprimirPlanejamento, gerarPDF } from '../components/PrintablePlan';
+import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor } from '../api/auth';
@@ -584,10 +584,26 @@ export default function PlanoDeAulaListaPage() {
                     <div className="space-y-4">
                       {v2.days!.map((day, idx) => (
                         <div key={day.date} className="border border-indigo-100 rounded-xl overflow-hidden">
-                          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between gap-2">
                             <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
                               Dia {idx + 1} — {day.date.split('-').reverse().join('/')}
                             </p>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => gerarPDFDia(selectedPlanning, day.date)}
+                                title="Gerar PDF deste dia"
+                                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                              >
+                                <Download className="h-3 w-3" /> PDF do dia
+                              </button>
+                              <button
+                                onClick={() => imprimirPlanejamentoDia(selectedPlanning, day.date)}
+                                title="Imprimir apenas este dia"
+                                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                              >
+                                <Printer className="h-3 w-3" /> Imprimir dia
+                              </button>
+                            </div>
                           </div>
                           <div className="px-4 py-3 space-y-3 bg-white">
                             {day.objectives?.length > 0 && (
