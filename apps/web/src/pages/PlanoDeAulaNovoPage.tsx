@@ -838,7 +838,7 @@ export default function PlanoDeAulaNovoPage() {
 
   if (loading) {
     return (
-      <PageShell title={isCoordRole ? 'Visualizar Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
+      <PageShell title={isCoordRole ? 'Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
@@ -846,10 +846,20 @@ export default function PlanoDeAulaNovoPage() {
     );
   }
 
+  // Título e subtítulo contextuais ao status real do plano — revisão é uma
+  // etapa, não um estado permanente. Plano já aprovado é só visualização.
+  const emRevisaoOuPendente = ['EM_REVISAO', 'RASCUNHO', 'DEVOLVIDO'].includes(status);
+  const tituloCoord = isCoordRole
+    ? (emRevisaoOuPendente ? 'Revisar Planejamento' : 'Visualizar Planejamento')
+    : (isEditing ? 'Editar Planejamento' : 'Novo Planejamento');
+  const subtituloCoord = isCoordRole
+    ? (emRevisaoOuPendente ? 'Aguardando sua análise — aprove ou devolva' : 'Planejamento aprovado — visualização e impressão')
+    : 'Planejamento por data com Matriz Pedagógica 2026 automática';
+
   return (
     <PageShell
-      title={isCoordRole ? 'Visualizar Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
-      subtitle={isCoordRole ? 'Modo de revisão — coordenação' : 'Planejamento por data com Matriz Pedagógica 2026 automática'}
+      title={tituloCoord}
+      subtitle={subtituloCoord}
     >
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ─── Cabeçalho com status ─── */}
