@@ -12,6 +12,7 @@ import {
   CheckCircle, AlertCircle, ChevronRight,
   Eye, ThumbsUp, MessageSquare, MessageCircle, TrendingUp,
   Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText, ArrowRight,
+  Printer, Download,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -26,6 +27,8 @@ import { AtalhosExecutivos } from '../components/dashboard/AtalhosExecutivos';
 import { AlertasSection } from '../components/dashboard/AlertasSection';
 import { TurmasStatusToday } from '../components/dashboard/TurmasStatusToday';
 import { PendenciasAlert } from '../components/dashboard/PendenciasAlert';
+import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
+import { safeJsonParse } from '../lib/safeJson';
 // Módulos legados removidos - consolidados na home premium
 import { ActionRequiredBlock } from '../components/dashboard/ActionRequiredBlock';
 import { KPIExecutiveBlock } from '../components/dashboard/KPIExecutiveBlock';
@@ -57,6 +60,7 @@ interface Planejamento {
   turmaNome: string;
   templateNome?: string;
   objectives?: string;
+  description?: string;
   reviewComment?: string;
   createdByUser?: { id: string; firstName: string; lastName: string; email: string };
   classroom?: { id: string; name: string };
@@ -334,6 +338,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [filtroPlanStatus, setFiltroPlanStatus] = useState<string>('TODOS');
   const [planExpandido, setPlanExpandido] = useState<string|null>(null);
   const [turmaExpandida, setTurmaExpandida] = useState<string | null>(null);
+  const [planoExpandido, setPlanoExpandido] = useState<string | null>(null);
   const [erroPainel, setErroPainel] = useState<string | null>(null);
   // FIX P4-3: filtros operacionais para a aba de diários da coordenação
   const [filtroDiarioTurma, setFiltroDiarioTurma] = useState<string>('');
@@ -455,6 +460,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               ?? '—',
             templateNome: ((p.template as Record<string, unknown> | null)?.name as string) ?? undefined,
             objectives: (p.objectives as string) ?? undefined,
+            description: (p.description as string) ?? undefined,
             reviewComment: (p.reviewComment as string) ?? undefined,
             createdByUser: (p.createdByUser as Planejamento['createdByUser']) ?? undefined,
             classroom: (p.classroom as Planejamento['classroom']) ?? undefined,
@@ -483,6 +489,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               ?? '—',
             templateNome: template?.name ?? undefined,
             objectives: (p.objectives as string) ?? undefined,
+            description: (p.description as string) ?? undefined,
             reviewComment: (p.reviewComment as string) ?? undefined,
             createdByUser: user as Planejamento['createdByUser'],
             classroom: classroom as Planejamento['classroom'],
@@ -1217,6 +1224,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                               ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
                                   .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                               : '—';
+                            // Detecta formato V2 (planejamento por dia) para oferecer impressão dia a dia
+                            const v2Plan = safeJsonParse<{ version?: number; days?: Array<{ date: string }> }>(
+                              (plan as any).description, {}
+                            );
+                            const temDias = v2Plan?.version === 2 && Array.isArray(v2Plan.days) && v2Plan.days.length > 0;
+                            const planoAberto = planoExpandido === plan.id;
                             return (
                               <div key={plan.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1253,6 +1266,31 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                         </button>
                                       </>
                                     )}
+                                    {/* Impressão / PDF — visualizar e imprimir o plano completo */}
+                                    <button
+                                      onClick={() => gerarPDF(plan as any)}
+                                      title="Gerar PDF do plano completo"
+                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      <Download className="h-3 w-3" /> PDF
+                                    </button>
+                                    <button
+                                      onClick={() => imprimirPlanejamento(plan as any)}
+                                      title="Imprimir o plano completo"
+                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      <Printer className="h-3 w-3" /> Imprimir
+                                    </button>
+                                    {/* Se o plano tem múltiplos dias, permite escolher imprimir por dia */}
+                                    {temDias && (
+                                      <button
+                                        onClick={() => setPlanoExpandido(planoAberto ? null : plan.id)}
+                                        title="Ver dias do plano para imprimir individualmente"
+                                        className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-700 font-medium px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                                      >
+                                        Por dia <ChevronRight className={`h-3 w-3 transition-transform ${planoAberto ? 'rotate-90' : ''}`} />
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => navigate(`/app/planejamento/${plan.id}/editar`)}
                                       className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
@@ -1261,6 +1299,38 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                     </button>
                                   </div>
                                 </div>
+
+                                {/* Lista expansível de dias — impressão individual, dia a dia, sem cortar página */}
+                                {temDias && planoAberto && (
+                                  <div className="mt-2.5 pt-2.5 border-t border-gray-100 space-y-1.5">
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                                      Imprimir por dia
+                                    </p>
+                                    {v2Plan.days!.map((day, idx) => (
+                                      <div key={day.date} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+                                        <span className="text-xs text-gray-600 font-medium">
+                                          Dia {idx + 1} — {day.date.split('-').reverse().join('/')}
+                                        </span>
+                                        <div className="flex gap-1.5 flex-shrink-0">
+                                          <button
+                                            onClick={() => gerarPDFDia(plan as any, day.date)}
+                                            title="Gerar PDF deste dia"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Download className="h-2.5 w-2.5" /> PDF
+                                          </button>
+                                          <button
+                                            onClick={() => imprimirPlanejamentoDia(plan as any, day.date)}
+                                            title="Imprimir apenas este dia"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Printer className="h-2.5 w-2.5" /> Imprimir
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
