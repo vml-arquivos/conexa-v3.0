@@ -149,6 +149,10 @@ interface DayState {
   matrizMessage?: string;
   teacher: DayTeacherData;
   expanded: boolean;
+  // Aditivo — preenchido quando a coordenação devolve apenas este dia.
+  // Não existia antes; lido do mesmo JSON description (formato V2).
+  reviewStatus?: 'DEVOLVIDO';
+  reviewComment?: string;
 }
 
 /** Contrato de retorno do endpoint by-classroom-day */
@@ -370,6 +374,7 @@ export default function PlanoDeAulaNovoPage() {
   const [aprovando, setAprovando] = useState(false);
   const [modalDevolver, setModalDevolver] = useState(false);
   const [motivoDevolver, setMotivoDevolver] = useState('');
+  const [diaParaDevolver, setDiaParaDevolver] = useState<string | null>(null);
 
   // ─── Estado principal ─────────────────────────────────────────────────────
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -491,6 +496,8 @@ export default function PlanoDeAulaNovoPage() {
               matrizLoading: false,
               teacher: day.teacher ?? { ...TEACHER_EMPTY },
               expanded: true,
+              reviewStatus: (day as any).reviewStatus,
+              reviewComment: (day as any).reviewComment,
             }));
             setDays(restored);
           } else {
@@ -896,8 +903,9 @@ export default function PlanoDeAulaNovoPage() {
           <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span>
-              {status === 'EM_REVISAO' && 'Este planejamento está aguardando aprovação da coordenação. Edição bloqueada.'}
-              {status === 'APROVADO' && 'Planejamento aprovado. Para editar, solicite devolução à coordenação.'}
+              {status === 'RASCUNHO' && isCoordRole && 'Este planejamento ainda é um rascunho do professor — ainda não foi enviado para revisão.'}
+              {status === 'EM_REVISAO' && (isCoordRole ? 'Aguardando sua aprovação ou devolução.' : 'Este planejamento está aguardando aprovação da coordenação. Edição bloqueada.')}
+              {status === 'APROVADO' && (isCoordRole ? 'Planejamento já aprovado — disponível apenas para visualização e impressão.' : 'Planejamento aprovado. Para editar, solicite devolução à coordenação.')}
               {status === 'EM_EXECUCAO' && 'Planejamento em execução. Edição bloqueada.'}
               {status === 'CONCLUIDO' && 'Planejamento concluído. Visualização somente leitura.'}
               {status === 'PUBLICADO' && 'Planejamento publicado. Edição bloqueada.'}
@@ -918,7 +926,7 @@ export default function PlanoDeAulaNovoPage() {
                 onClick={async () => {
                   try {
                     setAprovando(true);
-                    await http.patch(`/plannings/${planningId}/approve`);
+                    await http.post(`/plannings/${planningId}/aprovar`);
                     setStatus('APROVADO');
                     toast.success('Planejamento aprovado!');
                   } catch (err: any) {
@@ -928,20 +936,49 @@ export default function PlanoDeAulaNovoPage() {
                   }
                 }}
               >
-                <CheckCircle className="h-4 w-4 mr-1" /> Aprovar
+                <CheckCircle className="h-4 w-4 mr-1" /> Aprovar plano completo
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 className="border-red-300 text-red-700 hover:bg-red-50"
-                onClick={() => setModalDevolver(true)}
+                onClick={() => { setModalDevolver(true); setDiaParaDevolver(null); }}
               >
-                Devolver para Correção
+                Devolver plano completo
               </Button>
+              {days.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                  onClick={() => { setModalDevolver(true); setDiaParaDevolver(days[0]?.date ?? null); }}
+                >
+                  Devolver só um dia
+                </Button>
+              )}
             </div>
-            {/* Modal devolução inline */}
+            {/* Modal devolução inline — plano completo ou dia específico */}
             {modalDevolver && (
               <div className="mt-2 space-y-2">
+                {days.length > 1 && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">
+                      O que devolver?
+                    </label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white"
+                      value={diaParaDevolver ?? ''}
+                      onChange={e => setDiaParaDevolver(e.target.value || null)}
+                    >
+                      <option value="">Plano completo (todos os {days.length} dias)</option>
+                      {days.map((d, idx) => (
+                        <option key={d.date} value={d.date}>
+                          Dia {idx + 1} — {formatDateBR(d.date)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <textarea
                   className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none"
                   rows={3}
@@ -957,11 +994,20 @@ export default function PlanoDeAulaNovoPage() {
                     onClick={async () => {
                       try {
                         setAprovando(true);
-                        await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
+                        if (diaParaDevolver) {
+                          await http.post(
+                            `/plannings/${planningId}/devolver-dia/${diaParaDevolver}`,
+                            { comment: motivoDevolver.trim() },
+                          );
+                          toast.success(`Dia ${formatDateBR(diaParaDevolver)} devolvido para correção.`);
+                        } else {
+                          await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
+                          toast.success('Planejamento devolvido para correção.');
+                        }
                         setStatus('DEVOLVIDO');
                         setModalDevolver(false);
                         setMotivoDevolver('');
-                        toast.success('Planejamento devolvido para correção.');
+                        setDiaParaDevolver(null);
                       } catch (err: any) {
                         toast.error(err?.response?.data?.message ?? 'Erro ao devolver');
                       } finally {
@@ -969,9 +1015,9 @@ export default function PlanoDeAulaNovoPage() {
                       }
                     }}
                   >
-                    Confirmar Devolução
+                    {diaParaDevolver ? `Confirmar devolução do dia` : 'Confirmar devolução completa'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setModalDevolver(false); setMotivoDevolver(''); }}>
+                  <Button size="sm" variant="ghost" onClick={() => { setModalDevolver(false); setMotivoDevolver(''); setDiaParaDevolver(null); }}>
                     Cancelar
                   </Button>
                 </div>
@@ -1120,6 +1166,11 @@ export default function PlanoDeAulaNovoPage() {
                       Dia {idx + 1} — {formatDateBR(day.date)}
                     </span>
                     <div className="flex items-center gap-2">
+                      {day.reviewStatus === 'DEVOLVIDO' && (
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border border-orange-300">
+                          Devolvido pela coordenação
+                        </Badge>
+                      )}
                       {day.teacher.atividade.trim() && (
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
                           Preenchido
@@ -1157,6 +1208,16 @@ export default function PlanoDeAulaNovoPage() {
 
                 {day.expanded && (
                   <CardContent className="space-y-4">
+                    {/* Motivo da devolução deste dia específico, se houver */}
+                    {day.reviewStatus === 'DEVOLVIDO' && day.reviewComment && (
+                      <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl text-orange-800 text-sm">
+                        <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold">Motivo da devolução deste dia:</p>
+                          <p className="text-xs mt-0.5">{day.reviewComment}</p>
+                        </div>
+                      </div>
+                    )}
                     {/* Objetivos da Matriz (somente leitura) */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">

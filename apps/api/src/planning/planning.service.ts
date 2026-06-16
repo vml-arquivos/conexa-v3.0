@@ -1185,6 +1185,80 @@ export class PlanningService {
   }
 
   /**
+   * Devolve apenas UM dia específico de um planejamento multi-dia (formato V2),
+   * sem bloquear os demais dias já corretos. Não exige migration: a marcação
+   * fica registrada dentro do próprio campo `description` (JSON V2 existente),
+   * em cada item de `days[]`, no campo aditivo `reviewStatus`/`reviewComment`.
+   *
+   * O status geral do plano muda para DEVOLVIDO (sinaliza ao professor que há
+   * pendência), mas o frontend usa o detalhe por dia para mostrar exatamente
+   * o que precisa de correção — os demais dias continuam visíveis como ok.
+   */
+  async returnDayForCorrections(
+    id: string,
+    dayDate: string,
+    dto: { comment: string },
+    user: JwtPayload,
+  ) {
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) {
+      throw new ForbiddenException('Apenas a Coordenação da Unidade pode devolver planejamentos.');
+    }
+
+    const planning = await this.findOne(id, user);
+
+    if (planning.status !== PlanningStatus.EM_REVISAO && planning.status !== PlanningStatus.DEVOLVIDO) {
+      throw new BadRequestException('Apenas planejamentos em revisão ou já devolvidos podem ter dias devolvidos.');
+    }
+
+    let v2: any;
+    try {
+      v2 = planning.description ? JSON.parse(planning.description) : null;
+    } catch {
+      v2 = null;
+    }
+    if (!v2 || v2.version !== 2 || !Array.isArray(v2.days)) {
+      throw new BadRequestException('Este planejamento não está no formato por dia — use a devolução completa.');
+    }
+
+    const dayIndex = v2.days.findIndex((d: any) => d.date === dayDate);
+    if (dayIndex === -1) {
+      throw new BadRequestException(`Dia ${dayDate} não encontrado neste planejamento.`);
+    }
+
+    v2.days[dayIndex] = {
+      ...v2.days[dayIndex],
+      reviewStatus: 'DEVOLVIDO',
+      reviewComment: dto.comment,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: user.sub,
+    };
+
+    const updatedPlanning = await this.prisma.planning.update({
+      where: { id },
+      data: {
+        status: PlanningStatus.DEVOLVIDO,
+        description: JSON.stringify(v2),
+        reviewedAt: new Date(),
+        reviewedBy: user.sub,
+        reviewComment: `Dia ${dayDate} devolvido: ${dto.comment}`,
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditLogAction.RETURN_PLANNING,
+      entity: 'PLANNING',
+      entityId: id,
+      userId: user.sub,
+      mantenedoraId: planning.mantenedoraId,
+      unitId: planning.unitId,
+      changes: { dayDate, comment: dto.comment },
+    });
+
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
+  }
+
+  /**
    * GET /plannings/active-today
    * Retorna se há planejamento ativo (APROVADO ou EM_EXECUCAO) para a turma na data informada.
    * Usa filtro por range UTC do dia para cobrir timezone America/Sao_Paulo.

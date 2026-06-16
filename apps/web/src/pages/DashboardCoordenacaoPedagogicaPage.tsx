@@ -1369,11 +1369,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                         Por dia <ChevronRight className={`h-3 w-3 transition-transform ${planoAberto ? 'rotate-90' : ''}`} />
                                       </button>
                                     )}
+                                    {/* Texto contextual: planos já aprovados não precisam de "revisão" novamente */}
                                     <button
                                       onClick={() => navigate(`/app/planejamento/${plan.id}/editar`)}
                                       className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
                                     >
-                                      Abrir revisão →
+                                      {['APROVADO', 'PUBLICADO', 'CONCLUIDO'].includes(statusPlano)
+                                        ? 'Visualizar →'
+                                        : 'Abrir revisão →'}
                                     </button>
                                   </div>
                                 </div>
