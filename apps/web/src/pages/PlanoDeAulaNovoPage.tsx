@@ -38,8 +38,12 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Printer,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
+import type { Planning } from '../api/plannings';
 import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
@@ -802,6 +806,29 @@ export default function PlanoDeAulaNovoPage() {
   // Coordenação também é sempre bloqueada para edição — acessa apenas para revisão
   const bloqueado = isCoordRole || ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
 
+  // ─── Objeto Planning para impressão/PDF — reaproveita PrintablePlan.tsx ─────
+  // Monta a partir do estado já carregado em tela, sem nova chamada à API.
+  const planningForPrint: Planning | null = (planningId && days.length > 0)
+    ? ({
+        id: planningId,
+        title: title || `Planejamento ${turmaSelecionada?.name ?? ''} — ${startDate?.split('-').reverse().join('/') ?? ''}`,
+        status: status as Planning['status'],
+        type: 'ROTINA',
+        classroomId,
+        curriculumMatrixId: '',
+        startDate,
+        endDate: days[days.length - 1]?.date ?? startDate,
+        classroom: turmaSelecionada ? { id: turmaSelecionada.id, name: turmaSelecionada.name } : undefined,
+        createdByUser: user ? { id: user.id, firstName: user.nome ?? '', lastName: '', email: user.email ?? '' } : undefined,
+        description: JSON.stringify({
+          version: 2,
+          classroomId,
+          range: { start: startDate, end: days[days.length - 1]?.date ?? startDate, days: days.length },
+          days: days.map((d) => ({ date: d.date, objectives: d.objectives, teacher: d.teacher })),
+        } satisfies PlanningV2Json),
+      } as unknown as Planning)
+    : null;
+
   if (loading) {
     return (
       <PageShell title={isCoordRole ? 'Visualizar Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
@@ -819,7 +846,7 @@ export default function PlanoDeAulaNovoPage() {
     >
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ─── Cabeçalho com status ─── */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button variant="ghost" size="sm" onClick={() => navigate('/app/planejamentos')}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
@@ -829,6 +856,28 @@ export default function PlanoDeAulaNovoPage() {
             {statusInfo.icon}
             {statusInfo.label}
           </span>
+
+          {/* Visualizar e imprimir — disponível sempre que o plano já existe */}
+          {planningForPrint && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => gerarPDF(planningForPrint)}
+                title="Gerar PDF do plano completo"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5" /> PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => imprimirPlanejamento(planningForPrint)}
+                title="Imprimir o plano completo"
+              >
+                <Printer className="h-3.5 w-3.5 mr-1.5" /> Imprimir
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Banner de auto-save */}
@@ -1075,6 +1124,27 @@ export default function PlanoDeAulaNovoPage() {
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
                           Preenchido
                         </Badge>
+                      )}
+                      {planningForPrint && (
+                        <div
+                          className="flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => gerarPDFDia(planningForPrint, day.date)}
+                            title="Gerar PDF deste dia"
+                            className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                          >
+                            <Download className="h-3 w-3" /> PDF
+                          </button>
+                          <button
+                            onClick={() => imprimirPlanejamentoDia(planningForPrint, day.date)}
+                            title="Imprimir apenas este dia"
+                            className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                          >
+                            <Printer className="h-3 w-3" /> Imprimir
+                          </button>
+                        </div>
                       )}
                       {day.expanded ? (
                         <ChevronUp className="h-4 w-4 text-gray-400" />

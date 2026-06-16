@@ -339,6 +339,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [planExpandido, setPlanExpandido] = useState<string|null>(null);
   const [turmaExpandida, setTurmaExpandida] = useState<string | null>(null);
   const [planoExpandido, setPlanoExpandido] = useState<string | null>(null);
+  const [filtroStatusPlanejamento, setFiltroStatusPlanejamento] = useState<string>('TODOS');
   const [erroPainel, setErroPainel] = useState<string | null>(null);
   // FIX P4-3: filtros operacionais para a aba de diários da coordenação
   const [filtroDiarioTurma, setFiltroDiarioTurma] = useState<string>('');
@@ -522,8 +523,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       await http.post(`/plannings/${id}/aprovar`);
       toast.success('Planejamento aprovado! ✅');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
-    } catch {
-      toast.error('Erro ao aprovar');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao aprovar planejamento';
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
     } finally {
       setProcessando(null);
     }
@@ -537,7 +539,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       toast.success('Planejamento devolvido com observações');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');
-    } catch { toast.error('Erro ao devolver'); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao devolver planejamento';
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    }
     finally { setProcessando(null); }
   }
 
@@ -1123,12 +1128,31 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           CONCLUIDO:  { label: 'Concluído',  cor: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500' },
         };
 
-        // Agrupar por turma
+        // ─── Filtros de status — visão clara do que precisa de ação ────────────
+        const FILTROS_STATUS: Array<{ id: string; label: string; statuses: string[]; cor: string }> = [
+          { id: 'TODOS',     label: 'Todos',             statuses: [], cor: 'bg-gray-700' },
+          { id: 'ANALISE',   label: 'Aguardando análise', statuses: ['EM_REVISAO'],            cor: 'bg-yellow-500' },
+          { id: 'RASCUNHO',  label: 'Rascunhos',          statuses: ['RASCUNHO'],               cor: 'bg-gray-400' },
+          { id: 'DEVOLVIDO', label: 'Devolvidos',         statuses: ['DEVOLVIDO'],              cor: 'bg-orange-500' },
+          { id: 'APROVADO',  label: 'Aprovados',          statuses: ['APROVADO', 'PUBLICADO', 'CONCLUIDO'], cor: 'bg-green-500' },
+        ];
+
+        const contagemPorFiltro = (statuses: string[]) =>
+          statuses.length === 0
+            ? planejamentos.length
+            : planejamentos.filter(p => statuses.includes((p.status || '').toUpperCase())).length;
+
+        const filtroAtivo = FILTROS_STATUS.find(f => f.id === filtroStatusPlanejamento) ?? FILTROS_STATUS[0];
+        const planejamentosFiltrados = filtroAtivo.statuses.length === 0
+          ? planejamentos
+          : planejamentos.filter(p => filtroAtivo.statuses.includes((p.status || '').toUpperCase()));
+
+        // Agrupar por turma (após aplicar o filtro de status)
         const porTurma: Record<string, {
           turmaNome: string; professor: string;
           itens: typeof planejamentos;
         }> = {};
-        for (const p of planejamentos) {
+        for (const p of planejamentosFiltrados) {
           const chave = (p as any).classroom?.id || (p as any).classroomId || p.turmaNome || 'sem-turma';
           const nome  = (p as any).classroom?.name || p.turmaNome || chave;
           const prof  = (p as any).createdByUser
@@ -1137,57 +1161,85 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           if (!porTurma[chave]) porTurma[chave] = { turmaNome: nome, professor: prof, itens: [] };
           porTurma[chave].itens.push(p);
         }
-        const grupos = Object.entries(porTurma);
-
-        // Contadores globais
-        const pendentes = planejamentos.filter(p =>
-          p.status === 'EM_REVISAO' || p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO'
-        ).length;
+        // Ordena turmas alfabeticamente para navegação previsível
+        const grupos = Object.entries(porTurma).sort((a, b) => a[1].turmaNome.localeCompare(b[1].turmaNome));
 
         return (
-          <div className="space-y-3">
+          <div className="space-y-4">
 
             {/* Cabeçalho resumido */}
             <div className="flex items-center justify-between px-1">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Planejamentos</p>
                 <p className="text-xs text-gray-400">
-                  {grupos.length} turma{grupos.length !== 1 ? 's' : ''} · {planejamentos.length} plano{planejamentos.length !== 1 ? 's' : ''}
+                  {grupos.length} turma{grupos.length !== 1 ? 's' : ''} · {planejamentosFiltrados.length} de {planejamentos.length} plano{planejamentos.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {pendentes > 0 && (
-                  <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200">
-                    {pendentes} pendente{pendentes !== 1 ? 's' : ''}
-                  </span>
-                )}
-                <button onClick={loadDashboard}
-                  className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              <button onClick={loadDashboard}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            {planejamentos.length === 0 ? (
+            {/* ─── Filtros de status — sempre visíveis, contagem ao vivo ────────── */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {FILTROS_STATUS.map(f => {
+                const ativo = filtroStatusPlanejamento === f.id;
+                const count = contagemPorFiltro(f.statuses);
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setFiltroStatusPlanejamento(f.id)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      ativo
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {!ativo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${f.cor}`} />}
+                    {f.label}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ativo ? 'bg-white/20' : 'bg-gray-100'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {planejamentosFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-gray-100 gap-2">
                 <BookOpen className="h-10 w-10 text-gray-200" />
-                <p className="text-sm font-semibold text-gray-400">Nenhum planejamento</p>
+                <p className="text-sm font-semibold text-gray-400">
+                  {filtroAtivo.id === 'TODOS' ? 'Nenhum planejamento' : `Nenhum plano em "${filtroAtivo.label}"`}
+                </p>
+                {filtroAtivo.id !== 'TODOS' && (
+                  <button
+                    onClick={() => setFiltroStatusPlanejamento('TODOS')}
+                    className="text-xs text-indigo-600 hover:underline font-medium"
+                  >
+                    Ver todos os planejamentos
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 {grupos.map(([chave, grupo]) => {
                   const aberto = turmaExpandida === chave;
-                  const temPendente = grupo.itens.some(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
-                  );
-                  const countPendente = grupo.itens.filter(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
-                  ).length;
+                  // Pendências sempre calculadas sobre o conjunto completo da turma (não filtrado)
+                  // para o coordenador nunca perder de vista o que falta, independente do filtro ativo
+                  const itensCompletosTurma = planejamentos.filter(p => {
+                    const c = (p as any).classroom?.id || (p as any).classroomId || p.turmaNome || 'sem-turma';
+                    return c === chave;
+                  });
+                  const countAnalise   = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'EM_REVISAO').length;
+                  const countRascunho  = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'RASCUNHO').length;
+                  const countDevolvido = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'DEVOLVIDO').length;
+                  const countAprovado  = itensCompletosTurma.filter(p => ['APROVADO','PUBLICADO','CONCLUIDO'].includes((p.status || '').toUpperCase())).length;
 
                   return (
                     <div key={chave} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
 
-                      {/* Header da turma — sempre visível */}
+                      {/* Header da turma — sempre visível, com resumo claro por status */}
                       <button
                         onClick={() => setTurmaExpandida(aberto ? null : chave)}
                         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
@@ -1201,24 +1253,42 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             <p className="text-xs text-gray-400 truncate">Prof. {grupo.professor}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                          <span className="text-xs text-gray-400">
-                            {grupo.itens.length} plano{grupo.itens.length !== 1 ? 's' : ''}
-                          </span>
-                          {temPendente && (
-                            <span className="text-[11px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                              {countPendente} pendente{countPendente !== 1 ? 's' : ''}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2 flex-wrap justify-end">
+                          {countAnalise > 0 && (
+                            <span className="text-[10px] bg-yellow-100 text-yellow-700 font-bold px-1.5 py-0.5 rounded-full border border-yellow-200">
+                              {countAnalise} p/ análise
+                            </span>
+                          )}
+                          {countDevolvido > 0 && (
+                            <span className="text-[10px] bg-orange-100 text-orange-700 font-bold px-1.5 py-0.5 rounded-full border border-orange-200">
+                              {countDevolvido} devolvido{countDevolvido !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {countRascunho > 0 && (
+                            <span className="text-[10px] bg-gray-100 text-gray-600 font-bold px-1.5 py-0.5 rounded-full border border-gray-200">
+                              {countRascunho} rascunho{countRascunho !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {countAprovado > 0 && (
+                            <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full border border-green-200">
+                              {countAprovado} aprovado{countAprovado !== 1 ? 's' : ''}
                             </span>
                           )}
                           <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${aberto ? 'rotate-90' : ''}`} />
                         </div>
                       </button>
 
-                      {/* Lista de planos — só aparece quando expandido */}
+                      {/* Lista de planos da turma — respeitando o filtro de status ativo */}
                       {aberto && (
                         <div className="divide-y divide-gray-50 border-t border-gray-100">
-                          {grupo.itens.map(plan => {
-                            const cfg = STATUS_CFG[(plan.status || '').toUpperCase()] ?? STATUS_CFG.RASCUNHO;
+                          {grupo.itens.length === 0 ? (
+                            <div className="px-4 py-6 text-center">
+                              <p className="text-xs text-gray-400">Nenhum plano nesta turma para o filtro "{filtroAtivo.label}"</p>
+                            </div>
+                          ) : (
+                            grupo.itens.map(plan => {
+                            const statusPlano = (plan.status || '').toUpperCase();
+                            const cfg = STATUS_CFG[statusPlano] ?? STATUS_CFG.RASCUNHO;
                             const dataRaw = (plan as any).startDate || '';
                             const dataFmt = dataRaw
                               ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
@@ -1230,6 +1300,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             );
                             const temDias = v2Plan?.version === 2 && Array.isArray(v2Plan.days) && v2Plan.days.length > 0;
                             const planoAberto = planoExpandido === plan.id;
+                            // CORREÇÃO: o backend só aceita aprovação quando status === EM_REVISAO.
+                            // Mostrar o botão também em RASCUNHO causava erro 400 silencioso.
+                            const podeAprovarOuDevolver = canApprove && statusPlano === 'EM_REVISAO';
                             return (
                               <div key={plan.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1249,7 +1322,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`} />
                                       {cfg.label}
                                     </span>
-                                    {canApprove && ['EM_REVISAO','RASCUNHO'].includes(plan.status || '') && (
+                                    {podeAprovarOuDevolver && (
                                       <>
                                         <button
                                           onClick={() => aprovarPlanejamento(plan.id)}
@@ -1265,6 +1338,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                           Devolver
                                         </button>
                                       </>
+                                    )}
+                                    {canApprove && statusPlano === 'RASCUNHO' && (
+                                      <span className="text-[10px] text-gray-400 italic px-1">
+                                        Aguardando envio do professor
+                                      </span>
                                     )}
                                     {/* Impressão / PDF — visualizar e imprimir o plano completo */}
                                     <button
@@ -1333,7 +1411,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                 )}
                               </div>
                             );
-                          })}
+                          }))}
                         </div>
                       )}
                     </div>
@@ -1375,6 +1453,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           </div>
         );
       })()}
+
 
 
       {/* ══════════════════════════════════════════════════════════════════
