@@ -53,6 +53,16 @@ export default function MobileObservacaoPage() {
   const [saved, setSaved] = useState(false);
   const [fotos, setFotos] = useState<CapturedPhoto[]>([]);
   const [form, setForm] = useState({ campo: '', nivel: '', descricao: '' });
+  // Detalhamento por área de desenvolvimento — mesma seção opcional do
+  // desktop (ObservacaoCriancaPage), agora disponível também no app que
+  // o professor usa no dia a dia.
+  const [detalhes, setDetalhes] = useState({
+    motorSkills: '', cognitiveSkills: '', languageSkills: '',
+    socialInteraction: '', emotionalState: '', sleepPattern: '',
+    healthNotes: '', dietaryNotes: '', psychologicalNotes: '',
+    interests: '', challenges: '', nextSteps: '',
+  });
+  const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -86,12 +96,42 @@ export default function MobileObservacaoPage() {
     if (!crianca || !form.campo || !form.nivel || form.descricao.trim().length < 10) return;
     setSaving(true);
     try {
-      const payload: any = { childId: crianca.id, classroomId: turma, category: form.campo, nivel: form.nivel, description: form.descricao, observationDate: hojeISO() };
+      // CORREÇÃO CRÍTICA: o payload anterior enviava `description`/`nivel`,
+      // nomes que não existem no schema DevelopmentObservation — o backend
+      // descartava o texto em silêncio e o registro ficava praticamente
+      // vazio. Agora usa behaviorDescription (campo real) e guarda o campo
+      // de experiência + nível BNCC em `indicadores` (JSON), que é onde o
+      // schema já prevê esse tipo de dado estruturado.
+      const campoLabel = CAMPOS.find(c => c.id === form.campo)?.label ?? form.campo;
+      const nivelLabel = NIVEIS.find(n => n.id === form.nivel)?.label ?? form.nivel;
+      const payload: any = {
+        childId: crianca.id,
+        classroomId: turma,
+        category: form.campo,
+        date: hojeISO(),
+        behaviorDescription: form.descricao,
+        indicadores: { campoExperiencia: form.campo, campoExperienciaLabel: campoLabel, nivel: form.nivel, nivelLabel },
+        tags: [form.campo, form.nivel],
+        motorSkills: detalhes.motorSkills || undefined,
+        cognitiveSkills: detalhes.cognitiveSkills || undefined,
+        languageSkills: detalhes.languageSkills || undefined,
+        socialInteraction: detalhes.socialInteraction || undefined,
+        emotionalState: detalhes.emotionalState || undefined,
+        sleepPattern: detalhes.sleepPattern || undefined,
+        healthNotes: detalhes.healthNotes || undefined,
+        dietaryNotes: detalhes.dietaryNotes || undefined,
+        psychologicalNotes: detalhes.psychologicalNotes || undefined,
+        interests: detalhes.interests || undefined,
+        challenges: detalhes.challenges || undefined,
+        nextSteps: detalhes.nextSteps || undefined,
+      };
       if (isOnline) {
         await http.post('/development-observations', payload);
       } else { await postOfflineSafe('observacao', '/development-observations', 'POST', payload); }
       setSaved(true);
       setForm({ campo: '', nivel: '', descricao: '' }); setFotos([]);
+      setDetalhes({ motorSkills: '', cognitiveSkills: '', languageSkills: '', socialInteraction: '', emotionalState: '', sleepPattern: '', healthNotes: '', dietaryNotes: '', psychologicalNotes: '', interests: '', challenges: '', nextSteps: '' });
+      setMostrarDetalhes(false);
       setTimeout(() => { setSaved(false); setCrianca(null); }, 2500);
     } finally { setSaving(false); }
   };
@@ -206,6 +246,64 @@ export default function MobileObservacaoPage() {
               <MobileTextarea value={form.descricao} onChange={v => setForm(f => ({ ...f, descricao: v }))}
                 placeholder="Descreva a situação específica onde observou esse comportamento..." rows={5} />
             </MobileField>
+          )}
+
+          {/* Detalhamento por área — opcional, expansível. Mesmo conjunto de
+              campos do desktop, disponível direto no app que o professor usa
+              no dia a dia. */}
+          {form.nivel && (
+            <div style={{ marginBottom: 20 }}>
+              <button onClick={() => setMostrarDetalhes(v => !v)} style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: '#7c3aed', fontSize: 13, fontWeight: 600, WebkitTapHighlightColor: 'transparent',
+              }}>
+                {mostrarDetalhes ? '− Ocultar' : '+ Adicionar'} detalhamento por área
+              </button>
+              <p style={{ fontSize: 11, color: M.color.textMuted, margin: '4px 0 0' }}>
+                Opcional. Motricidade, linguagem, sono, saúde ou social/emocional.
+              </p>
+
+              {mostrarDetalhes && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <MobileField label="Habilidades motoras">
+                    <MobileTextarea value={detalhes.motorSkills} onChange={v => setDetalhes(d => ({ ...d, motorSkills: v }))} rows={2} placeholder="Coordenação, equilíbrio..." />
+                  </MobileField>
+                  <MobileField label="Habilidades cognitivas">
+                    <MobileTextarea value={detalhes.cognitiveSkills} onChange={v => setDetalhes(d => ({ ...d, cognitiveSkills: v }))} rows={2} placeholder="Atenção, memória..." />
+                  </MobileField>
+                  <MobileField label="Habilidades de linguagem">
+                    <MobileTextarea value={detalhes.languageSkills} onChange={v => setDetalhes(d => ({ ...d, languageSkills: v }))} rows={2} placeholder="Vocabulário, comunicação..." />
+                  </MobileField>
+                  <MobileField label="Interação social">
+                    <MobileTextarea value={detalhes.socialInteraction} onChange={v => setDetalhes(d => ({ ...d, socialInteraction: v }))} rows={2} placeholder="Relação com colegas..." />
+                  </MobileField>
+                  <MobileField label="Estado emocional">
+                    <MobileTextarea value={detalhes.emotionalState} onChange={v => setDetalhes(d => ({ ...d, emotionalState: v }))} rows={2} placeholder="Humor, reações..." />
+                  </MobileField>
+                  <MobileField label="Padrão de sono">
+                    <MobileTextarea value={detalhes.sleepPattern} onChange={v => setDetalhes(d => ({ ...d, sleepPattern: v }))} rows={2} placeholder="Qualidade e duração do sono..." />
+                  </MobileField>
+                  <MobileField label="Notas de saúde">
+                    <MobileTextarea value={detalhes.healthNotes} onChange={v => setDetalhes(d => ({ ...d, healthNotes: v }))} rows={2} placeholder="Sintomas, queixas observadas..." />
+                  </MobileField>
+                  <MobileField label="Notas de alimentação">
+                    <MobileTextarea value={detalhes.dietaryNotes} onChange={v => setDetalhes(d => ({ ...d, dietaryNotes: v }))} rows={2} placeholder="Aceitação alimentar, recusas..." />
+                  </MobileField>
+                  <MobileField label="Notas psicológicas">
+                    <MobileTextarea value={detalhes.psychologicalNotes} onChange={v => setDetalhes(d => ({ ...d, psychologicalNotes: v }))} rows={2} placeholder="Encaminhar à coordenação quando necessário..." />
+                  </MobileField>
+                  <MobileField label="Interesses">
+                    <MobileTextarea value={detalhes.interests} onChange={v => setDetalhes(d => ({ ...d, interests: v }))} rows={2} placeholder="O que demonstra gostar..." />
+                  </MobileField>
+                  <MobileField label="Desafios">
+                    <MobileTextarea value={detalhes.challenges} onChange={v => setDetalhes(d => ({ ...d, challenges: v }))} rows={2} placeholder="Dificuldades a trabalhar..." />
+                  </MobileField>
+                  <MobileField label="Próximos passos">
+                    <MobileTextarea value={detalhes.nextSteps} onChange={v => setDetalhes(d => ({ ...d, nextSteps: v }))} rows={2} placeholder="O que planejar..." />
+                  </MobileField>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Foto */}

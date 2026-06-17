@@ -38,7 +38,24 @@ export default function ObservacaoCriancaPage() {
     developmentAlerts: '',
     recommendations: '',
     date: new Date().toISOString().slice(0, 10),
+    // Campos detalhados por área de desenvolvimento — antes só existiam na
+    // tela restrita à coordenação (DesenvolvimentoInfantilPage). O professor,
+    // que acompanha a criança todos os dias, nunca tinha acesso a eles.
+    // Todos opcionais: quem só quer um registro rápido continua podendo.
+    socialInteraction: '',
+    emotionalState: '',
+    motorSkills: '',
+    cognitiveSkills: '',
+    languageSkills: '',
+    sleepPattern: '',
+    healthNotes: '',
+    dietaryNotes: '',
+    psychologicalNotes: '',
+    interests: '',
+    challenges: '',
+    nextSteps: '',
   });
+  const [mostrarDetalhamento, setMostrarDetalhamento] = useState(false);
   const [salvando, setSalvando] = useState<boolean>(false);
 
   // Lista de categorias disponíveis (simplificada)
@@ -101,6 +118,20 @@ export default function ObservacaoCriancaPage() {
         developmentAlerts: novaObs.developmentAlerts || undefined,
         recommendations: novaObs.recommendations || undefined,
         date: novaObs.date,
+        // Detalhamento por área — enviado apenas quando preenchido, para não
+        // sobrescrever registros existentes com strings vazias.
+        socialInteraction: novaObs.socialInteraction || undefined,
+        emotionalState: novaObs.emotionalState || undefined,
+        motorSkills: novaObs.motorSkills || undefined,
+        cognitiveSkills: novaObs.cognitiveSkills || undefined,
+        languageSkills: novaObs.languageSkills || undefined,
+        sleepPattern: novaObs.sleepPattern || undefined,
+        healthNotes: novaObs.healthNotes || undefined,
+        dietaryNotes: novaObs.dietaryNotes || undefined,
+        psychologicalNotes: novaObs.psychologicalNotes || undefined,
+        interests: novaObs.interests || undefined,
+        challenges: novaObs.challenges || undefined,
+        nextSteps: novaObs.nextSteps || undefined,
       });
       toast.success('Observação registrada com sucesso');
       // Limpar formulário e recarregar lista
@@ -110,7 +141,20 @@ export default function ObservacaoCriancaPage() {
         developmentAlerts: '',
         recommendations: '',
         date: new Date().toISOString().slice(0, 10),
+        socialInteraction: '',
+        emotionalState: '',
+        motorSkills: '',
+        cognitiveSkills: '',
+        languageSkills: '',
+        sleepPattern: '',
+        healthNotes: '',
+        dietaryNotes: '',
+        psychologicalNotes: '',
+        interests: '',
+        challenges: '',
+        nextSteps: '',
       });
+      setMostrarDetalhamento(false);
       try {
         const obsRes = await http.get('/development-observations', { params: { childId, limit: '200' } });
         const dados = Array.isArray(obsRes?.data)
@@ -245,6 +289,120 @@ export default function ObservacaoCriancaPage() {
               placeholder="Sugestões de acompanhamento, atividades ou estratégias"
             />
           </div>
+
+          {/* Detalhamento por área de desenvolvimento — opcional, expansível.
+              Antes só a coordenação tinha acesso a esses campos. O professor,
+              que vê a criança todos os dias, agora pode registrar aqui mesmo,
+              sem precisar de uma tela separada. */}
+          <div className="border-t border-gray-100 pt-3">
+            <button
+              type="button"
+              onClick={() => setMostrarDetalhamento((v) => !v)}
+              className="text-sm font-medium text-purple-700 hover:text-purple-800 flex items-center gap-1"
+            >
+              {mostrarDetalhamento ? '− Ocultar' : '+ Adicionar'} detalhamento por área de desenvolvimento
+            </button>
+            <p className="text-xs text-gray-400 mt-1">
+              Opcional. Use quando quiser registrar algo específico sobre motricidade, linguagem, sono, saúde ou comportamento social/emocional.
+            </p>
+
+            {mostrarDetalhamento && (
+              <div className="mt-3 space-y-4">
+                {/* Grupo: Desempenho */}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Desempenho</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Habilidades motoras</label>
+                    <textarea value={novaObs.motorSkills} onChange={(e) => setNovaObs({ ...novaObs, motorSkills: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Coordenação, equilíbrio, movimentos finos e grossos..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Habilidades cognitivas</label>
+                    <textarea value={novaObs.cognitiveSkills} onChange={(e) => setNovaObs({ ...novaObs, cognitiveSkills: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Resolução de problemas, atenção, memória..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Habilidades de linguagem</label>
+                    <textarea value={novaObs.languageSkills} onChange={(e) => setNovaObs({ ...novaObs, languageSkills: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Vocabulário, comunicação, compreensão..." />
+                  </div>
+                </div>
+
+                {/* Grupo: Comportamento e bem-estar */}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Comportamento e bem-estar</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Interação social</label>
+                    <textarea value={novaObs.socialInteraction} onChange={(e) => setNovaObs({ ...novaObs, socialInteraction: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Relação com colegas, brincadeiras em grupo..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Estado emocional</label>
+                    <textarea value={novaObs.emotionalState} onChange={(e) => setNovaObs({ ...novaObs, emotionalState: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Humor, reações emocionais ao longo do dia..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Padrão de sono</label>
+                    <textarea value={novaObs.sleepPattern} onChange={(e) => setNovaObs({ ...novaObs, sleepPattern: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Qualidade e duração do sono na rotina..." />
+                  </div>
+                </div>
+
+                {/* Grupo: Saúde — sensível, revisado pela coordenação */}
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Saúde e alimentação (conteúdo sensível)</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notas de saúde</label>
+                    <textarea value={novaObs.healthNotes} onChange={(e) => setNovaObs({ ...novaObs, healthNotes: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Sintomas, queixas, situações de saúde observadas..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notas de alimentação</label>
+                    <textarea value={novaObs.dietaryNotes} onChange={(e) => setNovaObs({ ...novaObs, dietaryNotes: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Aceitação alimentar, recusas, observações sobre refeições..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notas psicológicas</label>
+                    <textarea value={novaObs.psychologicalNotes} onChange={(e) => setNovaObs({ ...novaObs, psychologicalNotes: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Encaminhar para psicologia/coordenação quando necessário..." />
+                  </div>
+                </div>
+
+                {/* Grupo: Perfil */}
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Perfil da criança</p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Interesses</label>
+                    <textarea value={novaObs.interests} onChange={(e) => setNovaObs({ ...novaObs, interests: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="O que a criança demonstra gostar, temas de interesse..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Desafios</label>
+                    <textarea value={novaObs.challenges} onChange={(e) => setNovaObs({ ...novaObs, challenges: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="Dificuldades atuais a serem trabalhadas..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Próximos passos</label>
+                    <textarea value={novaObs.nextSteps} onChange={(e) => setNovaObs({ ...novaObs, nextSteps: e.target.value })}
+                      className="w-full min-h-[50px] rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder="O que planejar para o próximo período..." />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end">
             <Button onClick={salvarObs} disabled={salvando}>
               {salvando ? 'Salvando...' : 'Salvar Observação'}
@@ -290,6 +448,40 @@ export default function ObservacaoCriancaPage() {
                     {obs.recommendations && (
                       <p className="text-xs text-gray-600 mt-0.5">
                         Recomendações: {obs.recommendations}
+                      </p>
+                    )}
+                    {/* Campos de detalhamento — exibidos só quando preenchidos.
+                        nextSteps pode conter um marcador interno de anexo
+                        ([ANEXO_ATIVIDADE] {...}); removemos antes de exibir
+                        e mostramos o nome do arquivo via campo já serializado. */}
+                    {[
+                      { campo: obs.motorSkills, label: 'Motor' },
+                      { campo: obs.cognitiveSkills, label: 'Cognitivo' },
+                      { campo: obs.languageSkills, label: 'Linguagem' },
+                      { campo: obs.socialInteraction, label: 'Social' },
+                      { campo: obs.emotionalState, label: 'Emocional' },
+                      { campo: obs.sleepPattern, label: 'Sono' },
+                      { campo: obs.healthNotes, label: 'Saúde' },
+                      { campo: obs.dietaryNotes, label: 'Alimentação' },
+                      { campo: obs.psychologicalNotes, label: 'Psicológico' },
+                      { campo: obs.interests, label: 'Interesses' },
+                      { campo: obs.challenges, label: 'Desafios' },
+                      {
+                        campo: (obs.nextSteps as string | undefined)
+                          ?.split('\n')
+                          .filter((linha: string) => !linha.trim().startsWith('[ANEXO_ATIVIDADE]'))
+                          .join('\n')
+                          .trim(),
+                        label: 'Próximos passos',
+                      },
+                    ].filter((item) => item.campo).map((item) => (
+                      <p key={item.label} className="text-xs text-gray-500 mt-0.5">
+                        <span className="font-medium text-gray-600">{item.label}:</span> {item.campo}
+                      </p>
+                    ))}
+                    {obs.atividadeArquivoNome && (
+                      <p className="text-xs text-indigo-600 mt-0.5">
+                        Anexo: {obs.atividadeArquivoNome}
                       </p>
                     )}
                 </div>

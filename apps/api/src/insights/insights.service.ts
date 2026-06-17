@@ -672,6 +672,16 @@ export class InsightsService {
           developmentAlerts: true,
           recommendations: true,
           nextSteps: true,
+          // Campos que faltavam — fecha o cruzamento com o mesmo nível
+          // de profundidade do intelligence-core (saúde, alimentação,
+          // sono, psicologia, interesses, desafios, participação).
+          healthNotes: true,
+          dietaryNotes: true,
+          sleepPattern: true,
+          psychologicalNotes: true,
+          interests: true,
+          challenges: true,
+          planningParticipation: true,
           createdAt: true,
         },
       }),
@@ -753,6 +763,11 @@ export class InsightsService {
     const observationsWithAlerts = observations.filter((item) =>
       Boolean(item.developmentAlerts && item.developmentAlerts.trim().length > 0),
     );
+    // Sinais de saúde e psicologia merecem ponto de atenção próprio — antes
+    // ficavam fora do cálculo mesmo quando preenchidos pelo professor/coordenação.
+    const observationsWithHealthOrPsych = observations.filter((item: any) =>
+      Boolean(item.healthNotes?.trim() || item.psychologicalNotes?.trim()),
+    );
 
     const pontosAtencao: Array<{ tipo: string; severidade: string; titulo: string; descricao: string }> = [];
 
@@ -762,6 +777,15 @@ export class InsightsService {
         severidade: observationsWithAlerts.length >= 3 ? 'ALTA' : 'MEDIA',
         titulo: `${observationsWithAlerts.length} observação(ões) com alerta de desenvolvimento`,
         descricao: 'Revisar registros recentes com coordenação ou psicologia antes de qualquer encaminhamento.',
+      });
+    }
+
+    if (observationsWithHealthOrPsych.length > 0) {
+      pontosAtencao.push({
+        tipo: 'SAUDE_PSICOLOGICO',
+        severidade: observationsWithHealthOrPsych.length >= 2 ? 'ALTA' : 'MEDIA',
+        titulo: `${observationsWithHealthOrPsych.length} observação(ões) com nota de saúde ou psicológica`,
+        descricao: 'Conteúdo sensível registrado — revisar com equipe responsável antes de qualquer comunicação à família.',
       });
     }
 
@@ -815,8 +839,14 @@ export class InsightsService {
           item.motorSkills ||
           item.cognitiveSkills ||
           item.languageSkills ||
+          item.sleepPattern ||
+          item.interests ||
+          item.challenges ||
+          item.planningParticipation ||
           '',
-        alert: item.developmentAlerts || '',
+        // Saúde e psicologia entram no alerta — são os sinais de maior prioridade
+        // para revisão humana, igual ao critério já usado no intelligence-core.
+        alert: item.developmentAlerts || item.healthNotes || item.psychologicalNotes || '',
         recommendation: item.recommendations || item.nextSteps || '',
         source: 'DevelopmentObservation',
       })),
@@ -960,18 +990,61 @@ export class InsightsService {
       }
     }
 
-    // 4. Observações com alertas de desenvolvimento
+    // 4. Observações com alertas de desenvolvimento — lê o conjunto completo de
+    // campos estruturados (motor, cognitivo, linguagem, social, emocional,
+    // saúde, sono, alimentação), igual ao intelligence-core, em vez de só 2 campos.
     const obsAlertas = await this.prisma.developmentObservation.findMany({
-      where: { ...(resolvedUnit ? { classroom: { unit: { id: resolvedUnit } } } : {}), ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since }, developmentAlerts: { not: null } },
-      select: { id: true, date: true, psychologicalNotes: true }, take: 20,
+      where: {
+        ...(resolvedUnit ? { classroom: { unit: { id: resolvedUnit } } } : {}),
+        ...(params.classroomId ? { classroomId: params.classroomId } : {}),
+        ...(params.childId ? { childId: params.childId } : {}),
+        date: { gte: since },
+        OR: [
+          { developmentAlerts: { not: null } },
+          { psychologicalNotes: { not: null } },
+          { healthNotes: { not: null } },
+          { motorSkills: { not: null } },
+          { cognitiveSkills: { not: null } },
+          { languageSkills: { not: null } },
+          { socialInteraction: { not: null } },
+          { emotionalState: { not: null } },
+          { sleepPattern: { not: null } },
+        ],
+      },
+      select: {
+        id: true, date: true, childId: true,
+        developmentAlerts: true, psychologicalNotes: true, healthNotes: true,
+        motorSkills: true, cognitiveSkills: true, languageSkills: true,
+        socialInteraction: true, emotionalState: true, sleepPattern: true,
+      },
+      take: 30,
     });
     for (const o of obsAlertas) {
       const hp = !!o.psychologicalNotes;
-      add({ id: `obs-${o.id}`, type: 'OBSERVACAO_DESENVOLVIMENTO', title: 'Alerta de desenvolvimento',
-        description: `Observação com indicadores de atenção${hp ? ' e notas psicológicas' : ''}.`,
-        priority: hp ? 'HIGH' : 'MEDIUM', profile: hp ? ['PSICOLOGA', 'COORDENACAO_PEDAGOGICA'] : ['COORDENACAO_PEDAGOGICA', 'PROFESSOR'],
+      const hasHealth = !!o.healthNotes;
+      // Sinais de habilidade (motor/cognitivo/linguagem/social/emocional/sono) contam
+      // como ponto de atenção mesmo sem developmentAlerts explícito — é exatamente
+      // o que o intelligence-core já fazia e o motor de missões antes ignorava.
+      const habilidadesComSinal = [o.motorSkills, o.cognitiveSkills, o.languageSkills, o.socialInteraction, o.emotionalState, o.sleepPattern].filter(Boolean).length;
+      const temAlertaExplicito = !!o.developmentAlerts;
+      if (!temAlertaExplicito && !hp && !hasHealth && habilidadesComSinal === 0) continue;
+
+      const prioridade: 'HIGH' | 'MEDIUM' = (hp || hasHealth || temAlertaExplicito) ? 'HIGH' : 'MEDIUM';
+      const categoriasAfetadas = [
+        o.motorSkills && 'motricidade', o.cognitiveSkills && 'cognição', o.languageSkills && 'linguagem',
+        o.socialInteraction && 'interação social', o.emotionalState && 'estado emocional', o.sleepPattern && 'sono',
+      ].filter(Boolean) as string[];
+
+      add({ id: `obs-${o.id}`, type: 'OBSERVACAO_DESENVOLVIMENTO',
+        title: temAlertaExplicito ? 'Alerta de desenvolvimento registrado' : 'Observação com sinais de acompanhamento',
+        description: categoriasAfetadas.length > 0
+          ? `Registros em: ${categoriasAfetadas.join(', ')}${hp ? ' (com notas psicológicas)' : ''}${hasHealth ? ' (com notas de saúde)' : ''}.`
+          : `Observação com indicadores de atenção${hp ? ' e notas psicológicas' : ''}.`,
+        priority: prioridade,
+        profile: hp ? ['PSICOLOGA', 'COORDENACAO_PEDAGOGICA'] : ['COORDENACAO_PEDAGOGICA', 'PROFESSOR'],
         evidence: [{ source: 'DevelopmentObservation', sourceId: o.id, label: 'Alerta', date: o.date?.toISOString() }],
-        suggestedAction: hp ? 'Agendar avaliação com equipe de apoio.' : 'Acompanhar evolução.', targetRoute: '/app/observacao-crianca' });
+        suggestedAction: hp ? 'Agendar avaliação com equipe de apoio.' : 'Acompanhar evolução e revisar no Perfil Integral da Criança.',
+        targetRoute: `/app/crianca/${o.childId}/perfil-integral` });
     }
 
     // 5. Restrições alimentares críticas

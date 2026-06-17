@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import { Brain, BookOpen, ArrowLeft, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
 import { ChildQuickActions } from '../components/children/ChildQuickActions';
+import { getIntegralChildProfile } from '../api/intelligence-core';
 
 const DIMENSOES = [
   { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: '#ec4899' },
@@ -59,7 +60,7 @@ function calcularIdade(dob: string | null | undefined): string {
 export default function PainelAnaliticoCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
-  const [aba, setAba] = useState<'bncc'|'diario'|'microgestos'>('bncc');
+  const [aba, setAba] = useState<'bncc'|'diario'|'microgestos'|'inteligencia'>('bncc');
   const [microgestos, setMicrogestos] = useState<any[]>([]);
   const [loadingMg, setLoadingMg] = useState(false);
   const [loadingC, setLoadingC] = useState(true);
@@ -69,6 +70,26 @@ export default function PainelAnaliticoCriancaPage() {
   // Tarefa 2.2 — Frequência e restrições alimentares
   const [frequencia, setFrequencia] = useState<{ total: number; presentes: number; pct: number | null } | null>(null);
   const [restricoes, setRestricoes] = useState<any[]>([]);
+  // Nova aba — Inteligência Pedagógica: cruza saúde, comportamento, frequência,
+  // nutrição e RDIC num único perfil, consumindo o motor intelligence-core
+  // que já existia no backend mas nunca era chamado por nenhuma tela.
+  const [perfilIntegral, setPerfilIntegral] = useState<any>(null);
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
+  const [erroPerfil, setErroPerfil] = useState<string | null>(null);
+
+  const carregarPerfilIntegral = useCallback(async () => {
+    if (!childId) return;
+    setLoadingPerfil(true);
+    setErroPerfil(null);
+    try {
+      const data = await getIntegralChildProfile(childId, {});
+      setPerfilIntegral(data);
+    } catch (e: any) {
+      setErroPerfil(e?.response?.data?.message ?? 'Erro ao carregar perfil integral.');
+    } finally {
+      setLoadingPerfil(false);
+    }
+  }, [childId]);
 
   const carregarCentral = useCallback(async () => {
     if (!childId) return;
@@ -90,6 +111,7 @@ export default function PainelAnaliticoCriancaPage() {
 
   useEffect(() => { carregarCentral(); }, [carregarCentral]);
   useEffect(() => { if (aba === 'diario' && eventos.length === 0) carregarDiario(); }, [aba, carregarDiario, eventos.length]);
+  useEffect(() => { if (aba === 'inteligencia' && !perfilIntegral && !loadingPerfil) carregarPerfilIntegral(); }, [aba, perfilIntegral, loadingPerfil, carregarPerfilIntegral]);
 
   // Tarefa 2.2 — Buscar frequência e restrições ao montar
   useEffect(() => {
@@ -210,9 +232,9 @@ export default function PainelAnaliticoCriancaPage() {
         </div>
 
         <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
-          {(['bncc','diario','microgestos'] as const).map(a=>(
-            <button key={a} onClick={()=>setAba(a)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${aba===a?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {a==='bncc' ? <><Brain className="h-4 w-4"/>Indicadores BNCC</> : a==='diario' ? <><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</> : <><Activity className="h-4 w-4"/>Microgestos{microgestos.length>0&&<span className="bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full">{microgestos.length}</span>}</>}
+          {(['bncc','diario','microgestos','inteligencia'] as const).map(a=>(
+            <button key={a} onClick={()=>setAba(a)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${aba===a?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              {a==='bncc' ? <><Brain className="h-4 w-4"/>Indicadores BNCC</> : a==='diario' ? <><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</> : a==='microgestos' ? <><Activity className="h-4 w-4"/>Microgestos{microgestos.length>0&&<span className="bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full">{microgestos.length}</span>}</> : <><AlertCircle className="h-4 w-4"/>Inteligência Pedagógica{perfilIntegral?.attentionPoints?.length>0&&<span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">{perfilIntegral.attentionPoints.length}</span>}</>}
             </button>
           ))}
         </div>
@@ -420,6 +442,95 @@ export default function PainelAnaliticoCriancaPage() {
                     </div>
                   </CardContent>
                 </Card>
+              </>
+            )}
+          </div>
+        )}
+
+        {aba === 'inteligencia' && (
+          <div className="space-y-4">
+            {loadingPerfil ? (
+              <LoadingState message="Cruzando dados de frequência, desenvolvimento, saúde e RDIC..." />
+            ) : erroPerfil ? (
+              <Card><CardContent className="py-12 text-center">
+                <AlertCircle className="h-10 w-10 mx-auto mb-3 text-rose-300" />
+                <p className="text-sm text-gray-500">{erroPerfil}</p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={carregarPerfilIntegral}>Tentar novamente</Button>
+              </CardContent></Card>
+            ) : !perfilIntegral ? (
+              <Card><CardContent className="py-12 text-center">
+                <Brain className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-500">Nenhum dado carregado ainda.</p>
+              </CardContent></Card>
+            ) : (
+              <>
+                {/* Aviso de responsabilidade — este motor organiza evidências, não diagnostica */}
+                <div className="flex items-start gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700 text-xs">
+                  <Brain className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>{perfilIntegral.safety?.notes ?? 'Este painel organiza evidências de diferentes módulos do sistema. Não substitui avaliação profissional nem gera diagnóstico clínico.'}</p>
+                </div>
+
+                {/* Métricas cruzadas */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.attendance?.presenceRate ?? '—'}{perfilIntegral.metrics?.attendance?.presenceRate != null ? '%' : ''}</p>
+                    <p className="text-xs text-gray-500">Frequência no período</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.records?.observations ?? 0}</p>
+                    <p className="text-xs text-gray-500">Observações de desenvolvimento</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.rdic?.total ?? 0}</p>
+                    <p className="text-xs text-gray-500">RDICs registrados</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.alerts?.open ?? 0}</p>
+                    <p className="text-xs text-gray-500">Alertas operacionais abertos</p>
+                  </CardContent></Card>
+                </div>
+
+                {/* Pontos de atenção cruzados */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2"><AlertCircle className="h-4 w-4 text-amber-500"/>Pontos de Atenção</CardTitle></CardHeader>
+                  <CardContent>
+                    {(perfilIntegral.attentionPoints ?? []).length === 0 ? (
+                      <p className="text-sm text-gray-400 py-4 text-center">Nenhum ponto de atenção identificado no período.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {perfilIntegral.attentionPoints.map((p: any, i: number) => {
+                          const corSeveridade = p.severity === 'CRITICA' ? 'border-rose-300 bg-rose-50' : p.severity === 'ALTA' ? 'border-orange-300 bg-orange-50' : p.severity === 'MEDIA' ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50';
+                          return (
+                            <div key={i} className={`border rounded-xl p-3 ${corSeveridade}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-gray-800">{p.title}</p>
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white border border-current opacity-70">{p.severity}</span>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">{p.description}</p>
+                              {p.recommendation && <p className="text-xs text-gray-500 mt-1.5"><strong>Recomendação:</strong> {p.recommendation}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recomendações consolidadas */}
+                {(perfilIntegral.recommendations ?? []).length > 0 && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Award className="h-4 w-4 text-indigo-500"/>Recomendações</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1.5">
+                        {perfilIntegral.recommendations.map((r: string, i: number) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                            <ChevronRight className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />{r}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
               </>
             )}
           </div>

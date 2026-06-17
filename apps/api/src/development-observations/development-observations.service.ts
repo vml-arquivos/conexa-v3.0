@@ -383,6 +383,11 @@ export class DevelopmentObservationsService {
       developmentAlerts: nullableText(dto.developmentAlerts),
       recommendations: nullableText(dto.recommendations),
       nextSteps: nullableText(dto.nextSteps),
+      // Aditivo — sem estes dois campos, o nível BNCC e o campo de
+      // experiência selecionados no app mobile eram descartados em
+      // silêncio (o registro chegava sem nenhum payload reconhecido).
+      ...(dto.tags !== undefined ? { tags: dto.tags } : {}),
+      ...(dto.indicadores !== undefined ? { indicadores: dto.indicadores } : {}),
       createdBy: user.sub,
     };
   }
