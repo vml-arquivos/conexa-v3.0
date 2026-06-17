@@ -17,7 +17,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
-import { isUnidade } from '../api/auth';
+import { isUnidade, hasRole } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -142,7 +142,11 @@ function StatusBadge({ status }: { status: StatusDia }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DiarioCalendarioPage() {
   const { user } = useAuth();
-  const isCoord = isUnidade(user);
+  // Cobre todos os papéis de supervisão já liberados nesta rota (UNIDADE,
+  // STAFF_CENTRAL, MANTENEDORA) — isUnidade() sozinho detectava só UNIDADE,
+  // deixando STAFF_CENTRAL/MANTENEDORA tratados como professor (podendo
+  // tentar criar diário, e sem o seletor de turma obrigatório).
+  const isCoord = isUnidade(user) || hasRole(user, 'STAFF_CENTRAL') || hasRole(user, 'MANTENEDORA');
   const navigate = useNavigate();
   const hoje = getPedagogicalToday();
 
@@ -160,29 +164,58 @@ export default function DiarioCalendarioPage() {
   const [loading, setLoading] = useState(true);
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [turmaNome, setTurmaNome] = useState<string>('');
+  // Lista completa de turmas acessíveis — usada para o seletor exibido à
+  // coordenação (UNIDADE/STAFF_CENTRAL/MANTENEDORA), que supervisiona
+  // várias turmas e não deve cair automaticamente na primeira da lista.
+  const [turmasDisponiveis, setTurmasDisponiveis] = useState<{ id: string; name: string }[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO' | 'SEM_DIARIO'>('TODOS');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [futurosExpandidos, setFuturosExpandidos] = useState(false);
 
-  // ─── Carregar turma do professor ────────────────────────────────────────────
+  // ─── Carregar turma do professor / lista de turmas para a coordenação ──────
   useEffect(() => {
     async function loadTurma() {
       try {
         const res = await http.get('/lookup/classrooms/accessible');
         const turmas: { id: string; name: string }[] = Array.isArray(res.data) ? res.data : [];
-        if (turmas.length > 0) {
+        setTurmasDisponiveis(turmas);
+
+        // CORREÇÃO CRÍTICA: a coordenação (UNIDADE/STAFF_CENTRAL/MANTENEDORA)
+        // supervisiona várias turmas — antes, esta tela sempre auto-selecionava
+        // turmas[0] (a primeira em ordem alfabética), abrindo direto no Diário
+        // de uma turma que a coordenação nunca escolheu. Agora, com múltiplas
+        // turmas disponíveis, a coordenação precisa selecionar explicitamente
+        // no seletor abaixo. Professor com 1 turma só continua sem fricção.
+        if (turmas.length === 1) {
+          setClassroomId(turmas[0].id);
+          setTurmaNome(turmas[0].name);
+        } else if (turmas.length > 1 && !isCoord) {
+          // Professor com mais de uma turma vinculada (caso raro, ex: auxiliar
+          // em duas salas): mantém o comportamento anterior como fallback,
+          // mas isso não se aplica a perfis de coordenação.
           setClassroomId(turmas[0].id);
           setTurmaNome(turmas[0].name);
         }
+        // Coordenação com múltiplas turmas: classroomId fica undefined até
+        // seleção explícita — o seletor abaixo cuida disso.
       } catch {
         // silencioso — continua sem classroomId
       }
     }
     loadTurma();
-  }, []);
+  }, [user, isCoord]);
 
   // ─── Carregar diários do ano letivo ─────────────────────────────────────────
   useEffect(() => {
+    // CORREÇÃO: coordenação com múltiplas turmas e nenhuma selecionada ainda
+    // não deve disparar a busca — sem isso, a chamada saía sem classroomId e
+    // misturava diários de todas as turmas da unidade no mesmo calendário.
+    if (isCoord && turmasDisponiveis.length > 1 && !classroomId) {
+      setDiasMap({});
+      setLoading(false);
+      return;
+    }
+
     async function loadDiarios() {
       setLoading(true);
       try {
@@ -270,7 +303,7 @@ export default function DiarioCalendarioPage() {
     }
 
     loadDiarios();
-  }, [classroomId, user]);
+  }, [classroomId, user, turmasDisponiveis, isCoord]);
 
   // ─── Dias do mês selecionado ─────────────────────────────────────────────────
   const diasDoMes = useMemo(() => {
@@ -360,6 +393,45 @@ export default function DiarioCalendarioPage() {
         <ChevronRight className="h-3 w-3" />
         <span className="text-gray-800 font-medium">Diário da Turma</span>
       </nav>
+
+      {/* Seletor de turma — visível apenas para coordenação (UNIDADE/STAFF_CENTRAL/
+          MANTENEDORA) quando há mais de uma turma disponível. Sem isso, a tela
+          abria fixada na primeira turma em ordem alfabética, sem a coordenação
+          ter escolhido nada — turmas e diários de colegas ficavam misturados. */}
+      {isCoord && turmasDisponiveis.length > 1 && (
+        <div className="mb-4 bg-white border border-gray-200 rounded-2xl p-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">
+            Selecione a turma que deseja fiscalizar
+          </label>
+          <select
+            value={classroomId ?? ''}
+            onChange={(e) => {
+              const turma = turmasDisponiveis.find((t) => t.id === e.target.value);
+              setClassroomId(turma?.id);
+              setTurmaNome(turma?.name ?? '');
+            }}
+            className="w-full sm:w-80 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+          >
+            <option value="">Selecione uma turma...</option>
+            {turmasDisponiveis.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+          {!classroomId && (
+            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" /> Escolha uma turma para ver o diário correspondente.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!classroomId && isCoord && turmasDisponiveis.length > 1 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center text-gray-400">
+          <BookOpen className="h-10 w-10 mb-3 opacity-30" />
+          <p className="text-sm">Selecione uma turma acima para visualizar o diário.</p>
+        </div>
+      ) : (
+      <>
 
       {/* ── Card de destaque: Diário de Hoje ── */}
       {mesSelecionado === mesAtual.substring(0, 7) && (() => {
@@ -749,6 +821,8 @@ export default function DiarioCalendarioPage() {
       )}
 
       {/* CTA duplicado removido — o card 'Diário de Hoje' no topo já cobre este caso */}
+      </>
+      )}
     </PageShell>
   );
 }
