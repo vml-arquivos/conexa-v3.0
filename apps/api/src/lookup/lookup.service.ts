@@ -3,6 +3,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
+// Mesmo critério usado em rdx.service.ts: só restringe o escopo de quem é
+// EXCLUSIVAMENTE professor. Alguém que acumula PROFESSOR + UNIDADE (ou
+// STAFF_CENTRAL/MANTENEDORA) continua com a visão ampla que já tinha —
+// a correção de vazamento não deve bloquear coordenadores.
+function hasOnlyTeacherLevel(user: JwtPayload): boolean {
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  const levels = roles.map((r: any) => r?.level);
+  const hasBroaderAccess = levels.some((l) =>
+    ([RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER] as RoleLevel[]).includes(l),
+  );
+  return !hasBroaderAccess && levels.includes(RoleLevel.PROFESSOR);
+}
+
 export interface AccessibleUnit {
   id: string;
   code: string;
@@ -186,26 +199,15 @@ export class LookupService {
         },
         orderBy: { name: 'asc' },
       });
-      // Fallback: professor sem classroomTeacher formal — retornar turmas ativas da mantenedora
+      // CORREÇÃO CRÍTICA — vazamento de dados entre professores: o fallback
+      // anterior devolvia TODAS as turmas ativas da mantenedora quando o
+      // professor não tinha vínculo formal em ClassroomTeacher. Isso fazia
+      // com que um professor sem cadastro de vínculo correto visse turmas,
+      // crianças e fotos de colegas de outras turmas. Sem vínculo formal,
+      // o correto é não devolver nenhuma turma — e sinalizar o problema,
+      // não mascará-lo com acesso indevido a dados de terceiros.
       if (classrooms.length === 0) {
-        const fallback = await this.prisma.classroom.findMany({
-          where: {
-            isActive: true,
-            unit: { mantenedoraId: user.mantenedoraId },
-            ...(unitId && { unitId }),
-          },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            unitId: true,
-            ageGroupMin: true,
-            ageGroupMax: true,
-          },
-          orderBy: { name: 'asc' },
-          take: 50,
-        });
-        return fallback;
+        return [];
       }
       return classrooms;
     }
@@ -381,18 +383,13 @@ export class LookupService {
         });
         if (ct) {
           resolvedClassroomId = ct.classroomId;
-        } else {
-          // Fallback: primeira turma ativa da mantenedora (professor sem vínculo formal)
-          const firstClassroom = await this.prisma.classroom.findFirst({
-            where: {
-              isActive: true,
-              unit: { mantenedoraId: user.mantenedoraId },
-            },
-            select: { id: true },
-            orderBy: { name: 'asc' },
-          });
-          if (firstClassroom) resolvedClassroomId = firstClassroom.id;
         }
+        // CORREÇÃO CRÍTICA — vazamento de dados entre professores: o
+        // fallback anterior resolvia para "a primeira turma ativa da
+        // mantenedora" (ordem alfabética) quando o professor não tinha
+        // vínculo formal — ou seja, podia devolver a turma de QUALQUER
+        // outro professor da rede. Sem vínculo formal, simplesmente não
+        // há turma para resolver automaticamente.
       }
       if (!resolvedClassroomId) return [];
     }
@@ -411,9 +408,21 @@ export class LookupService {
       throw new ForbiddenException('Turma não encontrada ou sem acesso');
     }
 
-    // PROFESSOR: verificar vínculo formal, mas não bloquear se não tiver
-    // (professor pode registrar ocorrências mesmo sem classroomTeacher formal)
-    // O acesso é garantido pela mantenedoraId compartilhada
+    // CORREÇÃO CRÍTICA — vazamento de dados entre professores: antes, um
+    // professor podia passar QUALQUER classroomId de outra turma da mesma
+    // mantenedora e receber a lista de crianças normalmente, pois só a
+    // mantenedoraId compartilhada era validada. Agora, quando o usuário só
+    // tem nível PROFESSOR (sem acumular UNIDADE/STAFF_CENTRAL/MANTENEDORA),
+    // é exigido vínculo formal e ativo com a turma específica solicitada.
+    if (hasOnlyTeacherLevel(user)) {
+      const vinculo = await this.prisma.classroomTeacher.findFirst({
+        where: { teacherId: user.sub, classroomId: resolvedClassroomId, isActive: true },
+        select: { id: true },
+      });
+      if (!vinculo) {
+        throw new ForbiddenException('Professor sem vínculo ativo com esta turma');
+      }
+    }
 
     // Buscar crianças matriculadas na turma (via Enrollment)
     const enrollments = await this.prisma.enrollment.findMany({

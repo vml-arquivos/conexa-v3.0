@@ -1,6 +1,16 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RoleLevel } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+
+function hasOnlyTeacherLevel(user: JwtPayload): boolean {
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  const levels = roles.map((r: any) => r?.level);
+  const hasBroaderAccess = levels.some((l) =>
+    ([RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER] as RoleLevel[]).includes(l),
+  );
+  return !hasBroaderAccess && levels.includes(RoleLevel.PROFESSOR);
+}
 
 @Injectable()
 export class RdxService {
@@ -23,6 +33,17 @@ export class RdxService {
       where: { id: dto.classroomId, unitId: user.unitId },
     });
     if (!classroom) throw new NotFoundException('Turma não encontrada ou fora do escopo');
+
+    // Mesma correção do vazamento de leitura: professor só pode criar
+    // registro de fotos em turma onde tem vínculo ativo — sem isso, um
+    // professor poderia registrar atividades em turma de outro colega.
+    if (hasOnlyTeacherLevel(user)) {
+      const vinculo = await this.prisma.classroomTeacher.findFirst({
+        where: { teacherId: user.sub, classroomId: dto.classroomId, isActive: true },
+        select: { id: true },
+      });
+      if (!vinculo) throw new ForbiddenException('Professor sem vínculo com esta turma');
+    }
 
     // Criar o relatório com fotos como JSON no campo descricao (estrutura flexível)
     const fotosJson = dto.fotos ? JSON.stringify(dto.fotos) : null;
@@ -59,6 +80,24 @@ export class RdxService {
     if (classroomId) where.classroomId = classroomId;
     if (publicado !== undefined) where.publicado = publicado;
 
+    // CORREÇÃO CRÍTICA — vazamento de dados entre professores: o filtro
+    // anterior só restringia por mantenedoraId/unitId (a escola inteira),
+    // nunca por turma. Como classroomId chega vazio quando o frontend não
+    // envia o parâmetro, qualquer professor recebia os registros de fotos
+    // de TODAS as turmas da unidade, inclusive de colegas. Agora, quando o
+    // usuário só tem nível PROFESSOR (sem UNIDADE/STAFF_CENTRAL/MANTENEDORA),
+    // a consulta é restrita às turmas em que ele está efetivamente vinculado
+    // via ClassroomTeacher — mesmo padrão já usado em insights.service.ts.
+    if (hasOnlyTeacherLevel(user) && !classroomId) {
+      const vinculos = await this.prisma.classroomTeacher.findMany({
+        where: { teacherId: user.sub, isActive: true },
+        select: { classroomId: true },
+      });
+      const classroomIds = vinculos.map((v) => v.classroomId);
+      // Sem turma vinculada, não deve ver nenhum registro de outra turma.
+      where.classroomId = { in: classroomIds.length > 0 ? classroomIds : ['__nenhuma_turma__'] };
+    }
+
     const relatorios = await this.prisma.relatorioFoto.findMany({
       where,
       include: {
@@ -78,6 +117,20 @@ export class RdxService {
     const relatorio = await this.prisma.relatorioFoto.findUnique({ where: { id } });
     if (!relatorio) throw new NotFoundException('Relatório não encontrado');
     if (relatorio.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+    // Mesma correção do vazamento em listar(): valida também a unidade e,
+    // quando o usuário é só professor, exige vínculo ativo com a turma
+    // do relatório — sem isso, o ID de um relatório de outra turma da
+    // mesma rede ainda seria acessível diretamente por URL/query.
+    if (user.unitId && relatorio.unitId !== user.unitId) {
+      throw new ForbiddenException('Fora do escopo');
+    }
+    if (hasOnlyTeacherLevel(user)) {
+      const vinculo = await this.prisma.classroomTeacher.findFirst({
+        where: { teacherId: user.sub, classroomId: relatorio.classroomId, isActive: true },
+        select: { id: true },
+      });
+      if (!vinculo) throw new ForbiddenException('Professor sem vínculo com a turma deste relatório');
+    }
     return this.parseRelatorio(relatorio);
   }
 
@@ -88,6 +141,13 @@ export class RdxService {
     const relatorio = await this.prisma.relatorioFoto.findUnique({ where: { id } });
     if (!relatorio) throw new NotFoundException('Relatório não encontrado');
     if (relatorio.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+    if (hasOnlyTeacherLevel(user)) {
+      const vinculo = await this.prisma.classroomTeacher.findFirst({
+        where: { teacherId: user.sub, classroomId: relatorio.classroomId, isActive: true },
+        select: { id: true },
+      });
+      if (!vinculo) throw new ForbiddenException('Professor sem vínculo com a turma deste relatório');
+    }
 
     return this.prisma.relatorioFoto.update({
       where: { id },
@@ -103,6 +163,13 @@ export class RdxService {
     const relatorio = await this.prisma.relatorioFoto.findUnique({ where: { id } });
     if (!relatorio) throw new NotFoundException('Relatório não encontrado');
     if (relatorio.mantenedoraId !== user.mantenedoraId) throw new ForbiddenException('Fora do escopo');
+    if (hasOnlyTeacherLevel(user)) {
+      const vinculo = await this.prisma.classroomTeacher.findFirst({
+        where: { teacherId: user.sub, classroomId: relatorio.classroomId, isActive: true },
+        select: { id: true },
+      });
+      if (!vinculo) throw new ForbiddenException('Professor sem vínculo com a turma deste relatório');
+    }
 
     const parsed = this.parseRelatorio(relatorio);
     const fotosExistentes = parsed.fotos ?? [];
