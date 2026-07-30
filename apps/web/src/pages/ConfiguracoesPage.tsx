@@ -169,10 +169,27 @@ export default function ConfiguracoesPage() {
 
   async function loadUsuarios() {
     try {
-      const res = await http.get('/users?limit=50');
+      const res = await http.get('/admin/users', {
+        params: { limit: 50, _ts: Date.now() },
+      });
       const d = res.data;
-      setUsuarios(Array.isArray(d) ? d : d?.data ?? []);
-    } catch { /* silencioso */ }
+      const list = Array.isArray(d) ? d : d?.users ?? d?.data ?? [];
+      setUsuarios(list.map((item: any) => ({
+        id: item.id,
+        nome: `${item.firstName || ''} ${item.lastName || ''}`.trim(),
+        email: item.email,
+        role: item.roles?.[0]?.roleType || '',
+        ativo: item.status === 'ATIVO',
+        ultimoAcesso: item.lastLogin,
+        unidade: item.unit,
+      })));
+    } catch (error: any) {
+      setUsuarios([]);
+      toast.error(
+        error?.response?.data?.message ||
+        'Não foi possível carregar os usuários do banco de dados',
+      );
+    }
   }
 
   async function loadUnidade() {
@@ -261,7 +278,9 @@ export default function ConfiguracoesPage() {
 
   async function toggleUsuario(id: string, ativo: boolean) {
     try {
-      await http.put(`/users/${id}`, { ativo: !ativo });
+      await http.patch(`/admin/users/${id}`, {
+        status: ativo ? 'INATIVO' : 'ATIVO',
+      });
       setUsuarios(prev => prev.map(u => u.id === id ? { ...u, ativo: !ativo } : u));
       toast.success(ativo ? 'Usuário desativado' : 'Usuário ativado');
     } catch {
@@ -351,8 +370,8 @@ export default function ConfiguracoesPage() {
             <div className="space-y-4">
               <div className="flex gap-3">
                 <Input placeholder="Buscar usuário..." value={buscaUsuario} onChange={e => setBuscaUsuario(e.target.value)} className="flex-1" />
-                <Button onClick={() => setShowNovoUsuario(!showNovoUsuario)} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" /> Novo Usuário
+                <Button onClick={() => window.location.assign('/app/admin/usuarios')} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" /> Abrir Gestão Completa
                 </Button>
               </div>
 

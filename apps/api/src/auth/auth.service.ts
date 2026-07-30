@@ -128,7 +128,13 @@ export class AuthService {
       // Verificar se o usuário ainda existe e está ativo
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          mantenedoraId: true,
+          unitId: true,
+        },
       });
 
       if (!user || user.status !== 'ATIVO') {
@@ -146,10 +152,10 @@ export class AuthService {
       });
 
       const freshPayload: JwtPayload = {
-        sub: payload.sub,
-        email: payload.email,
-        mantenedoraId: payload.mantenedoraId,
-        unitId: payload.unitId,
+        sub: user.id,
+        email: user.email,
+        mantenedoraId: user.mantenedoraId,
+        unitId: user.unitId || undefined,
         roles: userRoles.map((ur) => ({
           roleId: ur.roleId,
           level: ur.role.level,

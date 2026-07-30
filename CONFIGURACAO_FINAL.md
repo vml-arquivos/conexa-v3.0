@@ -234,7 +234,7 @@ Copie e cole nas variáveis.
 
 **Formato**:
 ```
-AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+SUA_CHAVE_GEMINI_AQUI
 ```
 
 ---

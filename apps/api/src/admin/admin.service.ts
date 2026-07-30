@@ -8,7 +8,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { EnrollmentStatus, RoleLevel, RoleType, UserStatus } from '@prisma/client';
+import {
+  EnrollmentStatus,
+  Prisma,
+  RoleLevel,
+  RoleType,
+  UserStatus,
+} from '@prisma/client';
 import { Readable } from 'stream';
 import csvParser from 'csv-parser';
 import * as bcrypt from 'bcrypt';
@@ -27,6 +33,35 @@ const ROLE_TYPE_TO_LEVEL: Record<RoleType, RoleLevel> = {
   PROFESSOR: RoleLevel.PROFESSOR,
   PROFESSOR_AUXILIAR: RoleLevel.PROFESSOR,
 };
+
+const ADMIN_USER_SELECT = Prisma.validator<Prisma.UserSelect>()({
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  phone: true,
+  cpf: true,
+  status: true,
+  emailVerified: true,
+  lastLogin: true,
+  createdAt: true,
+  updatedAt: true,
+  unitId: true,
+  unit: { select: { name: true, code: true } },
+  roles: {
+    where: { isActive: true },
+    orderBy: { updatedAt: 'desc' },
+    select: {
+      scopeLevel: true,
+      role: { select: { type: true, level: true } },
+      unitScopes: { select: { unitId: true } },
+    },
+  },
+});
+
+type AdminUserRecord = Prisma.UserGetPayload<{
+  select: typeof ADMIN_USER_SELECT;
+}>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function norm(v: unknown): string {
@@ -75,6 +110,36 @@ function classroomCodeFromName(name: string): string {
   );
 }
 
+function normalizeAdminUser(user: AdminUserRecord) {
+  const unit = user.unit
+    ? { name: user.unit.name, unitCode: user.unit.code }
+    : undefined;
+
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    phone: user.phone,
+    cpf: user.cpf,
+    status: user.status,
+    emailVerified: user.emailVerified,
+    lastLogin: user.lastLogin,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    unitId: user.unitId,
+    unit,
+    // Somente vínculos ATIVOS são expostos. Incluir a unidade também dentro
+    // do papel mantém compatibilidade com as duas telas administrativas.
+    roles: user.roles.map((assignment) => ({
+      roleType: assignment.role.type,
+      scopeLevel: assignment.role.level,
+      unitScopes: assignment.unitScopes.map((scope) => scope.unitId),
+      unit,
+    })),
+  };
+}
+
 // ─── DTOs internos ────────────────────────────────────────────────────────────
 export interface CreateUserDto {
   firstName: string;
@@ -109,6 +174,47 @@ export class AdminService {
 
   private isDeveloper(user: JwtPayload): boolean {
     return Array.isArray(user?.roles) && user.roles.some((r) => r.level === RoleLevel.DEVELOPER);
+  }
+
+  private hasLevel(user: JwtPayload, level: RoleLevel): boolean {
+    return Array.isArray(user?.roles) && user.roles.some((role) => role.level === level);
+  }
+
+  private assertCanAssignRole(actor: JwtPayload, roleType: RoleType): void {
+    const targetLevel = ROLE_TYPE_TO_LEVEL[roleType];
+    if (!targetLevel) {
+      throw new BadRequestException(`roleType inválido: ${roleType}`);
+    }
+
+    if (this.isDeveloper(actor)) return;
+
+    // Nenhum perfil abaixo de DEVELOPER pode promover outro usuário a
+    // desenvolvedor.
+    if (targetLevel === RoleLevel.DEVELOPER) {
+      throw new ForbiddenException('Apenas DEVELOPER pode atribuir este perfil');
+    }
+
+    if (this.hasLevel(actor, RoleLevel.MANTENEDORA)) return;
+
+    if (this.hasLevel(actor, RoleLevel.STAFF_CENTRAL)) {
+      if (
+        targetLevel === RoleLevel.STAFF_CENTRAL ||
+        targetLevel === RoleLevel.UNIDADE ||
+        targetLevel === RoleLevel.PROFESSOR
+      ) {
+        return;
+      }
+      throw new ForbiddenException('Perfil acima da permissão do usuário autenticado');
+    }
+
+    if (this.hasLevel(actor, RoleLevel.UNIDADE)) {
+      if (targetLevel === RoleLevel.UNIDADE || targetLevel === RoleLevel.PROFESSOR) {
+        return;
+      }
+      throw new ForbiddenException('Gestores de unidade só podem atribuir perfis da própria unidade');
+    }
+
+    throw new ForbiddenException('Perfil sem permissão para gerenciar usuários');
   }
 
   private async assertUnitAccess(user: JwtPayload, unitId: string): Promise<void> {
@@ -160,11 +266,15 @@ export class AdminService {
    * Garante que o Role do tipo informado existe para a mantenedora.
    * Retorna o Role encontrado ou criado.
    */
-  private async ensureRole(mantenedoraId: string, roleType: RoleType) {
+  private async ensureRole(
+    mantenedoraId: string,
+    roleType: RoleType,
+    client: Prisma.TransactionClient = this.prisma as unknown as Prisma.TransactionClient,
+  ) {
     const level = ROLE_TYPE_TO_LEVEL[roleType];
     if (!level) throw new BadRequestException(`roleType inválido: ${roleType}`);
 
-    return this.prisma.role.upsert({
+    return client.role.upsert({
       where: { mantenedoraId_type: { mantenedoraId, type: roleType } },
       create: {
         mantenedoraId,
@@ -198,52 +308,21 @@ export class AdminService {
     const whereUnitId: string | undefined = isMantenedora
       ? (opts.unitId || undefined)
       : (user.unitId || undefined);
+    const take = Number.isFinite(opts.limit)
+      ? Math.min(Math.max(Math.trunc(opts.limit), 1), 500)
+      : 200;
 
     const users = await this.prisma.user.findMany({
       where: {
         mantenedoraId: user.mantenedoraId,
         ...(whereUnitId ? { unitId: whereUnitId } : {}),
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        cpf: true,
-        status: true,
-        emailVerified: true,
-        lastLogin: true,
-        createdAt: true,
-        unitId: true,
-        unit: { select: { name: true, code: true } },
-        roles: {
-          select: {
-            scopeLevel: true,
-            role: { select: { type: true } },
-          },
-        },
-      },
-      take: opts.limit,
+      select: ADMIN_USER_SELECT,
+      take,
       orderBy: { createdAt: 'desc' },
     });
 
-    // Normalizar para o formato esperado pelo frontend
-    const normalized = users.map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      email: u.email,
-      phone: u.phone,
-      cpf: u.cpf,
-      status: u.status,
-      emailVerified: u.emailVerified,
-      lastLogin: u.lastLogin,
-      createdAt: u.createdAt,
-      unitId: u.unitId,
-      unit: u.unit ? { name: u.unit.name, unitCode: u.unit.code } : undefined,
-      roles: u.roles.map((r) => ({ roleType: r.role?.type ?? r.scopeLevel })),
-    }));
+    const normalized = users.map(normalizeAdminUser);
 
     return { ok: true, total: normalized.length, users: normalized };
   }
@@ -300,6 +379,7 @@ export class AdminService {
 
     const roleLevel = ROLE_TYPE_TO_LEVEL[dto.roleType];
     if (!roleLevel) throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
+    this.assertCanAssignRole(actor, dto.roleType);
 
     const needsUnit =
       roleLevel === RoleLevel.UNIDADE || roleLevel === RoleLevel.PROFESSOR;
@@ -317,6 +397,9 @@ export class AdminService {
       if (!unit) throw new BadRequestException(`Unidade com código "${dto.unitCode}" não encontrada`);
       unitId = unit.id;
     }
+    if (unitId) {
+      await this.assertUnitAccess(actor, unitId);
+    }
 
     // Verificar e-mail duplicado
     const existing = await this.prisma.user.findUnique({
@@ -326,9 +409,10 @@ export class AdminService {
     if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const role = await this.ensureRole(actor.mantenedoraId, dto.roleType);
 
     const created = await this.prisma.$transaction(async (tx) => {
+      const role = await this.ensureRole(actor.mantenedoraId, dto.roleType, tx);
+
       // 1. Criar usuário
       const newUser = await tx.user.create({
         data: {
@@ -383,17 +467,16 @@ export class AdminService {
     });
 
     this.logger.log(`Usuário criado: ${created.email} por ${actor.email}`);
+    const persisted = await this.prisma.user.findUnique({
+      where: { id: created.id },
+      select: ADMIN_USER_SELECT,
+    });
+    if (!persisted) throw new NotFoundException('Usuário criado não foi encontrado');
+
     return {
       ok: true,
-      user: {
-        id: created.id,
-        email: created.email,
-        firstName: created.firstName,
-        lastName: created.lastName,
-        unitId: created.unitId,
-        status: created.status,
-        roles: [{ roleType: dto.roleType }],
-      },
+      persisted: true,
+      user: normalizeAdminUser(persisted),
     };
   }
 
@@ -407,11 +490,43 @@ export class AdminService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, mantenedoraId: true, email: true },
+      select: {
+        id: true,
+        mantenedoraId: true,
+        email: true,
+        unitId: true,
+        roles: {
+          where: { isActive: true },
+          select: {
+            role: { select: { type: true, level: true } },
+          },
+        },
+      },
     });
     if (!target) throw new NotFoundException('Usuário não encontrado');
     if (target.mantenedoraId !== actor.mantenedoraId)
       throw new ForbiddenException('Sem permissão para editar este usuário');
+
+    const actorIsUnit = this.hasLevel(actor, RoleLevel.UNIDADE) && !this.isDeveloper(actor);
+    if (actorIsUnit && (!actor.unitId || target.unitId !== actor.unitId)) {
+      throw new ForbiddenException('Gestores de unidade só podem editar usuários da própria unidade');
+    }
+    if (target.unitId) {
+      await this.assertUnitAccess(actor, target.unitId);
+    }
+
+    if (dto.firstName !== undefined && !dto.firstName.trim())
+      throw new BadRequestException('firstName não pode ser vazio');
+    if (dto.lastName !== undefined && !dto.lastName.trim())
+      throw new BadRequestException('lastName não pode ser vazio');
+    if (dto.email !== undefined && !dto.email.trim())
+      throw new BadRequestException('email não pode ser vazio');
+    if (
+      dto.status !== undefined &&
+      !Object.values(UserStatus).includes(dto.status)
+    ) {
+      throw new BadRequestException(`status inválido: ${dto.status}`);
+    }
 
     // Verificar e-mail duplicado (se estiver mudando)
     if (dto.email && dto.email.trim().toLowerCase() !== target.email) {
@@ -422,19 +537,54 @@ export class AdminService {
       if (dup) throw new ConflictException('Já existe um usuário com este e-mail');
     }
 
-    // Resolver unitId se unitCode foi informado
-    let unitId: string | null | undefined = undefined; // undefined = não alterar
+    const currentRole = target.roles[0]?.role;
+    const requestedRoleLevel = dto.roleType
+      ? ROLE_TYPE_TO_LEVEL[dto.roleType]
+      : currentRole?.level;
+
+    if (dto.roleType) {
+      if (!requestedRoleLevel)
+        throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
+      this.assertCanAssignRole(actor, dto.roleType);
+    }
+
+    const roleNeedsUnit =
+      requestedRoleLevel === RoleLevel.UNIDADE ||
+      requestedRoleLevel === RoleLevel.PROFESSOR;
+
+    // A unidade começa com o valor persistido. Se o perfil mudou para um papel
+    // central, ela é removida explicitamente; se unitCode veio, é resolvida
+    // sempre dentro da mantenedora autenticada.
+    let resolvedUnitId: string | null = target.unitId;
+    let shouldUpdateUnit = false;
     if (dto.unitCode !== undefined) {
+      shouldUpdateUnit = true;
       if (dto.unitCode?.trim()) {
         const unit = await this.prisma.unit.findFirst({
           where: { code: dto.unitCode.trim(), mantenedoraId: actor.mantenedoraId },
           select: { id: true },
         });
         if (!unit) throw new BadRequestException(`Unidade com código "${dto.unitCode}" não encontrada`);
-        unitId = unit.id;
+        resolvedUnitId = unit.id;
       } else {
-        unitId = null;
+        resolvedUnitId = null;
       }
+    }
+    if (dto.roleType && !roleNeedsUnit) {
+      shouldUpdateUnit = true;
+      resolvedUnitId = null;
+    }
+    if (roleNeedsUnit && !resolvedUnitId) {
+      throw new BadRequestException('unitCode é obrigatório para este perfil');
+    }
+    if (!roleNeedsUnit && dto.unitCode?.trim()) {
+      throw new BadRequestException('Este perfil não deve possuir unidade local');
+    }
+    if (resolvedUnitId) {
+      await this.assertUnitAccess(actor, resolvedUnitId);
+    }
+    if (actorIsUnit && resolvedUnitId !== actor.unitId) {
+      throw new ForbiddenException('Não é permitido mover usuários para outra unidade');
     }
 
     // Hash de senha se fornecida
@@ -454,7 +604,7 @@ export class AdminService {
       if (dto.phone !== undefined) updateData.phone = dto.phone?.trim() || null;
       if (dto.cpf !== undefined) updateData.cpf = dto.cpf?.trim() || null;
       if (dto.status) updateData.status = dto.status;
-      if (unitId !== undefined) updateData.unitId = unitId;
+      if (shouldUpdateUnit) updateData.unitId = resolvedUnitId;
 
       const u = await tx.user.update({
         where: { id: userId },
@@ -464,10 +614,20 @@ export class AdminService {
 
       // 2. Atualizar role se informado
       if (dto.roleType) {
-        const roleLevel = ROLE_TYPE_TO_LEVEL[dto.roleType];
-        if (!roleLevel) throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
+        const role = await this.ensureRole(actor.mantenedoraId, dto.roleType, tx);
 
-        const role = await this.ensureRole(actor.mantenedoraId, dto.roleType);
+        // Limpar todos os escopos antigos antes de trocar o papel. Os registros
+        // de UserRole são mantidos para auditoria, mas só um fica ativo.
+        const assignments = await tx.userRole.findMany({
+          where: { userId },
+          select: { id: true },
+        });
+        const assignmentIds = assignments.map((assignment) => assignment.id);
+        if (assignmentIds.length) {
+          await tx.userRoleUnitScope.deleteMany({
+            where: { userRoleId: { in: assignmentIds } },
+          });
+        }
 
         // Desativar roles anteriores
         await tx.userRole.updateMany({
@@ -483,10 +643,50 @@ export class AdminService {
           select: { id: true },
         });
 
-        // Recriar escopos se unitId foi alterado
-        if (unitId !== undefined && unitId !== null) {
-          await tx.userRoleUnitScope.deleteMany({ where: { userRoleId: userRole.id } });
-          await tx.userRoleUnitScope.create({ data: { userRoleId: userRole.id, unitId } });
+        if (roleNeedsUnit && resolvedUnitId) {
+          await tx.userRoleUnitScope.create({
+            data: { userRoleId: userRole.id, unitId: resolvedUnitId },
+          });
+        } else if (
+          role.level === RoleLevel.STAFF_CENTRAL ||
+          role.level === RoleLevel.MANTENEDORA
+        ) {
+          const allUnits = await tx.unit.findMany({
+            where: { mantenedoraId: actor.mantenedoraId },
+            select: { id: true },
+          });
+          if (allUnits.length) {
+            await tx.userRoleUnitScope.createMany({
+              data: allUnits.map((unit) => ({
+                userRoleId: userRole.id,
+                unitId: unit.id,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        }
+      } else if (shouldUpdateUnit && resolvedUnitId) {
+        // Alteração isolada de unidade: sincronizar o escopo dos papéis ativos
+        // de unidade/professor sem criar ou desativar papel algum.
+        const activeAssignments = await tx.userRole.findMany({
+          where: { userId, isActive: true },
+          select: {
+            id: true,
+            role: { select: { level: true } },
+          },
+        });
+        for (const assignment of activeAssignments) {
+          if (
+            assignment.role.level === RoleLevel.UNIDADE ||
+            assignment.role.level === RoleLevel.PROFESSOR
+          ) {
+            await tx.userRoleUnitScope.deleteMany({
+              where: { userRoleId: assignment.id },
+            });
+            await tx.userRoleUnitScope.create({
+              data: { userRoleId: assignment.id, unitId: resolvedUnitId },
+            });
+          }
         }
       }
 
@@ -494,16 +694,18 @@ export class AdminService {
     });
 
     this.logger.log(`Usuário atualizado: ${updated.email} por ${actor.email}`);
+    // Leitura pós-commit: a resposta vem da mesma fonte que alimenta a lista,
+    // comprovando que nome, status, unidade e papel foram persistidos.
+    const persisted = await this.prisma.user.findUnique({
+      where: { id: updated.id },
+      select: ADMIN_USER_SELECT,
+    });
+    if (!persisted) throw new NotFoundException('Usuário atualizado não foi encontrado');
+
     return {
       ok: true,
-      user: {
-        id: updated.id,
-        email: updated.email,
-        firstName: updated.firstName,
-        lastName: updated.lastName,
-        unitId: updated.unitId,
-        status: updated.status,
-      },
+      persisted: true,
+      user: normalizeAdminUser(persisted),
     };
   }
 

@@ -37,27 +37,19 @@ export default defineConfig({
         categories: ['education', 'productivity'],
       },
       workbox: {
+        // O minificador do Workbox encerra o worker prematuramente em alguns
+        // builders. O SW continua sendo gerado para produção, apenas sem a
+        // etapa de minificação que tornava o deploy não determinístico.
+        mode: 'development',
+        disableDevLogs: true,
+        sourcemap: false,
         // Aumentar limite para arquivos grandes (chunks do recharts etc.)
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
-        // Cache estratégico: app shell sempre do cache, dados da rede com fallback
+        cleanupOutdatedCaches: true,
+        // Somente o app shell e arquivos públicos podem ser armazenados.
+        // Dados autenticados da API têm o PostgreSQL como fonte única da verdade.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
-          {
-            // API: network-first com fallback para cache (dados frescos quando online)
-            urlPattern: /^https:\/\/apicocris\.casadf\.com\.br\/(?!auth).*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-          {
-            // Auth: sempre da rede (tokens não podem ser stale)
-            urlPattern: /^https:\/\/apicocris\.casadf\.com\.br\/auth.*/i,
-            handler: 'NetworkOnly',
-          },
           {
             // Assets estáticos: cache-first (imagens, fontes)
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|woff|woff2)$/i,
