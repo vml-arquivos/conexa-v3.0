@@ -3,17 +3,33 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { AuthProvider } from './app/AuthProvider';
 import { router } from './app/router';
+import { AppErrorBoundary } from './components/ErrorBoundary';
 import { Toaster } from './components/ui/toaster';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  throw new Error('Elemento raiz da aplicação não encontrado.');
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <AuthProvider>
-      <RouterProvider router={router} />
-      <Toaster />
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </AuthProvider>
+    </AppErrorBoundary>
   </StrictMode>
 );
+
+window.requestAnimationFrame(() => {
+  if (rootElement.hasChildNodes()) {
+    const bootWindow = window as Window & { __CONEXA_BOOT_SUCCEEDED__?: () => void };
+    bootWindow.__CONEXA_BOOT_SUCCEEDED__?.();
+  }
+});
 
 // Migração de segurança: versões anteriores do PWA mantinham GETs autenticados
 // da API por até 24 horas. Remover esse cache evita que uma leitura antiga

@@ -12,30 +12,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // O registro e o manifest são ativados por public/registerSW.js somente
+      // em celulares. Isso impede que navegadores desktop ofereçam a instalação
+      // do PWA e também remove registros legados que possam servir um app shell
+      // antigo após um redeploy.
+      injectRegister: false,
       includeAssets: ['branding/cocris/logo-cocris.png', 'vite.svg'],
-      manifest: {
-        name: 'COCRIS Pedagógico',
-        short_name: 'COCRIS',
-        description: 'Sistema de gestão pedagógica para educação infantil',
-        theme_color: '#4f46e5',
-        background_color: '#ffffff',
-        display: 'standalone',
-        orientation: 'portrait',
-        start_url: '/app/mobile',
-        scope: '/',
-        lang: 'pt-BR',
-        icons: [
-          { src: 'branding/cocris/logo-cocris.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-          { src: 'branding/cocris/logo-cocris.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-        ],
-        shortcuts: [
-          { name: 'Chamada', url: '/app/mobile/chamada', description: 'Registrar chamada da turma' },
-          { name: 'Diário', url: '/app/mobile/diario', description: 'Escrever no diário da turma' },
-          { name: 'Observação', url: '/app/mobile/observacao', description: 'Observação individual de criança' },
-        ],
-        categories: ['education', 'productivity'],
-      },
+      manifest: false,
       workbox: {
         // O minificador do Workbox encerra o worker prematuramente em alguns
         // builders. O SW continua sendo gerado para produção, apenas sem a
@@ -49,6 +32,13 @@ export default defineConfig({
         // Somente o app shell e arquivos públicos podem ser armazenados.
         // Dados autenticados da API têm o PostgreSQL como fonte única da verdade.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Os scripts de recuperação precisam vir sempre da rede para também
+        // corrigirem instalações antigas do Service Worker.
+        globIgnores: ['**/registerSW.js', '**/boot-recovery.js', '**/sw-device-policy.js'],
+        // Um Service Worker antigo ainda consegue baixar esta versão e executar
+        // a migração. No desktop ele se remove e recarrega o cliente pela rede;
+        // no celular o arquivo não altera o funcionamento offline.
+        importScripts: ['/sw-device-policy.js'],
         runtimeCaching: [
           {
             // Assets estáticos: cache-first (imagens, fontes)
@@ -80,13 +70,19 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('react-router') || id.includes('react-is')) return 'vendor-react'
-            if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts'
-            if (id.includes('lucide-react')) return 'vendor-icons'
-            if (id.includes('@tanstack')) return 'vendor-query'
-            if (id.includes('workbox') || id.includes('vite-plugin-pwa')) return 'vendor-pwa'
-            return 'vendor'
+          const normalizedId = id.replace(/\\/g, '/');
+          if (normalizedId.includes('/node_modules/')) {
+            if (
+              normalizedId.includes('/node_modules/react/') ||
+              normalizedId.includes('/node_modules/react-dom/') ||
+              normalizedId.includes('/node_modules/react-router/') ||
+              normalizedId.includes('/node_modules/react-router-dom/') ||
+              normalizedId.includes('/node_modules/react-is/')
+            ) return 'vendor-react'
+            if (normalizedId.includes('/node_modules/recharts/') || normalizedId.includes('/node_modules/d3-')) return 'vendor-charts'
+            if (normalizedId.includes('/node_modules/lucide-react/')) return 'vendor-icons'
+            if (normalizedId.includes('/node_modules/@tanstack/')) return 'vendor-query'
+            if (normalizedId.includes('/node_modules/workbox-') || normalizedId.includes('/node_modules/vite-plugin-pwa/')) return 'vendor-pwa'
           }
         },
       },

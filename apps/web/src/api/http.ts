@@ -7,14 +7,17 @@ import {
   clearSession as clearTokenSession,
 } from './tokenStorage';
 
-// Validar VITE_API_URL obrigatório
-const baseURL = import.meta.env.VITE_API_URL;
+// VITE_API_URL continua sendo a configuração recomendada e usada em produção.
+// O fallback relativo evita que uma variável ausente derrube todo o bundle antes
+// de o React conseguir exibir uma mensagem. Nesse cenário, a API responderá em
+// /api (ou falhará de forma visível na tela de login), nunca como página branca.
+const configuredBaseURL = String(import.meta.env.VITE_API_URL ?? '').trim();
+const baseURL = configuredBaseURL || '/api';
 
-if (!baseURL) {
-  throw new Error(
-    'VITE_API_URL não está configurado. ' +
-    'Defina a variável de ambiente VITE_API_URL no arquivo .env ou nas configurações do Coolify. ' +
-    'Exemplo: VITE_API_URL=https://api.conexa3.casadf.com.br'
+if (!configuredBaseURL) {
+  console.error(
+    '[Conexa] VITE_API_URL não está configurado; usando /api como fallback seguro. ' +
+    'Configure VITE_API_URL no build de produção.',
   );
 }
 
