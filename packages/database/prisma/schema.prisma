@@ -115,6 +115,7 @@ enum DiaryEventStatus {
 /// Tipo de planejamento
 enum PlanningType {
   SEMANAL
+  QUINZENAL
   MENSAL
   TRIMESTRAL
   SEMESTRAL
