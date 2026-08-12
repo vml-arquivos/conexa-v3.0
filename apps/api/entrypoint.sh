@@ -220,16 +220,21 @@ run_operational_access_fix() {
 
 
 # ── Função: corrigir faixas etárias das turmas (idempotente) ─────────────────
+# Garante que ageGroupMin/Max de cada turma correspondem às faixas do
+# Currículo em Movimento DF para derivação correta do segmento EI01/EI02/EI03.
 run_faixas_etarias_fix() {
   local SQL_FILE="/app/prisma/manual-sql/correcao-faixas-etarias/01_auto_deploy_corrigir_faixas_etarias.sql"
+
   if [ "${RUN_FAIXAS_ETARIAS_FIX_ON_DEPLOY:-true}" != "true" ]; then
     echo "ℹ️  Correção de faixas etárias desativada por RUN_FAIXAS_ETARIAS_FIX_ON_DEPLOY."
     return 0
   fi
+
   if [ ! -f "$SQL_FILE" ]; then
     echo "⚠️  SQL de faixas etárias não encontrado em $SQL_FILE. Pulando."
     return 0
   fi
+
   echo "📐 Corrigindo faixas etárias das turmas (EI01/EI02/EI03)..."
   if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$SQL_FILE"; then
     echo "✅ Faixas etárias corrigidas."
@@ -249,6 +254,7 @@ run_operational_access_fix
 
 # ── Passo 3.5: Corrigir faixas etárias das turmas (EI01/EI02/EI03) ───────────
 # Garante ageGroupMin/Max corretos conforme Currículo em Movimento DF/BNCC.
+# Corrige Maternal 1 (midpoint errado → EI01) e Berçário II (faixa incorreta).
 # Idempotente: só altera turmas com valores incorretos.
 run_faixas_etarias_fix
 
