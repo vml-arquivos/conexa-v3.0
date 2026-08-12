@@ -70,8 +70,8 @@ function inferirSegmento(turma: { name?: string; ageGroupMin?: number | null }):
   if (/PRÉ|PRE|JARDIM/.test(nome)) return 'EI03';
   const min = turma.ageGroupMin ?? null;
   if (min !== null) {
-    if (min <= 6)  return 'EI01';
-    if (min <= 42) return 'EI02';
+    if (min <= 18) return 'EI01';
+    if (min <= 47) return 'EI02';
     return 'EI03';
   }
   return null;
@@ -1288,6 +1288,7 @@ export default function PlanoDeAulaNovoPage() {
                             campoDeExperiencia={obj.campoExperiencia}
                             objetivoBNCC={obj.objetivoBNCC}
                             objetivoCurriculo={obj.objetivoCurriculoDF}
+                            faixaEtariaPadrao={turmaSelecionada ? (inferirSegmento(turmaSelecionada) ?? 'EI01') : 'EI01'}
                             onAtividadeGerada={(atividade) => {
                               // Preenche o campo de atividade como rascunho editável
                               // O professor sempre revisa antes de salvar
