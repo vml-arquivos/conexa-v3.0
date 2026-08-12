@@ -18,7 +18,7 @@ import { QueryPlanningDto } from './dto/query-planning.dto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { getScopedWhereForPlanning } from './planning-scope.helper';
 import { maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
-import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
+import { RoleLevel, PlanningStatus, AuditLogAction, AuditLogEntity } from '@prisma/client';
 import { assertSchoolDay, formatPedagogicalDate } from '../common/utils/date.utils';
 
 function parsePedagogicalDateInput(value: string): Date {
@@ -186,7 +186,7 @@ export class PlanningService {
       userId: user.sub,
       mantenedoraId: user.mantenedoraId,
       action: AuditLogAction.CREATE,
-      entity: 'Planning',
+      entity: AuditLogEntity.PLANNING,
       entityId: planning.id,
       description: `Planejamento criado a partir do template ${template.name} para data ${dto.date}`,
     });
@@ -773,7 +773,7 @@ export class PlanningService {
     // Registrar auditoria
     await this.auditService.log({
       action: AuditLogAction.UPDATE,
-      entity: 'PLANNING' as any,
+      entity: AuditLogEntity.PLANNING,
       entityId: id,
       userId: user.sub,
       mantenedoraId: planning.mantenedoraId,
@@ -830,7 +830,7 @@ export class PlanningService {
     // Registrar auditoria
     await this.auditService.log({
       action: 'CLOSE' as any,
-      entity: 'PLANNING' as any,
+      entity: AuditLogEntity.PLANNING,
       entityId: id,
       userId: user.sub,
       mantenedoraId: planning.mantenedoraId,
@@ -1041,7 +1041,7 @@ export class PlanningService {
     // 4. Registrar auditoria
     await this.auditService.log({
         action: AuditLogAction.SUBMIT_REVIEW,
-        entity: 'PLANNING',
+        entity: AuditLogEntity.PLANNING,
         entityId: id,
         userId: user.sub,
         mantenedoraId: planning.mantenedoraId,
@@ -1110,7 +1110,7 @@ export class PlanningService {
 
     await this.auditService.log({
         action: AuditLogAction.APPROVE_PLANNING,
-        entity: 'PLANNING',
+        entity: AuditLogEntity.PLANNING,
         entityId: id,
         userId: user.sub,
         mantenedoraId: planning.mantenedoraId,
@@ -1173,7 +1173,7 @@ export class PlanningService {
 
     await this.auditService.log({
         action: AuditLogAction.RETURN_PLANNING,
-        entity: 'PLANNING',
+        entity: AuditLogEntity.PLANNING,
         entityId: id,
         userId: user.sub,
         mantenedoraId: planning.mantenedoraId,
@@ -1247,7 +1247,7 @@ export class PlanningService {
 
     await this.auditService.log({
       action: AuditLogAction.RETURN_PLANNING,
-      entity: 'PLANNING',
+      entity: AuditLogEntity.PLANNING,
       entityId: id,
       userId: user.sub,
       mantenedoraId: planning.mantenedoraId,

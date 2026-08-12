@@ -1,14 +1,22 @@
 /**
- * ensure-matriz-segments.js
+ * ensure-matriz-segments.js  (v2 — corrigido)
  *
- * Garante que existam matrizes ativas EI01, EI02, EI03 para 2026,
- * clonando entries de EI01 para EI02/EI03 de forma idempotente.
+ * PROBLEMA CORRIGIDO: A versão anterior clonava entries da EI01 para EI02/EI03,
+ * resultando em bebês, crianças bem pequenas e crianças pequenas com os mesmos
+ * objetivos. Isso viola a BNCC e o Currículo em Movimento do DF.
  *
- * Uso dentro do container:
+ * SOLUÇÃO: Cada segmento (EI01, EI02, EI03) deve ter sua própria matriz com
+ * objetivos de aprendizagem específicos para a faixa etária.
+ *
+ * Faixas etárias conforme BNCC e Currículo em Movimento do DF:
+ *   EI01 – Bebês:                 0 a 18 meses   (Berçário I e II)
+ *   EI02 – Crianças Bem Pequenas: 19 a 47 meses  (Maternal I e II)
+ *   EI03 – Crianças Pequenas:     48 a 71 meses  (I Período / Primeiro Período)
+ *
+ * Uso:
  *   node /app/scripts/ensure-matriz-segments.js
  *   MANTENEDORA_ID=<id> node /app/scripts/ensure-matriz-segments.js
- *
- * Compatível com o schema atual (sem code/ageGroupMin/startDate).
+ *   DRY_RUN=true node /app/scripts/ensure-matriz-segments.js
  */
 'use strict';
 
@@ -16,207 +24,246 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const YEAR = 2026;
-const SEGMENTS = ['EI01', 'EI02', 'EI03'];
-const SEGMENT_LABELS = {
-  EI01: 'Berçário (EI01) — 0 a 18 meses',
-  EI02: 'Maternal (EI02) — 19 a 47 meses',
-  EI03: 'Pré-Escola (EI03) — 48 a 71 meses',
+const DRY_RUN = process.env.DRY_RUN === 'true';
+
+const SEGMENT_META = {
+  EI01: {
+    label: 'Bebês — 0 a 18 meses (Berçário I e II)',
+    descricao: 'Matriz Curricular 2026 — EI01 Bebês (0 a 18 meses)',
+    faixaEtaria: '0–18 meses',
+    turmas: ['Berçário I', 'Berçário II'],
+  },
+  EI02: {
+    label: 'Crianças Bem Pequenas — 19 a 47 meses (Maternal I e II)',
+    descricao: 'Matriz Curricular 2026 — EI02 Crianças Bem Pequenas (19 a 47 meses)',
+    faixaEtaria: '19–47 meses',
+    turmas: ['Maternal I', 'Maternal II'],
+  },
+  EI03: {
+    label: 'Crianças Pequenas — 48 a 71 meses (I Período / Primeiro Período)',
+    descricao: 'Matriz Curricular 2026 — EI03 Crianças Pequenas (48 a 71 meses)',
+    faixaEtaria: '48–71 meses',
+    turmas: ['I Período', 'Primeiro Período'],
+  },
 };
 
 async function main() {
-  console.log('🔍 ensure-matriz-segments.js — iniciando...\n');
+  const tag = DRY_RUN ? '[DRY-RUN] ' : '';
+  console.log(`${tag}ensure-matriz-segments.js v2 — iniciando...\n`);
 
-  // ── 1. Encontrar a mantenedora ──────────────────────────────────────────────
+  // ── 1. Encontrar a mantenedora ─────────────────────────────────────────────
   let mantenedoraId = process.env.MANTENEDORA_ID;
-
   if (!mantenedoraId) {
-    // Tenta buscar por nome "Conexa" ou qualquer variação
-    let mantenedora = await prisma.mantenedora.findFirst({
-      where: { name: { contains: 'Conexa', mode: 'insensitive' } },
-    });
-    if (!mantenedora) {
-      // Fallback: primeira mantenedora ativa
-      mantenedora = await prisma.mantenedora.findFirst({
+    const mantenedora =
+      (await prisma.mantenedora.findFirst({
+        where: { name: { contains: 'Coração', mode: 'insensitive' } },
+      })) ||
+      (await prisma.mantenedora.findFirst({
         where: { isActive: true },
         orderBy: { createdAt: 'asc' },
-      });
-    }
+      }));
     if (!mantenedora) {
-      console.error('❌ Nenhuma mantenedora encontrada no banco. Abortando.');
+      console.error('❌ Nenhuma mantenedora encontrada. Abortando.');
       process.exit(1);
     }
     mantenedoraId = mantenedora.id;
     console.log(`✅ Mantenedora: ${mantenedora.name} (${mantenedoraId})\n`);
-  } else {
-    console.log(`✅ Usando MANTENEDORA_ID do ambiente: ${mantenedoraId}\n`);
   }
 
-  // ── 2. Listar matrizes existentes para 2026 ────────────────────────────────
+  // ── 2. Verificar matrizes existentes ───────────────────────────────────────
   const existingMatrices = await prisma.curriculumMatrix.findMany({
     where: { mantenedoraId, year: YEAR },
-    select: { id: true, name: true, segment: true, isActive: true, description: true, version: true },
+    select: {
+      id: true, name: true, segment: true, isActive: true, version: true,
+      _count: { select: { entries: true } },
+    },
   });
 
   console.log(`📊 Matrizes 2026 encontradas: ${existingMatrices.length}`);
   existingMatrices.forEach(m =>
-    console.log(`   - ${m.segment}: "${m.name}" (ativa: ${m.isActive}, id: ${m.id})`)
+    console.log(
+      `   ${m.segment}: "${m.name}" (ativa: ${m.isActive}, entries: ${m._count.entries})`
+    )
   );
   console.log('');
 
-  // ── 3. Verificar se EI01 existe como fonte ─────────────────────────────────
-  const sourceMatrix = existingMatrices.find(m => m.segment === 'EI01' && m.isActive);
-  if (!sourceMatrix) {
-    // Tentar qualquer EI01 (mesmo inativa)
-    const anyEI01 = existingMatrices.find(m => m.segment === 'EI01');
-    if (!anyEI01) {
-      console.error('❌ Nenhuma matriz EI01 encontrada para 2026.');
-      console.error('   Execute primeiro: node /app/scripts/seed-curriculum-ei01.js');
-      console.error('   (ou verifique se o seed da Matriz foi executado)');
-      process.exit(1);
+  // ── 3. Diagnóstico: detectar clonagem indevida ─────────────────────────────
+  const bySegment = {};
+  for (const m of existingMatrices) {
+    if (!bySegment[m.segment]) bySegment[m.segment] = [];
+    bySegment[m.segment].push(m);
+  }
+
+  // Verificar se EI02 e EI03 têm os mesmos objetivoBNCCCode que EI01 (clonagem)
+  const ei01 = (bySegment['EI01'] || []).find(m => m.isActive);
+  const ei02 = (bySegment['EI02'] || []).find(m => m.isActive);
+  const ei03 = (bySegment['EI03'] || []).find(m => m.isActive);
+
+  if (ei01 && ei02) {
+    const sample01 = await prisma.curriculumMatrixEntry.findFirst({
+      where: { matrixId: ei01.id },
+      select: { objetivoBNCCCode: true },
+    });
+    const sample02 = await prisma.curriculumMatrixEntry.findFirst({
+      where: { matrixId: ei02.id },
+      select: { objetivoBNCCCode: true },
+    });
+    if (sample01 && sample02 && sample01.objetivoBNCCCode?.startsWith('EI01') &&
+        sample02.objetivoBNCCCode?.startsWith('EI01')) {
+      console.warn('⚠️  ATENÇÃO: EI02 contém objetivos EI01 (clonagem indevida detectada).');
+      console.warn('   A EI02 deve conter objetivos EI02xx (ex: EI02EO01, EI02CG01, etc.)');
+      console.warn('   Execute o script seed-curriculum-ei02.js para corrigir os dados.\n');
     }
-    // Ativar a EI01 inativa
-    await prisma.curriculumMatrix.update({ where: { id: anyEI01.id }, data: { isActive: true } });
-    console.log(`⚠️  EI01 estava inativa — ativada: ${anyEI01.name}`);
-    anyEI01.isActive = true;
-    Object.assign(sourceMatrix || {}, anyEI01);
   }
 
-  const source = sourceMatrix || existingMatrices.find(m => m.segment === 'EI01');
-  console.log(`✅ Matriz fonte (EI01): "${source.name}" (${source.id})\n`);
-
-  // ── 4. Buscar entries da EI01 ──────────────────────────────────────────────
-  const sourceEntries = await prisma.curriculumMatrixEntry.findMany({
-    where: { matrixId: source.id },
-    select: {
-      date: true,
-      weekOfYear: true,
-      dayOfWeek: true,
-      bimester: true,
-      campoDeExperiencia: true,
-      objetivoBNCC: true,
-      objetivoBNCCCode: true,
-      objetivoCurriculo: true,
-      intencionalidade: true,
-      // exemploAtividade: omitido intencionalmente
-    },
-    orderBy: [{ date: 'asc' }, { campoDeExperiencia: 'asc' }],
-  });
-
-  console.log(`📚 Entries na EI01: ${sourceEntries.length}\n`);
-
-  if (sourceEntries.length === 0) {
-    console.warn('⚠️  EI01 não tem entries. Nada a clonar.');
-    console.warn('   Execute: node /app/scripts/seed-curriculum-ei01.js');
-    process.exit(0);
+  if (ei01 && ei03) {
+    const sample01 = await prisma.curriculumMatrixEntry.findFirst({
+      where: { matrixId: ei01.id },
+      select: { objetivoBNCCCode: true },
+    });
+    const sample03 = await prisma.curriculumMatrixEntry.findFirst({
+      where: { matrixId: ei03.id },
+      select: { objetivoBNCCCode: true },
+    });
+    if (sample01 && sample03 && sample01.objetivoBNCCCode?.startsWith('EI01') &&
+        sample03.objetivoBNCCCode?.startsWith('EI01')) {
+      console.warn('⚠️  ATENÇÃO: EI03 contém objetivos EI01 (clonagem indevida detectada).');
+      console.warn('   A EI03 deve conter objetivos EI03xx (ex: EI03EO01, EI03CG01, etc.)');
+      console.warn('   Execute o script seed-curriculum-ei03.js para corrigir os dados.\n');
+    }
   }
 
-  // ── 5. Para cada segmento faltante: criar + clonar ─────────────────────────
-  let totalMatricesCriadas = 0;
-  let totalEntriesCriadas = 0;
+  // ── 4. Garantir que cada segmento tem uma matriz ativa ─────────────────────
+  for (const [segment, meta] of Object.entries(SEGMENT_META)) {
+    const existing = (bySegment[segment] || []).find(m => m.isActive);
 
-  for (const segment of SEGMENTS) {
-    if (segment === 'EI01') continue;
-
-    let targetMatrix = existingMatrices.find(m => m.segment === segment);
-
-    if (!targetMatrix) {
-      // Criar a matriz para este segmento
-      const baseName = source.name
-        .replace(/EI0[123]/g, '')
-        .replace(/Ber[çc][aá]rio|Maternal|Pr[eé]-Escola/gi, '')
-        .replace(/\s*[-—]\s*$/, '')
-        .trim();
-
-      const newMatrix = await prisma.curriculumMatrix.create({
-        data: {
-          mantenedoraId,
-          name: `${baseName || 'Matriz Curricular 2026'} — ${SEGMENT_LABELS[segment]}`,
-          year: YEAR,
-          segment,
-          isActive: true,
-          version: source.version || 1,
-          description: source.description || `Matriz Curricular 2026 — ${segment}`,
-        },
-      });
-      targetMatrix = { id: newMatrix.id, name: newMatrix.name, segment, isActive: true };
-      totalMatricesCriadas++;
-      console.log(`✅ Matriz criada: "${newMatrix.name}" (${newMatrix.id})`);
+    if (!existing) {
+      const inactiveExisting = (bySegment[segment] || [])[0];
+      if (inactiveExisting) {
+        console.log(`⚠️  ${segment} existe mas está inativa — ativando...`);
+        if (!DRY_RUN) {
+          await prisma.curriculumMatrix.update({
+            where: { id: inactiveExisting.id },
+            data: { isActive: true },
+          });
+        }
+        console.log(`   ↳ ${DRY_RUN ? '[DRY-RUN] ' : ''}Ativada: "${inactiveExisting.name}"`);
+      } else {
+        console.log(`➕ Criando matriz ${segment}: "${meta.label}"`);
+        if (!DRY_RUN) {
+          await prisma.curriculumMatrix.create({
+            data: {
+              mantenedoraId,
+              name: `Matriz Curricular COCRIS 2026 — ${meta.label}`,
+              year: YEAR,
+              segment,
+              isActive: true,
+              version: 1,
+              description: meta.descricao,
+            },
+          });
+        }
+        console.log(
+          `   ↳ ${DRY_RUN ? '[DRY-RUN] ' : ''}Criada. ` +
+          `IMPORTANTE: execute seed-curriculum-${segment.toLowerCase()}.js para popular os objetivos corretos.`
+        );
+      }
     } else {
-      console.log(`ℹ️  Matriz ${segment} já existe: "${targetMatrix.name}" (${targetMatrix.id})`);
-      if (!targetMatrix.isActive) {
-        await prisma.curriculumMatrix.update({ where: { id: targetMatrix.id }, data: { isActive: true } });
-        console.log(`   ↳ Ativada (estava inativa)`);
+      console.log(`✅ ${segment}: "${existing.name}" (${existing._count.entries} entries)`);
+      // Atualizar description se desatualizada
+      const expectedDesc = meta.descricao;
+      if (existing.description !== expectedDesc && !DRY_RUN) {
+        // Apenas atualizar metadados, nunca os entries
+        // (não fazemos nada, para não sobrescrever dados pedagógicos)
       }
     }
-
-    // ── 6. Clonar entries (idempotente) ────────────────────────────────────
-    const existingEntries = await prisma.curriculumMatrixEntry.findMany({
-      where: { matrixId: targetMatrix.id },
-      select: { date: true, campoDeExperiencia: true },
-    });
-
-    const existingKeys = new Set(
-      existingEntries.map(e => {
-        const d = e.date instanceof Date ? e.date : new Date(e.date);
-        return `${d.toISOString().slice(0, 10)}_${e.campoDeExperiencia}`;
-      })
-    );
-
-    const toInsert = sourceEntries.filter(e => {
-      const d = e.date instanceof Date ? e.date : new Date(e.date);
-      const key = `${d.toISOString().slice(0, 10)}_${e.campoDeExperiencia}`;
-      return !existingKeys.has(key);
-    });
-
-    if (toInsert.length === 0) {
-      console.log(`   ↳ Todas as ${sourceEntries.length} entries já existem em ${segment}. Nada a inserir.\n`);
-      continue;
-    }
-
-    // createMany em batch (skipDuplicates como segurança extra)
-    const result = await prisma.curriculumMatrixEntry.createMany({
-      data: toInsert.map(e => ({
-        matrixId: targetMatrix.id,
-        date: e.date,
-        weekOfYear: e.weekOfYear,
-        dayOfWeek: e.dayOfWeek,
-        bimester: e.bimester,
-        campoDeExperiencia: e.campoDeExperiencia,
-        objetivoBNCC: e.objetivoBNCC,
-        objetivoBNCCCode: e.objetivoBNCCCode,
-        objetivoCurriculo: e.objetivoCurriculo,
-        intencionalidade: e.intencionalidade,
-      })),
-      skipDuplicates: true,
-    });
-
-    totalEntriesCriadas += result.count;
-    console.log(`   ↳ ${result.count} entries clonadas para ${segment} (${existingEntries.length} já existiam)\n`);
   }
 
-  // ── 7. Verificação final ───────────────────────────────────────────────────
-  console.log('📊 Verificação final:');
+  // ── 5. Verificação de faixas etárias das turmas ───────────────────────────
+  console.log('\n📋 Verificando turmas por faixa etária:');
+  const classrooms = await prisma.classroom.findMany({
+    where: { isActive: true },
+    select: { id: true, name: true, ageGroupMin: true, ageGroupMax: true },
+    orderBy: [{ ageGroupMin: 'asc' }, { name: 'asc' }],
+  });
+
+  const problemas = [];
+  for (const c of classrooms) {
+    const nameUpper = c.name.toUpperCase();
+    let expectedSegment = null;
+
+    // Inferir segmento esperado pelo NOME da turma
+    if (nameUpper.includes('BERÇ') && nameUpper.includes('II')) {
+      expectedSegment = 'EI01'; // Berçário II: ainda bebês (12–18 meses)
+    } else if (nameUpper.includes('BERÇ') && nameUpper.includes('I')) {
+      expectedSegment = 'EI01'; // Berçário I: bebês (0–12 meses)
+    } else if (nameUpper.includes('MATERNAL') && (nameUpper.includes(' I ') || nameUpper.includes(' 1') || nameUpper.endsWith(' I'))) {
+      expectedSegment = 'EI02'; // Maternal I: crianças bem pequenas
+    } else if (nameUpper.includes('MATERNAL') && (nameUpper.includes(' II') || nameUpper.includes(' 2'))) {
+      expectedSegment = 'EI02'; // Maternal II: crianças bem pequenas
+    } else if (nameUpper.includes('PERÍODO') || nameUpper.includes('PERÍODO')) {
+      expectedSegment = 'EI03'; // Qualquer período: crianças pequenas
+    }
+
+    // Segmento derivado do ageGroupMin atual
+    let derivedSegment = null;
+    if (c.ageGroupMin <= 18) derivedSegment = 'EI01';
+    else if (c.ageGroupMin <= 47) derivedSegment = 'EI02';
+    else if (c.ageGroupMin <= 71) derivedSegment = 'EI03';
+
+    const ok = !expectedSegment || expectedSegment === derivedSegment;
+    const icon = ok ? '✅' : '❌';
+    console.log(
+      `   ${icon} ${c.name.padEnd(30)} ageGroupMin=${String(c.ageGroupMin).padStart(2)}m ` +
+      `→ ${derivedSegment || '???'}` +
+      (ok ? '' : `  ← ESPERADO: ${expectedSegment}`)
+    );
+    if (!ok) problemas.push({ ...c, expectedSegment, derivedSegment });
+  }
+
+  if (problemas.length > 0) {
+    console.log(`\n⚠️  ${problemas.length} turma(s) com faixa etária incorreta.`);
+    console.log('   Execute fix-classroom-age-groups.sql para corrigir.\n');
+  } else {
+    console.log('\n✅ Todas as turmas estão com faixa etária correta.\n');
+  }
+
+  // ── 6. Resumo final ────────────────────────────────────────────────────────
   const finalMatrices = await prisma.curriculumMatrix.findMany({
     where: { mantenedoraId, year: YEAR, isActive: true },
-    select: { segment: true, name: true, _count: { select: { entries: true } } },
+    select: {
+      segment: true, name: true,
+      _count: { select: { entries: true } },
+    },
     orderBy: { segment: 'asc' },
   });
 
-  finalMatrices.forEach(m =>
-    console.log(`   ${m.segment}: "${m.name}" — ${m._count.entries} entries`)
+  console.log('📊 Estado final das matrizes ativas:');
+  for (const m of finalMatrices) {
+    const meta = SEGMENT_META[m.segment];
+    const faixa = meta ? meta.faixaEtaria : '?';
+    const hasCorrectCodes = await prisma.curriculumMatrixEntry.findFirst({
+      where: {
+        matrixId: (finalMatrices.find(x => x.segment === m.segment) || {}).id,
+        objetivoBNCCCode: { startsWith: m.segment },
+      },
+    }).catch(() => null);
+    const correctIcon = hasCorrectCodes ? '✅' : '⚠️ ';
+    console.log(
+      `   ${correctIcon} ${m.segment} (${faixa}): "${m.name}" — ${m._count.entries} entries`
+    );
+  }
+
+  const missingSegments = Object.keys(SEGMENT_META).filter(
+    s => !finalMatrices.some(m => m.segment === s)
   );
-
-  console.log(`\n✅ Concluído!`);
-  console.log(`   Matrizes criadas: ${totalMatricesCriadas}`);
-  console.log(`   Entries clonadas: ${totalEntriesCriadas}`);
-
-  const allPresent = SEGMENTS.every(s => finalMatrices.some(m => m.segment === s));
-  if (!allPresent) {
-    const missing = SEGMENTS.filter(s => !finalMatrices.some(m => m.segment === s));
-    console.warn(`\n⚠️  Segmentos ainda faltando: ${missing.join(', ')}`);
+  if (missingSegments.length > 0) {
+    console.warn(`\n⚠️  Segmentos faltando: ${missingSegments.join(', ')}`);
     process.exit(1);
   }
-  console.log('\n🎉 EI01, EI02 e EI03 estão ativas e com entries!');
+
+  console.log('\n✅ Concluído!');
+  if (DRY_RUN) console.log('   (modo DRY_RUN — nenhuma alteração foi gravada)');
 }
 
 main()
