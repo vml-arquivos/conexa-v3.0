@@ -444,9 +444,7 @@ export class PlanningService {
     }
 
     if (query.type) {
-      where.template = {
-        type: query.type,
-      };
+      where.type = query.type;
     }
 
     // Filtro por período: interseção de períodos

@@ -3,7 +3,7 @@ import { PlanningService } from './planning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
-import { RoleLevel, RoleType, PlanningStatus } from '@prisma/client';
+import { RoleLevel, RoleType, PlanningStatus, PlanningType } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 // --- Helpers para criar payloads de usuário de teste ---
@@ -63,6 +63,7 @@ const mockPrismaService = {
   },
   classroomTeacher: {
     findFirst: jest.fn(),
+    findMany: jest.fn(),
   },
 };
 
@@ -89,6 +90,31 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
     }).compile();
 
     service = module.get<PlanningService>(PlanningService);
+  });
+
+
+  // ─── Regressão: listagem/filtro do calendário ────────────────────────────
+
+  describe('findAll — calendário e tipo', () => {
+    it('deve filtrar Planning.type diretamente e aceitar período sem usar PlanningTemplate.type', async () => {
+      const professor = makeProfessor();
+      mockPrismaService.classroomTeacher.findMany.mockResolvedValue([{ classroomId: 'class-1' }]);
+      mockPrismaService.planning.findMany.mockResolvedValue([]);
+
+      await service.findAll(
+        {
+          type: PlanningType.QUINZENAL,
+          startDate: '2026-08-01',
+          endDate: '2026-08-31',
+        },
+        professor,
+      );
+
+      const call = mockPrismaService.planning.findMany.mock.calls[0][0];
+      expect(call.where.type).toBe(PlanningType.QUINZENAL);
+      expect(call.where.template).toBeUndefined();
+      expect(call.where.AND).toBeDefined();
+    });
   });
 
   // ─── Testes de Mascaramento ───────────────────────────────────────────────
