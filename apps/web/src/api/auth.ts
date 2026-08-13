@@ -12,6 +12,7 @@ export interface User {
   status?: string;
   mantenedoraId?: string;
   unitId?: string;
+  unit?: { id?: string; name?: string; code?: string };
   roles?: string[];
   [key: string]: unknown;
 }

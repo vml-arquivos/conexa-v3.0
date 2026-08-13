@@ -204,7 +204,7 @@ export default function AtestadosDocumentosPage() {
   // ── View de edição ───────────────────────────────────────────────────────
   if (selecionado) {
     return (
-      <PageShell titulo="Atestados e Documentos" subtitulo={`${selecionado.firstName} ${selecionado.lastName}`}>
+      <PageShell title="Atestados e Documentos" subtitle={`${selecionado.firstName} ${selecionado.lastName}`}>
         <div className="mb-4 flex items-center gap-2">
           <button
             onClick={fecharEdicao}
@@ -414,7 +414,7 @@ export default function AtestadosDocumentosPage() {
 
   // ── View de lista ────────────────────────────────────────────────────────
   return (
-    <PageShell titulo="Atestados e Documentos" subtitulo="Acompanhe a situação documental e os atestados médicos de cada criança">
+    <PageShell title="Atestados e Documentos" subtitle="Acompanhe a situação documental e os atestados médicos de cada criança">
       <div className="flex items-center gap-3 mb-5">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

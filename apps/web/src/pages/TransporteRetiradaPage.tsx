@@ -163,7 +163,7 @@ export default function TransporteRetiradaPage() {
 
   if (selecionado) {
     return (
-      <PageShell titulo="Transporte e Retirada" subtitulo={`${selecionado.firstName} ${selecionado.lastName}`}>
+      <PageShell title="Transporte e Retirada" subtitle={`${selecionado.firstName} ${selecionado.lastName}`}>
         <div className="mb-4 flex items-center gap-2">
           <button
             onClick={fecharEdicao}
@@ -359,7 +359,7 @@ export default function TransporteRetiradaPage() {
   }
 
   return (
-    <PageShell titulo="Transporte e Retirada" subtitulo="Gerencie o transporte escolar e os autorizados para retirada de cada criança">
+    <PageShell title="Transporte e Retirada" subtitle="Gerencie o transporte escolar e os autorizados para retirada de cada criança">
       {/* Barra de busca */}
       <div className="flex items-center gap-3 mb-5">
         <div className="relative flex-1">

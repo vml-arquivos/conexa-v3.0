@@ -949,7 +949,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       Cancelar
                     </button>
                     <button
-                      onClick={() => handleRejeitar(itemParaRejeitar.id, 'plan')}
+                      onClick={() => devolverPlanejamento(itemParaRejeitar.id, motivoRejeicao)}
                       disabled={!motivoRejeicao.trim()}
                       className="flex-1 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-40"
                     >

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -45,11 +46,13 @@ import { AlimentosModule } from './alimentos/alimentos.module';
 import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
 import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/acompanhamento-nutricional.module';
 import { PlanningConferenciaModule } from './planning-conferencia/planning-conferencia.module';
+import { AlertasModule } from './alertas/alertas.module';
 
 @Module({
   imports: [
     AdminModule,
     EventEmitterModule.forRoot({ global: true }),
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -93,6 +96,7 @@ import { PlanningConferenciaModule } from './planning-conferencia/planning-confe
     ConfiguracaoRefeicaoModule,
     AcompanhamentoNutricionalModule,
     PlanningConferenciaModule,
+    AlertasModule,
   ],
   controllers: [AppController],
   providers: [
