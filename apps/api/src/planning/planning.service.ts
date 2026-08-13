@@ -439,6 +439,8 @@ export class PlanningService {
     }
 
     if (query.type) {
+      // PlanningType pertence ao próprio Planning. PlanningTemplate não possui campo `type`.
+      // Filtrar na relação gerava PrismaClientValidationError e resposta 500.
       where.type = query.type;
     }
 

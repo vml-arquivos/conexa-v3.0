@@ -38,7 +38,7 @@ Este arquivo contém todo o SQL necessário para criar as tabelas, enums, índic
 
 ```bash
 # 1. Configurar DATABASE_URL no .env
-echo 'DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"' >> .env
+echo 'DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"' >> .env
 
 # 2. Gerar Prisma Client
 npm run prisma:generate
@@ -54,7 +54,7 @@ npm run db:studio
 
 ```bash
 # 1. Configurar DATABASE_URL no .env (ou variável de ambiente do CI/CD)
-export DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"
+export DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
 
 # 2. Gerar Prisma Client
 npm run prisma:generate

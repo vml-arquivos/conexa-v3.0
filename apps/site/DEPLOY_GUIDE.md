@@ -56,7 +56,7 @@ No painel do Coolify:
    DATABASE_URL=mysql://usuario:senha@cocris-db:3306/cocris
    
    # Authentication (copiar do Manus)
-   JWT_SECRET=your-jwt-secret-min-32-chars
+   JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
    OAUTH_SERVER_URL=https://api.manus.im
    VITE_OAUTH_PORTAL_URL=https://login.manus.im
    OWNER_OPEN_ID=your-owner-open-id

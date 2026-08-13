@@ -22,10 +22,10 @@
 
 ### 4. Environment Variables (14)
 ```
-DATABASE_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
-DIRECT_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
-REDIS_URL=redis://default:EWCBWCNg0uX92uoCNTRLcL7zwjSpIMkEzXtqxIqi9QL6xCK1ieJbyTrzgkx8Vjzr@y0oso44kkssw40skk048ksgs:6379/0
-JWT_SECRET=0MsE4rEpC7FPosGYzlsXw9GNfD+YZmIDylHzDp2v9YIRRQMHIlbf2IF3fPMGz7tdXAhPVKf/bfJrNXRyL+LAGw==
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+REDIS_URL=redis://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[DB]
+JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
 JWT_EXPIRATION=7d
 NODE_ENV=production
 PORT=3000
@@ -80,7 +80,7 @@ VITE_APP_VERSION=3.0.0
 
 ### 3. Environment Variables (4)
 ```
-DATABASE_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 API_URL=https://api.conexa3.casadf.com.br
 NODE_ENV=production
 PORT=5174

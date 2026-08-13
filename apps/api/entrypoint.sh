@@ -5,13 +5,55 @@ echo "=== Conexa-V3 Entrypoint ==="
 
 # ── Validação de variáveis obrigatórias ──────────────────────────────────────
 echo "Validando variáveis de ambiente obrigatórias..."
-for VAR in DATABASE_URL JWT_SECRET; do
+for VAR in DATABASE_URL DIRECT_URL JWT_SECRET; do
   if [ -z "${!VAR:-}" ]; then
     echo "❌ ERRO: variável obrigatória '$VAR' não definida."
     exit 1
   fi
 done
 echo "✅ Variáveis de ambiente validadas."
+
+# ── Coerência básica entre banco de runtime e banco de migrations ───────────
+# DATABASE_URL pode usar pooler e DIRECT_URL conexão direta, portanto host/porta
+# podem ser diferentes. O nome lógico do banco, porém, precisa ser o mesmo.
+echo "Validando coerência DATABASE_URL x DIRECT_URL..."
+RUNTIME_DB=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 -c "SELECT current_database();" 2>/dev/null) || {
+  echo "❌ ERRO: não foi possível conectar ao DATABASE_URL de runtime."
+  exit 1
+}
+DIRECT_DB=$(psql "$DIRECT_URL" -t -A -v ON_ERROR_STOP=1 -c "SELECT current_database();" 2>/dev/null) || {
+  echo "❌ ERRO: não foi possível conectar ao DIRECT_URL de migrations."
+  exit 1
+}
+if [ -z "$RUNTIME_DB" ] || [ -z "$DIRECT_DB" ] || [ "$RUNTIME_DB" != "$DIRECT_DB" ]; then
+  echo "❌ ERRO: DATABASE_URL e DIRECT_URL apontam para bancos lógicos diferentes."
+  echo "   Runtime DB: ${RUNTIME_DB:-indisponível}"
+  echo "   Migration DB: ${DIRECT_DB:-indisponível}"
+  echo "   Nenhuma migration será executada até corrigir as variáveis no Coolify."
+  exit 1
+fi
+echo "✅ Runtime e migrations apontam para o mesmo banco lógico: $RUNTIME_DB"
+
+# Além do nome, compara o histórico Prisma nos dois endpoints. Isso detecta o
+# caso perigoso de duas instâncias PostgreSQL diferentes com o mesmo nome de DB.
+RUNTIME_HAS_MIG=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public._prisma_migrations') IS NOT NULL;" 2>/dev/null)
+DIRECT_HAS_MIG=$(psql "$DIRECT_URL" -t -A -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public._prisma_migrations') IS NOT NULL;" 2>/dev/null)
+if [ "$RUNTIME_HAS_MIG" != "$DIRECT_HAS_MIG" ]; then
+  echo "❌ ERRO: histórico Prisma diverge entre DATABASE_URL e DIRECT_URL."
+  echo "   Nenhuma migration será executada."
+  exit 1
+fi
+if [ "$RUNTIME_HAS_MIG" = "t" ]; then
+  MIGRATION_FINGERPRINT_SQL="SELECT md5(COALESCE(string_agg(migration_name || ':' || COALESCE(finished_at::text,'FAILED') || ':' || COALESCE(rolled_back_at::text,''), '|' ORDER BY migration_name),'')) FROM _prisma_migrations;"
+  RUNTIME_MIG_FP=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 -c "$MIGRATION_FINGERPRINT_SQL" 2>/dev/null)
+  DIRECT_MIG_FP=$(psql "$DIRECT_URL" -t -A -v ON_ERROR_STOP=1 -c "$MIGRATION_FINGERPRINT_SQL" 2>/dev/null)
+  if [ -z "$RUNTIME_MIG_FP" ] || [ "$RUNTIME_MIG_FP" != "$DIRECT_MIG_FP" ]; then
+    echo "❌ ERRO: DATABASE_URL e DIRECT_URL têm históricos de migrations diferentes."
+    echo "   Nenhuma migration será executada até corrigir as conexões."
+    exit 1
+  fi
+  echo "✅ Histórico Prisma consistente entre runtime e migrations."
+fi
 
 # ── Função: verificar se a tabela _prisma_migrations existe ──────────────────
 table_exists() {
@@ -20,48 +62,26 @@ table_exists() {
     2>/dev/null | grep -q "t"
 }
 
-# ── Função: resolver todas as migrations FAILED (sem filtro de steps) ────────
-resolve_failed_migrations() {
+# ── Função: diagnosticar migrations FAILED sem alterar histórico ──────────────
+check_failed_migrations() {
   echo "Verificando migrations com status FAILED no banco..."
 
   if ! table_exists; then
-    echo "  ℹ️  Tabela _prisma_migrations ainda não existe (DB zerado). Pulando resolução."
+    echo "  ℹ️  Tabela _prisma_migrations ainda não existe (DB zerado)."
     return 0
   fi
 
-  # Condição correta: finished_at IS NULL AND rolled_back_at IS NULL
-  # NÃO filtra por applied_steps_count — migration pode falhar com steps=0
   local FAILED
   FAILED=$(psql "$DATABASE_URL" -t -A \
     -c "SELECT migration_name FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NULL;" \
-    2>&1)
-
-  if [ $? -ne 0 ]; then
-    echo "  ⚠️  Erro ao consultar _prisma_migrations: $FAILED"
-    return 0
-  fi
-
-  FAILED=$(echo "$FAILED" | grep -v "^$" || true)
+    2>/dev/null | grep -v "^$" || true)
 
   if [ -z "$FAILED" ]; then
     echo "✅ Nenhuma migration FAILED encontrada."
-    return 0
+  else
+    echo "⚠️  Migration FAILED detectada. O histórico NÃO será alterado automaticamente:"
+    echo "$FAILED" | sed 's/^/  - /'
   fi
-
-  echo "⚠️  Migrations FAILED encontradas. Resolvendo via SQL..."
-  while IFS= read -r MIG; do
-    [ -z "$MIG" ] && continue
-    echo "  → Resolvendo migration FAILED: '$MIG'"
-    local RESULT
-    RESULT=$(psql "$DATABASE_URL" -c \
-      "UPDATE \"_prisma_migrations\" SET rolled_back_at = NOW() WHERE migration_name = '$MIG' AND rolled_back_at IS NULL;" \
-      2>&1)
-    if echo "$RESULT" | grep -q "UPDATE [1-9]"; then
-      echo "    ✅ Migration '$MIG' marcada como rolled-back."
-    else
-      echo "    ⚠️  Resultado inesperado para '$MIG': $RESULT"
-    fi
-  done <<< "$FAILED"
 }
 
 # ── Função: extrair nome da migration de output do Prisma ────────────────────
@@ -77,7 +97,7 @@ extract_migration_name() {
   echo "$NAME"
 }
 
-# ── Função: executar migrate deploy com retry automático em P3009 e P3018 ─────
+# ── Função: executar migrate deploy com retry controlado em P3009 ─────────────
 run_migrate_deploy() {
   echo "Executando prisma migrate deploy..."
 
@@ -130,64 +150,15 @@ run_migrate_deploy() {
     fi
   fi
 
-  # ── Tratamento P3018: migration falhou com erro de SQL (objeto já existe) ─────
-  # P3018 ocorre quando o SQL da migration falha (ex: "already exists").
-  # Estratégia: verificar se os objetos críticos já existem no banco.
-  # Se sim, a migration já foi aplicada parcialmente e podemos marcá-la como
-  # aplicada via "migrate resolve --applied" para que o Prisma não tente re-executar.
+  # ── Tratamento P3018: nunca marcar migration como aplicada sem prova ────────
+  # A versão anterior usava `prisma migrate resolve --applied` automaticamente
+  # quando encontrava "already exists". Isso pode registrar uma migration como
+  # aplicada mesmo com colunas/índices ausentes, gerando schema drift e 500 em runtime.
   if echo "$MIGRATE_OUTPUT" | grep -q "P3018\|already exists\|42P07\|42P01"; then
-    echo "⚠️  P3018/already-exists detectado. Verificando se estrutura já existe no banco..."
-
-    local FAILED_MIG
-    FAILED_MIG=$(extract_migration_name "$MIGRATE_OUTPUT")
-
-    if [ -z "$FAILED_MIG" ]; then
-      # Fallback: buscar no banco qual migration está em estado pendente/failed
-      FAILED_MIG=$(psql "$DATABASE_URL" -t -A \
-        -c "SELECT migration_name FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NULL LIMIT 1;" \
-        2>/dev/null | grep -v "^$" || true)
-    fi
-
-    if [ -n "$FAILED_MIG" ]; then
-      echo "  → Migration com problema: '$FAILED_MIG'"
-      echo "  → Marcando como aplicada via 'prisma migrate resolve --applied'..."
-
-      set +e
-      RESOLVE_OUTPUT=$(npx prisma migrate resolve --applied "$FAILED_MIG" 2>&1)
-      RESOLVE_EXIT=$?
-      set -e
-
-      echo "$RESOLVE_OUTPUT"
-
-      if [ $RESOLVE_EXIT -eq 0 ]; then
-        echo "  ✅ Migration '$FAILED_MIG' marcada como aplicada."
-        echo "  → Retentando prisma migrate deploy (1 retry após P3018)..."
-
-        set +e
-        MIGRATE_OUTPUT=$(npx prisma migrate deploy 2>&1)
-        MIGRATE_EXIT=$?
-        set -e
-
-        echo "$MIGRATE_OUTPUT"
-
-        if [ $MIGRATE_EXIT -eq 0 ]; then
-          echo "✅ Migrations aplicadas com sucesso (após resolve P3018)."
-          return 0
-        else
-          echo "❌ ERRO: prisma migrate deploy falhou novamente após resolve P3018 (exit $MIGRATE_EXIT)."
-          echo "   Verifique os logs acima para detalhes."
-          exit 1
-        fi
-      else
-        echo "  ⚠️  Falha ao executar migrate resolve: $RESOLVE_OUTPUT"
-        echo "❌ ERRO: não foi possível resolver a migration P3018. Deploy abortado."
-        exit 1
-      fi
-    else
-      echo "  ⚠️  Não foi possível identificar a migration com problema."
-      echo "❌ ERRO: prisma migrate deploy falhou com P3018 mas não foi possível identificar a migration."
-      exit 1
-    fi
+    echo "❌ ERRO DE MIGRATION P3018/already-exists."
+    echo "   Por segurança, o Conexa NÃO marca migrations como aplicadas automaticamente."
+    echo "   O deploy foi abortado para impedir schema drift e perda de consistência."
+    exit 1
   fi
 
   # Erro diferente de P3009/P3018
@@ -195,10 +166,10 @@ run_migrate_deploy() {
   exit 1
 }
 
-# ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
-resolve_failed_migrations
+# ── Passo 1: Diagnosticar migrations FAILED sem alterar histórico ────────────
+check_failed_migrations
 
-# ── Passo 2: Aplicar migrations (com retry inteligente em P3009 e P3018) ──────
+# ── Passo 2: Aplicar migrations (retry controlado apenas em P3009) ─────────────
 run_migrate_deploy
 
 # ── Passo 3: Regenerar Prisma client com o schema atual ──────────────────────
@@ -209,7 +180,24 @@ echo "Regenerando Prisma client com schema atual..."
 npx prisma generate --schema=./prisma/schema.prisma
 echo "✅ Prisma client regenerado."
 
-# ── Passo 4: Popular banco de alimentos (idempotente) ─────────────────────────
+# ── Passo 4: Validar schema de Planning no MESMO banco usado em runtime ───────
+echo "Validando schema runtime de Planning..."
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c '
+  SELECT
+    "id", "mantenedoraId", "unitId", "classroomId", "templateId",
+    "curriculumMatrixId", "title", "description", "type",
+    "startDate", "endDate", "objectives", "activities", "resources",
+    "evaluation", "bnccAreas", "curriculumAlignment", "pedagogicalContent",
+    "observacoes_template", "status", "anoLetivo", "professorId",
+    "createdAt", "updatedAt", "createdBy", "updatedBy", "publishedAt",
+    "submittedAt", "reviewedAt", "reviewedBy", "reviewComment"
+  FROM "Planning" LIMIT 0;
+  SELECT '"'"'QUINZENAL'"'"'::"PlanningType";
+  UPDATE "Planning" SET "updatedAt" = "updatedAt" WHERE FALSE;
+' >/dev/null
+echo "✅ Schema runtime de Planning validado (leitura + enum + permissão de escrita)."
+
+# ── Passo 5: Popular banco de alimentos (idempotente) ─────────────────────────
 # Executa o seed de alimentos a cada deploy — é idempotente (upsert por nome).
 # Garante que novos alimentos adicionados ao CSV sejam inseridos automaticamente.
 if [ -f /app/scripts/seed-alimentos.js ]; then
@@ -217,7 +205,7 @@ if [ -f /app/scripts/seed-alimentos.js ]; then
   node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
 fi
 
-# ── Passo 5: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 6: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js

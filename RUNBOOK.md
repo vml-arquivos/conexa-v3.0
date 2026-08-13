@@ -27,8 +27,8 @@ As seguintes variáveis de ambiente **DEVEM** ser configuradas no ambiente de pr
 | Variável | App | Descrição | Exemplo | Obrigatório |
 | :--- | :--- | :--- | :--- | :--- |
 | `NODE_ENV` | `api`, `site` | Define o ambiente para produção | `production` | **Sim** |
-| `DATABASE_URL` | `api` | URL de conexão com o banco de dados principal | `postgresql://user:pass@host:port/main_db` | **Sim** |
-| `SITE_DATABASE_URL` | `site` | URL de conexão com o banco de dados do site (agora Postgres) | `postgresql://user:pass@host:port/site_db` | **Sim** |
+| `DATABASE_URL` | `api` | URL de conexão com o banco de dados principal | `postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]` | **Sim** |
+| `SITE_DATABASE_URL` | `site` | URL de conexão com o banco de dados do site (agora Postgres) | `postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]` | **Sim** |
 | `JWT_SECRET` | `api` | Segredo para assinar os tokens JWT | `segredo_forte_de_pelo_menos_32_chars` | **Sim** |
 | `CORS_ORIGIN` | `api` | Whitelist de origens para o CORS | `https://app.conexa.com,https://conexa.com` | **Sim** |
 | `OPENAI_API_KEY` | `api` | Chave da API da OpenAI para o motor de IA | `sk-xxxxxxxx` | **Sim** |

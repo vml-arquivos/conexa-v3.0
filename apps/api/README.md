@@ -203,7 +203,7 @@ Copie a URL e cole no seu arquivo `.env`:
 
 ```bash
 # .env
-DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"
+DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
 ```
 
 **⚠️ IMPORTANTE:** Nunca comite o arquivo `.env` no Git. Use variáveis de ambiente no seu ambiente de produção.

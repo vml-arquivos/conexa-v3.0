@@ -82,7 +82,7 @@ Shared Buffers: 256MB
 Após criado, copie a **Connection String**:
 
 ```
-postgresql://conexa_user:[SENHA]@conexa-v3-db:5432/conexa
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 **⚠️ ANOTE**: Você vai usar essa string nas variáveis de ambiente!
@@ -123,10 +123,10 @@ Clique em **"Environment Variables"** e adicione:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://conexa_user:[SUA_SENHA]@conexa-v3-db:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # JWT
-JWT_SECRET=sua-chave-secreta-super-segura-aqui-min-32-caracteres
+JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
 JWT_EXPIRES_IN=7d
 
 # API
@@ -293,7 +293,7 @@ Clique em **"Environment Variables"** e adicione:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://conexa_user:[SUA_SENHA]@conexa-v3-db:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # API
 API_URL=https://api.conexa.seu-dominio.com
