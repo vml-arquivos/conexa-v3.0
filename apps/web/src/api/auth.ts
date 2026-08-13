@@ -12,7 +12,12 @@ export interface User {
   status?: string;
   mantenedoraId?: string;
   unitId?: string;
-  unit?: { id?: string; name?: string; code?: string };
+  unit?: {
+    id?: string;
+    name?: string;
+    code?: string;
+    unitCode?: string;
+  } | null;
   roles?: string[];
   [key: string]: unknown;
 }

@@ -220,7 +220,7 @@ export default function MovimentacoesPage() {
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left touch-manipulation"
                   >
                     <ChildAvatar
-                      child={{ firstName: aluno.firstName, lastName: aluno.lastName, photoUrl: aluno.photoUrl ?? undefined }}
+                      child={{ firstName: aluno.firstName, lastName: aluno.lastName, photoUrl: aluno.photoUrl }}
                       sizeClassName="w-8 h-8"
                     />
                     <div className="flex-1 min-w-0">
