@@ -26,7 +26,7 @@ Este app faz parte de um **monorepo pnpm**. O Dockerfile precisa acessar a raiz 
 
 | Domínio | HTTPS |
 |---------|-------|
-| `app.conexa3.casadf.com.br` | ✅ Enabled (Let's Encrypt) |
+| `appcocris.casadf.com.br` | ✅ Enabled (Let's Encrypt) |
 
 ---
 
@@ -35,7 +35,7 @@ Este app faz parte de um **monorepo pnpm**. O Dockerfile precisa acessar a raiz 
 ⚠️ **IMPORTANTE**: Todas as variáveis devem ser marcadas como **Build Time** (não Runtime)
 
 ```bash
-VITE_API_URL=https://api.conexa3.casadf.com.br
+VITE_API_URL=https://apicocris.casadf.com.br
 VITE_APP_NAME=Conexa V3.0
 VITE_APP_VERSION=3.0.0
 VITE_APP_ENV=production
@@ -79,7 +79,7 @@ conexa-v3.0/
 - [ ] Base Directory configurado como `/` (raiz)
 - [ ] Dockerfile Location: `apps/web/Dockerfile`
 - [ ] Todas as variáveis VITE_* configuradas como **Build Time**
-- [ ] Domínio `app.conexa3.casadf.com.br` configurado
+- [ ] Domínio `appcocris.casadf.com.br` configurado
 - [ ] HTTPS habilitado
 - [ ] Port: `80`
 

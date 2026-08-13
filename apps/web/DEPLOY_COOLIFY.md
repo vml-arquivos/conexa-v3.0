@@ -2,9 +2,9 @@
 
 ## 📋 Pré-requisitos
 
-- ✅ Backend API deployado e funcionando em `https://api.conexa3.casadf.com.br`
+- ✅ Backend API deployado e funcionando em `https://apicocris.casadf.com.br`
 - ✅ Banco de dados populado com seed
-- ✅ Domínio configurado: `app.conexa3.casadf.com.br`
+- ✅ Domínio configurado: `appcocris.casadf.com.br`
 
 ---
 
@@ -25,7 +25,7 @@
 ## 🌐 Passo 2: Configurar Domínio
 
 1. Na aplicação criada → **Domains**
-2. Adicionar domínio: `app.conexa3.casadf.com.br`
+2. Adicionar domínio: `appcocris.casadf.com.br`
 3. Habilitar **HTTPS** (Let's Encrypt)
 
 ---
@@ -36,7 +36,7 @@ Na aba **Environment Variables**, adicionar:
 
 ```bash
 # API Backend
-VITE_API_URL=https://api.conexa3.casadf.com.br
+VITE_API_URL=https://apicocris.casadf.com.br
 
 # App Configuration
 VITE_APP_NAME=Conexa V3.0
@@ -74,7 +74,7 @@ VITE_API_TIMEOUT=30000
 
 ## ✅ Passo 5: Testar Acesso
 
-1. Acesse: `https://app.conexa3.casadf.com.br`
+1. Acesse: `https://appcocris.casadf.com.br`
 2. Tela de login deve aparecer
 3. Testar login com:
    - **Email**: `developer@conexa.com`
@@ -116,7 +116,7 @@ docker logs [CONTAINER_ID]
 - Deve ter `try_files $uri $uri/ /index.html;`
 
 ### Erro de CORS
-- Verificar se backend permite origem `app.conexa3.casadf.com.br`
+- Verificar se backend permite origem `appcocris.casadf.com.br`
 - Verificar configuração de CORS no NestJS
 
 ---

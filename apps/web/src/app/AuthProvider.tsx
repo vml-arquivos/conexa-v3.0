@@ -107,22 +107,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error) => {
         // FIX p0.2: NUNCA usar o JWT local como fallback de roles.
-        // Se /auth/me falha, o usuário deve fazer login novamente.
-        // Motivo: o JWT pode conter roles desatualizadas (ex: STAFF_CENTRAL de
-        // um papel que foi desativado no banco). O banco é a fonte de verdade.
+        // Se /auth/me falha por token expirado/inválido, o usuário deve
+        // fazer login novamente. Motivo: o JWT pode conter roles
+        // desatualizadas (ex: STAFF_CENTRAL de um papel desativado no
+        // banco). O banco é a fonte de verdade.
         if (isAuthExpiredError(error)) {
           // Token expirado ou inválido — sessão encerrada normalmente.
           clearLocalSession();
         } else {
-          // Erro de rede ou erro transitório do servidor.
-          // Comportamento seguro: forçar novo login em vez de usar dados stale.
+          // Erro de rede, CORS ou falha transitória do servidor (ex: API
+          // fora do ar, deploy em andamento, CORS_ORIGIN desatualizado).
+          // NÃO apagar os tokens aqui: eles continuam válidos, só não foi
+          // possível confirmá-los agora. Apagar a sessão neste caso faz o
+          // usuário perder o login sempre que a rede falha por um instante
+          // (foi exatamente isso que agravou o incidente de CORS de
+          // 2026-08-13: o token era descartado a cada tentativa e o
+          // usuário precisava logar de novo mesmo depois da rede voltar).
+          // O usuário fica sem sessão restaurada nesta carga de página,
+          // mas o token permanece guardado para a próxima tentativa.
           console.warn(
-            '[AuthProvider] Falha ao carregar /auth/me. ' +
-            'Por segurança, a sessão não será restaurada a partir do token local. ' +
-            'O usuário precisará fazer login novamente.',
+            '[AuthProvider] Falha ao carregar /auth/me (rede/CORS/servidor). ' +
+            'Sessão local preservada para nova tentativa; usuário não autenticado nesta carga.',
             error,
           );
-          clearLocalSession();
         }
       })
       .finally(() => {

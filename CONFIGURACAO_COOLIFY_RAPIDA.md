@@ -1,6 +1,10 @@
+> ⚠️ **AÇÃO OBRIGATÓRIA — CREDENCIAIS**: este arquivo continha a senha real do Postgres, do Redis e o `JWT_SECRET` de produção em texto puro. Foram substituídos por placeholders, mas continuam recuperáveis no histórico do Git — rotacione-os agora no Coolify e trate os valores antigos como comprometidos.
+>
+> ⚠️ **AÇÃO OBRIGATÓRIA — CORS/DOMÍNIO**: os valores de `CORS_ORIGIN` abaixo ainda podem estar desatualizados (domínio antigo `cocris.casadf.com.br`). O sistema migrou para os domínios `appcocris.casadf.com.br` (frontend) e `apicocris.casadf.com.br` (API). Confirme no Coolify, na aba de variáveis de ambiente do serviço `conexa-v3-api`, que `CORS_ORIGIN` inclui `https://appcocris.casadf.com.br,https://cocris.casadf.com.br` — foi esta divergência que causava "Network Error" ao fazer login.
+
 # Configuração Rápida Coolify
 
-## Backend API (api.conexa3.casadf.com.br)
+## Backend API (apicocris.casadf.com.br)
 
 ### 1. General
 - **Name**: conexa-v3-api
@@ -9,7 +13,7 @@
 - **Dockerfile Location**: `/Dockerfile`
 
 ### 2. Network
-- **Domains**: `https://api.conexa3.casadf.com.br`
+- **Domains**: `https://apicocris.casadf.com.br`
 - **Ports Exposes**: `3000`
 - **Port Mappings**: `3000:3000`
 
@@ -22,16 +26,16 @@
 
 ### 4. Environment Variables (14)
 ```
-DATABASE_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
-DIRECT_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
-REDIS_URL=redis://default:EWCBWCNg0uX92uoCNTRLcL7zwjSpIMkEzXtqxIqi9QL6xCK1ieJbyTrzgkx8Vjzr@y0oso44kkssw40skk048ksgs:6379/0
-JWT_SECRET=0MsE4rEpC7FPosGYzlsXw9GNfD+YZmIDylHzDp2v9YIRRQMHIlbf2IF3fPMGz7tdXAhPVKf/bfJrNXRyL+LAGw==
+DATABASE_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
+DIRECT_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
+REDIS_URL=redis://default:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:6379/0
+JWT_SECRET=[REDACTED_ROTACIONAR — gerar novo com openssl rand -base64 48]
 JWT_EXPIRATION=7d
 NODE_ENV=production
 PORT=3000
 APP_TIMEZONE=America/Sao_Paulo
-API_URL=https://api.conexa3.casadf.com.br
-CORS_ORIGIN=https://app.conexa3.casadf.com.br,https://conexa3.casadf.com.br
+API_URL=https://apicocris.casadf.com.br
+CORS_ORIGIN=https://appcocris.casadf.com.br,https://cocris.casadf.com.br
 GEMINI_API_KEY=[SUA_CHAVE_AQUI]
 GEMINI_MODEL=gemini-2.0-flash-exp
 ENABLE_AI_ASSISTANT=true
@@ -47,7 +51,7 @@ node scripts/seed-admin.js
 
 ---
 
-## Frontend Web (app.conexa3.casadf.com.br)
+## Frontend Web (appcocris.casadf.com.br)
 
 ### 1. General
 - **Name**: conexa-v3-web
@@ -55,19 +59,19 @@ node scripts/seed-admin.js
 - **Base Directory**: `/apps/web`
 
 ### 2. Network
-- **Domains**: `https://app.conexa3.casadf.com.br`
+- **Domains**: `https://appcocris.casadf.com.br`
 - **Ports Exposes**: `5173`
 
 ### 3. Environment Variables (3)
 ```
-VITE_API_URL=https://api.conexa3.casadf.com.br
+VITE_API_URL=https://apicocris.casadf.com.br
 VITE_APP_NAME=Conexa V3.0
 VITE_APP_VERSION=3.0.0
 ```
 
 ---
 
-## Site (conexa3.casadf.com.br)
+## Site (cocris.casadf.com.br)
 
 ### 1. General
 - **Name**: conexa-v3-site
@@ -75,13 +79,13 @@ VITE_APP_VERSION=3.0.0
 - **Base Directory**: `/apps/site`
 
 ### 2. Network
-- **Domains**: `https://conexa3.casadf.com.br`
+- **Domains**: `https://cocris.casadf.com.br`
 - **Ports Exposes**: `5174`
 
 ### 3. Environment Variables (4)
 ```
-DATABASE_URL=postgres://postgres:G8pDA7CYCRRyYPDJMU82peXreI6gYJbKGf47X75q3fvmCMHTuJDomaBVBQSNc1kw@vswwog0sss0c48ggwsgsg4ow:5432/postgres
-API_URL=https://api.conexa3.casadf.com.br
+DATABASE_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
+API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174
 ```
@@ -99,16 +103,16 @@ PORT=5174
 
 ```bash
 # API
-curl https://api.conexa3.casadf.com.br/health
+curl https://apicocris.casadf.com.br/health
 
 # Login
-curl -X POST https://api.conexa3.casadf.com.br/auth/login \
+curl -X POST https://apicocris.casadf.com.br/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@conexa.com","password":"Admin@123"}'
 
 # Frontend
-curl https://app.conexa3.casadf.com.br
+curl https://appcocris.casadf.com.br
 
 # Site
-curl https://conexa3.casadf.com.br
+curl https://cocris.casadf.com.br
 ```

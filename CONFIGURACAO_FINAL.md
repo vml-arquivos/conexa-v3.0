@@ -8,9 +8,9 @@
 
 | Serviço | Subdomínio | IP | Porta |
 |---------|------------|-----|-------|
-| **Backend API** | `api.conexa3.casadf.com.br` | 34.26.204.248 | 3000 |
-| **Frontend Web** | `app.conexa3.casadf.com.br` | 34.26.204.248 | 5173 |
-| **Site** | `conexa3.casadf.com.br` | 34.26.204.248 | 5174 |
+| **Backend API** | `apicocris.casadf.com.br` | 34.26.204.248 | 3000 |
+| **Frontend Web** | `appcocris.casadf.com.br` | 34.26.204.248 | 5173 |
+| **Site** | `cocris.casadf.com.br` | 34.26.204.248 | 5174 |
 
 ✅ **DNS já configurado e apontando para o IP correto!**
 
@@ -20,7 +20,7 @@
 
 ### 🚀 BACKEND API
 
-**Domínio no Coolify**: `api.conexa3.casadf.com.br`
+**Domínio no Coolify**: `apicocris.casadf.com.br`
 
 **Variáveis** (14):
 
@@ -32,8 +32,8 @@ JWT_SECRET=[gere com: openssl rand -base64 32]
 JWT_EXPIRES_IN=7d
 NODE_ENV=production
 PORT=3000
-API_URL=https://api.conexa3.casadf.com.br
-CORS_ORIGIN=https://app.conexa3.casadf.com.br,https://conexa3.casadf.com.br
+API_URL=https://apicocris.casadf.com.br
+CORS_ORIGIN=https://appcocris.casadf.com.br,https://cocris.casadf.com.br
 GEMINI_API_KEY=[obtenha em: https://makersuite.google.com/app/apikey]
 GEMINI_MODEL=gemini-1.5-flash
 ENABLE_AI_ASSISTANT=true
@@ -47,12 +47,12 @@ LOG_FORMAT=json
 
 ### 🎨 FRONTEND WEB
 
-**Domínio no Coolify**: `app.conexa3.casadf.com.br`
+**Domínio no Coolify**: `appcocris.casadf.com.br`
 
 **Variáveis** (3):
 
 ```bash
-VITE_API_URL=https://api.conexa3.casadf.com.br
+VITE_API_URL=https://apicocris.casadf.com.br
 VITE_APP_NAME=Conexa V3.0
 VITE_APP_VERSION=3.0.0
 ```
@@ -61,13 +61,13 @@ VITE_APP_VERSION=3.0.0
 
 ### 🌐 SITE INSTITUCIONAL
 
-**Domínio no Coolify**: `conexa3.casadf.com.br`
+**Domínio no Coolify**: `cocris.casadf.com.br`
 
 **Variáveis** (4):
 
 ```bash
 DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
-API_URL=https://api.conexa3.casadf.com.br
+API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174
 ```
@@ -140,7 +140,7 @@ node scripts/seed-test-users.js
 2. **GitHub**: `vml-arquivos/conexa-v3.0`
 3. **Branch**: `main`
 4. **Name**: `conexa-v3-web`
-5. **Domínio**: `app.conexa3.casadf.com.br`
+5. **Domínio**: `appcocris.casadf.com.br`
 6. **Environment Variables**: Adicione as 3 variáveis acima
 7. **Deploy**
 
@@ -152,7 +152,7 @@ node scripts/seed-test-users.js
 2. **GitHub**: `vml-arquivos/conexa-v3.0`
 3. **Branch**: `main`
 4. **Name**: `conexa-v3-site`
-5. **Domínio**: `conexa3.casadf.com.br`
+5. **Domínio**: `cocris.casadf.com.br`
 6. **Environment Variables**: Adicione as 4 variáveis acima
 7. **Deploy**
 
@@ -162,15 +162,15 @@ node scripts/seed-test-users.js
 
 ```bash
 # 1. Backend
-curl https://api.conexa3.casadf.com.br/health
+curl https://apicocris.casadf.com.br/health
 # Deve retornar: {"status":"ok"}
 
 # 2. Frontend
-curl https://app.conexa3.casadf.com.br
+curl https://appcocris.casadf.com.br
 # Deve retornar HTML
 
 # 3. Site
-curl https://conexa3.casadf.com.br
+curl https://cocris.casadf.com.br
 # Deve retornar HTML
 ```
 
@@ -241,41 +241,41 @@ AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ## ✅ CHECKLIST COMPLETO
 
-### Backend API (`api.conexa3.casadf.com.br`)
+### Backend API (`apicocris.casadf.com.br`)
 
 - [ ] Domínio configurado no Coolify
 - [ ] 14 variáveis de ambiente adicionadas
 - [ ] `DATABASE_URL` copiada do PostgreSQL
 - [ ] `REDIS_URL` copiada do Redis
 - [ ] `JWT_SECRET` gerada com openssl
-- [ ] `API_URL=https://api.conexa3.casadf.com.br`
-- [ ] `CORS_ORIGIN=https://app.conexa3.casadf.com.br,https://conexa3.casadf.com.br`
+- [ ] `API_URL=https://apicocris.casadf.com.br`
+- [ ] `CORS_ORIGIN=https://appcocris.casadf.com.br,https://cocris.casadf.com.br`
 - [ ] `GEMINI_API_KEY` obtida no Google
 - [ ] Redeploy realizado
 - [ ] Status: **Running** (verde)
 - [ ] Migrations executadas
 - [ ] Admin criado (`admin@conexa.com`)
 - [ ] Usuários de teste criados (13 usuários)
-- [ ] Health check funciona: `curl https://api.conexa3.casadf.com.br/health`
+- [ ] Health check funciona: `curl https://apicocris.casadf.com.br/health`
 
-### Frontend Web (`app.conexa3.casadf.com.br`)
+### Frontend Web (`appcocris.casadf.com.br`)
 
 - [ ] Aplicação criada no Coolify
-- [ ] Domínio configurado: `app.conexa3.casadf.com.br`
+- [ ] Domínio configurado: `appcocris.casadf.com.br`
 - [ ] 3 variáveis de ambiente adicionadas
-- [ ] `VITE_API_URL=https://api.conexa3.casadf.com.br`
+- [ ] `VITE_API_URL=https://apicocris.casadf.com.br`
 - [ ] Deploy realizado
 - [ ] Status: **Running** (verde)
 - [ ] SSL ativo (cadeado verde)
 - [ ] Tela de login acessível
 
-### Site (`conexa3.casadf.com.br`)
+### Site (`cocris.casadf.com.br`)
 
 - [ ] Aplicação criada no Coolify
-- [ ] Domínio configurado: `conexa3.casadf.com.br`
+- [ ] Domínio configurado: `cocris.casadf.com.br`
 - [ ] 4 variáveis de ambiente adicionadas
 - [ ] `DATABASE_URL` (mesma do backend)
-- [ ] `API_URL=https://api.conexa3.casadf.com.br`
+- [ ] `API_URL=https://apicocris.casadf.com.br`
 - [ ] Deploy realizado
 - [ ] Status: **Running** (verde)
 - [ ] SSL ativo (cadeado verde)
@@ -283,10 +283,10 @@ AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ### Testes Finais
 
-- [ ] Login funciona: `https://app.conexa3.casadf.com.br` → `admin@conexa.com` / `Admin@123`
+- [ ] Login funciona: `https://appcocris.casadf.com.br` → `admin@conexa.com` / `Admin@123`
 - [ ] Dashboard carrega após login
 - [ ] IA funciona: Teste "Gerar com IA" em Planejamentos
-- [ ] Site institucional carrega: `https://conexa3.casadf.com.br`
+- [ ] Site institucional carrega: `https://cocris.casadf.com.br`
 
 ---
 
@@ -298,21 +298,21 @@ AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 ✅ **CORRETO**:
 ```bash
-CORS_ORIGIN=https://app.conexa3.casadf.com.br,https://conexa3.casadf.com.br
+CORS_ORIGIN=https://appcocris.casadf.com.br,https://cocris.casadf.com.br
 ```
 
 ❌ **ERRADO**:
 ```bash
-CORS_ORIGIN=https://app.conexa3.casadf.com.br, https://conexa3.casadf.com.br
+CORS_ORIGIN=https://appcocris.casadf.com.br,https://cocris.casadf.com.br
 ```
 
 ---
 
 ### 2. Todos os Subdomínios Usam CONEXA3
 
-✅ `api.conexa3.casadf.com.br`  
-✅ `app.conexa3.casadf.com.br`  
-✅ `conexa3.casadf.com.br`
+✅ `apicocris.casadf.com.br`  
+✅ `appcocris.casadf.com.br`  
+✅ `cocris.casadf.com.br`
 
 ❌ ~~`api.conexa.casadf.com.br`~~ (ERRADO)
 
@@ -355,9 +355,9 @@ CORS_ORIGIN=https://app.conexa3.casadf.com.br, https://conexa3.casadf.com.br
 **Tempo total**: 25 minutos
 
 ### URLs Finais
-- Backend API: `https://api.conexa3.casadf.com.br`
-- Frontend Web: `https://app.conexa3.casadf.com.br`
-- Site: `https://conexa3.casadf.com.br`
+- Backend API: `https://apicocris.casadf.com.br`
+- Frontend Web: `https://appcocris.casadf.com.br`
+- Site: `https://cocris.casadf.com.br`
 
 ---
 

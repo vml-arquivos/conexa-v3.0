@@ -30,18 +30,29 @@ async function bootstrap() {
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // ─── CORS estrito com whitelist explícita ─────────────────────────────────
-  // Suporta CORS_ORIGIN via variável de ambiente (separado por vírgula)
-  // ou usa os domínios COCRIS como padrão.
+  // Suporta CORS_ORIGIN via variável de ambiente (separado por vírgula) e
+  // SEMPRE inclui os domínios canônicos COCRIS, mesmo quando CORS_ORIGIN
+  // está configurado com valores diferentes.
+  //
+  // Motivo (incidente 2026-08-13): após a migração de domínio de
+  // *.conexa3.casadf.com.br para *cocris.casadf.com.br, a variável
+  // CORS_ORIGIN configurada no Coolify continuou apontando para os domínios
+  // antigos. Como antes o valor do env substituía completamente a lista
+  // padrão, o domínio novo (appcocris.casadf.com.br) passou a ser rejeitado
+  // pelo CORS — o navegador bloqueava a resposta do /auth/login e o
+  // frontend exibia "Network Error" na tela de login, mesmo com usuário e
+  // senha corretos. Unificar as duas listas (env + padrão) evita que uma
+  // variável de ambiente desatualizada derrube o login de novo no futuro.
   const corsEnv = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
     : [];
 
-  const allowedOrigins: string[] = corsEnv.length
-    ? corsEnv
-    : [
-        'https://appcocris.casadf.com.br',
-        'https://cocris.casadf.com.br',
-      ];
+  const defaultOrigins = [
+    'https://appcocris.casadf.com.br',
+    'https://cocris.casadf.com.br',
+  ];
+
+  const allowedOrigins: string[] = Array.from(new Set([...defaultOrigins, ...corsEnv]));
 
   if (process.env.NODE_ENV !== 'production') {
     allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
