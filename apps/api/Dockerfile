@@ -6,8 +6,11 @@ FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV CI=true
 # ARG BUILD_DATE force-invalida o cache Docker a cada redeploy no Coolify
-# quando a variável BUILD_DATE muda (configurar no Coolify como variável de build)
-ARG BUILD_DATE=unknown
+# quando a variável BUILD_DATE muda (configurar no Coolify como variável de build).
+# O valor default abaixo também muda o SHA do commit a cada bump manual, o que
+# por si só já força o Coolify a rebuildar em vez de reaproveitar a imagem
+# cacheada pelo mesmo Git Commit SHA (ver Coolify: "Build step skipped").
+ARG BUILD_DATE=2026-08-13T03-58-00Z
 LABEL build-date=$BUILD_DATE
 # Prisma em Debian slim precisa do openssl para geração do client
 RUN apt-get update -y \
