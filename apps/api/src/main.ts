@@ -30,11 +30,18 @@ async function bootstrap() {
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // ─── CORS estrito com whitelist explícita ─────────────────────────────────
-  const allowedOrigins = [
-    'https://app.conexa3.casadf.com.br',
-    'https://conexa3.casadf.com.br',
-    // 'https://staging.conexa3.casadf.com.br', // descomente quando existir
-  ];
+  // Suporta CORS_ORIGIN via variável de ambiente (separado por vírgula)
+  // ou usa os domínios COCRIS como padrão.
+  const corsEnv = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    : [];
+
+  const allowedOrigins: string[] = corsEnv.length
+    ? corsEnv
+    : [
+        'https://appcocris.casadf.com.br',
+        'https://cocris.casadf.com.br',
+      ];
 
   if (process.env.NODE_ENV !== 'production') {
     allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
@@ -63,7 +70,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT) || 3000;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 Conexa API rodando em http://0.0.0.0:${port}`);
+  console.log(`🚀 COCRIS Pedagógico API rodando em http://0.0.0.0:${port}`);
   console.log(`🔒 CORS habilitado para: ${allowedOrigins.join(', ')}`);
 }
 

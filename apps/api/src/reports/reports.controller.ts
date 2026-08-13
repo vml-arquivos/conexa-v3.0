@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { RoleLevel } from '@prisma/client';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,6 +21,7 @@ export class ReportsController {
    * - PROFESSOR: somente da própria turma
    */
   @Get('diary/by-classroom')
+  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   getDiaryByClassroom(
     @Query('classroomId') classroomId: string,
     @Query('startDate') startDate: string,
@@ -43,7 +45,7 @@ export class ReportsController {
    * - PROFESSOR: negado
    */
   @Get('diary/by-period')
-  @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   getDiaryByPeriod(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
@@ -62,7 +64,7 @@ export class ReportsController {
    * - PROFESSOR: negado
    */
   @Get('diary/unplanned')
-  @RequireRoles('DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   getUnplannedDiaryEvents(
     @Query('unitId') unitId: string | undefined,
     @CurrentUser() user: JwtPayload,
@@ -86,7 +88,7 @@ export class ReportsController {
    * RBAC: UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
    */
   @Get('unit/coverage')
-  @RequireRoles('UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   getUnitCoverage(
     @Query('unitId') unitId: string | undefined,
     @Query('startDate') startDate: string | undefined,
@@ -107,7 +109,7 @@ export class ReportsController {
    * RBAC: UNIDADE, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
    */
   @Get('unit/pendings')
-  @RequireRoles('UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   getUnitPendings(
     @Query('unitId') unitId: string | undefined,
     @Query('daysWithout') daysWithout: string | undefined,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../app/AuthProvider';
+import { useAutoSave } from '../hooks/useAutoSave';
 import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -141,6 +142,18 @@ export default function PlanejamentoDiarioPage() {
   const [gerandoIA, setGerandoIA] = useState(false);
   const [sugestoesIA, setSugestoesIA] = useState<SugestoesIA | null>(null);
 
+  // ─── Auto-save no localStorage ───────────────────────────────────────────────────────────────────────
+  const { hasDraft: planHasDraft, clearDraft: planClearDraft, lastSaved: planLastSaved } = useAutoSave({
+    key: `planejamento-diario-rascunho-${(user as any)?.id ?? 'anon'}`,
+    data: templateAtivo,
+    enabled: !!templateAtivo && aba === 'template',
+    onRestore: (saved) => {
+      setTemplateAtivo(saved as Partial<TemplatePlanejamento>);
+      setAba('template');
+      toast.info('Rascunho do planejamento recuperado automaticamente.');
+    },
+  });
+
   const ddmm = formatarDataDDMM(dataSelecionada);
   const objetivosDia = getObjetivosDia(ddmm, segmentoSelecionado);
   const segmentosNaData = getSegmentosNaData(ddmm);
@@ -174,6 +187,7 @@ export default function PlanejamentoDiarioPage() {
         ano: dataSelecionada.getFullYear(),
       });
       toast.success('Planejamento salvo com sucesso!');
+      planClearDraft();
       setAba('historico');
       carregarTemplates();
     } catch (err: any) {
@@ -186,6 +200,7 @@ export default function PlanejamentoDiarioPage() {
       };
       setTemplates(prev => [local, ...prev]);
       toast.success('Planejamento salvo localmente!');
+      planClearDraft();
       setAba('historico');
     } finally {
       setSalvando(false);
@@ -508,6 +523,16 @@ export default function PlanejamentoDiarioPage() {
       {/* ─── ABA TEMPLATE ─── */}
       {aba === 'template' && (
         <div className="space-y-6">
+          {/* Banner de auto-save */}
+          {planHasDraft && (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm">
+              <span className="text-amber-800">
+                💾 Rascunho salvo automaticamente
+                {planLastSaved && ` às ${planLastSaved.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
+              </span>
+              <button onClick={planClearDraft} className="text-xs text-amber-600 underline hover:text-amber-800">Descartar rascunho</button>
+            </div>
+          )}
           {!templateAtivo ? (
             <div className="text-center py-16">
               <FileText className="h-16 w-16 text-gray-200 mx-auto mb-4" />

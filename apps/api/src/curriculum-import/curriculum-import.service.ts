@@ -124,6 +124,200 @@ export class CurriculumImportService {
     };
   }
 
+  // ─── Tarefa 3.3 — Importação via CSV ────────────────────────────────────────
+
+  /**
+   * Importa uma matriz curricular a partir de um CSV em memória (Buffer).
+   *
+   * Colunas esperadas (case-insensitive, separador vírgula):
+   *   data (YYYY-MM-DD), campo_experiencia, objetivo_bncc, codigo_bncc,
+   *   objetivo_curriculo, intencionalidade (opcional), exemplo_atividade (opcional)
+   *
+   * Cria a CurriculumMatrix se não existir, depois faz upsert das entries.
+   * Retorna relatório: { importados, erros, matrixId }
+   */
+  async importCsv(
+    csvBuffer: Buffer,
+    params: {
+      mantenedoraId: string;
+      name: string;
+      year: number;
+      segment: string;
+      version: number;
+    },
+    user: JwtPayload,
+  ): Promise<{ matrixId: string; importados: number; erros: string[] }> {
+    this.validatePermission(user);
+
+    const { mantenedoraId, name, year, segment, version } = params;
+
+    // Parse CSV em memória
+    const text = csvBuffer.toString('utf-8');
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    if (lines.length < 2) {
+      throw new BadRequestException('CSV vazio ou sem linhas de dados');
+    }
+
+    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+
+    // Validar colunas obrigatórias
+    const obrigatorias = ['data', 'campo_experiencia', 'objetivo_bncc', 'objetivo_curriculo'];
+    const faltando = obrigatorias.filter((c) => !headers.includes(c));
+    if (faltando.length > 0) {
+      throw new BadRequestException(
+        `Colunas obrigatórias ausentes no CSV: ${faltando.join(', ')}`,
+      );
+    }
+
+    // Mapeamento de campo_experiencia string → enum
+    const CAMPO_MAP: Record<string, string> = {
+      'o eu o outro e o nos': 'O_EU_O_OUTRO_E_O_NOS',
+      'corpo gestos e movimentos': 'CORPO_GESTOS_E_MOVIMENTOS',
+      'tracos sons cores e formas': 'TRACOS_SONS_CORES_E_FORMAS',
+      'escuta fala pensamento e imaginacao': 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+      'espacos tempos quantidades relacoes e transformacoes':
+        'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+      'eu outro nos': 'O_EU_O_OUTRO_E_O_NOS',
+      'corpo gestos': 'CORPO_GESTOS_E_MOVIMENTOS',
+      'tracos sons': 'TRACOS_SONS_CORES_E_FORMAS',
+      'escuta fala': 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+      'espacos tempos': 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+    };
+
+    const normalizarCampo = (raw: string): string | null => {
+      const key = raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z ]/g, '')
+        .trim();
+      if (CAMPO_MAP[key]) return CAMPO_MAP[key];
+      for (const [k, v] of Object.entries(CAMPO_MAP)) {
+        if (key.includes(k) || k.includes(key)) return v;
+      }
+      const enumValues = [
+        'O_EU_O_OUTRO_E_O_NOS',
+        'CORPO_GESTOS_E_MOVIMENTOS',
+        'TRACOS_SONS_CORES_E_FORMAS',
+        'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
+        'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
+      ];
+      const upper = raw.toUpperCase().replace(/[^A-Z_]/g, '');
+      if (enumValues.includes(upper)) return upper;
+      return null;
+    };
+
+    // Criar ou localizar a CurriculumMatrix
+    let matrix = await this.prisma.curriculumMatrix.findFirst({
+      where: { mantenedoraId, year, segment, version },
+    });
+
+    if (!matrix) {
+      matrix = await this.prisma.curriculumMatrix.create({
+        data: {
+          mantenedoraId,
+          name,
+          year,
+          segment,
+          version,
+          isActive: true,
+          createdBy: user.sub,
+        },
+      });
+    }
+
+    let importados = 0;
+    const erros: string[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => { row[h] = cols[idx] ?? ''; });
+
+      const dataStr = row['data'];
+      const campoRaw = row['campo_experiencia'];
+      const objetivoBNCC = row['objetivo_bncc'];
+      const objetivoCurriculo = row['objetivo_curriculo'];
+
+      if (!dataStr || !campoRaw || !objetivoBNCC || !objetivoCurriculo) {
+        erros.push(`Linha ${i + 1}: campos obrigatórios ausentes`);
+        continue;
+      }
+
+      // Validar data
+      const dateObj = new Date(`${dataStr}T12:00:00-03:00`);
+      if (isNaN(dateObj.getTime())) {
+        erros.push(`Linha ${i + 1}: data inválida "${dataStr}"`);
+        continue;
+      }
+
+      // Mapear campo de experiência
+      const campoEnum = normalizarCampo(campoRaw);
+      if (!campoEnum) {
+        erros.push(`Linha ${i + 1}: campo_experiencia não reconhecido "${campoRaw}"`);
+        continue;
+      }
+
+      // Calcular weekOfYear e dayOfWeek
+      const startOfYear = new Date(dateObj.getFullYear(), 0, 1);
+      const weekOfYear = Math.ceil(
+        ((dateObj.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getDay() + 1) / 7,
+      );
+      const dayOfWeek = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
+
+      try {
+        const existing = await this.prisma.curriculumMatrixEntry.findFirst({
+          where: {
+            matrixId: matrix.id,
+            date: {
+              gte: new Date(`${dataStr}T00:00:00-03:00`),
+              lte: new Date(`${dataStr}T23:59:59-03:00`),
+            },
+          },
+        });
+
+        if (existing) {
+          await this.prisma.curriculumMatrixEntry.update({
+            where: { id: existing.id },
+            data: {
+              campoDeExperiencia: campoEnum as any,
+              objetivoBNCC,
+              objetivoBNCCCode: row['codigo_bncc'] || null,
+              objetivoCurriculo,
+              intencionalidade: row['intencionalidade'] || null,
+              exemploAtividade: row['exemplo_atividade'] || null,
+            },
+          });
+        } else {
+          await this.prisma.curriculumMatrixEntry.create({
+            data: {
+              matrixId: matrix.id,
+              date: dateObj,
+              weekOfYear,
+              dayOfWeek,
+              campoDeExperiencia: campoEnum as any,
+              objetivoBNCC,
+              objetivoBNCCCode: row['codigo_bncc'] || null,
+              objetivoCurriculo,
+              intencionalidade: row['intencionalidade'] || null,
+              exemploAtividade: row['exemplo_atividade'] || null,
+            },
+          });
+        }
+        importados++;
+      } catch (err: any) {
+        erros.push(`Linha ${i + 1}: ${err?.message ?? 'erro desconhecido'}`);
+      }
+    }
+
+    // Invalidar cache
+    await this.matrixCacheInvalidation.bump(mantenedoraId);
+
+    return { matrixId: matrix.id, importados, erros };
+  }
+
+  // ─── Métodos privados ────────────────────────────────────────────────────────
+
   /**
    * Simula upsert para dry-run
    */
@@ -180,17 +374,6 @@ export class CurriculumImportService {
 
   /**
    * Aplica upsert real com match por range de dia pedagógico.
-   *
-   * Correção crítica: em vez de findUnique(matrixId_date) com DateTime exato,
-   * usa findFirst com range do dia pedagógico (00:00 a 23:59 no fuso -03:00).
-   * Isso evita duplicatas por drift de timezone.
-   *
-   * Proteção de integridade histórica:
-   * - Se a entry tem DiaryEvent vinculado, NÃO altera campos normativos
-   *   (objetivoBNCC, objetivoCurriculo, campoDeExperiencia, date).
-   * - Atualiza apenas intencionalidade/exemploAtividade se vierem preenchidos.
-   *
-   * Inserção canônica: grava date como T12:00:00-03:00 para minimizar drift.
    */
   private async applyUpsert(
     matrix: any,
@@ -207,13 +390,11 @@ export class CurriculumImportService {
         const existing = await this.findEntryByPedagogicalDay(matrix.id, entry.date);
 
         if (existing) {
-          // Verificar se há DiaryEvent vinculado (integridade histórica)
           const hasLinkedEvents = await this.prisma.diaryEvent.count({
             where: { curriculumEntryId: existing.id },
           });
 
           if (hasLinkedEvents > 0 && !force) {
-            // Só atualiza campos não-normativos se vierem preenchidos E forem diferentes
             const nonNormativeUpdate: any = {};
             if (
               entry.intencionalidade &&
@@ -242,14 +423,12 @@ export class CurriculumImportService {
             continue;
           }
 
-          // Sem eventos vinculados (ou force=true): verificar se há mudanças
           if (!this.hasChanges(existing, entry) && !force) {
             unchanged++;
             continue;
           }
 
           if (force) {
-            // Force: atualiza tudo
             await this.prisma.curriculumMatrixEntry.update({
               where: { id: existing.id },
               data: {
@@ -266,7 +445,6 @@ export class CurriculumImportService {
             });
             updates++;
           } else {
-            // Sem force: atualiza campos que mudaram
             const updateData: any = {};
             if (entry.intencionalidade) updateData.intencionalidade = entry.intencionalidade;
             if (entry.exemploAtividade) updateData.exemploAtividade = entry.exemploAtividade;
@@ -297,7 +475,6 @@ export class CurriculumImportService {
             }
           }
         } else {
-          // Não existe: inserir com data canônica (T12:00:00-03:00)
           const ymd = getPedagogicalDay(entry.date);
           const canonicalDate = new Date(`${ymd}T12:00:00-03:00`);
 
@@ -319,7 +496,6 @@ export class CurriculumImportService {
           inserts++;
         }
       } catch (error) {
-        // Ignorar erros de unique constraint (já existe com data exata)
         unchanged++;
       }
     }
@@ -329,12 +505,8 @@ export class CurriculumImportService {
 
   /**
    * Busca uma entry pelo dia pedagógico (range 00:00 a 23:59 no fuso -03:00).
-   * Evita duplicatas por drift de timezone.
    */
-  private async findEntryByPedagogicalDay(
-    matrixId: string,
-    date: Date,
-  ) {
+  private async findEntryByPedagogicalDay(matrixId: string, date: Date) {
     const ymd = getPedagogicalDay(date);
     const start = new Date(`${ymd}T00:00:00-03:00`);
     const end = new Date(`${ymd}T23:59:59-03:00`);
@@ -357,7 +529,6 @@ export class CurriculumImportService {
 
   /**
    * Verifica se há mudanças entre entrada existente e nova.
-   * Não considera null/undefined como mudança (proteção contra sobrescrita).
    */
   private hasChanges(existing: any, entry: ParsedMatrixEntry): boolean {
     const normativeChanged =

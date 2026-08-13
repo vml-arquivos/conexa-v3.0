@@ -11,7 +11,9 @@ import { Button } from '../components/ui/button';
 import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import http from '../api/http';
-import { Brain, BookOpen, ArrowLeft, RefreshCw, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
+import { Brain, BookOpen, ArrowLeft, Activity, TrendingUp, BarChart2, Award, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChildQuickActions } from '../components/children/ChildQuickActions';
+import { getIntegralChildProfile } from '../api/intelligence-core';
 
 const DIMENSOES = [
   { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: '#ec4899' },
@@ -58,11 +60,36 @@ function calcularIdade(dob: string | null | undefined): string {
 export default function PainelAnaliticoCriancaPage() {
   const { childId } = useParams<{ childId: string }>();
   const navigate = useNavigate();
-  const [aba, setAba] = useState<'bncc'|'diario'>('bncc');
+  const [aba, setAba] = useState<'bncc'|'diario'|'microgestos'|'inteligencia'>('bncc');
+  const [microgestos, setMicrogestos] = useState<any[]>([]);
+  const [loadingMg, setLoadingMg] = useState(false);
   const [loadingC, setLoadingC] = useState(true);
   const [loadingD, setLoadingD] = useState(false);
   const [central, setCentral] = useState<any>(null);
   const [eventos, setEventos] = useState<any[]>([]);
+  // Tarefa 2.2 — Frequência e restrições alimentares
+  const [frequencia, setFrequencia] = useState<{ total: number; presentes: number; pct: number | null } | null>(null);
+  const [restricoes, setRestricoes] = useState<any[]>([]);
+  // Nova aba — Inteligência Pedagógica: cruza saúde, comportamento, frequência,
+  // nutrição e RDIC num único perfil, consumindo o motor intelligence-core
+  // que já existia no backend mas nunca era chamado por nenhuma tela.
+  const [perfilIntegral, setPerfilIntegral] = useState<any>(null);
+  const [loadingPerfil, setLoadingPerfil] = useState(false);
+  const [erroPerfil, setErroPerfil] = useState<string | null>(null);
+
+  const carregarPerfilIntegral = useCallback(async () => {
+    if (!childId) return;
+    setLoadingPerfil(true);
+    setErroPerfil(null);
+    try {
+      const data = await getIntegralChildProfile(childId, {});
+      setPerfilIntegral(data);
+    } catch (e: any) {
+      setErroPerfil(e?.response?.data?.message ?? 'Erro ao carregar perfil integral.');
+    } finally {
+      setLoadingPerfil(false);
+    }
+  }, [childId]);
 
   const carregarCentral = useCallback(async () => {
     if (!childId) return;
@@ -84,6 +111,37 @@ export default function PainelAnaliticoCriancaPage() {
 
   useEffect(() => { carregarCentral(); }, [carregarCentral]);
   useEffect(() => { if (aba === 'diario' && eventos.length === 0) carregarDiario(); }, [aba, carregarDiario, eventos.length]);
+  useEffect(() => { if (aba === 'inteligencia' && !perfilIntegral && !loadingPerfil) carregarPerfilIntegral(); }, [aba, perfilIntegral, loadingPerfil, carregarPerfilIntegral]);
+
+  // Tarefa 2.2 — Buscar frequência e restrições ao montar
+  useEffect(() => {
+    if (!childId) return;
+    // Frequência dos últimos 60 dias
+    const start = new Date(Date.now() - 60*24*60*60*1000).toISOString().slice(0,10);
+    http.get('/attendance', { params: { childId, startDate: start, limit: '200' } })
+      .then(r => {
+        const data: any[] = Array.isArray(r?.data) ? r.data : (r?.data?.data ?? []);
+        const presentes = data.filter((a: any) => a.present ?? a.presente ?? a.status === 'PRESENTE').length;
+        setFrequencia({ total: data.length, presentes, pct: data.length > 0 ? Math.round(presentes/data.length*100) : null });
+      })
+      .catch(() => {});
+    // Restrições alimentares via /children/:id
+    http.get(`/children/${childId}`)
+      .then(r => {
+        const dr = r?.data?.dietaryRestrictions;
+        if (Array.isArray(dr)) setRestricoes(dr);
+      })
+      .catch(() => {});
+  }, [childId]);
+
+  useEffect(() => {
+    if (aba !== 'microgestos' || microgestos.length > 0) return;
+    setLoadingMg(true);
+    http.get(`/microgesto/child/${childId}`)
+      .then(r => setMicrogestos(Array.isArray(r?.data) ? r.data : []))
+      .catch(() => {})
+      .finally(() => setLoadingMg(false));
+  }, [aba, childId, microgestos.length]);
 
   const { radarData, evolData, distData, resumo } = useMemo(() => {
     const rdics = central?.rdics ?? [];
@@ -143,36 +201,40 @@ export default function PainelAnaliticoCriancaPage() {
     <PageShell title={`Painel Analítico — ${nome}`} subtitle={`${central?.child?.turma?.name??'—'} · ${calcularIdade(central?.child?.dateOfBirth)}`}>
       <div className="space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <Button variant="outline" onClick={()=>navigate(`/app/crianca/${childId}/rdic-central`)} className="flex items-center gap-2 text-sm">
-            <ArrowLeft className="h-4 w-4"/>Central RDIC
-          </Button>
-          <Button variant="outline" onClick={()=>{carregarCentral();if(aba==='diario')carregarDiario();}} className="flex items-center gap-2 text-sm">
-            <RefreshCw className="h-4 w-4"/>Atualizar
-          </Button>
+          <ChildQuickActions
+            childId={childId}
+            classroomId={central?.child?.turma?.id}
+            current="painel"
+            onRefresh={() => { carregarCentral(); if (aba === 'diario') carregarDiario(); }}
+          />
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { icon:<Brain className="h-5 w-5 mx-auto mb-1 text-indigo-400"/>, val:`${resumo.pctGeral}%`, label:'Consolidado BNCC', sub:`${resumo.totalCons}/${resumo.totalInd}` },
-            { icon:<Award className="h-5 w-5 mx-auto mb-1 text-emerald-400"/>, val:central?.rdics?.length??0, label:'RDICs registados', sub:'' },
-            { icon:<Activity className="h-5 w-5 mx-auto mb-1 text-blue-400"/>, val:totalEvt, label:'Observações (180d)', sub:aba!=='diario'?'Ver diário →':'' },
-            { icon:<TrendingUp className="h-5 w-5 mx-auto mb-1 text-purple-400"/>, val:resumo.tend==='up'?'↑ Progresso':resumo.tend==='down'?'↓ Atenção':resumo.tend==='stable'?'→ Estável':'— Primeiro RDIC', label:'Tendência', sub:'' },
+            { icon:<Brain className="h-5 w-5 mx-auto mb-1 text-indigo-400"/>, val:`${resumo.pctGeral}%`, label:'Consolidado BNCC', sub:`${resumo.totalCons}/${resumo.totalInd}`, onClick: undefined },
+            { icon:<Award className="h-5 w-5 mx-auto mb-1 text-emerald-400"/>, val:central?.rdics?.length??0, label:'RDICs registados', sub:'', onClick: undefined },
+            { icon:<Activity className="h-5 w-5 mx-auto mb-1 text-blue-400"/>, val:totalEvt, label:'Observações (180d)', sub:aba!=='diario'?'Ver diário →':'', onClick: ()=>setAba('diario') },
+            { icon:<TrendingUp className="h-5 w-5 mx-auto mb-1 text-purple-400"/>, val:resumo.tend==='up'?'↑ Progresso':resumo.tend==='down'?'↓ Atenção':resumo.tend==='stable'?'→ Estável':'— Primeiro RDIC', label:'Tendência', sub:'', onClick: undefined },
+            // Tarefa 2.2 — Frequência
+            { icon:<ChevronRight className="h-5 w-5 mx-auto mb-1 text-sky-400"/>, val: frequencia?.pct !== null && frequencia?.pct !== undefined ? `${frequencia.pct}%` : '—', label:`Frequência (60d)`, sub: frequencia ? `${frequencia.presentes}/${frequencia.total} dias` : 'Carregando...', onClick: undefined },
+            // Tarefa 2.2 — Restrições alimentares
+            { icon:<AlertCircle className="h-5 w-5 mx-auto mb-1 text-orange-400"/>, val: restricoes.length > 0 ? restricoes.length : '—', label:'Restrições alim.', sub: restricoes.length > 0 ? restricoes.map((r:any)=>r.name??r.nome??r.type??'').filter(Boolean).slice(0,2).join(', ') : 'Nenhuma', onClick: undefined },
           ].map((k,i)=>(
-            <Card key={i} className={i===2?'cursor-pointer hover:shadow-md':''}  onClick={i===2?()=>setAba('diario'):undefined}>
+            <Card key={i} className={k.onClick?'cursor-pointer hover:shadow-md':''} onClick={k.onClick}>
               <CardContent className="p-4 text-center">
                 {k.icon}
-                <p className={`font-bold text-gray-800 ${i===0||i===1?'text-2xl':'text-lg'}`}>{k.val}</p>
+                <p className={`font-bold text-gray-800 ${i<=1?'text-2xl':'text-lg'}`}>{k.val}</p>
                 <p className="text-xs text-gray-500">{k.label}</p>
-                {k.sub&&<p className="text-xs text-gray-400 mt-0.5">{k.sub}</p>}
+                {k.sub&&<p className="text-xs text-gray-400 mt-0.5 truncate">{k.sub}</p>}
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <div className="flex gap-1 border-b border-gray-200">
-          {(['bncc','diario'] as const).map(a=>(
-            <button key={a} onClick={()=>setAba(a)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${aba===a?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}>
-              {a==='bncc'?<><Brain className="h-4 w-4"/>Indicadores BNCC</>:<><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</>}
+        <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+          {(['bncc','diario','microgestos','inteligencia'] as const).map(a=>(
+            <button key={a} onClick={()=>setAba(a)} className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${aba===a?'border-indigo-600 text-indigo-700':'border-transparent text-gray-500 hover:text-gray-700'}`}>
+              {a==='bncc' ? <><Brain className="h-4 w-4"/>Indicadores BNCC</> : a==='diario' ? <><BookOpen className="h-4 w-4"/>Diário de Bordo{totalEvt>0&&<span className="bg-indigo-100 text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">{totalEvt}</span>}</> : a==='microgestos' ? <><Activity className="h-4 w-4"/>Microgestos{microgestos.length>0&&<span className="bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full">{microgestos.length}</span>}</> : <><AlertCircle className="h-4 w-4"/>Inteligência Pedagógica{perfilIntegral?.attentionPoints?.length>0&&<span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full">{perfilIntegral.attentionPoints.length}</span>}</>}
             </button>
           ))}
         </div>
@@ -305,6 +367,174 @@ export default function PainelAnaliticoCriancaPage() {
           </div>
         )}
 
+        {aba === 'microgestos' && (
+          <div className="space-y-4">
+            {loadingMg ? (
+              <LoadingState message="Carregando microgestos..." />
+            ) : microgestos.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <Activity className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Nenhum microgesto registrado ainda.</p>
+                <p className="text-xs mt-1">Registre microgestos no Diário de Bordo para visualizar o portfólio.</p>
+              </div>
+            ) : (
+              <>
+                {/* Resumo por categoria */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Distribuição por Área de Desenvolvimento</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(
+                        microgestos.reduce((acc: Record<string, number>, m: any) => {
+                          const cat = m.categoria ?? 'OUTRO';
+                          acc[cat] = (acc[cat] ?? 0) + 1;
+                          return acc;
+                        }, {})
+                      ).sort((a,b) => (b[1] as number)-(a[1] as number)).map(([cat, count]) => (
+                        <div key={cat} className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 w-44 truncate">{cat.replace(/_/g,' ')}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2">
+                            <div className="bg-cyan-500 h-2 rounded-full transition-all" style={{ width: `${Math.round((count as number) / (microgestos.length as number) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 w-8 text-right">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Distribuição por nível */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Distribuição por Nível</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex gap-3 flex-wrap">
+                      {(['ALCANCADO','EM_DESENVOLVIMENTO','REQUER_ATENCAO'] as const).map(nivel => {
+                        const count = microgestos.filter((m:any) => m.nivel === nivel).length;
+                        const pct = Math.round(count/microgestos.length*100);
+                        const cor = nivel === 'ALCANCADO' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : nivel === 'EM_DESENVOLVIMENTO' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-rose-100 text-rose-700 border-rose-200';
+                        return (
+                          <div key={nivel} className={`flex-1 min-w-[120px] rounded-xl border p-3 text-center ${cor}`}>
+                            <p className="text-2xl font-bold">{count}</p>
+                            <p className="text-xs font-medium mt-0.5">{nivel === 'ALCANCADO' ? '✅ Alcançado' : nivel === 'EM_DESENVOLVIMENTO' ? '🟡 Em Desenvolvimento' : '🔴 Requer Atenção'}</p>
+                            <p className="text-xs opacity-70">{pct}%</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Timeline dos últimos 20 registros */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700">Últimos Registros</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-72 overflow-y-auto">
+                      {microgestos.slice(0,20).map((m: any, i: number) => (
+                        <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${m.nivel === 'ALCANCADO' ? 'bg-emerald-500' : m.nivel === 'EM_DESENVOLVIMENTO' ? 'bg-amber-400' : 'bg-rose-500'}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-gray-800 truncate">{(m.tags?.[0] ?? m.categoria ?? '').replace(/_/g,' ')}</p>
+                            <p className="text-xs text-gray-400">{m.data ? new Date(m.data).toLocaleDateString('pt-BR') : '—'}</p>
+                            {m.descricao && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{m.descricao}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
+
+        {aba === 'inteligencia' && (
+          <div className="space-y-4">
+            {loadingPerfil ? (
+              <LoadingState message="Cruzando dados de frequência, desenvolvimento, saúde e RDIC..." />
+            ) : erroPerfil ? (
+              <Card><CardContent className="py-12 text-center">
+                <AlertCircle className="h-10 w-10 mx-auto mb-3 text-rose-300" />
+                <p className="text-sm text-gray-500">{erroPerfil}</p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={carregarPerfilIntegral}>Tentar novamente</Button>
+              </CardContent></Card>
+            ) : !perfilIntegral ? (
+              <Card><CardContent className="py-12 text-center">
+                <Brain className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-500">Nenhum dado carregado ainda.</p>
+              </CardContent></Card>
+            ) : (
+              <>
+                {/* Aviso de responsabilidade — este motor organiza evidências, não diagnostica */}
+                <div className="flex items-start gap-2 p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-700 text-xs">
+                  <Brain className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>{perfilIntegral.safety?.notes ?? 'Este painel organiza evidências de diferentes módulos do sistema. Não substitui avaliação profissional nem gera diagnóstico clínico.'}</p>
+                </div>
+
+                {/* Métricas cruzadas */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.attendance?.presenceRate ?? '—'}{perfilIntegral.metrics?.attendance?.presenceRate != null ? '%' : ''}</p>
+                    <p className="text-xs text-gray-500">Frequência no período</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.records?.observations ?? 0}</p>
+                    <p className="text-xs text-gray-500">Observações de desenvolvimento</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.rdic?.total ?? 0}</p>
+                    <p className="text-xs text-gray-500">RDICs registrados</p>
+                  </CardContent></Card>
+                  <Card><CardContent className="py-3 text-center">
+                    <p className="text-2xl font-bold text-gray-800">{perfilIntegral.metrics?.alerts?.open ?? 0}</p>
+                    <p className="text-xs text-gray-500">Alertas operacionais abertos</p>
+                  </CardContent></Card>
+                </div>
+
+                {/* Pontos de atenção cruzados */}
+                <Card>
+                  <CardHeader><CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2"><AlertCircle className="h-4 w-4 text-amber-500"/>Pontos de Atenção</CardTitle></CardHeader>
+                  <CardContent>
+                    {(perfilIntegral.attentionPoints ?? []).length === 0 ? (
+                      <p className="text-sm text-gray-400 py-4 text-center">Nenhum ponto de atenção identificado no período.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {perfilIntegral.attentionPoints.map((p: any, i: number) => {
+                          const corSeveridade = p.severity === 'CRITICA' ? 'border-rose-300 bg-rose-50' : p.severity === 'ALTA' ? 'border-orange-300 bg-orange-50' : p.severity === 'MEDIA' ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50';
+                          return (
+                            <div key={i} className={`border rounded-xl p-3 ${corSeveridade}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-semibold text-gray-800">{p.title}</p>
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white border border-current opacity-70">{p.severity}</span>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">{p.description}</p>
+                              {p.recommendation && <p className="text-xs text-gray-500 mt-1.5"><strong>Recomendação:</strong> {p.recommendation}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recomendações consolidadas */}
+                {(perfilIntegral.recommendations ?? []).length > 0 && (
+                  <Card>
+                    <CardHeader><CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2"><Award className="h-4 w-4 text-indigo-500"/>Recomendações</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1.5">
+                        {perfilIntegral.recommendations.map((r: string, i: number) => (
+                          <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                            <ChevronRight className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />{r}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </PageShell>
   );

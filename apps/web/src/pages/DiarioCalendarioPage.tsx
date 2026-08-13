@@ -17,6 +17,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
+import { isUnidade } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -141,6 +142,7 @@ function StatusBadge({ status }: { status: StatusDia }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DiarioCalendarioPage() {
   const { user } = useAuth();
+  const isCoord = isUnidade(user);
   const navigate = useNavigate();
   const hoje = getPedagogicalToday();
 
@@ -308,8 +310,9 @@ export default function DiarioCalendarioPage() {
   }, [diasDoMes, diasMap]);
 
   // ─── Separar passados/hoje vs futuros ────────────────────────────────────────
+  // Ordem decrescente: hoje primeiro, depois dias anteriores
   const diasPassados = useMemo(
-    () => diasDoMes.filter(d => d <= hoje),
+    () => diasDoMes.filter(d => d <= hoje).slice().reverse(),
     [diasDoMes, hoje],
   );
   const diasFuturos = useMemo(
@@ -357,6 +360,59 @@ export default function DiarioCalendarioPage() {
         <ChevronRight className="h-3 w-3" />
         <span className="text-gray-800 font-medium">Diário da Turma</span>
       </nav>
+
+      {/* ── Card de destaque: Diário de Hoje ── */}
+      {mesSelecionado === mesAtual.substring(0, 7) && (() => {
+        const diaHoje = diasMap[hoje];
+        const statusHoje: StatusDia = diaHoje?.status ?? 'SEM_DIARIO';
+        const podeAbrir = !isCoord || statusHoje !== 'SEM_DIARIO';
+        return (
+          <div
+            onClick={() => podeAbrir && abrirDiario(hoje)}
+            className={`mb-5 flex items-center gap-4 p-4 rounded-2xl border-2 shadow-md transition-all ${
+              podeAbrir ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'
+            } ${
+              statusHoje === 'PUBLICADO'
+                ? 'border-emerald-400 bg-gradient-to-r from-emerald-50 to-white'
+                : statusHoje === 'RASCUNHO'
+                ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-white'
+                : 'border-blue-400 bg-gradient-to-r from-blue-50 to-white'
+            }`}
+          >
+            {/* Ícone de status */}
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+              statusHoje === 'PUBLICADO' ? 'bg-emerald-100' :
+              statusHoje === 'RASCUNHO' ? 'bg-amber-100' : 'bg-blue-100'
+            }`}>
+              {statusHoje === 'PUBLICADO' && <CheckCircle2 className="h-7 w-7 text-emerald-600" />}
+              {statusHoje === 'RASCUNHO' && <Clock className="h-7 w-7 text-amber-600" />}
+              {statusHoje === 'SEM_DIARIO' && <Plus className="h-7 w-7 text-blue-600" />}
+            </div>
+            {/* Texto */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Hoje</span>
+                <StatusBadge status={statusHoje} />
+              </div>
+              <p className="text-base font-bold text-gray-800 mt-0.5">
+                {statusHoje === 'PUBLICADO' ? 'Diário publicado' :
+                 statusHoje === 'RASCUNHO' ? 'Continuar rascunho' :
+                 isCoord ? 'Sem diário registrado' : 'Registrar diário de hoje'}
+              </p>
+              {diaHoje?.momentoDestaque && (
+                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-sm">{diaHoje.momentoDestaque}</p>
+              )}
+            </div>
+            {/* Seta */}
+            {podeAbrir && (
+              <ArrowRight className={`h-5 w-5 flex-shrink-0 ${
+                statusHoje === 'PUBLICADO' ? 'text-emerald-500' :
+                statusHoje === 'RASCUNHO' ? 'text-amber-500' : 'text-blue-500'
+              }`} />
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Resumo do mês ── */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -553,8 +609,8 @@ export default function DiarioCalendarioPage() {
               return (
                 <div
                   key={data}
-                  onClick={() => abrirDiario(data)}
-                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all duration-150 ${
+                  onClick={() => { if (!isCoord || dia.status !== 'SEM_DIARIO') abrirDiario(data); }}
+                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 ${isCoord && dia.status === 'SEM_DIARIO' ? 'cursor-default' : 'cursor-pointer'} ${
                     isHoje
                       ? 'border-2 border-blue-400 bg-blue-50 shadow-md hover:shadow-lg'
                       : dia.status === 'PUBLICADO'
@@ -598,7 +654,7 @@ export default function DiarioCalendarioPage() {
                       </p>
                     ) : !isHoje && dia.status === 'SEM_DIARIO' ? (
                       <p className="text-xs text-red-400 mt-1 font-medium">Diário não registrado</p>
-                    ) : isHoje && dia.status === 'SEM_DIARIO' ? (
+                    ) : isHoje && dia.status === 'SEM_DIARIO' && !isCoord ? (
                       <p className="text-xs text-blue-500 mt-1 font-medium">Toque para registrar o diário de hoje</p>
                     ) : null}
                   </div>
@@ -614,6 +670,11 @@ export default function DiarioCalendarioPage() {
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg group-hover:bg-amber-200 transition-colors">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Continuar</span>
+                      </span>
+                    ) : isCoord ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Pendente</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
@@ -665,21 +726,29 @@ export default function DiarioCalendarioPage() {
         </div>
       )}
 
-      {/* ── CTA Diário de Hoje ── */}
-      {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <button
-            onClick={() => abrirDiario(hoje)}
-            className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm py-3.5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-150"
-          >
-            <BookOpen className="h-4 w-4" />
-            Abrir Diário de Hoje
-            <span className="hidden sm:inline text-blue-200 font-normal">
-              · {new Date(hoje + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-            </span>
-          </button>
+      {/* ── Legenda ── */}
+      {!loading && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 pb-2 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            Publicado
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+            Rascunho
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full border-2 border-blue-400 flex-shrink-0" />
+            Hoje
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-gray-200 flex-shrink-0" />
+            Fins de semana (não letívo)
+          </span>
         </div>
       )}
+
+      {/* CTA duplicado removido — o card 'Diário de Hoje' no topo já cobre este caso */}
     </PageShell>
   );
 }

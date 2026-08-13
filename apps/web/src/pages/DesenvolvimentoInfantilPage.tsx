@@ -48,7 +48,11 @@ import {
   Calendar,
   TrendingUp,
   X,
+  Plus,
+  Send,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Unidade {
@@ -670,6 +674,45 @@ export default function DesenvolvimentoInfantilPage() {
   const [resumoChildId, setResumoChildId] = useState<string | null>(null);
   const [resumoChildName, setResumoChildName] = useState('');
 
+  // ─── Estado do formulário de nova observação (coordenador) ──────────────────
+  const [mostrarFormObs, setMostrarFormObs] = useState(false);
+  const [novaObs, setNovaObs] = useState({
+    childId: '',
+    category: 'COMPORTAMENTO',
+    behaviorDescription: '',
+    developmentAlerts: '',
+    recommendations: '',
+    date: new Date().toISOString().split('T')[0],
+  });
+  const [salvandoObs, setSalvandoObs] = useState(false);
+
+  const salvarNovaObs = async () => {
+    if (!novaObs.childId || !novaObs.behaviorDescription.trim()) {
+      toast.error('Selecione uma criança e preencha a descrição');
+      return;
+    }
+    setSalvandoObs(true);
+    try {
+      await http.post('/development-observations', {
+        childId: novaObs.childId,
+        classroomId: selectedClassroomId || undefined,
+        category: novaObs.category,
+        behaviorDescription: novaObs.behaviorDescription,
+        developmentAlerts: novaObs.developmentAlerts || undefined,
+        recommendations: novaObs.recommendations || undefined,
+        date: novaObs.date,
+      });
+      toast.success('Observação registrada com sucesso');
+      setMostrarFormObs(false);
+      setNovaObs({ childId: '', category: 'COMPORTAMENTO', behaviorDescription: '', developmentAlerts: '', recommendations: '', date: new Date().toISOString().split('T')[0] });
+      buscarObservacoes();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Erro ao salvar observação');
+    } finally {
+      setSalvandoObs(false);
+    }
+  };
+
   // ─── Carregar unidades ─────────────────────────────────────────────────────
   useEffect(() => {
     getAccessibleUnits()
@@ -808,7 +851,7 @@ export default function DesenvolvimentoInfantilPage() {
       title="Desenvolvimento Infantil"
       subtitle="Acompanhamento das observações de desenvolvimento da rede"
     >
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
         {isPsicologa ? (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
             <Brain className="h-3.5 w-3.5" />
@@ -817,10 +860,95 @@ export default function DesenvolvimentoInfantilPage() {
         ) : (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
             <Sparkles className="h-3.5 w-3.5" />
-            Coordenação Geral — Visão Consolidada de Todas as Unidades
+            Coordenação — Visão Consolidada de Observações
           </span>
         )}
+        {/* Botão Nova Observação — coordenador tem CRUD no backend */}
+        <button
+          onClick={() => setMostrarFormObs(v => !v)}
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Nova Observação
+        </button>
       </div>
+
+      {/* Formulário inline de nova observação */}
+      {mostrarFormObs && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-5 space-y-3">
+          <p className="text-sm font-semibold text-purple-800 flex items-center gap-2"><ClipboardList className="h-4 w-4" /> Registrar Observação de Desenvolvimento</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Criança *</label>
+              <select
+                value={novaObs.childId}
+                onChange={e => setNovaObs(v => ({ ...v, childId: e.target.value }))}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                <option value="">{criancas.length === 0 ? 'Selecione uma turma primeiro' : 'Selecionar criança...'}</option>
+                {criancas.map(c => <option key={c.id} value={c.id}>{c.firstName} {c.lastName}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+              <select
+                value={novaObs.category}
+                onChange={e => setNovaObs(v => ({ ...v, category: e.target.value }))}
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                {Object.entries(CATEGORIAS).map(([k, c]) => <option key={k} value={k}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
+              <input type="date" value={novaObs.date} onChange={e => setNovaObs(v => ({ ...v, date: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Descrição do comportamento / observação *</label>
+            <textarea
+              value={novaObs.behaviorDescription}
+              onChange={e => setNovaObs(v => ({ ...v, behaviorDescription: e.target.value }))}
+              rows={3}
+              placeholder="Descreva o comportamento ou situação observada..."
+              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Alertas de desenvolvimento</label>
+              <textarea
+                value={novaObs.developmentAlerts}
+                onChange={e => setNovaObs(v => ({ ...v, developmentAlerts: e.target.value }))}
+                rows={2}
+                placeholder="Alertas relevantes (opcional)..."
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Recomendações</label>
+              <textarea
+                value={novaObs.recommendations}
+                onChange={e => setNovaObs(v => ({ ...v, recommendations: e.target.value }))}
+                rows={2}
+                placeholder="Recomendações pedagógicas (opcional)..."
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setMostrarFormObs(false)} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancelar</button>
+            <button
+              onClick={salvarNovaObs}
+              disabled={salvandoObs || !novaObs.childId || !novaObs.behaviorDescription.trim()}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-60 transition-colors"
+            >
+              {salvandoObs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Salvar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-5 space-y-3">
         <div className="flex items-center justify-between">

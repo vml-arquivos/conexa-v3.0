@@ -10,8 +10,9 @@ import http from '../api/http';
 import {
   Users, BookOpen, ClipboardList, ShoppingCart,
   CheckCircle, AlertCircle, ChevronRight,
-  Eye, ThumbsUp, MessageSquare, TrendingUp,
-  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2,
+  Eye, ThumbsUp, MessageSquare, MessageCircle, TrendingUp,
+  Bell, Star, Brain, GraduationCap, Plus, RefreshCw, BarChart2, FileText, ArrowRight,
+  Printer, Download,
 } from 'lucide-react';
 import { RecadosWidget } from '../components/recados/RecadosWidget';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,6 +22,24 @@ import { useUnitScope } from '../contexts/UnitScopeContext';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { TriangleAlert } from 'lucide-react';
+import { KPIGrid } from '../components/dashboard/KPIGrid';
+import { AtalhosExecutivos } from '../components/dashboard/AtalhosExecutivos';
+import { AlertasSection } from '../components/dashboard/AlertasSection';
+import { TurmasStatusToday } from '../components/dashboard/TurmasStatusToday';
+import { PendenciasAlert } from '../components/dashboard/PendenciasAlert';
+import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
+import { safeJsonParse } from '../lib/safeJson';
+// Módulos legados removidos - consolidados na home premium
+import { ActionRequiredBlock } from '../components/dashboard/ActionRequiredBlock';
+import { KPIExecutiveBlock } from '../components/dashboard/KPIExecutiveBlock';
+import { PedagogicalSupervisionBlock } from '../components/dashboard/PedagogicalSupervisionBlock';
+import { VitalSignsAlertsBlock } from '../components/dashboard/VitalSignsAlertsBlock';
+import { WorkQueueBlock } from '../components/dashboard/WorkQueueBlock';
+// Tarefa 2.6 — Recharts para gráficos de planejamentos e diários
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts';
 
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
@@ -41,6 +60,7 @@ interface Planejamento {
   turmaNome: string;
   templateNome?: string;
   objectives?: string;
+  description?: string;
   reviewComment?: string;
   createdByUser?: { id: string; firstName: string; lastName: string; email: string };
   classroom?: { id: string; name: string };
@@ -115,6 +135,20 @@ function PedagogicoSubNav({
             </div>
           ) : (
             diarios.map((diario: any) => {
+              const legacyTurma = diario['turmaNome'];
+              const legacyProfessor = diario['professorNome'];
+              const legacyData = diario['data'];
+              const turma = diario.classroom?.name || legacyTurma || '—';
+              const professor = diario.createdByUser
+                ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+                : legacyProfessor || '—';
+              const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+              const dataFmt = dataRaw
+                ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                  })
+                : '—';
               const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext as any : {};
               const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes((diario.status || '').toUpperCase());
               const execLabel = ctx.statusExecucaoPlano === 'CUMPRIDO' ? '✅ Cumprido'
@@ -137,10 +171,10 @@ function PedagogicoSubNav({
                         {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">{climaLabel}</span>}
                       </div>
                       <p className="text-sm font-semibold text-gray-800 truncate">
-                        {diario.classroom?.name || '—'}
-                        {diario.createdByUser && (
+                        {turma}
+                        {professor !== '—' && (
                           <span className="text-xs font-normal text-gray-400 ml-2">
-                            · {diario.createdByUser.firstName} {diario.createdByUser.lastName}
+                            · {professor}
                           </span>
                         )}
                       </p>
@@ -153,11 +187,19 @@ function PedagogicoSubNav({
                         <p className="text-xs text-gray-500 mt-1.5 italic truncate max-w-md">"{ctx.momentoDestaque}"</p>
                       )}
                     </div>
-                    <p className="text-xs font-semibold text-gray-400 flex-shrink-0">
-                      {diario.eventDate
-                        ? new Date(diario.eventDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                        : '—'}
-                    </p>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <p className="text-xs font-semibold text-gray-400">{dataFmt}</p>
+                      <button
+                        onClick={() => navigate(
+                          `/app/diario-calendario?classroomId=${
+                            diario.classroomId ?? diario.classroom?.id ?? ''
+                          }`
+                        )}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+                      >
+                        Ver →
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -247,8 +289,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [planejamentos, setPlanejamentos] = useState<Planejamento[]>([]);
-  const [diarios, setDiarios] = useState<Diario[]>([]);
-  const [abaAtiva, setAbaAtiva] = useState<'inicio'|'planejamentos'|'diarios'|'observacoes'|'sala'|'relatorios'|'cobertura'|'ocorrencias'|'pedagogico'>('inicio');
+  const [diarios, setDiarios] = useState<any[]>([]);
+  const [metricasExecucao, setMetricasExecucao] = useState<Record<string, {
+    total: number; publicados: number; comMatriz: number; comPlano: number;
+  }>>({});
   // Aba Cobertura
   interface CoberturaData {
     unitId: string; startDate: string; endDate: string;
@@ -272,7 +316,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [loadingCobertura, setLoadingCobertura] = useState(false);
   const apiCache = useApiCache(60_000);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const abaAtiva = (searchParams.get('aba') as any) ?? 'inicio';
+  function setAbaAtiva(novaAba: string) {
+    const novosParams = new URLSearchParams(searchParams.toString());
+    novosParams.set('aba', novaAba);
+    setSearchParams(novosParams, { replace: false });
+  }
   // FIX P1: usar selectedUnitId do contexto global como fallback para unitIdParam
   // Isso resolve o erro 403 quando STAFF_CENTRAL acessa sem unitId no token
   const { selectedUnitId: ctxUnitId } = useUnitScope();
@@ -288,7 +338,35 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   const [filtroPlanStatus, setFiltroPlanStatus] = useState<string>('TODOS');
   const [planExpandido, setPlanExpandido] = useState<string|null>(null);
   const [turmaExpandida, setTurmaExpandida] = useState<string | null>(null);
+  const [planoExpandido, setPlanoExpandido] = useState<string | null>(null);
+  const [filtroStatusPlanejamento, setFiltroStatusPlanejamento] = useState<string>('TODOS');
   const [erroPainel, setErroPainel] = useState<string | null>(null);
+  // FIX P4-3: filtros operacionais para a aba de diários da coordenação
+  const [filtroDiarioTurma, setFiltroDiarioTurma] = useState<string>('');
+  const [filtroDiarioStatus, setFiltroDiarioStatus] = useState<string>('TODOS');
+  const [filtroDiarioDataInicio, setFiltroDiarioDataInicio] = useState<string>('');
+  const [filtroDiarioDataFim, setFiltroDiarioDataFim] = useState<string>('');
+  const [filtroDiarioProfessor, setFiltroDiarioProfessor] = useState<string>('');
+  const ITENS_POR_PAGINA = 10;
+  const [paginaDiarios, setPaginaDiarios] = useState(1);
+
+  async function carregarDiarios() {
+    try {
+      const params: Record<string, string> = unitIdParam ? { unitId: unitIdParam } : {};
+      if (filtroDiarioDataInicio) params.startDate = `${filtroDiarioDataInicio}T00:00:00.000Z`;
+      if (filtroDiarioDataFim) params.endDate = `${filtroDiarioDataFim}T23:59:59.999Z`;
+      const res = await http.get('/coordenacao/diarios', { params });
+      const payload = res.data;
+      const listaDiarios = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.diarios) ? payload.diarios : []);
+      setDiarios(listaDiarios);
+      if (payload?.metricas) setMetricasExecucao(payload.metricas);
+    } catch {
+      setDiarios([]);
+      setMetricasExecucao({});
+    }
+  }
 
   // FIX P1: recarregar quando unitIdParam mudar (troca de unidade pelo seletor)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -296,6 +374,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   useEffect(() => { loadDashboardCb(); }, [loadDashboardCb]);
 
   useEffect(() => {
+    carregarDiarios();
+  }, [unitIdParam, filtroDiarioDataInicio, filtroDiarioDataFim]);
+
+  useEffect(() => {
+    setPaginaDiarios(1);
     if (abaAtiva === 'cobertura' && !cobertura) {
       carregarCobertura();
     }
@@ -325,11 +408,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   async function loadDashboard() {
     try {
       setLoading(true);
+      const diarioParams: Record<string, string> = unitIdParam ? { unitId: unitIdParam } : {};
+      if (filtroDiarioDataInicio) diarioParams.startDate = `${filtroDiarioDataInicio}T00:00:00.000Z`;
+      if (filtroDiarioDataFim) diarioParams.endDate = `${filtroDiarioDataFim}T23:59:59.999Z`;
       const [dashRes, reqRes, planRes, diarRes] = await Promise.allSettled([
         http.get('/coordenacao/dashboard/unidade', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/requisicoes', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
         http.get('/coordenacao/planejamentos', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
-        http.get('/coordenacao/diarios', { params: unitIdParam ? { unitId: unitIdParam } : {} }),
+        http.get('/coordenacao/diarios', { params: diarioParams }),
       ]);
       // Carregar alertas e resumo em paralelo (não bloqueante)
       const mes = new Date().toISOString().slice(0, 7);
@@ -375,6 +461,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               ?? '—',
             templateNome: ((p.template as Record<string, unknown> | null)?.name as string) ?? undefined,
             objectives: (p.objectives as string) ?? undefined,
+            description: (p.description as string) ?? undefined,
             reviewComment: (p.reviewComment as string) ?? undefined,
             createdByUser: (p.createdByUser as Planejamento['createdByUser']) ?? undefined,
             classroom: (p.classroom as Planejamento['classroom']) ?? undefined,
@@ -403,6 +490,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               ?? '—',
             templateNome: template?.name ?? undefined,
             objectives: (p.objectives as string) ?? undefined,
+            description: (p.description as string) ?? undefined,
             reviewComment: (p.reviewComment as string) ?? undefined,
             createdByUser: user as Planejamento['createdByUser'],
             classroom: classroom as Planejamento['classroom'],
@@ -411,25 +499,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         }));
       }
       if (diarRes.status === 'fulfilled') {
-        const rawDiarios: any[] = Array.isArray(diarRes.value.data) ? diarRes.value.data : [];
-        setDiarios(rawDiarios.map((d: any) => ({
-          id: d.id,
-          titulo: d.title ?? 'Diário de Bordo',
-          status: d.status ?? 'RASCUNHO',
-          climaEmocional: d.climaEmocional ?? d.aiContext?.climaEmocional ?? null,
-          presencas: d.presencas ?? d.aiContext?.presencas ?? null,
-          ausencias: d.ausencias ?? d.aiContext?.ausencias ?? null,
-          momentoDestaque: d.momentoDestaque ?? d.aiContext?.momentoDestaque ?? null,
-          statusExecucaoPlano: d.aiContext?.statusExecucaoPlano ?? null,
-          camposBNCC: d.aiContext?.planejamentoObjetivos
-            ? (d.aiContext.planejamentoObjetivos as any[]).map((o: any) => o.campoExperiencia).filter(Boolean)
-            : [],
-          data: d.eventDate ? d.eventDate.slice(0, 10) : d.createdAt?.slice(0, 10) ?? '',
-          professorNome: d.createdByUser
-            ? `${d.createdByUser.firstName} ${d.createdByUser.lastName}`.trim()
-            : d.createdBy ?? 'Professor',
-          turmaNome: d.classroom?.name ?? d.classroomId ?? '—',
-        })));
+        const payload = diarRes.value.data;
+        const listaDiarios = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload?.diarios) ? payload.diarios : []);
+        setDiarios(listaDiarios);
+        if (payload?.metricas) setMetricasExecucao(payload.metricas);
       }
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
@@ -448,8 +523,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       await http.post(`/plannings/${id}/aprovar`);
       toast.success('Planejamento aprovado! ✅');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
-    } catch {
-      toast.error('Erro ao aprovar');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao aprovar planejamento';
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
     } finally {
       setProcessando(null);
     }
@@ -463,7 +539,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       toast.success('Planejamento devolvido com observações');
       setPlanejamentos(prev => prev.filter(p => p.id !== id));
       setItemParaRejeitar(null); setMotivoRejeicao('');
-    } catch { toast.error('Erro ao devolver'); }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Erro ao devolver planejamento';
+      toast.error(Array.isArray(msg) ? msg[0] : msg);
+    }
     finally { setProcessando(null); }
   }
 
@@ -485,19 +564,81 @@ export default function DashboardCoordenacaoPedagogicaPage() {
   );
 
   const totalPendencias = (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0);
+  const primeiroNome = (((user?.nome as string) || 'Coordenação').trim().split(' ')[0]) || 'Coordenação';
+  const totalTurmasHoje = dashboard?.turmasLista?.length ?? dashboard?.turmas ?? 0;
+  const turmasComChamadaHoje = (dashboard?.turmasLista ?? []).filter(t => t.chamadaFeita).length;
+  const turmasPendentesHoje = Math.max(totalTurmasHoje - turmasComChamadaHoje, 0);
+  const diariosPublicados = diarios.filter(d => ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((d.status || '').toUpperCase())).length;
+  const diariosRascunho = diarios.filter(d => (d.status || '').toUpperCase() === 'RASCUNHO').length;
+  // MÓDULO 1: AVALIAÇÃO DO PLANO
+  const atalhosAvaliacao = [
+    {
+      label: 'Planejamentos',
+      desc: `${dashboard?.planejamentosParaRevisar ?? 0} aguardando revisão`,
+      icon: <BookOpen className="h-5 w-5" />,
+      className: 'from-amber-500 via-orange-500 to-rose-500',
+      action: () => setAbaAtiva('planejamentos'),
+    },
+    {
+      label: 'Diários da Turma',
+      desc: `${diariosPublicados} publicados · ${diariosRascunho} rascunho(s)`,
+      icon: <ClipboardList className="h-5 w-5" />,
+      className: 'from-sky-600 via-blue-600 to-indigo-700',
+      action: () => navigate('/app/diario-calendario'),
+    },
+    {
+      label: 'Relatórios',
+      desc: 'Indicadores e análises da unidade',
+      icon: <FileText className="h-5 w-5" />,
+      className: 'from-emerald-600 via-teal-600 to-cyan-700',
+      action: () => setAbaAtiva('relatorios'),
+    },
+  ] as const;
+
+  // MÓDULO 2: VISÃO 360° DA TURMA
+  const atalhosVisao360 = [
+    {
+      label: 'Atendimentos Pais',
+      desc: 'Registrar reuniões e gerar PDF',
+      icon: <MessageCircle className="h-5 w-5" />,
+      className: 'from-teal-500 via-emerald-500 to-green-600',
+      action: () => navigate('/app/atendimentos-pais'),
+    },
+  ] as const;
+
+  // MÓDULO 3: OCORRÊNCIAS E EVIDÊNCIAS
+  const atalhosOcorrencias = [
+    {
+      label: 'Pedidos de Material',
+      desc: canApprove ? `${dashboard?.requisicoesParaAnalisar ?? 0} aguardando aprovação` : 'Acompanhar pedidos',
+      icon: <ShoppingCart className="h-5 w-5" />,
+      className: 'from-rose-500 via-red-500 to-pink-600',
+      action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+    },
+    {
+      label: 'Ocorrências',
+      desc: 'Registrar e analisar ocorrências',
+      icon: <TriangleAlert className="h-5 w-5" />,
+      className: 'from-red-600 via-orange-600 to-yellow-600',
+      action: () => setAbaAtiva('ocorrencias'),
+    },
+  ] as const;
 
   const abas = [
-    { id: 'inicio',        label: 'Início',       icon: <Star className="h-4 w-4" /> },
-    { id: 'pedagogico',    label: 'Pedagógico',   icon: <Brain className="h-4 w-4" />, badge: dashboard?.diariosEstaSemana },
-    { id: 'planejamentos', label: 'Planejamentos', icon: <BookOpen className="h-4 w-4" />, badge: dashboard?.planejamentosParaRevisar },
-    { id: 'relatorios',    label: 'Relatórios',   icon: <TrendingUp className="h-4 w-4" /> },
-    { id: 'ocorrencias',   label: 'Ocorrências',  icon: <TriangleAlert className="h-4 w-4" /> },
+    { id: 'inicio',        label: 'Hoje',          icon: <Star className="h-4 w-4" />,
+      badge: (dashboard?.requisicoesParaAnalisar ?? 0) + (dashboard?.planejamentosParaRevisar ?? 0) || undefined },
+    { id: 'turmas',        label: 'Turmas',         icon: <Users className="h-4 w-4" /> },
+    { id: 'planejamentos', label: 'Planejamentos',  icon: <BookOpen className="h-4 w-4" />,
+      badge: dashboard?.planejamentosParaRevisar },
+    { id: 'relatorios',    label: 'Relatórios',     icon: <TrendingUp className="h-4 w-4" /> },
+    // PR 141: aba de ocorrências para a coordenação pedagógica
+    { id: 'ocorrencias',   label: 'Ocorrências',    icon: <TriangleAlert className="h-4 w-4" /> },
   ] as const;
 
   return (
     <PageShell
       title={`Painel da Coordenação Pedagógica`}
-      subtitle={`Bem-vindo, ${((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Acompanhe e apoie o trabalho dos professores.`}
+      subtitle={`Olá, ${primeiroNome}. Acompanhe diários, planejamentos, chamadas e pendências da unidade.`}
     >
       {/* Modal motivo rejeição */}
       {itemParaRejeitar && canApprove && (
@@ -521,19 +662,42 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         </div>
       )}
 
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4 flex-wrap">
+        <button
+          onClick={() => navigate('/app/teacher-dashboard')}
+          className="hover:text-gray-700 transition-colors"
+        >
+          Início
+        </button>
+        <ChevronRight className="h-3 w-3 flex-shrink-0" />
+        <button
+          onClick={() => setAbaAtiva('inicio')}
+          className="hover:text-gray-700 transition-colors"
+        >
+          Coordenação Pedagógica
+        </button>
+        {abaAtiva !== 'inicio' && (
+          <>
+            <ChevronRight className="h-3 w-3 flex-shrink-0" />
+            <span className="text-gray-600 font-medium capitalize">
+              {abaAtiva === 'turmas' ? 'Turmas' :
+               abaAtiva === 'planejamentos' ? 'Planejamentos' :
+               abaAtiva === 'relatorios' ? 'Relatórios' :
+               abaAtiva === 'ocorrencias' ? 'Ocorrências' :
+               abaAtiva === 'pedagogico' ? 'Pedagógico' :
+               abaAtiva === 'diarios' ? 'Diários' : abaAtiva}
+            </span>
+          </>
+        )}
+      </nav>
+
       {/* Alerta de pendências */}
-      {totalPendencias > 0 && (
-        <div className="mb-4 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-center gap-3">
-          <Bell className="h-6 w-6 text-orange-500 flex-shrink-0" />
-          <div>
-            <p className="font-bold text-orange-800">{totalPendencias} {totalPendencias === 1 ? 'item precisa' : 'itens precisam'} da sua atenção</p>
-            <p className="text-sm text-orange-600">
-              {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 ? `${dashboard?.requisicoesParaAnalisar} pedido(s) de material · ` : ''}
-              {(dashboard?.planejamentosParaRevisar ?? 0) > 0 ? `${dashboard?.planejamentosParaRevisar} planejamento(s) para revisar` : ''}
-            </p>
-          </div>
-        </div>
-      )}
+      <PendenciasAlert
+        totalPendencias={totalPendencias}
+        planejamentosParaRevisar={dashboard?.planejamentosParaRevisar ?? 0}
+        requisicoesParaAnalisar={dashboard?.requisicoesParaAnalisar ?? 0}
+      />
 
       {/* Banner modo leitura para Coordenação Geral */}
       {isCentralUser && (
@@ -571,194 +735,385 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
       {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
-        <div className="space-y-5">
+        <div className="space-y-8">
 
-          {/* Alertas automáticos calculados no dashboard (fallback) */}
-          {!loadingAlertas && (!alertasReais || alertasReais.total === 0) && dashboard?.alertas && (dashboard.alertas as any[]).length > 0 && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" /> Atenção hoje
-              </p>
-              <ul className="space-y-1">
-                {(dashboard.alertas as any[]).map((a: any, i: number) => (
-                  <li key={i} className="text-sm text-amber-700 flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0 mt-1.5" />
-                    {typeof a === 'string' ? a : (a.mensagem ?? JSON.stringify(a))}
-                  </li>
-                ))}
-              </ul>
+          {/* BLOCO 1: AÇÃO EXIGIDA */}
+          <ActionRequiredBlock
+            items={[
+              {
+                id: 'requisicoes',
+                type: 'requisicao',
+                title: 'Requisições Pendentes',
+                count: dashboard?.requisicoesParaAnalisar ?? 0,
+                subtitle: 'Aguardando análise',
+                color: 'bg-pink-600',
+                bgColor: 'bg-pink-50',
+                icon: <ShoppingCart className="h-5 w-5 text-pink-600" />,
+                action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+                actionLabel: 'Analisar',
+              },
+              {
+                id: 'planejamentos',
+                type: 'planejamento',
+                title: 'Planejamentos',
+                count: dashboard?.planejamentosParaRevisar ?? 0,
+                subtitle: 'Aguardando revisão',
+                color: 'bg-blue-600',
+                bgColor: 'bg-blue-50',
+                icon: <ClipboardList className="h-5 w-5 text-blue-600" />,
+                action: () => setAbaAtiva('planejamentos'),
+                actionLabel: 'Revisar',
+              },
+              {
+                id: 'atendimentos',
+                type: 'atendimento',
+                title: 'Atendimentos',
+                count: 0,
+                subtitle: 'Agendados para hoje',
+                color: 'bg-green-600',
+                bgColor: 'bg-green-50',
+                icon: <Users className="h-5 w-5 text-green-600" />,
+                action: () => {},
+                actionLabel: 'Ver agenda',
+              },
+              {
+                id: 'faltas',
+                type: 'faltas',
+                title: 'Alunos com Faltas',
+                count: 0,
+                subtitle: 'Faltas recorrentes',
+                color: 'bg-red-600',
+                bgColor: 'bg-red-50',
+                icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+                action: () => {},
+                actionLabel: 'Acompanhar',
+              },
+            ]}
+          />
+
+          {/* BLOCO 2: KPIs EXECUTIVOS */}
+          <KPIExecutiveBlock
+            items={[
+              {
+                id: 'diarios',
+                label: 'Diários Publicados',
+                value: diariosPublicados,
+                unit: `de ${Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho)}`,
+                trend: { value: 8, direction: 'up', label: 'vs ontem' },
+                color: 'text-blue-600',
+                icon: <BookOpen className="h-5 w-5 text-blue-600" />,
+                onClick: () => navigate('/app/diario-calendario'),
+              },
+              {
+                id: 'planejamentos-aprovados',
+                label: 'Planejamentos Aprovados',
+                value: `${Math.round(((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1) * 100)}%`,
+                trend: { value: 10, direction: 'up', label: 'vs semana' },
+                color: 'text-emerald-600',
+                icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,
+              },
+              {
+                id: 'frequencia',
+                label: 'Frequência Média',
+                value: '92%',
+                trend: { value: 4, direction: 'up', label: 'vs semana' },
+                color: 'text-purple-600',
+                icon: <BarChart2 className="h-5 w-5 text-purple-600" />,
+              },
+              {
+                id: 'alertas',
+                label: 'Alertas Críticos',
+                value: alertasReais?.total ?? 0,
+                trend: { value: 2, direction: 'down', label: 'vs ontem' },
+                color: 'text-red-600',
+                icon: <Bell className="h-5 w-5 text-red-600" />,
+              },
+            ]}
+          />
+
+          {/* BLOCO 3: FISCALIZAÇÃO PEDAGÓGICA */}
+          <PedagogicalSupervisionBlock
+            planningMetrics={[
+              { label: 'Aguardando Revisão', value: dashboard?.planejamentosParaRevisar ?? 0, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round(((dashboard?.planejamentosParaRevisar ?? 0) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0), color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Devolvidos', value: 0, color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Rascunho', value: 0, color: 'text-gray-600', bgColor: 'bg-gray-50' },
+            ]}
+            diaryMetrics={[
+              { label: 'Publicados', value: diariosPublicados, color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((diariosPublicados / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Rascunho', value: diariosRascunho, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round((diariosRascunho / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Sem Registro', value: Math.max(0, (dashboard?.turmas ?? 0) - diariosPublicados - diariosRascunho), color: 'text-red-600', bgColor: 'bg-red-50' },
+              { label: 'Total', value: Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho), color: 'text-blue-600', bgColor: 'bg-blue-50' },
+            ]}
+            classrooms={[
+              ...((dashboard?.turmasLista ?? []).map((turma: any) => ({
+                id: turma.id,
+                name: turma.nome,
+                professor: turma.professor || '—',
+                status: (turma.chamadaFeita ? 'on-time' : 'pending') as 'on-time' | 'pending' | 'critical',
+                planningStatus: 'approved' as const,
+                diaryStatus: 'published' as const,
+                frequency: 92,
+                onClick: () => navigate(`/app/turma/${turma.id}`),
+              })) ?? [])
+            ]}
+          />
+
+          {/* BLOCO 4: SINAIS VITAIS E ALERTAS */}
+          <VitalSignsAlertsBlock
+            alerts={[
+              {
+                id: 'faltas-recorrentes',
+                type: 'critical',
+                title: 'Alunos com Faltas Recorrentes',
+                count: 0,
+                description: 'Alunos com 5+ faltas no mês',
+                color: 'text-red-600',
+                bgColor: 'bg-red-100',
+                icon: <AlertCircle className="h-5 w-5 text-red-600" />,
+                onClick: () => {},
+              },
+              {
+                id: 'ocorrencias',
+                type: 'warning',
+                title: 'Aumento de Ocorrências',
+                count: alertasReais?.total ?? 0,
+                description: 'Comparado com período anterior',
+                color: 'text-amber-600',
+                bgColor: 'bg-amber-100',
+                icon: <TriangleAlert className="h-5 w-5 text-amber-600" />,
+                onClick: () => setAbaAtiva('ocorrencias'),
+              },
+              {
+                id: 'desenvolvimento',
+                type: 'warning',
+                title: 'Desenvolvimento Baixo',
+                count: 0,
+                description: 'Alunos com desenvolvimento < 50%',
+                color: 'text-amber-600',
+                bgColor: 'bg-amber-100',
+                icon: <Brain className="h-5 w-5 text-amber-600" />,
+                onClick: () => {},
+              },
+            ]}
+          />
+
+          {/* BLOCO 5: FILA DE TRABALHO */}
+          <WorkQueueBlock
+            items={[
+              ...(dashboard?.planejamentosParaRevisar ?? 0 > 0 ? [{
+                id: 'planejamento-1',
+                type: 'planejamento' as const,
+                title: 'Planejamento - Turma A',
+                subtitle: 'Aguardando revisão',
+                status: 'pending' as const,
+                priority: 'high' as const,
+                date: new Date().toLocaleDateString('pt-BR'),
+                onClick: () => setAbaAtiva('planejamentos'),
+              }] : []),
+              ...(dashboard?.requisicoesParaAnalisar ?? 0 > 0 ? [{
+                id: 'requisicao-1',
+                type: 'requisicao' as const,
+                title: 'Requisição de Material',
+                subtitle: 'Papel A4 - Turma B',
+                status: 'pending' as const,
+                priority: 'medium' as const,
+                date: new Date().toLocaleDateString('pt-BR'),
+                onClick: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
+              }] : []),
+            ]}
+          />
+
+          {/* MÓDULOS LEGADOS REMOVIDOS - Agora consolidados na home premium acima */}
+
+          {/* Recados */}
+          <RecadosWidget unitId={unitIdParam} />
+        </div>
+      )}
+      
+      {/* ABA: TURMAS — visão consolidada de todas as turmas da unidade */}
+      {abaAtiva === 'turmas' && (
+        <div className="space-y-4">
+
+          {/* Resumo pedagógico da semana */}
+          {dashboard && (
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  label: 'Diários esta semana',
+                  val: dashboard.diariosEstaSemana ?? (dashboard as any).indicadores?.diariosHoje ?? 0,
+                  icon: <ClipboardList className="h-4 w-4 text-blue-600" />,
+                  bg: 'bg-blue-50',
+                  onClick: () => setAbaAtiva('diarios' as any),
+                },
+                {
+                  label: 'Turmas com chamada',
+                  val: `${(dashboard as any).indicadores?.turmasComChamadaHoje ?? 0}/${(dashboard as any).indicadores?.totalTurmas ?? dashboard.turmas ?? 0}`,
+                  icon: <CheckCircle className="h-4 w-4 text-emerald-600" />,
+                  bg: 'bg-emerald-50',
+                  onClick: undefined as (() => void) | undefined,
+                },
+                {
+                  label: 'Cobertura hoje',
+                  val: (dashboard as any).indicadores?.diariosHoje > 0 ? `${(dashboard as any).indicadores.diariosHoje} reg.` : '—',
+                  icon: <BarChart2 className="h-4 w-4 text-purple-600" />,
+                  bg: 'bg-purple-50',
+                  onClick: () => { setCobertura(null); setPendencias(null); carregarCobertura(); },
+                },
+              ].map(c => (
+                <button
+                  key={c.label}
+                  onClick={c.onClick}
+                  disabled={!c.onClick}
+                  className={`${c.bg} rounded-2xl p-3 text-center ${c.onClick ? 'hover:opacity-90 cursor-pointer transition-opacity' : 'cursor-default'}`}
+                >
+                  <div className="flex justify-center mb-1">{c.icon}</div>
+                  <p className="text-lg font-bold text-gray-800">{c.val}</p>
+                  <p className="text-[11px] text-gray-500">{c.label}</p>
+                </button>
+              ))}
             </div>
           )}
 
-          {/* KPIs do dia */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { icon: <Users className="h-5 w-5 text-blue-600"/>,          bg: 'bg-blue-50',   val: dashboard?.turmas ?? 0,                                          label: 'Turmas' },
-              { icon: <Star className="h-5 w-5 text-purple-600"/>,         bg: 'bg-purple-50', val: dashboard?.professores ?? 0,                                     label: 'Professores' },
-              { icon: <TrendingUp className="h-5 w-5 text-green-600"/>,    bg: 'bg-green-50',  val: dashboard?.taxaPresencaMedia ? `${dashboard.taxaPresencaMedia}%` : '--', label: 'Chamadas hoje' },
-              { icon: <ClipboardList className="h-5 w-5 text-orange-600"/>,bg: 'bg-orange-50', val: dashboard?.diariosEstaSemana ?? 0,                               label: 'Diários esta semana' },
-            ].map((c, i) => (
-              <div key={i} className={`${c.bg} rounded-2xl border p-4 text-center`}>
-                <div className="flex justify-center mb-2">{c.icon}</div>
-                <p className="text-2xl font-bold text-gray-800">{c.val}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{c.label}</p>
+          {/* Lista de turmas com acesso rápido */}
+          <div className="space-y-2">
+            {(dashboard?.turmasLista ?? []).map(turma => (
+              <div key={turma.id}
+                className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-blue-200 transition-colors">
+                {/* Cabeçalho da turma */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-800 truncate">{turma.nome}</p>
+                      <p className="text-xs text-gray-400">
+                        {turma.totalAlunos} alunos · Prof. {turma.professor || '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                      turma.chamadaFeita
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
+                    </span>
+                  </div>
+                </div>
+                {/* Ações rápidas */}
+                <div className="grid grid-cols-5 gap-0 border-t border-gray-50">
+                  {[
+                    {
+                      label: 'Diários',
+                      color: 'text-blue-600',
+                      bg: 'hover:bg-blue-50',
+                      onClick: () => navigate(
+                        `/app/diario-calendario?classroomId=${turma.id}`
+                      ),
+                    },
+                    { label: 'Planos', path: `/app/planejamentos?classroomId=${turma.id}`, color: 'text-amber-600', bg: 'hover:bg-amber-50' },
+                    { label: 'RDIC', path: `/app/rdic-coord?classroomId=${turma.id}`, color: 'text-violet-600', bg: 'hover:bg-violet-50' },
+                    { label: 'Painel', path: `/app/turma/${turma.id}/painel`, color: 'text-teal-600', bg: 'hover:bg-teal-50' },
+                    { label: 'Obs.', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-pink-600', bg: 'hover:bg-pink-50' },
+                  ].map(item => (
+                    <button
+                      key={item.label}
+                      onClick={() => ('onClick' in item ? item.onClick() : navigate(item.path))}
+                      className={`py-2.5 text-[11px] font-semibold ${item.color} ${item.bg} transition-colors text-center border-r border-gray-50 last:border-0`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
 
-          {loadingAlertas && (
-            <Card className="rounded-2xl border-2 border-blue-200 bg-blue-50">
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2 text-blue-800"><AlertCircle className="h-5 w-5"/>Atualizando alertas</CardTitle></CardHeader>
-              <CardContent>
-                <p className="text-sm text-blue-700">Carregando alertas da unidade e resumo de diários...</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Alertas reais do banco */}
-          {alertasReais && alertasReais.total > 0 && (
-            <div className="space-y-2">
-              {alertasReais.criticos.length > 0 && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                  <p className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {alertasReais.criticos.length} alerta{alertasReais.criticos.length > 1 ? 's' : ''} crítico{alertasReais.criticos.length > 1 ? 's' : ''}
-                  </p>
-                  <ul className="space-y-1">
-                    {alertasReais.criticos.map((a: any) => (
-                      <li key={a.id} className="text-sm text-red-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
-                        <span><strong>{a.titulo}</strong> — {a.descricao}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {alertasReais.atencao.length > 0 && (
-                <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
-                  <p className="text-sm font-bold text-orange-800 mb-2 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" />
-                    {alertasReais.atencao.length} atenção
-                  </p>
-                  <ul className="space-y-1">
-                    {alertasReais.atencao.map((a: any) => (
-                      <li key={a.id} className="text-sm text-orange-700 flex items-start gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />
-                        {a.titulo}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          {/* Diários recentes da unidade */}
+          {diarios.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">
+                Diários recentes — todas as turmas
+              </p>
+              <div className="space-y-2">
+                {diarios.slice(0, 6).map((diario: any) => {
+                  const legacyTurma = diario['turmaNome'];
+                  const legacyProfessor = diario['professorNome'];
+                  const legacyData = diario['data'];
+                  const turmaNm = diario.classroom?.name || legacyTurma || '—';
+                  const professorNm = diario.createdByUser
+                    ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
+                    : legacyProfessor || '—';
+                  const dataRaw = diario.eventDate || legacyData || diario.createdAt || '';
+                  const dataFmt = dataRaw
+                    ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`)
+                        .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                    : '—';
+                  const ctx      = diario.aiContext && typeof diario.aiContext === 'object'
+                    ? diario.aiContext as any : {};
+                  const publicado = ['PUBLICADO','REVISADO','ARQUIVADO']
+                    .includes((diario.status || '').toUpperCase());
+                  return (
+                    <div key={diario.id}
+                      className={`rounded-xl border px-4 py-2.5 bg-white flex items-center justify-between gap-3 ${
+                        publicado ? 'border-emerald-100' : 'border-amber-100'
+                      }`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{turmaNm}</p>
+                        <p className="text-xs text-gray-400">
+                          {professorNm}
+                          {ctx.presencas != null && <span className="ml-2 text-emerald-600">· {ctx.presencas} pres.</span>}
+                          {ctx.climaEmocional && <span className="ml-1">· {ctx.climaEmocional}</span>}
+                        </p>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0">{dataFmt}</span>
+                    </div>
+                  );
+                })}
+                {diarios.length > 6 && (
+                  <button
+                    onClick={() => setAbaAtiva('diarios' as any)}
+                    className="w-full py-2 text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    Ver todos os {diarios.length} diários →
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Status das turmas hoje */}
-          {(dashboard?.turmasLista ?? []).length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-800">Status das Turmas — Hoje</p>
-                <button
-                  onClick={() => setAbaAtiva('pedagogico')}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  Ver pedagógico →
-                </button>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {(dashboard.turmasLista ?? []).map(turma => (
-                  <div key={turma.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Users className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{turma.nome}</p>
-                        <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
-                      </div>
+          {/* Cobertura inline */}
+          {cobertura && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2 px-1">Cobertura — hoje</p>
+              <div className="space-y-2">
+                {(cobertura.turmas ?? []).map((cls: any) => (
+                  <div key={cls.classroomId}
+                    className="bg-white rounded-xl border border-gray-100 px-4 py-2.5 flex items-center gap-3">
+                    <p className="text-sm font-medium text-gray-800 flex-1 truncate">{cls.classroomName}</p>
+                    <div className="w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
+                      <div
+                        className={`h-full rounded-full ${
+                          (cls.percentual ?? 0) >= 80 ? 'bg-emerald-500'
+                          : (cls.percentual ?? 0) >= 40 ? 'bg-amber-400'
+                          : 'bg-red-400'
+                        }`}
+                        style={{ width: `${Math.max(cls.percentual ?? 0, 2)}%` }}
+                      />
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
-                        turma.chamadaFeita ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
-                      </span>
-                      <button
-                        onClick={() => navigate(`/app/turma/${turma.id}/painel`)}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors"
-                      >
-                        Painel →
-                      </button>
-                    </div>
+                    <span className={`text-xs font-bold flex-shrink-0 ${
+                      (cls.percentual ?? 0) >= 80 ? 'text-emerald-600'
+                      : (cls.percentual ?? 0) >= 40 ? 'text-amber-600'
+                      : 'text-red-500'
+                    }`}>{cls.percentual ?? 0}%</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* Ações pendentes */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {(dashboard?.planejamentosParaRevisar ?? 0) > 0 && (
-              <button
-                onClick={() => setAbaAtiva('planejamentos')}
-                className="flex items-center gap-3 p-4 bg-amber-50 border-2 border-amber-200 rounded-2xl text-left hover:bg-amber-100 transition-all"
-              >
-                <span className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
-                  {dashboard?.planejamentosParaRevisar}
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-amber-800">Planejamentos</p>
-                  <p className="text-xs text-amber-600">aguardando revisão</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-amber-500 ml-auto" />
-              </button>
-            )}
-            {(dashboard?.requisicoesParaAnalisar ?? 0) > 0 && (
-              <button
-                onClick={() => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests')}
-                className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-2xl text-left hover:bg-red-100 transition-all"
-              >
-                <span className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0">
-                  {dashboard?.requisicoesParaAnalisar}
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-red-800">Pedidos de material</p>
-                  <p className="text-xs text-red-600">{canApprove ? 'aguardando aprovação' : 'para visualizar e analisar'}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-red-500 ml-auto" />
-              </button>
-            )}
-            <button
-              onClick={() => setAbaAtiva('pedagogico')}
-              className="flex items-center gap-3 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl text-left hover:bg-blue-100 transition-all"
-            >
-              <span className="w-10 h-10 bg-blue-500 text-white rounded-xl flex items-center justify-center flex-shrink-0">
-                <ClipboardList className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-blue-800">Pedagógico</p>
-                <p className="text-xs text-blue-600">{dashboard?.diariosEstaSemana ?? 0} diários esta semana</p>
-                {resumoDiarios && (
-                  <div className="flex gap-2 mt-1.5 flex-wrap">
-                    {resumoDiarios.climaEmocional?.BOM > 0 && (
-                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                        Bom: {resumoDiarios.climaEmocional.BOM}
-                      </span>
-                    )}
-                    {resumoDiarios.execucaoPlano?.CUMPRIDO > 0 && (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">
-                        Cumpridos: {resumoDiarios.execucaoPlano.CUMPRIDO}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              <ChevronRight className="h-4 w-4 text-blue-500 ml-auto flex-shrink-0" />
-            </button>
-          </div>
-
-          {/* Recados */}
-          <RecadosWidget unitId={unitIdParam} />
         </div>
       )}
 
@@ -773,12 +1128,31 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           CONCLUIDO:  { label: 'Concluído',  cor: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500' },
         };
 
-        // Agrupar por turma
+        // ─── Filtros de status — visão clara do que precisa de ação ────────────
+        const FILTROS_STATUS: Array<{ id: string; label: string; statuses: string[]; cor: string }> = [
+          { id: 'TODOS',     label: 'Todos',             statuses: [], cor: 'bg-gray-700' },
+          { id: 'ANALISE',   label: 'Aguardando análise', statuses: ['EM_REVISAO'],            cor: 'bg-yellow-500' },
+          { id: 'RASCUNHO',  label: 'Rascunhos',          statuses: ['RASCUNHO'],               cor: 'bg-gray-400' },
+          { id: 'DEVOLVIDO', label: 'Devolvidos',         statuses: ['DEVOLVIDO'],              cor: 'bg-orange-500' },
+          { id: 'APROVADO',  label: 'Aprovados',          statuses: ['APROVADO', 'PUBLICADO', 'CONCLUIDO'], cor: 'bg-green-500' },
+        ];
+
+        const contagemPorFiltro = (statuses: string[]) =>
+          statuses.length === 0
+            ? planejamentos.length
+            : planejamentos.filter(p => statuses.includes((p.status || '').toUpperCase())).length;
+
+        const filtroAtivo = FILTROS_STATUS.find(f => f.id === filtroStatusPlanejamento) ?? FILTROS_STATUS[0];
+        const planejamentosFiltrados = filtroAtivo.statuses.length === 0
+          ? planejamentos
+          : planejamentos.filter(p => filtroAtivo.statuses.includes((p.status || '').toUpperCase()));
+
+        // Agrupar por turma (após aplicar o filtro de status)
         const porTurma: Record<string, {
           turmaNome: string; professor: string;
           itens: typeof planejamentos;
         }> = {};
-        for (const p of planejamentos) {
+        for (const p of planejamentosFiltrados) {
           const chave = (p as any).classroom?.id || (p as any).classroomId || p.turmaNome || 'sem-turma';
           const nome  = (p as any).classroom?.name || p.turmaNome || chave;
           const prof  = (p as any).createdByUser
@@ -787,57 +1161,85 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           if (!porTurma[chave]) porTurma[chave] = { turmaNome: nome, professor: prof, itens: [] };
           porTurma[chave].itens.push(p);
         }
-        const grupos = Object.entries(porTurma);
-
-        // Contadores globais
-        const pendentes = planejamentos.filter(p =>
-          p.status === 'EM_REVISAO' || p.status === 'RASCUNHO' || p.status === 'DEVOLVIDO'
-        ).length;
+        // Ordena turmas alfabeticamente para navegação previsível
+        const grupos = Object.entries(porTurma).sort((a, b) => a[1].turmaNome.localeCompare(b[1].turmaNome));
 
         return (
-          <div className="space-y-3">
+          <div className="space-y-4">
 
             {/* Cabeçalho resumido */}
             <div className="flex items-center justify-between px-1">
               <div>
                 <p className="text-sm font-semibold text-gray-800">Planejamentos</p>
                 <p className="text-xs text-gray-400">
-                  {grupos.length} turma{grupos.length !== 1 ? 's' : ''} · {planejamentos.length} plano{planejamentos.length !== 1 ? 's' : ''}
+                  {grupos.length} turma{grupos.length !== 1 ? 's' : ''} · {planejamentosFiltrados.length} de {planejamentos.length} plano{planejamentos.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {pendentes > 0 && (
-                  <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-full border border-amber-200">
-                    {pendentes} pendente{pendentes !== 1 ? 's' : ''}
-                  </span>
-                )}
-                <button onClick={loadDashboard}
-                  className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              <button onClick={loadDashboard}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            {planejamentos.length === 0 ? (
+            {/* ─── Filtros de status — sempre visíveis, contagem ao vivo ────────── */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {FILTROS_STATUS.map(f => {
+                const ativo = filtroStatusPlanejamento === f.id;
+                const count = contagemPorFiltro(f.statuses);
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setFiltroStatusPlanejamento(f.id)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                      ativo
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    {!ativo && <span className={`inline-block w-1.5 h-1.5 rounded-full ${f.cor}`} />}
+                    {f.label}
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ativo ? 'bg-white/20' : 'bg-gray-100'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {planejamentosFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl border border-gray-100 gap-2">
                 <BookOpen className="h-10 w-10 text-gray-200" />
-                <p className="text-sm font-semibold text-gray-400">Nenhum planejamento</p>
+                <p className="text-sm font-semibold text-gray-400">
+                  {filtroAtivo.id === 'TODOS' ? 'Nenhum planejamento' : `Nenhum plano em "${filtroAtivo.label}"`}
+                </p>
+                {filtroAtivo.id !== 'TODOS' && (
+                  <button
+                    onClick={() => setFiltroStatusPlanejamento('TODOS')}
+                    className="text-xs text-indigo-600 hover:underline font-medium"
+                  >
+                    Ver todos os planejamentos
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
                 {grupos.map(([chave, grupo]) => {
                   const aberto = turmaExpandida === chave;
-                  const temPendente = grupo.itens.some(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
-                  );
-                  const countPendente = grupo.itens.filter(p =>
-                    ['EM_REVISAO','RASCUNHO','DEVOLVIDO'].includes(p.status || '')
-                  ).length;
+                  // Pendências sempre calculadas sobre o conjunto completo da turma (não filtrado)
+                  // para o coordenador nunca perder de vista o que falta, independente do filtro ativo
+                  const itensCompletosTurma = planejamentos.filter(p => {
+                    const c = (p as any).classroom?.id || (p as any).classroomId || p.turmaNome || 'sem-turma';
+                    return c === chave;
+                  });
+                  const countAnalise   = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'EM_REVISAO').length;
+                  const countRascunho  = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'RASCUNHO').length;
+                  const countDevolvido = itensCompletosTurma.filter(p => (p.status || '').toUpperCase() === 'DEVOLVIDO').length;
+                  const countAprovado  = itensCompletosTurma.filter(p => ['APROVADO','PUBLICADO','CONCLUIDO'].includes((p.status || '').toUpperCase())).length;
 
                   return (
                     <div key={chave} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
 
-                      {/* Header da turma — sempre visível */}
+                      {/* Header da turma — sempre visível, com resumo claro por status */}
                       <button
                         onClick={() => setTurmaExpandida(aberto ? null : chave)}
                         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
@@ -851,29 +1253,56 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             <p className="text-xs text-gray-400 truncate">Prof. {grupo.professor}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                          <span className="text-xs text-gray-400">
-                            {grupo.itens.length} plano{grupo.itens.length !== 1 ? 's' : ''}
-                          </span>
-                          {temPendente && (
-                            <span className="text-[11px] bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-200">
-                              {countPendente} pendente{countPendente !== 1 ? 's' : ''}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2 flex-wrap justify-end">
+                          {countAnalise > 0 && (
+                            <span className="text-[10px] bg-yellow-100 text-yellow-700 font-bold px-1.5 py-0.5 rounded-full border border-yellow-200">
+                              {countAnalise} p/ análise
+                            </span>
+                          )}
+                          {countDevolvido > 0 && (
+                            <span className="text-[10px] bg-orange-100 text-orange-700 font-bold px-1.5 py-0.5 rounded-full border border-orange-200">
+                              {countDevolvido} devolvido{countDevolvido !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {countRascunho > 0 && (
+                            <span className="text-[10px] bg-gray-100 text-gray-600 font-bold px-1.5 py-0.5 rounded-full border border-gray-200">
+                              {countRascunho} rascunho{countRascunho !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {countAprovado > 0 && (
+                            <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full border border-green-200">
+                              {countAprovado} aprovado{countAprovado !== 1 ? 's' : ''}
                             </span>
                           )}
                           <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${aberto ? 'rotate-90' : ''}`} />
                         </div>
                       </button>
 
-                      {/* Lista de planos — só aparece quando expandido */}
+                      {/* Lista de planos da turma — respeitando o filtro de status ativo */}
                       {aberto && (
                         <div className="divide-y divide-gray-50 border-t border-gray-100">
-                          {grupo.itens.map(plan => {
-                            const cfg = STATUS_CFG[(plan.status || '').toUpperCase()] ?? STATUS_CFG.RASCUNHO;
+                          {grupo.itens.length === 0 ? (
+                            <div className="px-4 py-6 text-center">
+                              <p className="text-xs text-gray-400">Nenhum plano nesta turma para o filtro "{filtroAtivo.label}"</p>
+                            </div>
+                          ) : (
+                            grupo.itens.map(plan => {
+                            const statusPlano = (plan.status || '').toUpperCase();
+                            const cfg = STATUS_CFG[statusPlano] ?? STATUS_CFG.RASCUNHO;
                             const dataRaw = (plan as any).startDate || '';
                             const dataFmt = dataRaw
                               ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
                                   .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                               : '—';
+                            // Detecta formato V2 (planejamento por dia) para oferecer impressão dia a dia
+                            const v2Plan = safeJsonParse<{ version?: number; days?: Array<{ date: string }> }>(
+                              (plan as any).description, {}
+                            );
+                            const temDias = v2Plan?.version === 2 && Array.isArray(v2Plan.days) && v2Plan.days.length > 0;
+                            const planoAberto = planoExpandido === plan.id;
+                            // CORREÇÃO: o backend só aceita aprovação quando status === EM_REVISAO.
+                            // Mostrar o botão também em RASCUNHO causava erro 400 silencioso.
+                            const podeAprovarOuDevolver = canApprove && statusPlano === 'EM_REVISAO';
                             return (
                               <div key={plan.id} className="px-4 py-3 hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -893,7 +1322,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${cfg.dot}`} />
                                       {cfg.label}
                                     </span>
-                                    {canApprove && ['EM_REVISAO','RASCUNHO'].includes(plan.status || '') && (
+                                    {podeAprovarOuDevolver && (
                                       <>
                                         <button
                                           onClick={() => aprovarPlanejamento(plan.id)}
@@ -910,17 +1339,82 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                         </button>
                                       </>
                                     )}
+                                    {canApprove && statusPlano === 'RASCUNHO' && (
+                                      <span className="text-[10px] text-gray-400 italic px-1">
+                                        Aguardando envio do professor
+                                      </span>
+                                    )}
+                                    {/* Impressão / PDF — visualizar e imprimir o plano completo */}
                                     <button
-                                      onClick={() => navigate(`/app/planejamentos/${plan.id}`)}
+                                      onClick={() => gerarPDF(plan as any)}
+                                      title="Gerar PDF do plano completo"
+                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      <Download className="h-3 w-3" /> PDF
+                                    </button>
+                                    <button
+                                      onClick={() => imprimirPlanejamento(plan as any)}
+                                      title="Imprimir o plano completo"
+                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                    >
+                                      <Printer className="h-3 w-3" /> Imprimir
+                                    </button>
+                                    {/* Se o plano tem múltiplos dias, permite escolher imprimir por dia */}
+                                    {temDias && (
+                                      <button
+                                        onClick={() => setPlanoExpandido(planoAberto ? null : plan.id)}
+                                        title="Ver dias do plano para imprimir individualmente"
+                                        className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-700 font-medium px-2 py-1 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                                      >
+                                        Por dia <ChevronRight className={`h-3 w-3 transition-transform ${planoAberto ? 'rotate-90' : ''}`} />
+                                      </button>
+                                    )}
+                                    {/* Texto contextual: planos já aprovados não precisam de "revisão" novamente */}
+                                    <button
+                                      onClick={() => navigate(`/app/planejamento/${plan.id}/editar`)}
                                       className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
                                     >
-                                      Ver →
+                                      {['APROVADO', 'PUBLICADO', 'CONCLUIDO'].includes(statusPlano)
+                                        ? 'Visualizar →'
+                                        : 'Abrir revisão →'}
                                     </button>
                                   </div>
                                 </div>
+
+                                {/* Lista expansível de dias — impressão individual, dia a dia, sem cortar página */}
+                                {temDias && planoAberto && (
+                                  <div className="mt-2.5 pt-2.5 border-t border-gray-100 space-y-1.5">
+                                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                                      Imprimir por dia
+                                    </p>
+                                    {v2Plan.days!.map((day, idx) => (
+                                      <div key={day.date} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+                                        <span className="text-xs text-gray-600 font-medium">
+                                          Dia {idx + 1} — {day.date.split('-').reverse().join('/')}
+                                        </span>
+                                        <div className="flex gap-1.5 flex-shrink-0">
+                                          <button
+                                            onClick={() => gerarPDFDia(plan as any, day.date)}
+                                            title="Gerar PDF deste dia"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Download className="h-2.5 w-2.5" /> PDF
+                                          </button>
+                                          <button
+                                            onClick={() => imprimirPlanejamentoDia(plan as any, day.date)}
+                                            title="Imprimir apenas este dia"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                          >
+                                            <Printer className="h-2.5 w-2.5" /> Imprimir
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
-                          })}
+                          }))}
                         </div>
                       )}
                     </div>
@@ -964,6 +1458,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       })()}
 
 
+
       {/* ══════════════════════════════════════════════════════════════════
           ABA: PEDAGÓGICO (diários + turmas + cobertura)
       ══════════════════════════════════════════════════════════════════ */}
@@ -983,6 +1478,113 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ABA: DIÁRIOS */}
       {abaAtiva === 'diarios' && (
         <div className="space-y-4">
+
+          {/* Tarefa 2.6 — Gráficos Recharts: status dos diários e planejamentos */}
+          {(diarios.length > 0 || planejamentos.length > 0) && (() => {
+            // Dados para gráfico de pizza: status dos diários
+            const statusCount: Record<string, number> = {};
+            for (const d of diarios) {
+              const s = (d.status ?? 'RASCUNHO').toUpperCase();
+              statusCount[s] = (statusCount[s] ?? 0) + 1;
+            }
+            const CORES_STATUS: Record<string, string> = {
+              PUBLICADO: '#10b981', REVISADO: '#6366f1', ARQUIVADO: '#94a3b8',
+              RASCUNHO: '#f59e0b', DEVOLVIDO: '#ef4444',
+            };
+            const dadosPizza = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
+
+            // Dados para gráfico de barras: diários por turma (top 8)
+            const porTurma: Record<string, number> = {};
+            for (const d of diarios) {
+              const turma = d.classroom?.name ?? d.turmaNome ?? 'Sem turma';
+              porTurma[turma] = (porTurma[turma] ?? 0) + 1;
+            }
+            const dadosBarras = Object.entries(porTurma)
+              .sort(([,a],[,b]) => b - a)
+              .slice(0, 8)
+              .map(([name, total]) => ({ name: name.length > 12 ? name.slice(0,12)+'…' : name, total }));
+
+            // Dados para gráfico de planejamentos por status
+            const planStatus: Record<string, number> = {};
+            for (const p of planejamentos) {
+              const s = (p.status ?? 'RASCUNHO').toUpperCase();
+              planStatus[s] = (planStatus[s] ?? 0) + 1;
+            }
+            const CORES_PLAN: Record<string, string> = {
+              APROVADO: '#10b981', EM_REVISAO: '#6366f1', RASCUNHO: '#f59e0b',
+              DEVOLVIDO: '#ef4444', EM_EXECUCAO: '#3b82f6', CONCLUIDO: '#8b5cf6',
+            };
+            const dadosPlanPizza = Object.entries(planStatus).map(([name, value]) => ({ name, value }));
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Gráfico de barras: diários por turma */}
+                {dadosBarras.length > 0 && (
+                  <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Diários por turma</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={dadosBarras} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <Tooltip formatter={(v: any) => [v, 'Diários']} />
+                          <Bar dataKey="total" fill="#6366f1" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Gráfico de pizza: status dos diários */}
+                {dadosPizza.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos diários</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <PieChart>
+                          <Pie data={dadosPizza} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
+                            {dadosPizza.map((entry, i) => (
+                              <Cell key={i} fill={CORES_STATUS[entry.name] ?? '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, n: any) => [v, n]} />
+                          <Legend iconSize={10} wrapperStyle={{ fontSize: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Gráfico de pizza: status dos planejamentos */}
+                {dadosPlanPizza.length > 0 && (
+                  <Card className="lg:col-span-1">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos planejamentos</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <ResponsiveContainer width="100%" height={180}>
+                        <PieChart>
+                          <Pie data={dadosPlanPizza} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
+                            {dadosPlanPizza.map((entry, i) => (
+                              <Cell key={i} fill={CORES_PLAN[entry.name] ?? '#94a3b8'} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(v: any, n: any) => [v, n]} />
+                          <Legend iconSize={10} wrapperStyle={{ fontSize: '10px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Header com resumo */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {(() => {
@@ -1016,105 +1618,273 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             })()}
           </div>
 
+          {/* FIX P4-3: Filtros operacionais por turma, status, data e professor */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtrar diários</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Turma</label>
+                <input
+                  type="text"
+                  placeholder="Buscar turma..."
+                  value={filtroDiarioTurma}
+                  onChange={e => setFiltroDiarioTurma(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <select
+                  value={filtroDiarioStatus}
+                  onChange={e => setFiltroDiarioStatus(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                >
+                  <option value="TODOS">Todos</option>
+                  <option value="PUBLICADO">Publicado</option>
+                  <option value="RASCUNHO">Rascunho</option>
+                  <option value="REVISADO">Revisado</option>
+                  <option value="ARQUIVADO">Arquivado</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data início</label>
+                <input
+                  type="date"
+                  value={filtroDiarioDataInicio}
+                  onChange={e => setFiltroDiarioDataInicio(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data fim</label>
+                <input
+                  type="date"
+                  value={filtroDiarioDataFim}
+                  onChange={e => setFiltroDiarioDataFim(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Professor</label>
+                <input
+                  type="text"
+                  placeholder="Buscar professor..."
+                  value={filtroDiarioProfessor}
+                  onChange={e => setFiltroDiarioProfessor(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                />
+              </div>
+              <button
+                onClick={() => { setFiltroDiarioTurma(''); setFiltroDiarioStatus('TODOS'); setFiltroDiarioDataInicio(''); setFiltroDiarioDataFim(''); setFiltroDiarioProfessor(''); }}
+                className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          </div>
+
           {/* Lista de diários */}
-          {diarios.length === 0 ? (
+          {(() => {
+            const diariosFiltrados = (diarios as any[]).filter((d: any) => {
+              const turma = d.classroom?.name || d.turmaNome || '';
+              const professor = d.createdByUser
+                ? `${d.createdByUser.firstName ?? ''} ${d.createdByUser.lastName ?? ''}`.trim()
+                : d.professorNome || '';
+              const dataRaw = (d.eventDate || d.data || d.createdAt || '').substring(0, 10);
+              const status = (d.status || '').toUpperCase();
+              if (filtroDiarioTurma && !turma.toLowerCase().includes(filtroDiarioTurma.toLowerCase())) return false;
+              if (filtroDiarioProfessor && !professor.toLowerCase().includes(filtroDiarioProfessor.toLowerCase())) return false;
+              if (filtroDiarioStatus !== 'TODOS') {
+                const isPublicado = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
+                if (filtroDiarioStatus === 'PUBLICADO' && !isPublicado) return false;
+                if (filtroDiarioStatus === 'RASCUNHO' && status !== 'RASCUNHO') return false;
+                if (filtroDiarioStatus === 'REVISADO' && status !== 'REVISADO') return false;
+                if (filtroDiarioStatus === 'ARQUIVADO' && status !== 'ARQUIVADO') return false;
+              }
+              if (filtroDiarioDataInicio && dataRaw < filtroDiarioDataInicio) return false;
+              if (filtroDiarioDataFim && dataRaw > filtroDiarioDataFim) return false;
+              return true;
+            });
+            return diariosFiltrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
               <ClipboardList className="h-10 w-10 text-gray-200" />
-              <p className="text-sm text-gray-400 font-medium">Nenhum diário registrado neste período.</p>
+              <p className="text-sm text-gray-400">{diarios.length === 0 ? 'Nenhum diário registrado neste período.' : 'Nenhum diário encontrado com os filtros aplicados.'}</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {diarios.map((diario: any) => {
-                // Mapeamento robusto: suporta campos da API (title/eventDate/classroom.name)
-                // e campos do mapeamento local (titulo/data/turmaNome/professorNome)
-                const titulo    = diario.title    || diario.titulo    || '—';
-                const turma     = diario.classroom?.name || diario.turmaNome || '—';
+            <div className="space-y-3">
+              {diariosFiltrados.slice(0, paginaDiarios * ITENS_POR_PAGINA).map((diario: any) => {
+                const turma = diario.classroom?.name || diario.turmaNome || '—';
                 const professor = diario.createdByUser
                   ? `${diario.createdByUser.firstName ?? ''} ${diario.createdByUser.lastName ?? ''}`.trim()
                   : diario.professorNome || '—';
-                const dataRaw   = diario.eventDate || diario.data || diario.createdAt || '';
-                const dataFmt   = dataRaw
-                  ? new Date(dataRaw.includes('T') ? dataRaw : dataRaw + 'T12:00:00')
-                      .toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                const dataRaw = diario.eventDate || diario.data || diario.createdAt || '';
+                const dataFmt = dataRaw
+                  ? new Date(dataRaw.includes('T') ? dataRaw : `${dataRaw}T12:00:00`).toLocaleDateString('pt-BR', {
+                    weekday: 'short', day: '2-digit', month: '2-digit',
+                  })
                   : '—';
-                const status    = (diario.status || '').toUpperCase();
-                const ctx       = diario.aiContext && typeof diario.aiContext === 'object'
+                const status = (diario.status || '').toUpperCase();
+                const ctx = diario.aiContext && typeof diario.aiContext === 'object'
                   ? diario.aiContext as any : {};
-                const climaEmocional = diario.climaEmocional || ctx.climaEmocional;
-                const presencas      = diario.presencas ?? ctx.presencas;
-                const momentoDest    = diario.momentoDestaque || ctx.momentoDestaque;
-                const statusExec     = diario.statusExecucaoPlano || ctx.statusExecucaoPlano;
-                const camposBNCC     = (diario.camposBNCC ?? []) as string[];
+                const publicado = ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes(status);
 
-                const statusPubl = ['PUBLICADO','REVISADO','ARQUIVADO'].includes(status);
-                const statusCfg  = statusPubl
-                  ? { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Publicado' }
-                  : { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   label: 'Rascunho'  };
+                const entrada = diario.curriculumEntry;
+                const campo = entrada?.campoDeExperiencia?.replace(/_/g, ' ') ?? null;
+                const bncc = entrada?.objetivoBNCC ?? null;
+                const curricDF = entrada?.objetivoCurriculo ?? null;
+                const intenc = entrada?.intencionalidade ?? null;
+                const codigoBNCC = entrada?.objetivoBNCCCode ?? null;
 
-                const climaEmoji: Record<string, string> = {
-                  OTIMO: '🌟', MUITO_BOM: '🌟', BOM: '😊', REGULAR: '😐', AGITADO: '😬', DIFICIL: '😔',
+                const conferencia = diario.conferencia;
+                const plano = diario.planning;
+                const execStatus = ctx.statusExecucaoPlano || conferencia?.status || null;
+
+                const EXEC_CFG: Record<string, { label: string; bg: string; text: string }> = {
+                  CUMPRIDO: { label: 'Cumprido', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                  FEITO: { label: 'Feito', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                  PARCIAL: { label: 'Parcial', bg: 'bg-amber-50', text: 'text-amber-700' },
+                  NAO_REALIZADO: { label: 'Não realizado', bg: 'bg-red-50', text: 'text-red-700' },
                 };
-                const execLabel: Record<string, { label: string; cor: string }> = {
-                  CUMPRIDO:      { label: 'Cumprido',     cor: 'bg-emerald-100 text-emerald-700' },
-                  PARCIAL:       { label: 'Parcial',      cor: 'bg-amber-100 text-amber-700'    },
-                  NAO_REALIZADO: { label: 'Não realizado', cor: 'bg-red-100 text-red-600'        },
+                const execCfg = execStatus ? (EXEC_CFG[execStatus] ?? null) : null;
+
+                const CLIMA: Record<string, string> = {
+                  OTIMO: 'Ótimo', BOM: 'Bom', REGULAR: 'Regular', AGITADO: 'Agitado', DIFICIL: 'Difícil',
                 };
+
+                const metricasTurma = metricasExecucao[diario.classroomId] ?? null;
 
                 return (
-                  <div key={diario.id}
-                    className={`rounded-2xl border p-3 bg-white ${statusCfg.border} hover:shadow-sm transition-all`}>
-                    <div className="flex items-start justify-between gap-2">
+                  <div
+                    key={diario.id}
+                    className={`rounded-2xl border bg-white overflow-hidden ${
+                      publicado ? 'border-emerald-200' : 'border-amber-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/70">
                       <div className="flex-1 min-w-0">
-                        {/* Badges */}
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}>
-                            {statusCfg.label}
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
+                            publicado
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {publicado ? 'Publicado' : 'Rascunho'}
                           </span>
-                          {climaEmocional && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-medium">
-                              {climaEmoji[climaEmocional] ?? ''} {climaEmocional}
+                          {execCfg && (
+                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execCfg.bg} ${execCfg.text}`}>
+                              Execução: {execCfg.label}
                             </span>
                           )}
-                          {statusExec && execLabel[statusExec] && (
-                            <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${execLabel[statusExec].cor}`}>
-                              📋 {execLabel[statusExec].label}
+                          {diario.curriculumEntryId && (
+                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              BNCC vinculada
                             </span>
                           )}
                         </div>
-                        {/* Turma e professor */}
-                        <p className="text-sm font-bold text-gray-800 truncate">{turma}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-sm font-bold text-gray-900 truncate">{turma}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
                           Prof. {professor}
-                          {presencas != null && (
-                            <span className="ml-2 text-emerald-600 font-medium">· {presencas} presentes</span>
+                          {diario.presencas != null && (
+                            <span className="ml-2 text-emerald-600 font-medium">· {diario.presencas} presentes</span>
+                          )}
+                          {diario.ausencias != null && (
+                            <span className="ml-2 text-rose-500 font-medium">· {diario.ausencias} ausências</span>
                           )}
                         </p>
-                        {/* Momento de destaque */}
-                        {(momentoDest || titulo !== '—') && (
-                          <p className="text-xs text-gray-500 mt-1.5 italic line-clamp-2">
-                            "{momentoDest || titulo}"
-                          </p>
-                        )}
-                        {camposBNCC.length > 0 && (
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            {camposBNCC.slice(0, 3).map((c: string, i: number) => (
-                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 border border-indigo-100 font-medium">
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        )}
                       </div>
-                      {/* Data */}
-                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">
-                        {dataFmt}
-                      </span>
+                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">{dataFmt}</span>
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      {(diario.momentoDestaque || diario.title) && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Registro</p>
+                          <p className="mt-1 text-sm text-gray-700 leading-6">
+                            {diario.momentoDestaque || diario.title}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">BNCC / Currículo</p>
+                          {entrada ? (
+                            <div className="mt-2 space-y-1.5 text-sm text-indigo-900">
+                              {campo && <p><span className="font-semibold">Campo:</span> {campo}</p>}
+                              {codigoBNCC && <p><span className="font-semibold">Código:</span> {codigoBNCC}</p>}
+                              {bncc && <p><span className="font-semibold">Objetivo BNCC:</span> {bncc}</p>}
+                              {curricDF && <p><span className="font-semibold">Currículo:</span> {curricDF}</p>}
+                              {intenc && <p><span className="font-semibold">Intencionalidade:</span> {intenc}</p>}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-indigo-700">Sem vínculo de BNCC neste diário.</p>
+                          )}
+                        </div>
+
+                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Conferência de execução</p>
+                          {plano ? (
+                            <div className="mt-2 space-y-1.5 text-sm text-emerald-900">
+                              <p><span className="font-semibold">Plano:</span> {plano.title}</p>
+                              <p><span className="font-semibold">Status do plano:</span> {plano.status}</p>
+                              {execCfg && <p><span className="font-semibold">Execução:</span> {execCfg.label}</p>}
+                              {conferencia?.observacao && <p><span className="font-semibold">Observação:</span> {conferencia.observacao}</p>}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-emerald-700">Diário sem planejamento vinculado.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Clima</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{CLIMA[diario.climaEmocional || ctx.climaEmocional] ?? '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Métrica turma</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.publicados}/${metricasTurma.total} publicados` : '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com BNCC</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comMatriz}/${metricasTurma.total}` : '—'}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com plano</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comPlano}/${metricasTurma.total}` : '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/app/diario-calendario?classroomId=${diario.classroomId ?? diario.classroom?.id ?? ''}`);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                          Ver diário completo
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
               })}
+
+              {diariosFiltrados.length > paginaDiarios * ITENS_POR_PAGINA && (
+                <button
+                  onClick={() => setPaginaDiarios(p => p + 1)}
+                  className="w-full py-3 text-sm text-blue-600 hover:bg-blue-50 rounded-2xl border border-blue-100 font-medium transition-colors mt-2"
+                >
+                  Carregar mais ({diariosFiltrados.length - paginaDiarios * ITENS_POR_PAGINA} restantes)
+                </button>
+              )}
             </div>
-          )}
+          );
+          })()
+          }
         </div>
       )}
       {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
@@ -1176,236 +1946,34 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       )}
 
       {/* ABA: RELATÓRIOS */}
+      {/* ABA: RELATÓRIOS */}
       {abaAtiva === 'relatorios' && (
-        <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-            <p className="text-sm font-semibold text-teal-800 mb-1">Relatórios de Desenvolvimento por Turma</p>
-            <p className="text-sm text-teal-700">
-              Selecione uma turma para visualizar o relatório consolidado de desenvolvimento, evolução e observações individuais de cada aluno.
-            </p>
-          </div>
-
-          {/* Acesso rápido por turma */}
-          <div className="grid grid-cols-1 gap-3">
-            {dashboard?.turmasLista?.map(turma => (
-              <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-teal-200 transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                      <Users className="h-5 w-5 text-teal-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{turma.nome}</p>
-                      <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor}</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {turma.chamadaFeita ? '✅ Chamada feita' : '⏳ Chamada pendente'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-purple-50 rounded-xl hover:bg-purple-100 transition-all">
-                    <Brain className="h-5 w-5 text-purple-600" />
-                    <span className="text-xs font-medium text-purple-700">Observações</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all">
-                    <GraduationCap className="h-5 w-5 text-indigo-600" />
-                    <span className="text-xs font-medium text-indigo-700">Atividades</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(`/app/rdic?classroomId=${turma.id}`)}
-                    className="flex flex-col items-center gap-1 p-3 bg-teal-50 rounded-xl hover:bg-teal-100 transition-all">
-                    <ClipboardList className="h-5 w-5 text-teal-600" />
-                    <span className="text-xs font-medium text-teal-700">RDICs</span>
-                  </button>
-                </div>
-              </div>
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400 px-1">Acesso direto aos relatórios da unidade</p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Diários por turma',     path: unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports',                         icon: <ClipboardList className="h-5 w-5 text-blue-600" />,   bg: 'bg-blue-50',   border: 'border-blue-100'   },
+              { label: 'Consumo de materiais',  path: unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais', icon: <ShoppingCart className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-50', border: 'border-orange-100' },
+              { label: 'Desenvolvimento',       path: unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil', icon: <Brain className="h-5 w-5 text-purple-600" />,        bg: 'bg-purple-50', border: 'border-purple-100' },
+              { label: 'RDICs publicados',      path: '/app/rdic-geral',                                                                           icon: <FileText className="h-5 w-5 text-teal-600" />,        bg: 'bg-teal-50',   border: 'border-teal-100'   },
+              { label: 'Requisições aprovadas', path: '/app/material-requests',                                                                    icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,  bg: 'bg-emerald-50',border: 'border-emerald-100' },
+              { label: 'Ocorrências',           path: '/app/ocorrencias',                                                                          icon: <TriangleAlert className="h-5 w-5 text-red-500" />,    bg: 'bg-red-50',    border: 'border-red-100'    },
+            ].map(item => (
+              <button key={item.label} onClick={() => navigate(item.path)}
+                className={`${item.bg} border ${item.border} rounded-2xl p-4 text-left hover:opacity-90 transition-opacity`}>
+                <div className="mb-2">{item.icon}</div>
+                <p className="text-sm font-semibold text-gray-800">{item.label}</p>
+              </button>
             ))}
           </div>
-
-          {/* Atalhos de relatórios gerais */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports')}
-              className="p-4 bg-white border-2 border-blue-100 rounded-2xl text-left hover:border-blue-300 hover:shadow-sm transition-all">
-              <TrendingUp className="h-6 w-6 text-blue-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Relatório de Diários</p>
-              <p className="text-xs text-gray-400">Por turma e período</p>
-            </button>
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais')}
-              className="p-4 bg-white border-2 border-orange-100 rounded-2xl text-left hover:border-orange-300 hover:shadow-sm transition-all">
-              <ShoppingCart className="h-6 w-6 text-orange-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Consumo de Materiais</p>
-              <p className="text-xs text-gray-400">Pedidos e gastos</p>
-            </button>
-            <button
-              onClick={() => navigate(unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil')}
-              className="p-4 bg-white border-2 border-purple-100 rounded-2xl text-left hover:border-purple-300 hover:shadow-sm transition-all">
-              <Brain className="h-6 w-6 text-purple-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">Desenvolvimento Infantil</p>
-              <p className="text-xs text-gray-400">Observações individuais</p>
-            </button>
-            <button
-              onClick={() => navigate('/app/rdic-geral')}
-              className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
-              <ClipboardList className="h-6 w-6 text-teal-600 mb-2" />
-              <p className="font-semibold text-sm text-gray-800">RDICs Publicados</p>
-              <p className="text-xs text-gray-400">Relatórios individuais</p>
-            </button>
-          </div>
         </div>
       )}
 
-      {/* ABA: COBERTURA DE REGISTROS */}
-      {abaAtiva === 'cobertura' && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-bold text-gray-700">Cobertura de Registros — Hoje</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Crianças com pelo menos 1 DiaryEvent registrado hoje</p>
-            </div>
-            <button
-              onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded" title="Atualizar">
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
-
-          {loadingCobertura ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Carregando cobertura...</div>
-          ) : (
-            <>
-              {/* Indicadores da Unidade */}
-              {cobertura && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-700">{cobertura.totalComRegistro}</p>
-                    <p className="text-xs text-blue-500 mt-1">Com registro hoje</p>
-                  </div>
-                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-700">{cobertura.totalCriancas}</p>
-                    <p className="text-xs text-gray-500 mt-1">Total de crianças</p>
-                  </div>
-                  <div className={`border rounded-xl p-4 text-center ${
-                    cobertura.percentualGeral >= 80 ? 'bg-green-50 border-green-200' :
-                    cobertura.percentualGeral >= 50 ? 'bg-yellow-50 border-yellow-200' :
-                    'bg-red-50 border-red-200'
-                  }`}>
-                    <p className={`text-2xl font-bold ${
-                      cobertura.percentualGeral >= 80 ? 'text-green-700' :
-                      cobertura.percentualGeral >= 50 ? 'text-yellow-700' : 'text-red-700'
-                    }`}>{cobertura.percentualGeral}%</p>
-                    <p className="text-xs text-gray-500 mt-1">Cobertura geral</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Barra de cobertura global */}
-              {cobertura && (
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">Cobertura da unidade hoje</span>
-                    <span className="text-sm font-bold text-gray-600">{cobertura.percentualGeral}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className={`h-3 rounded-full transition-all duration-700 ${
-                        cobertura.percentualGeral >= 80 ? 'bg-green-500' :
-                        cobertura.percentualGeral >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${cobertura.percentualGeral}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Por turma */}
-              {cobertura && cobertura.turmas.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-gray-700">Por turma</p>
-                  {cobertura.turmas.map(t => (
-                    <div key={t.classroomId} className="bg-white border border-gray-200 rounded-xl p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-sm text-gray-800">{t.classroomName}</span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          t.percentual >= 80 ? 'bg-green-100 text-green-700' :
-                          t.percentual >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>{t.criancasComRegistro}/{t.totalCriancas} · {t.percentual}%</span>
-                      </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${
-                            t.percentual >= 80 ? 'bg-green-500' :
-                            t.percentual >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${t.percentual}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Pendências */}
-              {pendencias && pendencias.totalPendentes > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                    <p className="text-sm font-semibold text-orange-700">
-                      {pendencias.totalPendentes} {pendencias.totalPendentes === 1 ? 'criança sem' : 'crianças sem'} registro hoje
-                    </p>
-                  </div>
-                  <div className="space-y-1.5">
-                    {pendencias.pendentes.map(p => (
-                      <div key={p.childId} className="flex items-center gap-3 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2">
-                        <div className="w-7 h-7 rounded-full bg-orange-200 flex items-center justify-center text-orange-700 text-xs font-bold flex-shrink-0">
-                          {p.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{p.nome}</p>
-                          <p className="text-xs text-gray-400">{p.classroomName}</p>
-                        </div>
-                        <span className="text-xs text-orange-500 font-medium">Sem registro</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {pendencias && pendencias.totalPendentes === 0 && (
-                <div className="text-center py-8 bg-green-50 border border-green-200 rounded-xl">
-                  <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
-                  <p className="font-semibold text-green-700">Todas as crianças têm registro hoje!</p>
-                  <p className="text-xs text-green-500 mt-1">Cobertura completa</p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Aba Ocorrências */}
+      {/* PR 141: ABA OCORRÊNCIAS — painel de ocorrências da unidade para a coordenação pedagógica */}
       {abaAtiva === 'ocorrencias' && (
-        <div className="space-y-4">
-          <OcorrenciasPanel titulo="Ocorrências da Unidade" unitId={unitIdParam} />
-        </div>
-      )}
-
-      {/* Widget de Recados */}
-      {abaAtiva === 'inicio' && (
-        <RecadosWidget
-          titulo="Recados para Professoras"
-          podeEnviar={true}
-          unitId={undefined}
-          turmas={dashboard?.turmasLista?.map(t => ({ id: t.id, name: t.nome })) ?? []}
+        <OcorrenciasPanel
+          titulo="Ocorrências da Unidade"
+          unitId={unitIdParam ?? user?.unitId ?? undefined}
         />
       )}
     </PageShell>

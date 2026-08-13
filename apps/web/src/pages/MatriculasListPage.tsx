@@ -228,8 +228,10 @@ export default function MatriculasListPage() {
                     className="flex items-center gap-3 flex-1 min-w-0 text-left touch-manipulation"
                   >
                     <ChildAvatar
-                      child={{ firstName: aluno.firstName, lastName: aluno.lastName, photoUrl: aluno.photoUrl }}
-                      sizeClassName="w-8 h-8"
+                      firstName={aluno.firstName}
+                      lastName={aluno.lastName}
+                      photoUrl={aluno.photoUrl ?? undefined}
+                      size="sm"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-700 truncate">

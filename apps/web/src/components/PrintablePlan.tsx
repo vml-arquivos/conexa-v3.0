@@ -461,7 +461,7 @@ export function buildPrintableHTML(plan: Planning): string {
   <div class="page">
     <!-- Cabeçalho -->
     <div class="header">
-      <div class="header-logo">Conexa — Sistema de Gestão Pedagógica</div>
+      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
       <div class="header-title">${plan.title}</div>
       <div class="header-subtitle">Planejamento de Aula — gerado em ${new Date().toLocaleDateString('pt-BR')}</div>
     </div>
@@ -509,7 +509,7 @@ export function buildPrintableHTML(plan: Planning): string {
 
     <!-- Rodapé -->
     <div class="footer">
-      <span>Conexa V3 — Sistema de Gestão Pedagógica</span>
+      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
       <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>
@@ -522,10 +522,280 @@ export function buildPrintableHTML(plan: Planning): string {
 </html>`;
 }
 
-// ─── Funções de ação ──────────────────────────────────────────────────────────
+/**
+ * Constrói o HTML imprimível de um único dia do planejamento.
+ * Reaproveita o mesmo layout visual do plano completo, mas filtra para
+ * mostrar apenas o dia selecionado — garante impressão em página única.
+ */
+export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
+  const rawDesc = (plan as any).description as string | undefined;
+  const v2 = safeJsonParse<PlanningV2>(rawDesc, {} as PlanningV2);
+  const isV2 = v2?.version === 2 && Array.isArray(v2.days);
+
+  const day = isV2 ? v2.days!.find((d) => d.date === dayDate) : null;
+  const dataFormatada = dayDate ? dayDate.split('-').reverse().join('/') : '';
+
+  const objetivosHTML =
+    day?.objectives && day.objectives.length > 0
+      ? `<div class="section">
+          <div class="section-title">Objetivos da Matriz Pedagógica 2026</div>
+          ${day.objectives
+            .map(
+              (obj) => `
+            <div class="objective-card">
+              <div class="obj-campo">${(obj.campoExperiencia || 'Não informado').replace(/_/g, ' ')}</div>
+              <div class="obj-codigo">Código BNCC: ${obj.codigoBNCC || 'Não informado'}</div>
+              <div class="obj-text"><strong>Objetivo BNCC:</strong> ${obj.objetivoBNCC || 'Não informado'}</div>
+              <div class="obj-text"><strong>Currículo em Movimento — DF:</strong> ${obj.objetivoCurriculoDF ?? obj.objetivoCurriculo ?? 'Não informado'}</div>
+              <div class="obj-text"><strong>Intencionalidade Pedagógica:</strong> ${obj.intencionalidadePedagogica ?? obj.intencionalidade ?? 'Não informado'}</div>
+              ${obj.exemploAtividade ? `<div class="obj-text"><strong>Exemplo de Atividade:</strong> ${obj.exemploAtividade}</div>` : ''}
+            </div>`,
+            )
+            .join('')}
+        </div>`
+      : '';
+
+  const atividadeHTML = day?.teacher?.atividade
+    ? `<div class="section">
+        <div class="section-title">Desenvolvimento da Atividade</div>
+        <div class="field-value">${day.teacher.atividade.replace(/\n/g, '<br>')}</div>
+      </div>`
+    : '';
+
+  const recursosHTML = day?.teacher?.recursos
+    ? `<div class="section">
+        <div class="section-title">Recursos / Materiais</div>
+        <div class="field-value">${day.teacher.recursos.replace(/\n/g, '<br>')}</div>
+      </div>`
+    : '';
+
+  const observacoesHTML = day?.teacher?.observacoes
+    ? `<div class="section">
+        <div class="section-title">Observações</div>
+        <div class="field-value">${day.teacher.observacoes.replace(/\n/g, '<br>')}</div>
+      </div>`
+    : '';
+
+  const conteudoDia = `
+    <div class="day-block" style="margin-bottom: 0;">
+      ${objetivosHTML}
+      ${atividadeHTML}
+      ${recursosHTML}
+      ${observacoesHTML}
+      ${!objetivosHTML && !atividadeHTML && !recursosHTML && !observacoesHTML
+        ? '<div class="section"><div class="field-value" style="color:#9ca3af;">Nenhum conteúdo registrado para este dia.</div></div>'
+        : ''}
+    </div>`;
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plano de Aula — ${dataFormatada} — ${plan.title}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      color: #1a1a1a;
+      background: #fff;
+      padding: 0;
+    }
+
+    .page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 28px 40px;
+    }
+
+    .header {
+      border-bottom: 3px solid #4f46e5;
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+
+    .header-logo {
+      font-size: 10pt;
+      color: #6366f1;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .header-title {
+      font-size: 17pt;
+      font-weight: 800;
+      color: #1e1b4b;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .header-subtitle {
+      font-size: 9pt;
+      color: #6b7280;
+    }
+
+    .day-pill {
+      display: inline-block;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 11pt;
+      font-weight: 700;
+      padding: 5px 16px;
+      border-radius: 999px;
+      margin-top: 8px;
+      letter-spacing: 0.3px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 24px;
+      background: #f8f9ff;
+      border: 1px solid #e0e7ff;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+
+    .meta-item { display: flex; flex-direction: column; gap: 2px; }
+    .meta-label { font-size: 8pt; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .meta-value { font-size: 10.5pt; color: #111827; font-weight: 500; }
+
+    .section { padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
+    .section:last-child { border-bottom: none; }
+    .section-title { font-size: 8.5pt; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .field-value { font-size: 10.5pt; color: #374151; line-height: 1.5; }
+
+    .objective-card { border-left: 3px solid #818cf8; padding: 6px 10px; margin-bottom: 7px; background: #f5f3ff; border-radius: 0 6px 6px 0; }
+    .objective-card:last-child { margin-bottom: 0; }
+    .obj-campo { font-size: 9pt; font-weight: 700; color: #4338ca; text-transform: uppercase; margin-bottom: 3px; }
+    .obj-codigo { font-size: 8pt; color: #6b7280; font-family: monospace; margin-bottom: 3px; }
+    .obj-text { font-size: 9.5pt; color: #374151; line-height: 1.45; margin-bottom: 2px; }
+
+    .footer {
+      margin-top: 20px;
+      padding-top: 10px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 8.5pt;
+      color: #9ca3af;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .action-bar {
+      position: fixed; top: 0; left: 0; right: 0;
+      background: #4f46e5; color: #fff;
+      padding: 10px 24px; display: flex; align-items: center; gap: 12px;
+      z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .action-bar span { flex: 1; font-size: 11pt; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn { padding: 7px 18px; border-radius: 6px; font-size: 10pt; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-print { background: #fff; color: #4f46e5; }
+    .btn-close { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* Garante que o conteúdo de UM dia caiba sempre em uma única página */
+    @media print {
+      .action-bar { display: none !important; }
+      body { padding: 0; }
+      .page { padding: 18px 28px; }
+      @page { size: A4; margin: 12mm; }
+    }
+
+    @media screen {
+      body { padding-top: 56px; background: #f3f4f6; }
+      .page { background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,0.08); margin: 24px auto; border-radius: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="action-bar">
+    <span>Plano de Aula — ${dataFormatada}</span>
+    <button class="btn btn-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+    <button class="btn btn-close" onclick="window.close()">Fechar</button>
+  </div>
+
+  <div class="page">
+    <div class="header">
+      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
+      <div class="header-title">${plan.title}</div>
+      <div class="header-subtitle">Plano de Aula do Dia</div>
+      <span class="day-pill">${dataFormatada}</span>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <span class="meta-label">Turma</span>
+        <span class="meta-value">${nomeTurma(plan)}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Professor(a)</span>
+        <span class="meta-value">${nomeProfessor(plan)}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Status do Planejamento</span>
+        <span class="meta-value"><span class="status-badge">${labelStatus(plan.status)}</span></span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Data</span>
+        <span class="meta-value">${dataFormatada}</span>
+      </div>
+    </div>
+
+    ${conteudoDia}
+
+    <div class="footer">
+      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
+      <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+    </div>
+  </div>
+
+  <script>window.focus();</script>
+</body>
+</html>`;
+}
 
 /**
- * Abre uma nova janela com o planejamento formatado para impressão/PDF.
+ * Abre uma nova janela com o plano de UM dia específico, formatado
+ * para impressão em página única.
+ */
+export function imprimirPlanejamentoDia(plan: Planning, dayDate: string): void {
+  const html = buildPrintableDayHTML(plan, dayDate);
+  const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+  if (!win) {
+    alert('Permita pop-ups para este site para usar a impressão.');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+/**
+ * Abre o plano de UM dia e dispara o diálogo de impressão diretamente.
+ */
+export function gerarPDFDia(plan: Planning, dayDate: string): void {
+  const html = buildPrintableDayHTML(plan, dayDate);
+  const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+  if (!win) {
+    alert('Permita pop-ups para este site para usar a geração de PDF.');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  win.onload = () => {
+    setTimeout(() => {
+      win.focus();
+      win.print();
+    }, 300);
+  };
+}
+
+/**
+ * Abre uma nova janela com o planejamento completo formatado para impressão/PDF.
  */
 export function imprimirPlanejamento(plan: Planning): void {
   const html = buildPrintableHTML(plan);

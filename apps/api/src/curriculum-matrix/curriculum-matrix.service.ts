@@ -293,6 +293,41 @@ export class CurriculumMatrixService {
     };
   }
 
+    /**
+   * Tarefa 3.4 — Ativar ou desativar uma matriz curricular
+   *
+   * Apenas MANTENEDORA, STAFF_CENTRAL e DEVELOPER podem ativar/desativar.
+   * Invalida o cache de matriz após a alteração.
+   */
+  async activate(id: string, isActive: boolean, user: JwtPayload) {
+    const matrix = await this.prisma.curriculumMatrix.findUnique({ where: { id } });
+    if (!matrix) throw new NotFoundException('Matriz curricular não encontrada');
+
+    const hasPermission = user.roles.some(
+      (r) =>
+        r.level === 'DEVELOPER' ||
+        r.level === 'MANTENEDORA' ||
+        r.level === 'STAFF_CENTRAL',
+    );
+    if (!hasPermission) {
+      throw new ForbiddenException('Você não tem permissão para ativar/desativar matrizes');
+    }
+
+    const updated = await this.prisma.curriculumMatrix.update({
+      where: { id },
+      data: { isActive: Boolean(isActive) },
+    });
+
+    await this.matrixCacheInvalidation.bump(matrix.mantenedoraId);
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      isActive: updated.isActive,
+      message: isActive ? 'Matriz ativada com sucesso' : 'Matriz desativada com sucesso',
+    };
+  }
+
   /**
    * Validar acesso do usuário
    */
@@ -300,7 +335,6 @@ export class CurriculumMatrixService {
     if (user.roles[0]?.level === 'DEVELOPER') {
       return; // Developer tem acesso total
     }
-
     // Todos os outros níveis podem visualizar, mas apenas criar/editar é restrito
     return;
   }

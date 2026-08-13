@@ -104,11 +104,7 @@ const MICRO_GESTURES: MicroGesture[] = [
 
 export default function MicroGesturePanel({ child, onRegister }: MicroGesturePanelProps) {
   const [selectedGesture, setSelectedGesture] = useState<string | null>(null);
-  const [lastRegisters, setLastRegisters] = useState<Array<{ type: string; time: string; action: string }>>([
-    { type: 'ALIMENTACAO', time: '10:30', action: 'Mamou' },
-    { type: 'FRALDA', time: '09:15', action: 'Trocou' },
-    { type: 'SONO', time: '08:00', action: 'Acordou' },
-  ]);
+  const [lastRegisters, setLastRegisters] = useState<Array<{ type: string; time: string; action: string }>>([]); 
   const [registering, setRegistering] = useState(false);
 
   const handleQuickRegister = async (gestureType: string, actionId?: string) => {

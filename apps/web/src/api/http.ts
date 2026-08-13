@@ -1,5 +1,11 @@
 import axios, { AxiosHeaders } from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import {
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  clearSession as clearTokenSession,
+} from './tokenStorage';
 
 // Validar VITE_API_URL obrigatório
 const baseURL = import.meta.env.VITE_API_URL;
@@ -21,6 +27,11 @@ type AuthExpiredAxiosError = AxiosError & {
   isAuthExpired?: boolean;
 };
 
+type RefreshAccessTokenResult = {
+  accessToken: string | null;
+  shouldLogout: boolean;
+};
+
 const http = axios.create({
   baseURL,
 });
@@ -29,13 +40,10 @@ const refreshClient = axios.create({
   baseURL,
 });
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<RefreshAccessTokenResult> | null = null;
 
 function clearSession() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  sessionStorage.clear();
-  document.cookie = 'access_token=; Max-Age=0; path=/';
+  clearTokenSession();
 }
 
 function redirectToLogin() {
@@ -45,9 +53,15 @@ function redirectToLogin() {
   }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem('refreshToken');
-  if (!refreshToken) return null;
+function isSessionExpiredStatus(status?: number): boolean {
+  return status === 401 || status === 403;
+}
+
+async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return { accessToken: null, shouldLogout: true };
+  }
 
   if (!refreshPromise) {
     refreshPromise = refreshClient
@@ -57,14 +71,19 @@ async function refreshAccessToken(): Promise<string | null> {
       .then((response) => {
         const newAccessToken = response.data?.accessToken || response.data?.access_token || response.data?.token;
         if (!newAccessToken) {
-          throw new Error('Resposta de refresh sem accessToken');
+          clearSession();
+          return { accessToken: null, shouldLogout: true };
         }
-        localStorage.setItem('accessToken', newAccessToken);
-        return newAccessToken as string;
+        setAccessToken(newAccessToken);
+        return { accessToken: newAccessToken as string, shouldLogout: false };
       })
-      .catch(() => {
-        clearSession();
-        return null;
+      .catch((refreshError) => {
+        const refreshStatus = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined;
+        if (isSessionExpiredStatus(refreshStatus)) {
+          clearSession();
+          return { accessToken: null, shouldLogout: true };
+        }
+        throw refreshError;
       })
       .finally(() => {
         refreshPromise = null;
@@ -77,7 +96,7 @@ async function refreshAccessToken(): Promise<string | null> {
 // Request interceptor: adiciona Bearer token
 http.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -116,17 +135,19 @@ http.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const newAccessToken = await refreshAccessToken();
+    const refreshResult = await refreshAccessToken();
 
-    if (!newAccessToken) {
-      error.isAuthExpired = true;
-      setTimeout(() => redirectToLogin(), 0);
+    if (!refreshResult.accessToken) {
+      if (refreshResult.shouldLogout) {
+        error.isAuthExpired = true;
+        setTimeout(() => redirectToLogin(), 0);
+      }
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
     originalRequest.headers = originalRequest.headers ?? new AxiosHeaders();
-    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+    originalRequest.headers.Authorization = `Bearer ${refreshResult.accessToken}`;
 
     return http(originalRequest);
   }

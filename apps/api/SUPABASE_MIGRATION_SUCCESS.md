@@ -18,11 +18,11 @@
 
 ```diff
  # Database
--DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
+-DATABASE_URL="postgresql://postgres:Marcelle@040410vm@db.ockzuvbnzfoqsiwmpixr.supabase.co:5432/postgres"
 +# Connection pooling (para queries da aplicação)
-+DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
++DATABASE_URL="postgresql://postgres.ockzuvbnzfoqsiwmpixr:Marcelle@040410vm@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 +# Direct connection (para migrações)
-+DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
++DIRECT_URL="postgresql://postgres.ockzuvbnzfoqsiwmpixr:Marcelle@040410vm@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
 ```
 
 ---
@@ -139,13 +139,13 @@ Database schema is up to date!
 ```bash
 # Database (Supabase)
 # Connection pooling - para queries da aplicação
-DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
+DATABASE_URL="postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
 # Direct connection - para migrações
-DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
+DIRECT_URL="postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres"
 
 # JWT
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
-JWT_REFRESH_SECRET=[CONFIGURE_NO_AMBIENTE]
+JWT_SECRET="your_jwt_secret_here_change_in_production"
+JWT_REFRESH_SECRET="your_refresh_secret_here_change_in_production"
 JWT_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 

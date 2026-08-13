@@ -510,14 +510,28 @@ export default function PainelInteligenciaPage() {
           </div>
         )}
 
-        {/* ── Estado inicial ── */}
+        {/* ── Estado inicial orientativo (Tarefa 1.4) ── */}
         {!turmaId && !loadingTurmas && (
-          <div className="text-center py-12">
-            <Sparkles className="h-12 w-12 mx-auto mb-3 text-indigo-200" />
-            <p className="text-sm font-semibold text-gray-600">Painel de Inteligência Pedagógica</p>
-            <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
-              Seleccione uma turma para começar a análise. Os dados são actualizados em tempo real.
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Brain className="h-12 w-12 text-indigo-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-700 mb-2">
+              Selecione uma turma para começar
+            </h3>
+            <p className="text-sm text-gray-500 max-w-sm mb-6">
+              Escolha a turma, depois a criança e o tipo de análise
+              para visualizar os indicadores de desenvolvimento.
             </p>
+            {/* Passos visuais */}
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 font-semibold flex-shrink-0">1</span>
+              <span>Selecione a turma</span>
+              <ChevronRight className="h-3 w-3 text-gray-300" />
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 font-semibold flex-shrink-0">2</span>
+              <span>Escolha a criança</span>
+              <ChevronRight className="h-3 w-3 text-gray-300" />
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 font-semibold flex-shrink-0">3</span>
+              <span>Tipo de análise</span>
+            </div>
           </div>
         )}
 

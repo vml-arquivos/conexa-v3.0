@@ -18,7 +18,7 @@ import {
   Sparkles, Lightbulb, Target, Clock, RefreshCw,
   CheckCircle, Users, Search, UserCircle, X, Brain, Heart, Apple, Star, AlertCircle,
   Camera, UploadCloud, Trash2, TriangleAlert, Pencil, ClipboardList,
-  WandSparkles, Loader2, Printer, ChevronRight, ArrowLeft, ChevronLeft, History,
+  WandSparkles, Loader2, Printer, ChevronRight, ArrowLeft, ChevronLeft, History, BarChart2,
 } from 'lucide-react';
 import { AlergiaAlert } from '../components/ui/AlergiaAlert';
 import { extractErrorMessage } from '../lib/utils';
@@ -54,6 +54,14 @@ interface DiaryEntry {
   status: string;
   createdAt: string;
   aiContext?: Record<string, any> | null;
+}
+
+function getDiaryEntryDate(diary: Pick<DiaryEntry, 'date' | 'createdAt'>) {
+  return (diary.date || diary.createdAt || '').substring(0, 10);
+}
+
+function isPublishedDiaryStatus(status?: string | null) {
+  return ['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes((status || '').toUpperCase());
 }
 
 interface Microgesto {
@@ -251,6 +259,43 @@ function normalizePlanningObjectives(raw: unknown) {
   return [] as any[];
 }
 
+function pickDiaryPdfValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (normalized && !['undefined', 'null'].includes(normalized.toLowerCase())) {
+        return normalized;
+      }
+    }
+  }
+  return undefined;
+}
+
+function resolveDiaryProfessorName(entry: Record<string, any>, ctx: Record<string, any>, fallback: string) {
+  return pickDiaryPdfValue(
+    entry?.professorNome,
+    entry?.teacherName,
+    entry?.createdByUser?.nome,
+    entry?.createdByUser?.name,
+    ctx?.professorNome,
+    ctx?.teacherName,
+    ctx?.teacher,
+    fallback,
+  ) ?? fallback;
+}
+
+function resolveDiaryTurmaNome(entry: Record<string, any>, ctx: Record<string, any>, fallback?: string) {
+  return pickDiaryPdfValue(
+    entry?.turmaNome,
+    entry?.classroomName,
+    entry?.classroom?.name,
+    ctx?.turmaNome,
+    ctx?.classroomName,
+    fallback,
+    'Turma',
+  ) ?? 'Turma';
+}
+
 function summarizePlanningObservation(planningTitle: string | undefined, observation: string) {
   const texto = observation.trim();
   if (!texto) return '';
@@ -307,6 +352,40 @@ function getInitialDiaryForm(dateFromQuery?: string) {
   };
 }
 
+function getDiaryFormFromEntry(entry: DiaryEntry) {
+  const ctx = entry.aiContext && typeof entry.aiContext === 'object' ? entry.aiContext as Record<string, any> : {};
+  const date = getDiaryEntryDate(entry) || getPedagogicalToday();
+
+  return {
+    ...getInitialDiaryForm(date),
+    date,
+    acolhidaInicial: ctx.acolhidaInicial || '',
+    climaEmocional: entry.climaEmocional || ctx.climaEmocional || 'BOM',
+    momentoDestaque: entry.momentoDestaque || ctx.momentoDestaque || '',
+    reflexaoPedagogica: entry.reflexaoPedagogica || ctx.reflexaoPedagogica || '',
+    encaminhamentos: entry.encaminhamentos || ctx.encaminhamentos || '',
+    presencas: entry.presencas ?? ctx.presencas ?? 0,
+    ausencias: entry.ausencias ?? ctx.ausencias ?? 0,
+    rotina: Array.isArray(ctx.rotina) && ctx.rotina.length > 0 ? ctx.rotina : ROTINA_PADRAO.map(r => ({ ...r })),
+    microgestos: Array.isArray(entry.microgestos) && entry.microgestos.length > 0 ? entry.microgestos : (Array.isArray(ctx.microgestos) ? ctx.microgestos : []),
+    criancasPresentes: Array.isArray(ctx.criancasPresentes) ? ctx.criancasPresentes : [],
+    execucaoPlanejamento: ctx.execucaoPlanejamento || '',
+    reacaoCriancas: ctx.reacaoCriancas || '',
+    fatoresInfluenciaram: Array.isArray(ctx.fatoresInfluenciaram) ? ctx.fatoresInfluenciaram : [],
+    avaliacoesObjetivos: Array.isArray(ctx.avaliacoesObjetivos) ? ctx.avaliacoesObjetivos : [],
+    adaptacoesRealizadas: ctx.adaptacoesRealizadas || '',
+    ocorrencias: ctx.ocorrencias || '',
+    statusExecucaoPlano: ctx.statusExecucaoPlano || '',
+    materiaisUtilizados: ctx.materiaisUtilizados || '',
+    textoComplementarProfessor: ctx.textoComplementarProfessor || '',
+    objetivoAtingido: ctx.objetivoAtingido || '',
+    oQueFuncionou: ctx.oQueFuncionou || '',
+    oQueNaoFuncionou: ctx.oQueNaoFuncionou || '',
+    avaliacaoPlanoAula: ctx.avaliacaoPlanoAula || '',
+    observacoesIndividuais: Array.isArray(ctx.observacoesIndividuais) ? ctx.observacoesIndividuais : [],
+  };
+}
+
 function getInitialAvaliacaoIndividualForm() {
   return {
     childIds: [] as string[],
@@ -340,9 +419,10 @@ function getPlanningObservationPreview(planningTitle: string | undefined, observ
   return resumo.length > 180 ? `${resumo.slice(0, 177)}...` : resumo;
 }
 
-function getCriancaNome(crianca?: Crianca) {
+function getCriancaNome(crianca?: Crianca | null) {
   if (!crianca) return 'Criança';
-  return `${crianca.firstName} ${crianca.lastName}`.trim();
+  const nome = `${crianca.firstName ?? ''} ${crianca.lastName ?? ''}`.trim();
+  return nome || 'Criança';
 }
 
 function getPlanningStatusLabel(status?: string) {
@@ -615,6 +695,12 @@ export default function DiarioBordoPage() {
   const navigate = useNavigate();
   const roles = normalizeRoles(user);
   const isDeveloper = roles.includes('DEVELOPER');
+  // Coordenação e gestão: acesso somente leitura ao diário (audita, não preenche)
+  const isApenasLeitura = !isDeveloper && (
+    roles.includes('UNIDADE') ||
+    roles.includes('STAFF_CENTRAL') ||
+    roles.includes('MANTENEDORA')
+  );
   const currentUserId = (user as any)?.id ?? (user as any)?.sub ?? '';
   const classroomIdFromQuery = searchParams.get('classroomId') ?? undefined;
   const childIdFromQuery = searchParams.get('childId') ?? undefined;
@@ -623,19 +709,25 @@ export default function DiarioBordoPage() {
   const abaFromQuery = searchParams.get('aba') as 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | null;
   // Se vier com ?aba=novo (via calendário) ou com ?date= (via chamada), abrir direto no formulário
   const abaInicial: 'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' =
-    (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
-  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias'>(abaInicial);
+    isApenasLeitura
+      ? 'lista'
+      : (abaFromQuery === 'novo' || (dateFromQuery && !abaFromQuery)) ? 'novo' : (abaFromQuery ?? 'lista');
+  const [aba, setAba] = useState<'lista' | 'novo' | 'microgestos' | 'observacoes' | 'ocorrencias' | 'fotos'>(abaInicial);
   const [diarios, setDiarios] = useState<DiaryEntry[]>([]);
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [gerandoIA, setGerandoIA] = useState(false);
   const [obsIndividualAberta, setObsIndividualAberta] = useState<string | null>(null);
+  // ── Estado das Observações Dinâmicas do Plano (Bloco 3.6) ──────────────────
+  const [obsDinamicasSelecionadas, setObsDinamicasSelecionadas] = useState<Record<string, string[]>>({});
+  const [obsPlanoAberta, setObsPlanoAberta] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO'>('TODOS');
-  const [filtroCrianca, setFiltroCrianca] = useState('');
-  const [filtroComportamento, setFiltroComportamento] = useState('');
+  const [filtroBusca, setFiltroBusca] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // ── Estado do Calendário Mensal ──────────────────────────────────────────────
@@ -644,6 +736,13 @@ export default function DiarioBordoPage() {
   const [calAno, setCalAno] = useState<number>(() => new Date().getFullYear());
   // Painel lateral: diário selecionado ao clicar em dia com diário
   const [painelDiario, setPainelDiario] = useState<DiaryEntry | null>(null);
+  // PR 141: ID do diário sendo editado — quando preenchido, salvarDiario usa PATCH em vez de POST
+  const [diarioEditandoId, setDiarioEditandoId] = useState<string | null>(null);
+  // AUDITORIA RETROATIVA: modal de justificativa obrigatória
+  const [modalJustificativaAberto, setModalJustificativaAberto] = useState(false);
+  const [justificativaRetroativa, setJustificativaRetroativa] = useState('');
+  const [modalJustificativaTipo, setModalJustificativaTipo] = useState<'ocorrencia' | 'registro' | ''>('');
+  const [pendingRetroativoAction, setPendingRetroativoAction] = useState<(() => void) | null>(null);
 
   // Formulário do Diário
   const [form, setForm] = useState(() => getInitialDiaryForm(dateFromQuery));
@@ -659,6 +758,7 @@ export default function DiarioBordoPage() {
   // Dados da turma e professor
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [childId, setChildId] = useState<string | undefined>();
+  const [turmaNomeAtual, setTurmaNomeAtual] = useState<string>('Turma');
   const [draftRegistry, setDraftRegistry] = useLocalStorage<Record<string, {
     form: ReturnType<typeof getInitialDiaryForm>;
     microgestoForm: { tipos: string[]; descricao: string; campo: string; horario: string; criancasSelecionadas: string[] };
@@ -672,6 +772,8 @@ export default function DiarioBordoPage() {
   // Chamada do dia pré-carregada para preencher presenças automaticamente
   const [chamadaCarregada, setChamadaCarregada] = useState(false);
   const [chamadaInfo, setChamadaInfo] = useState<{ presentes: number; ausentes: number; total: number } | null>(null);
+  // Controla visibilidade do banner de rascunho após clicar em "Continuar"
+  const [rascunhoJaCarregado, setRascunhoJaCarregado] = useState(false);
   // Planejamento aprovado do dia
   const [planejamentoHoje, setPlanejamentoHoje] = useState<{
     id: string;
@@ -687,6 +789,15 @@ export default function DiarioBordoPage() {
     // Vínculo com matriz curricular — necessário para registrar ocorrências
     curriculumMatrixId?: string;
     curriculumEntryId?: string; // entrada da matriz para o dia de hoje
+    // Observações dinâmicas geradas pelo backend ao aprovar o plano
+    observacoesTemplate?: Array<{
+      id: string;
+      label: string;
+      emoji: string;
+      grupo: string;
+      origemObjetivo?: string;
+      campoExperiencia?: string;
+    }>;
   } | null>(null);
 
   // Ocorrências
@@ -847,6 +958,14 @@ export default function DiarioBordoPage() {
   async function salvarOcorrencia() {
     if (!criancaSelecionadaOcorr) { toast.error('Selecione uma criança'); return; }
     if (!ocorrForm.descricao.trim()) { toast.error('Descreva a ocorrência'); return; }
+    // AUDITORIA: ocorrência retroativa exige justificativa
+    if (isDataRetroativa(ocorrForm.eventDate)) {
+      solicitarJustificativa('ocorrencia', () => executarSalvarOcorrencia());
+      return;
+    }
+    await executarSalvarOcorrencia();
+  }
+  async function executarSalvarOcorrencia() {
     setSavingOcorr(true);
     try {
       // Resolver classroomId: usar o do estado ou buscar a primeira turma acessível
@@ -1067,6 +1186,7 @@ export default function DiarioBordoPage() {
         : turmas[0];
       const cid = turmaInicial.id;
       setClassroomId(cid);
+      setTurmaNomeAtual(turmaInicial.name || 'Turma');
 
       // Buscar crianças matriculadas na turma
       let lista: Crianca[] = [];
@@ -1156,6 +1276,14 @@ export default function DiarioBordoPage() {
           let objetivosMatriz: Array<Record<string, any>> = [];
           let intencionalidadeGeral = '';
           let recursos = '';
+          let observacoesTemplate: Array<{
+            id: string;
+            label: string;
+            emoji: string;
+            grupo: string;
+            origemObjetivo?: string;
+            campoExperiencia?: string;
+          }> = [];
           try {
             const detailRes = await http.get(`/plannings/${activePlan.planningId}`);
             const planHoje = detailRes.data;
@@ -1165,6 +1293,7 @@ export default function DiarioBordoPage() {
               ?? planHoje.content,
             );
             const day0 = pedagogicalContent.days?.[0] ?? {};
+            observacoesTemplate = Array.isArray(planHoje.observacoesTemplate) ? planHoje.observacoesTemplate : [];
             const parsedObjectives = normalizePlanningObjectives(
               day0.objectives
               ?? planHoje.objectives
@@ -1233,6 +1362,8 @@ export default function DiarioBordoPage() {
             curriculumMatrixId: undefined,
             // curriculumEntryId vem do endpoint active-today (opcional — não bloqueia o botão)
             curriculumEntryId: activePlan.curriculumEntryId,
+            // Observações dinâmicas geradas ao aprovar o plano
+            observacoesTemplate,
           });
         }
       } catch {
@@ -1249,13 +1380,25 @@ export default function DiarioBordoPage() {
   async function loadDiarios() {
     setLoading(true);
     try {
-      const res = await http.get('/diary-events?limit=50&type=ATIVIDADE_PEDAGOGICA');
+      const res = await http.get('/diary-events', {
+        params: {
+          limit: '50',
+          type: 'ATIVIDADE_PEDAGOGICA',
+          pedagogicalOnly: 'true',
+        },
+      });
       const d = res.data;
       const raw: any[] = Array.isArray(d) ? d : d?.data ?? [];
+      const semFimDeSemana = raw.filter((item: any) => {
+        const dataStr = (item.eventDate || item.date || item.createdAt || '').substring(0, 10);
+        if (!dataStr) return false;
+        const diaSemana = new Date(`${dataStr}T12:00:00`).getDay();
+        return diaSemana !== 0 && diaSemana !== 6;
+      });
       // BUG B FIX: O modelo DiaryEvent não possui campos raiz presencas/ausencias.
       // Esses valores são persistidos dentro do campo JSONB aiContext.
       // Mapear aiContext para campos raiz para exibição consistente na lista.
-      const mapped = raw.map((item: any) => {
+      const mapped = semFimDeSemana.map((item: any) => {
         const ctx = item.aiContext && typeof item.aiContext === 'object' ? item.aiContext : {};
         return {
           ...item,
@@ -1264,6 +1407,8 @@ export default function DiarioBordoPage() {
           climaEmocional: item.climaEmocional ?? ctx.climaEmocional ?? '',
           momentoDestaque: item.momentoDestaque ?? ctx.momentoDestaque ?? item.description ?? '',
           reflexaoPedagogica: item.reflexaoPedagogica ?? ctx.reflexaoPedagogica ?? item.developmentNotes ?? '',
+          // FIX P4-2: mapear observations (campo do backend) para encaminhamentos (campo do frontend)
+          encaminhamentos: item.encaminhamentos ?? ctx.encaminhamentos ?? item.observations ?? '',
           rotina: item.rotina ?? ctx.rotina ?? [],
           microgestos: item.microgestos ?? ctx.microgestos ?? [],
         };
@@ -1449,6 +1594,7 @@ export default function DiarioBordoPage() {
     setForm({ ...getInitialDiaryForm(dateFromQuery), ...currentDraft.form, date: currentDraft.form?.date || form.date });
     setMicrogestoForm({ ...currentDraft.microgestoForm });
     setAvaliacaoIndividualForm({ ...getInitialAvaliacaoIndividualForm(), ...currentDraft.avaliacaoIndividualForm });
+    setRascunhoJaCarregado(true);
     setAba('novo');
     toast.success('Rascunho carregado para continuar a edição.');
   }
@@ -1465,9 +1611,40 @@ export default function DiarioBordoPage() {
     toast.success('Rascunho descartado.');
   }
 
+  function isDataRetroativa(data: string): boolean {
+    return data < getPedagogicalToday();
+  }
+  function solicitarJustificativa(
+    tipo: 'ocorrencia' | 'registro',
+    acao: () => void,
+  ) {
+    setModalJustificativaTipo(tipo);
+    setJustificativaRetroativa('');
+    setPendingRetroativoAction(() => acao);
+    setModalJustificativaAberto(true);
+  }
+  async function confirmarJustificativa() {
+    if (!justificativaRetroativa.trim()) {
+      toast.error('A justificativa é obrigatória para esta edição auditada.');
+      return;
+    }
+    pendingRetroativoAction?.();
+    setModalJustificativaAberto(false);
+    setJustificativaRetroativa('');
+    setPendingRetroativoAction(null);
+  }
+
   async function salvarDiario() {
-    if (!chamadaCarregada) {
+    if (!chamadaCarregada && !isDataRetroativa(form.date)) {
       toast.error('Realize a Chamada do Dia antes de abrir e salvar o Diário do Dia.');
+      return;
+    }
+    // GATE 2 (segurança produção): plano de aula aprovado obrigatório para publicação
+    if (!planejamentoHoje) {
+      toast.error(
+        'Publicação bloqueada: nenhum plano de aula aprovado vinculado a hoje. ' +
+        'Solicite à coordenação aprovar o planejamento antes de publicar o diário.',
+      );
       return;
     }
     if (!form.momentoDestaque.trim() && !form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
@@ -1486,8 +1663,12 @@ export default function DiarioBordoPage() {
       toast.error('Seleccione o status de execução do plano do dia: CUMPRIDO, PARCIAL ou NÃO REALIZADO.');
       return;
     }
-    if (!form.avaliacaoPlanoAula.trim() && !form.reflexaoPedagogica.trim()) {
-      toast.error('Preencha a Avaliação do Plano de Aula antes de salvar. Use o botão "Gerar com IA" ou escreva diretamente.');
+    // GATE 3 (segurança produção): avaliação da execução obrigatória para publicação
+    if (!form.avaliacaoPlanoAula.trim()) {
+      toast.error(
+        'Preencha a Avaliação do Plano de Aula antes de publicar. ' +
+        'Use o botão "Gerar com IA" ou escreva diretamente no campo.',
+      );
       return;
     }
     // BUG F FIX: Bloquear registro de diário em fins de semana (dias não letivos)
@@ -1510,46 +1691,28 @@ export default function DiarioBordoPage() {
         : (criancas.length > 0 ? criancas.length - presencasReais : form.ausencias);
 
       if (!classroomId || !childId) {
-        // Modo offline/demo: salva localmente
-        const localEntry = {
-          id: Date.now().toString(),
-          date: form.date,
-          climaEmocional: form.climaEmocional,
-          momentoDestaque: form.momentoDestaque,
-          reflexaoPedagogica: form.reflexaoPedagogica,
-          encaminhamentos: form.encaminhamentos,
-          presencas: presencasReais,
-          ausencias: ausenciasReais,
-          rotina: form.rotina,
-          microgestos: form.microgestos,
-          status: 'LOCAL',
-          createdAt: new Date().toISOString(),
-        };
-        const saved = JSON.parse(localStorage.getItem('diarios_bordo') || '[]');
-        saved.unshift(localEntry);
-        localStorage.setItem('diarios_bordo', JSON.stringify(saved.slice(0, 100)));
+        toast.error('Turma ou aluno não identificado. Não é possível salvar o diário sem vínculo com uma turma ativa. Recarregue a página ou contate a coordenação.');
+        setSaving(false);
+        return;
       } else {
-        await http.post('/diary-events', {
+        // PR 141: payload compartilhado entre POST (novo) e PATCH (edição)
+        const diarioPayload = {
           type: 'ATIVIDADE_PEDAGOGICA',
           title: form.momentoDestaque.substring(0, 100) || 'Diário de Bordo',
           description: form.reflexaoPedagogica || form.momentoDestaque || 'Diário de Bordo',
           eventDate: form.date + 'T12:00:00.000Z',
           childId,
           classroomId,
-          // PR 2: sinaliza ao backend que este save é uma publicação
           status: 'PUBLICADO',
-          // FIX: planningId undefined (não null) para evitar falha de validação CUID no DTO
+          ...(form.date < getPedagogicalToday() ? { retroactiveEdit: true, retroactiveNote: `Registro retroativo criado em ${new Date().toLocaleDateString('pt-BR')}` } : {}),
           ...(planejamentoHoje?.id ? { planningId: planejamentoHoje.id } : {}),
           observations: form.encaminhamentos,
           developmentNotes: form.reflexaoPedagogica,
           microgestos: form.microgestos,
           tags: [form.climaEmocional],
-          // BUG B FIX: Enviar presencas/ausencias como campos raiz do DTO
-          // O service usa createDto.presencas ?? 0 (campo raiz), não aiContext.presencas
           presencas: presencasReais,
           ausencias: ausenciasReais,
           aiContext: {
-            // BUG B FIX: Persistir totais exatos da chamada no aiContext (campo JSONB)
             presencas: presencasReais,
             ausencias: ausenciasReais,
             climaEmocional: form.climaEmocional,
@@ -1558,7 +1721,6 @@ export default function DiarioBordoPage() {
             reflexaoPedagogica: form.reflexaoPedagogica,
             rotina: form.rotina,
             criancasPresentes: form.criancasPresentes,
-            // BUG C FIX: Registrar execução do planejamento no diário
             planejamentoId: planejamentoHoje?.id ?? null,
             planejamentoTitulo: planejamentoHoje?.title ?? null,
             execucaoPlanejamento: form.execucaoPlanejamento,
@@ -1575,14 +1737,58 @@ export default function DiarioBordoPage() {
             oQueNaoFuncionou: form.oQueNaoFuncionou || null,
             avaliacaoPlanoAula: form.avaliacaoPlanoAula || null,
             observacoesIndividuais: (form.observacoesIndividuais ?? []).length > 0 ? form.observacoesIndividuais : null,
-            // Salvar lista de crianças para uso no PDF
+            // Observações dinâmicas do plano (Bloco 3.6)
+            observacoesDinamicasPlano: Object.entries(obsDinamicasSelecionadas)
+              .filter(([, ids]) => ids.length > 0)
+              .map(([obsId, criancaIds]) => {
+                const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                return {
+                  id: obsId,
+                  label: tag?.label ?? obsId,
+                  emoji: tag?.emoji ?? '📌',
+                  grupo: 'plano',
+                  criancaIds,
+                  planningId: planejamentoHoje?.id,
+                };
+              }).length > 0
+              ? Object.entries(obsDinamicasSelecionadas)
+                  .filter(([, ids]) => ids.length > 0)
+                  .map(([obsId, criancaIds]) => {
+                    const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                    return {
+                      id: obsId,
+                      label: tag?.label ?? obsId,
+                      emoji: tag?.emoji ?? '📌',
+                      grupo: 'plano',
+                      criancaIds,
+                      planningId: planejamentoHoje?.id,
+                    };
+                  })
+              : null,
+            planejamentoObjetivos: planejamentoHoje?.objetivosMatriz ?? null,
+            planejamentoAtividade: planejamentoHoje?.activities ?? null,
+            planejamentoRecursos: planejamentoHoje?.recursos ?? null,
+            turmaNome: turmaNomeAtual || null,
+            professorNome: (user as any)?.nome ?? (user as any)?.firstName ?? null,
             criancas: criancas.map(c => ({
               id: c.id,
               firstName: c.firstName,
               lastName: c.lastName,
             })),
           },
-        });
+        };
+        // PR 141: se há um ID de diário sendo editado, usar PATCH; caso contrário, POST
+        if (diarioEditandoId) {
+          const resPatch = await http.patch(`/diary-events/${diarioEditandoId}`, diarioPayload);
+          if (!resPatch.data?.id) {
+            throw new Error('O servidor não confirmou a atualização do diário. Tente novamente.');
+          }
+        } else {
+          const resPost = await http.post('/diary-events', diarioPayload);
+          if (!resPost.data?.id) {
+            throw new Error('O servidor não confirmou o registro do diário. Tente novamente.');
+          }
+        }
       }
       toast.success('Diário de Bordo salvo! Abrindo versão para impressão...');
       // Gerar PDF imediatamente após salvar
@@ -1597,7 +1803,7 @@ export default function DiarioBordoPage() {
       } catch { /* usa fallback */ }
       const pdfData: DiaryPrintData = {
         data: form.date,
-        turmaNome: turmaNomeResolvido,
+        turmaNome: turmaNomeResolvido || turmaNomeAtual,
         professorNome: nomeProfessor,
         planejamentoTitulo: planejamentoHoje?.title,
         planejamentoAtividade: planejamentoHoje?.activities,
@@ -1608,6 +1814,8 @@ export default function DiarioBordoPage() {
         avaliacaoPlanoAula: form.avaliacaoPlanoAula || undefined,
         momentoDestaque: form.momentoDestaque || undefined,
         reflexaoPedagogica: form.reflexaoPedagogica || undefined,
+        // FIX P4-2: incluir encaminhamentos no payload do PDF (campo observations no backend)
+        encaminhamentos: form.encaminhamentos || undefined,
         presencas: presencasReais,
         ausencias: ausenciasReais,
         totalAlunos: criancas.length || undefined,
@@ -1625,6 +1833,11 @@ export default function DiarioBordoPage() {
       setForm(getInitialDiaryForm(dateFromQuery));
       setMicrogestoForm({ tipos: ['ESCUTA'], descricao: '', campo: 'eu-outro-nos', horario: '', criancasSelecionadas: [] });
       setAvaliacaoIndividualForm(getInitialAvaliacaoIndividualForm());
+      // PR 141: limpar o ID de edição após salvar com sucesso
+      setDiarioEditandoId(null);
+      // Limpar estados das observações dinâmicas do plano
+      setObsDinamicasSelecionadas({});
+      setObsPlanoAberta(null);
     } catch (err: any) {
       toast.error(extractErrorMessage(err, 'Erro ao salvar diário'));
     } finally {
@@ -1633,31 +1846,50 @@ export default function DiarioBordoPage() {
   }
 
   const diariosFiltrados = diarios.filter(d => {
-    if (busca && !new Date(d.date || d.createdAt).toLocaleDateString('pt-BR').includes(busca) && !(d.momentoDestaque || '').toLowerCase().includes(busca.toLowerCase()) && !(d.reflexaoPedagogica || '').toLowerCase().includes(busca.toLowerCase())) return false;
-    if (filtroStatus !== 'TODOS') {
-      const s = (d.status || '').toUpperCase();
-      if (filtroStatus === 'PUBLICADO' && s !== 'PUBLICADO' && s !== 'REVISADO' && s !== 'ARQUIVADO') return false;
-      if (filtroStatus === 'RASCUNHO' && s !== 'RASCUNHO') return false;
-    }
-    if (filtroCrianca.trim()) {
-      const termo = filtroCrianca.toLowerCase();
-      const ctx = d.aiContext && typeof d.aiContext === 'object' ? d.aiContext as any : {};
-      const obsIds: string[] = (ctx.observacoesIndividuais ?? []).flatMap((o: any) => o.criancaIds ?? []);
-      const nomeMatch = criancas.some(c =>
-        obsIds.includes(c.id) &&
-        (`${c.firstName} ${c.lastName}`).toLowerCase().includes(termo)
+    const ctx = d.aiContext && typeof d.aiContext === 'object' ? d.aiContext as any : {};
+
+    if (filtroBusca.trim()) {
+      const q = filtroBusca.toLowerCase();
+      const nomesObservacoes = (ctx.observacoesIndividuais ?? []).flatMap((o: any) =>
+        (o.criancaIds ?? []).map((id: string) => {
+          const crianca = criancas.find(c => c.id === id);
+          return crianca ? `${crianca.firstName ?? ''} ${crianca.lastName ?? ''}`.trim() : '';
+        })
       );
-      const microMatch = (d.microgestos ?? []).some((m: any) =>
-        (m.criancaNome || '').toLowerCase().includes(termo)
-      );
-      if (!nomeMatch && !microMatch) return false;
+      const texto = [
+        d.momentoDestaque || '',
+        d.reflexaoPedagogica || '',
+        ctx.momentoDestaque || '',
+        ctx.reflexaoPedagogica || '',
+        ctx.avaliacaoPlanoAula || '',
+        ctx.turmaNome || '',
+        ...nomesObservacoes,
+        ...(ctx.microgestos ?? []).map((m: any) => m.descricao ?? ''),
+      ].join(' ').toLowerCase();
+      const dataStr = (d.date || d.createdAt || '').substring(0, 10);
+      if (!texto.includes(q) && !dataStr.includes(q)) return false;
     }
-    if (filtroComportamento.trim()) {
-      const termo = filtroComportamento.toLowerCase();
-      const ctx = d.aiContext && typeof d.aiContext === 'object' ? d.aiContext as any : {};
-      const labels: string[] = (ctx.observacoesIndividuais ?? []).map((o: any) => (o.label || '').toLowerCase());
-      if (!labels.some(l => l.includes(termo))) return false;
+
+    if (filtroTipo) {
+      const status = (d.status || '').toUpperCase();
+      if (filtroTipo === 'PUBLICADO' && !['PUBLICADO', 'REVISADO', 'ARQUIVADO'].includes(status)) return false;
+      if (filtroTipo === 'RASCUNHO' && status !== 'RASCUNHO') return false;
+      if (filtroTipo === 'OCORRENCIA') {
+        const temOcorrencia = (ctx.ocorrencias ?? []).length > 0 || (d as any).type === 'OCORRENCIA';
+        if (!temOcorrencia) return false;
+      }
     }
+
+    if (filtroDataInicio) {
+      const dataD = (d.date || d.createdAt || '').substring(0, 10);
+      if (dataD < filtroDataInicio) return false;
+    }
+
+    if (filtroDataFim) {
+      const dataD = (d.date || d.createdAt || '').substring(0, 10);
+      if (dataD > filtroDataFim) return false;
+    }
+
     return true;
   });
 
@@ -1680,7 +1912,57 @@ export default function DiarioBordoPage() {
     ...(planejamentoHoje?.intencionalidadeGeral?.trim() ? [planejamentoHoje.intencionalidadeGeral.trim()] : []),
   ]));
 
+  // FIX P4-1: Detectar se já existe diário PUBLICADO para a data do formulário.
+  // Quando verdadeiro, o formulário de novo diário deve ocultar as ações de rascunho/guardar
+  // e exibir apenas o modo leitura/edição segura, evitando duplicação ou sobrescrita acidental.
+  const diarioPublicadoParaData = diarios.find(d => {
+    return getDiaryEntryDate(d) === form.date && isPublishedDiaryStatus(d.status);
+  }) ?? null;
+
+  useEffect(() => {
+    if (aba !== 'novo' || diarioEditandoId || !diarioPublicadoParaData) return;
+    setPainelDiario(diarioPublicadoParaData);
+    setAba('lista');
+  }, [aba, diarioEditandoId, diarioPublicadoParaData]);
+
   return (
+    <>
+    {modalJustificativaAberto && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md mx-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <TriangleAlert className="h-5 w-5 text-amber-500" />
+            <h2 className="text-base font-semibold text-gray-800">
+              Justificativa Obrigatória
+            </h2>
+          </div>
+          <p className="text-sm text-gray-600">
+            {modalJustificativaTipo === 'ocorrencia'
+              ? 'Alterar ocorrências retroativamente exige justificativa registrada em auditoria.'
+              : 'Alterar registros importantes retroativamente exige justificativa registrada.'}
+          </p>
+          <Textarea
+            value={justificativaRetroativa}
+            onChange={e => setJustificativaRetroativa(e.target.value)}
+            placeholder="Descreva o motivo da alteração retroativa..."
+            className="min-h-24 text-sm"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" size="sm"
+              onClick={() => {
+                setModalJustificativaAberto(false);
+                setPendingRetroativoAction(null);
+              }}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={confirmarJustificativa}
+              className="bg-amber-600 hover:bg-amber-700 text-white">
+              Confirmar e Salvar
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
     <PageShell title="Diário da Turma" subtitle="Registre o dia pedagógico, microgestos e reflexões sobre a prática docente">
       {/* PR 1: Breadcrumb e navegação de volta ao calendário */}
       <nav className="flex items-center gap-2 text-sm text-gray-500 -mt-4 mb-4">
@@ -1716,16 +1998,47 @@ export default function DiarioBordoPage() {
           </Button>
         </div>
       )}
+      {/* Banner modo leitura para coordenação/gestão */}
+      {isApenasLeitura && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl">
+          <span className="text-blue-500 text-lg">👁️</span>
+          <div>
+            <p className="text-sm font-semibold text-blue-800">Visualização da Coordenação</p>
+            <p className="text-xs text-blue-600">Este diário foi registrado pelo professor. Coordenadores podem visualizar mas não editar.</p>
+          </div>
+        </div>
+      )}
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
           { id: 'lista', label: 'Meus Diários', icon: <BookOpen className="h-4 w-4" /> },
-          { id: 'novo', label: 'Diário do Dia', icon: <Plus className="h-4 w-4" /> },
+          { id: 'novo', label: 'Diário do Dia', icon: <Plus className="h-4 w-4" />, onClickOverride: () => {
+            // Se já existe diário salvo para hoje, mostrar no painel lateral
+            const hoje = new Date().toISOString().split('T')[0];
+            const diarioHoje = diarios.find((d: any) => {
+              const dataStr = (d.date || d.createdAt || '').substring(0, 10);
+              return dataStr === hoje;
+            });
+            if (diarioHoje) {
+              setPainelDiario(diarioHoje as any);
+              setAba('lista');
+            } else {
+              setPainelDiario(null);
+              // PR 141: garantir que não há ID de edição residual ao criar novo
+              setDiarioEditandoId(null);
+              setAba('novo');
+            }
+          }},
           { id: 'ocorrencias', label: 'Ocorrências', icon: <TriangleAlert className="h-4 w-4" /> },
           { id: 'observacoes', label: 'Observações Individuais', icon: <Brain className="h-4 w-4" /> },
           { id: 'microgestos', label: 'O que são Microgestos?', icon: <Sparkles className="h-4 w-4" /> },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setAba(tab.id as any)}
+          { id: 'fotos', label: 'Fotos da Turma', icon: <Camera className="h-4 w-4" /> },
+        ].filter(tab => {
+          if (!isApenasLeitura) return true;
+          // Coordenação/Gestão: apenas leitura — ocultar abas de criação
+          return tab.id === 'lista';
+        }).map(tab => (
+          <button key={tab.id} onClick={() => (tab as any).onClickOverride ? (tab as any).onClickOverride() : setAba(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${aba === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
             {tab.icon} {tab.label}
           </button>
@@ -1766,6 +2079,8 @@ export default function DiarioBordoPage() {
           } else {
             // Dia SEM diário (passado/hoje): navegar para formulário de criação
             setPainelDiario(null);
+            // PR 141: garantir que não há ID de edição residual ao criar novo
+            setDiarioEditandoId(null);
             setForm(f => ({ ...f, date: data }));
             setAba('novo');
           }
@@ -1785,93 +2100,95 @@ export default function DiarioBordoPage() {
                   >
                     <History className="h-4 w-4" /> Histórico completo
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setMostrarFiltros(v => !v)}
-                    className={`flex items-center gap-2 border-gray-200 transition-colors ${mostrarFiltros ? 'bg-blue-50 text-blue-700 border-blue-200' : 'text-gray-600 hover:bg-gray-50'}`}
-                  >
-                    <Search className="h-4 w-4" />
-                    Buscar e filtrar
-                    {(busca || filtroStatus !== 'TODOS' || filtroCrianca || filtroComportamento) && (
-                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-bold">!</span>
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Buscar por aluno, conteúdo ou data..."
+                          value={filtroBusca}
+                          onChange={e => setFiltroBusca(e.target.value)}
+                          className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                        {filtroBusca && (
+                          <button
+                            onClick={() => setFiltroBusca('')}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setMostrarFiltros(v => !v)}
+                        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-xl border transition-colors flex-shrink-0 ${
+                          mostrarFiltros
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <BarChart2 className="h-4 w-4" />
+                        Filtros
+                        {(filtroTipo || filtroDataInicio || filtroDataFim) && (
+                          <span className="w-2 h-2 bg-amber-400 rounded-full" />
+                        )}
+                      </button>
+                    </div>
+
+                    {mostrarFiltros && (
+                      <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                        <select
+                          value={filtroTipo}
+                          onChange={e => setFiltroTipo(e.target.value)}
+                          className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                        >
+                          <option value="">Todos os tipos</option>
+                          <option value="PUBLICADO">Publicados</option>
+                          <option value="RASCUNHO">Rascunhos</option>
+                          <option value="OCORRENCIA">Com ocorrências</option>
+                        </select>
+                        <input
+                          type="date"
+                          value={filtroDataInicio}
+                          onChange={e => setFiltroDataInicio(e.target.value)}
+                          className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                          placeholder="De"
+                        />
+                        <input
+                          type="date"
+                          value={filtroDataFim}
+                          onChange={e => setFiltroDataFim(e.target.value)}
+                          className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                          placeholder="Até"
+                        />
+                        {(filtroTipo || filtroDataInicio || filtroDataFim) && (
+                          <button
+                            onClick={() => { setFiltroTipo(''); setFiltroDataInicio(''); setFiltroDataFim(''); }}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            Limpar filtros
+                          </button>
+                        )}
+                      </div>
                     )}
-                  </Button>
+
+                    {(filtroBusca || filtroTipo || filtroDataInicio || filtroDataFim) && (
+                      <p className="text-xs text-gray-500 px-1">
+                        {diariosFiltrados.length} resultado{diariosFiltrados.length !== 1 ? 's' : ''} encontrado{diariosFiltrados.length !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <Button onClick={() => setAba('novo')} size="sm" className="flex items-center gap-2">
+                <Button onClick={() => {
+                  setDiarioEditandoId(null);
+                  setForm(getInitialDiaryForm(getPedagogicalToday()));
+                  setAba('novo');
+                }} size="sm" className="flex items-center gap-2">
                   <Plus className="h-4 w-4" /> Novo Diário
                 </Button>
               </div>
 
-              {/* Painel de filtros expansível */}
-              {mostrarFiltros && (
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
-                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Filtros de busca</p>
-
-                  {/* Busca geral */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Buscar por data, momento destaque ou reflexão..."
-                      value={busca}
-                      onChange={e => setBusca(e.target.value)}
-                      className="w-full pl-8 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Filtro por status */}
-                    <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1">
-                      {([
-                        { id: 'TODOS',     label: 'Todos' },
-                        { id: 'PUBLICADO', label: 'Publicados' },
-                        { id: 'RASCUNHO',  label: 'Rascunhos' },
-                      ] as const).map(op => (
-                        <button
-                          key={op.id}
-                          onClick={() => setFiltroStatus(op.id)}
-                          className={`flex-1 text-xs font-semibold py-1.5 rounded-lg transition-all ${
-                            filtroStatus === op.id
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'text-gray-500 hover:text-gray-800'
-                          }`}
-                        >
-                          {op.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Busca por criança */}
-                    <input
-                      type="text"
-                      placeholder="🧒 Nome da criança..."
-                      value={filtroCrianca}
-                      onChange={e => setFiltroCrianca(e.target.value)}
-                      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-
-                    {/* Busca por comportamento */}
-                    <input
-                      type="text"
-                      placeholder="🔍 Comportamento observado..."
-                      value={filtroComportamento}
-                      onChange={e => setFiltroComportamento(e.target.value)}
-                      className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                    />
-                  </div>
-
-                  {/* Limpar filtros */}
-                  {(busca || filtroStatus !== 'TODOS' || filtroCrianca || filtroComportamento) && (
-                    <button
-                      onClick={() => { setBusca(''); setFiltroStatus('TODOS'); setFiltroCrianca(''); setFiltroComportamento(''); }}
-                      className="text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                    >
-                      ✕ Limpar todos os filtros
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
             {loading && <LoadingState message="Carregando diários..." />}
@@ -2011,41 +2328,92 @@ export default function DiarioBordoPage() {
                           </div>
                         )}
 
-                        {/* Botão imprimir diário individual */}
-                        <div className="flex justify-end pt-2 border-t border-gray-100">
+                        {/* Botões: Editar e Imprimir */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setForm(getDiaryFormFromEntry(painelDiario));
+                              setDiarioEditandoId(painelDiario.id);
+                              setPainelDiario(null);
+                              setAba('novo');
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+                           >
+                             ✏️ Editar
+                          </button>
+                          {isDeveloper && (
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm('Apagar este diário permanentemente? Esta ação não pode ser desfeita.')) return;
+                                try {
+                                  await http.delete(`/diary-events/${painelDiario.id}`);
+                                  toast.success('Diário apagado.');
+                                  setPainelDiario(null);
+                                  loadDiarios();
+                                } catch (err: any) {
+                                  toast.error(err?.response?.data?.message || 'Erro ao apagar diário.');
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100"
+                            >
+                              🗑️ Apagar
+                            </button>
+                          )}
+                          </div>
                           <button
                             onClick={() => {
                               const ctx = painelDiario.aiContext && typeof painelDiario.aiContext === 'object' ? painelDiario.aiContext : {};
-                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const nomeProfessor = resolveDiaryProfessorName(painelDiario as any, ctx as Record<string, any>, (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)');
+                              const turmaNomePdf = resolveDiaryTurmaNome(painelDiario as any, ctx as Record<string, any>, turmaNomeAtual);
                               const dataStr = (painelDiario.date || painelDiario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: 'Turma',
+                                turmaNome: turmaNomePdf,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
                                 execucaoPlanejamento: ctx.execucaoPlanejamento,
                                 avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
                                 momentoDestaque: painelDiario.momentoDestaque || ctx.momentoDestaque,
-                                reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica,
-                                presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
-                                climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
-                                rotina: ctx.rotina as Record<string, boolean>,
-                                observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: (ctx.criancas as any[])?.length > 0
-                                  ? ctx.criancas as any[]
-                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
-                              });
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
-                          >
-                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
+                                 reflexaoPedagogica: painelDiario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                 // FIX P4-2: incluir encaminhamentos no PDF do painel lateral
+                                 encaminhamentos: (painelDiario as any).encaminhamentos || ctx.encaminhamentos || (painelDiario as any).observations || undefined,
+                                 presencas: painelDiario.presencas ?? ctx.presencas ?? 0,
+                                 ausencias: painelDiario.ausencias ?? ctx.ausencias ?? 0,
+                                 climaEmocional: painelDiario.climaEmocional || ctx.climaEmocional,
+                                 rotina: (() => {
+                                   const r = ctx.rotina;
+                                   if (!r) return undefined;
+                                   if (Array.isArray(r)) {
+                                     return Object.fromEntries(
+                                       (r as Array<{ momento: string; concluido: boolean }>)
+                                         .map(item => [item.momento, item.concluido])
+                                     );
+                                   }
+                                   return r as Record<string, boolean>;
+                                 })(),
+                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                 criancas: (ctx.criancas as any[])?.length > 0
+                                   ? ctx.criancas as any[]
+                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                   ?? (ctx as any).objetivosMatriz)
+                                   || undefined,
+                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                   || (ctx as any).activities || undefined,
+                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                   || (ctx as any).recursos || undefined,
+                               });
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                           >
+                             <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                           </button>
+                         </div>
+                       </div>
+                     </div>
+                   ) : (
                     <div className="flex flex-col items-center justify-center h-48 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/40 text-gray-400 gap-3">
                       <Calendar className="h-10 w-10 text-gray-300" />
                       <div className="text-center">
@@ -2075,7 +2443,7 @@ export default function DiarioBordoPage() {
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Buscar por data ou conteúdo..." className="pl-9" value={busca} onChange={e => setBusca(e.target.value)} />
+              <Input placeholder="Buscar por data ou conteúdo..." className="pl-9" value={filtroBusca} onChange={e => setFiltroBusca(e.target.value)} />
             </div>
             <Button onClick={() => setAba('novo')} className="flex items-center gap-2">
               <Plus className="h-4 w-4" /> Novo Diário
@@ -2309,31 +2677,51 @@ export default function DiarioBordoPage() {
                           <button
                             onClick={() => {
                               const ctx = diario.aiContext && typeof diario.aiContext === 'object' ? diario.aiContext : {};
-                              const nomeProfessor = (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)';
+                              const nomeProfessor = resolveDiaryProfessorName(diario as any, ctx as Record<string, any>, (user as any)?.nome ?? (user as any)?.firstName ?? 'Professor(a)');
+                              const turmaNomePdf = resolveDiaryTurmaNome(diario as any, ctx as Record<string, any>, turmaNomeAtual);
                               const dataStr = (diario.date || diario.createdAt || '').substring(0, 10);
                               abrirDiarioImprimivel({
                                 data: dataStr,
-                                turmaNome: 'Turma',
+                                turmaNome: turmaNomePdf,
                                 professorNome: nomeProfessor,
                                 planejamentoTitulo: ctx.planejamentoTitulo,
                                 statusExecucaoPlano: ctx.statusExecucaoPlano,
                                 execucaoPlanejamento: ctx.execucaoPlanejamento,
                                 avaliacaoPlanoAula: ctx.avaliacaoPlanoAula,
                                 momentoDestaque: diario.momentoDestaque || ctx.momentoDestaque,
-                                reflexaoPedagogica: diario.reflexaoPedagogica || ctx.reflexaoPedagogica,
-                                presencas: diario.presencas ?? ctx.presencas ?? 0,
-                                ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
-                                climaEmocional: diario.climaEmocional || ctx.climaEmocional,
-                                rotina: ctx.rotina as Record<string, boolean>,
-                                observacoesIndividuais: ctx.observacoesIndividuais as any,
-                                criancas: (ctx.criancas as any[])?.length > 0
-                                  ? ctx.criancas as any[]
-                                  : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
-                              });
-                            }}
-                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
-                          >
-                            <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
+                                 reflexaoPedagogica: diario.reflexaoPedagogica || ctx.reflexaoPedagogica,
+                                 // FIX P4-2: incluir encaminhamentos no PDF da lista histórica
+                                 encaminhamentos: diario.encaminhamentos || ctx.encaminhamentos || (diario as any).observations || undefined,
+                                 presencas: diario.presencas ?? ctx.presencas ?? 0,
+                                 ausencias: diario.ausencias ?? ctx.ausencias ?? 0,
+                                 climaEmocional: diario.climaEmocional || ctx.climaEmocional,
+                                 rotina: (() => {
+                                   const r = ctx.rotina;
+                                   if (!r) return undefined;
+                                   // Se já é Record<string,boolean> (novo formato)
+                                   if (!Array.isArray(r)) return r as Record<string, boolean>;
+                                   // Se é RotinaItem[] (formato antigo: {momento, concluido})
+                                   return (r as any[]).reduce((acc: Record<string, boolean>, item: any) => {
+                                     if (item?.momento) acc[item.momento] = Boolean(item.concluido);
+                                     return acc;
+                                   }, {});
+                                 })(),
+                                 observacoesIndividuais: ctx.observacoesIndividuais as any,
+                                 criancas: (ctx.criancas as any[])?.length > 0
+                                   ? ctx.criancas as any[]
+                                   : criancas.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName })),
+                                 planejamentoObjetivos: ((ctx as any).planejamentoObjetivos
+                                   ?? (ctx as any).objetivosMatriz)
+                                   || undefined,
+                                 planejamentoAtividade: (ctx as any).planejamentoAtividade
+                                   || (ctx as any).activities || undefined,
+                                 planejamentoRecursos: (ctx as any).planejamentoRecursos
+                                   || (ctx as any).recursos || undefined,
+                               });
+                             }}
+                             className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+                           >
+                             <Printer className="h-4 w-4" /> Imprimir / Salvar PDF
                           </button>
                         </div>
                       </div>
@@ -2349,7 +2737,7 @@ export default function DiarioBordoPage() {
       {/* ─── NOVO DIÁRIO ─── */}
       {aba === 'novo' && (
         <div className="space-y-5 max-w-4xl">
-          {currentDraft && (
+          {currentDraft && !rascunhoJaCarregado && (
             <Card className="border border-emerald-200 bg-emerald-50/70 shadow-sm">
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -2379,10 +2767,11 @@ export default function DiarioBordoPage() {
                   Realize a Chamada Diária antes de guardar o Diário do Dia. As presenças serão importadas automaticamente após a chamada.
                 </p>
                 <button
-                  onClick={() => { if (classroomId) window.location.href = '/app/chamada'; }}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 transition-colors font-medium"
+                  onClick={() => navigate(`/app/chamada?classroomId=${classroomId}&date=${form.date}&from=diario`)}
+                  className="mt-3 flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition-colors w-fit"
                 >
-                  <Users className="h-3.5 w-3.5" /> Ir para Chamada Diária
+                  <CheckCircle className="h-4 w-4" />
+                  Ir para Chamada Diária
                 </button>
               </div>
             </div>
@@ -2404,11 +2793,22 @@ export default function DiarioBordoPage() {
                   <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
                   {(() => {
                     const d = new Date(form.date + 'T12:00:00').getDay();
-                    return (d === 0 || d === 6) ? (
-                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" /> Fim de semana — dia não letivo. Altere a data.
-                      </p>
-                    ) : null;
+                    const hoje = getPedagogicalToday();
+                    const isRetroativo = form.date < hoje;
+                    return (
+                      <>
+                        {(d === 0 || d === 6) && (
+                          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> Fim de semana — dia não letivo. Altere a data.
+                          </p>
+                        )}
+                        {isRetroativo && d !== 0 && d !== 6 && (
+                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3" /> Edição retroativa — este diário será marcado como editado após a data original.
+                          </p>
+                        )}
+                      </>
+                    );
                   })()}
                 </div>
                 {criancas.length === 0 && (
@@ -3103,6 +3503,173 @@ export default function DiarioBordoPage() {
                   )}
                 </div>
               )}
+              {/* ── Bloco 3.6: Observações Específicas do Plano de Hoje (dinâmicas) ── */}
+              {criancas.length > 0
+               && planejamentoHoje
+               && (planejamentoHoje.observacoesTemplate ?? []).length > 0 && (
+                <div className="rounded-2xl border-2 border-indigo-200 bg-white p-4 sm:p-5 space-y-4 shadow-sm">
+
+                  {/* Cabeçalho */}
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-sm flex-shrink-0">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-indigo-900">
+                        Observações do Plano de Hoje
+                      </p>
+                      <p className="text-xs text-indigo-500 truncate">
+                        Geradas a partir de: {planejamentoHoje.title}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-600">
+                      {(planejamentoHoje.observacoesTemplate ?? []).length} pontos
+                    </span>
+                  </div>
+
+                  {/* Tags dinâmicas */}
+                  <div className="flex flex-wrap gap-2">
+                    {(planejamentoHoje.observacoesTemplate ?? []).map(tag => {
+                      const selecionados = obsDinamicasSelecionadas[tag.id] ?? [];
+                      const ativo = selecionados.length > 0;
+
+                      return (
+                        <div key={tag.id} className="relative" data-obs-panel>
+                          {/* Botão da tag */}
+                          <button
+                            type="button"
+                            onClick={() => setObsPlanoAberta(p => p === tag.id ? null : tag.id)}
+                            className={`rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                              ativo
+                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                : 'border-indigo-200 bg-white text-indigo-700 hover:border-indigo-400 hover:bg-indigo-50'
+                            }`}
+                          >
+                            <span>{tag.emoji}</span>
+                            <span>{tag.label}</span>
+                            {ativo && (
+                              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-white/30 text-[10px] font-bold">
+                                {selecionados.length}
+                              </span>
+                            )}
+                          </button>
+
+                          {/* Popover de seleção de crianças */}
+                          {obsPlanoAberta === tag.id && (
+                            <div
+                              className="absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border-2 border-indigo-200 bg-white shadow-xl p-3 space-y-3"
+                              data-obs-panel
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-bold text-indigo-900">{tag.emoji} {tag.label}</p>
+                                <button type="button" onClick={() => setObsPlanoAberta(null)} className="text-gray-400 hover:text-gray-600">
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {tag.origemObjetivo && (
+                                <p className="text-[10px] text-indigo-400 italic border border-indigo-100 rounded-lg px-2 py-1 bg-indigo-50 leading-relaxed">
+                                  Do objetivo: &ldquo;{tag.origemObjetivo.slice(0, 80)}{tag.origemObjetivo.length > 80 ? '...' : ''}&rdquo;
+                                </p>
+                              )}
+                              <p className="text-[10px] text-indigo-600">
+                                Quais crianças demonstraram isso hoje?
+                              </p>
+                              <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                                {criancas
+                                  .slice()
+                                  .sort((a, b) => a.firstName.localeCompare(b.firstName, 'pt-BR'))
+                                  .map(c => {
+                                    const sel = selecionados.includes(c.id);
+                                    return (
+                                      <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setObsDinamicasSelecionadas(prev => {
+                                            const atual = prev[tag.id] ?? [];
+                                            const novas = sel
+                                              ? atual.filter(id => id !== c.id)
+                                              : [...atual, c.id];
+                                            if (novas.length === 0) {
+                                              const { [tag.id]: _rem, ...resto } = prev;
+                                              return resto;
+                                            }
+                                            return { ...prev, [tag.id]: novas };
+                                          });
+                                        }}
+                                        className={`flex flex-col items-center gap-1 rounded-xl border-2 p-2 transition-all text-center ${
+                                          sel
+                                            ? 'border-indigo-500 bg-indigo-50'
+                                            : 'border-gray-100 bg-white hover:border-indigo-200'
+                                        }`}
+                                      >
+                                        {c.photoUrl ? (
+                                          <img src={c.photoUrl} alt={c.firstName} className="h-8 w-8 rounded-full object-cover" />
+                                        ) : (
+                                          <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                                            {c.firstName[0]}{c.lastName?.[0] ?? ''}
+                                          </div>
+                                        )}
+                                        <span className="text-[10px] font-medium text-gray-700 leading-tight max-w-[56px] truncate">
+                                          {c.firstName}
+                                        </span>
+                                        {sel && <CheckCircle className="h-3 w-3 text-indigo-500" />}
+                                      </button>
+                                    );
+                                  })}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setObsPlanoAberta(null)}
+                                className="w-full rounded-xl bg-indigo-600 text-white text-xs font-bold py-2 hover:bg-indigo-700 transition-colors"
+                              >
+                                Confirmar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Resumo das seleções */}
+                  {Object.values(obsDinamicasSelecionadas).some(ids => ids.length > 0) && (
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+                        Resumo — observações do plano
+                      </p>
+                      {Object.entries(obsDinamicasSelecionadas)
+                        .filter(([, ids]) => ids.length > 0)
+                        .map(([obsId, ids]) => {
+                          const tag = (planejamentoHoje?.observacoesTemplate ?? []).find(t => t.id === obsId);
+                          const nomes = ids.map(id => criancas.find(c => c.id === id)?.firstName ?? id).join(', ');
+                          return (
+                            <div key={obsId} className="flex items-start gap-2 text-xs text-indigo-800">
+                              <span>{tag?.emoji}</span>
+                              <span><strong>{tag?.label}:</strong> {nomes}</span>
+                              <button
+                                type="button"
+                                onClick={() => setObsDinamicasSelecionadas(prev => {
+                                  const { [obsId]: _rem, ...resto } = prev;
+                                  return resto;
+                                })}
+                                className="ml-auto text-indigo-300 hover:text-red-400 flex-shrink-0"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  {/* Nota informativa */}
+                  <p className="text-[10px] text-indigo-400 text-center italic">
+                    Estas observações foram geradas automaticamente a partir do plano de aula de hoje.
+                    Alimentam o RDIC e os relatórios de desenvolvimento.
+                  </p>
+                </div>
+              )}
               {/* ── Bloco 4: Complementares (materiais, adaptações, ocorrências) ── */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
@@ -3228,16 +3795,43 @@ export default function DiarioBordoPage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
-              <Save className="mr-2 h-4 w-4" /> Salvar rascunho
-            </Button>
-            <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
-              {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              Guardar Diário do Dia
-            </Button>
-            <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
-          </div>
+          {/* PR 141: 3 modos de ação:
+              1) Editando diário existente (diarioEditandoId preenchido) → só Atualizar + Cancelar
+              2) Diário publicado para a data (sem ID de edição) → banner bloqueio
+              3) Novo diário (nenhum dos anteriores) → Rascunho + Guardar + Cancelar
+          */}
+          {isApenasLeitura ? (
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+              <span className="text-xs text-blue-600 font-medium">👁️ Modo visualização — coordenação</span>
+            </div>
+          ) : diarioEditandoId ? (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4] bg-blue-600 hover:bg-blue-700">
+                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Atualizar Diário
+              </Button>
+              <Button variant="outline" onClick={() => { setDiarioEditandoId(null); setAba('lista'); }} className="sm:flex-1">Cancelar</Button>
+            </div>
+          ) : diarioPublicadoParaData ? (
+            <div className="flex flex-col gap-3 sm:flex-row items-center p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-emerald-800">Diário já publicado para esta data</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Para editar, use o botão ✏️ Editar no painel do diário na aba Meus Diários.</p>
+              </div>
+              <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1 border-emerald-300 text-emerald-800 hover:bg-emerald-100">Ver diários</Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="outline" onClick={salvarRascunhoDiario} className="sm:flex-1">
+                <Save className="mr-2 h-4 w-4" /> Salvar rascunho
+              </Button>
+              <Button onClick={salvarDiario} disabled={saving} className="sm:flex-[1.4]">
+                {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                Guardar Diário do Dia
+              </Button>
+              <Button variant="outline" onClick={() => setAba('lista')} className="sm:flex-1">Cancelar</Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -3729,6 +4323,102 @@ export default function DiarioBordoPage() {
         </div>
       )}
 
+      {/* ─── FOTOS DA TURMA — REGISTRO OBRIGATÓRIO DE ATIVIDADES ─── */}
+      {aba === 'fotos' && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            📸 As fotos da turma são registros obrigatórios das atividades pedagógicas executadas.
+            Devem ser enviadas semanalmente ao Regional de Ensino.
+            Vincule cada foto ao campo de experiência da BNCC e à atividade realizada.
+          </div>
+          <Card>
+            <CardContent className="pt-5 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <Camera className="h-4 w-4" /> Registrar Foto de Atividade
+              </h3>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Descrição da Atividade *</Label>
+                <Input placeholder="Ex: Brincadeira de roda — eu, o outro e o nós" className="text-sm" id="foto-desc" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Campo de Experiência (BNCC)</Label>
+                <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" id="foto-campo">
+                  <option value="">Selecione...</option>
+                  {[
+                    { id: 'eu-outro-nos', label: 'O eu, o outro e o nós' },
+                    { id: 'corpo-gestos', label: 'Corpo, gestos e movimentos' },
+                    { id: 'tracos-sons', label: 'Traços, sons, cores e formas' },
+                    { id: 'escuta-fala', label: 'Escuta, fala, pensamento e imaginação' },
+                    { id: 'espacos-tempos', label: 'Espaços, tempos, quantidades e relações' },
+                  ].map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-600">Foto</Label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-indigo-700"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem máx. 5 MB'); return; }
+                    try {
+                      const desc = (document.getElementById('foto-desc') as HTMLInputElement)?.value?.trim();
+                      const campo = (document.getElementById('foto-campo') as HTMLSelectElement)?.value;
+                      if (!desc) { toast.error('Descreva a atividade antes de enviar a foto'); return; }
+                      const fd = new FormData();
+                      fd.append('file', file);
+                      fd.append('description', desc);
+                      fd.append('campoExperiencia', campo || '');
+                      fd.append('classroomId', classroomId || '');
+                      fd.append('date', form.date);
+                      await http.post('/rdx/upload', fd, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                      });
+                      toast.success('Foto registrada com sucesso!');
+                      e.target.value = '';
+                    } catch (err: any) {
+                      toast.error(extractErrorMessage(err, 'Erro ao enviar foto'));
+                    }
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-amber-200 bg-amber-50/30">
+            <CardContent className="pt-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-700">Envio Semanal ao Regional</p>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    As fotos da semana atual devem ser enviadas até sexta-feira.
+                    O envio gera registro de auditoria automático.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-amber-600 hover:bg-amber-700 text-white flex-shrink-0 flex items-center gap-1"
+                  onClick={async () => {
+                    try {
+                      await http.post('/rdx/enviar-semanal', {
+                        classroomId,
+                        semana: form.date.substring(0, 7),
+                      });
+                      toast.success('Fotos marcadas como enviadas ao Regional!');
+                    } catch (err: any) {
+                      toast.error(extractErrorMessage(err, 'Erro ao registrar envio'));
+                    }
+                  }}
+                >
+                  <UploadCloud className="h-3.5 w-3.5" /> Marcar como Enviado
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* ─── O QUE SÃO MICROGESTOS? ─── */}
       {aba === 'microgestos' && (
         <div className="space-y-6 max-w-3xl">
@@ -3786,5 +4476,6 @@ export default function DiarioBordoPage() {
         </div>
       )}
     </PageShell>
+    </>
   );
 }

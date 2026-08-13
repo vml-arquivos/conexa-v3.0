@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import http from '../api/http';
 import { useAuth } from '../app/AuthProvider';
 import { isUnidade, isCentral } from '../api/auth';
+import { ChildAvatar } from '../components/children/ChildAvatar';
 import {
   CheckCircle,
   XCircle,
@@ -95,8 +96,8 @@ function getLocalDateStr(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Máximo de dias retroativos permitidos (G4 FIX: 5 dias conforme regra de negócio) */
-const MAX_RETROATIVO = 5;
+/** Máximo de dias retroativos permitidos — 30 dias para permitir registro de chamadas em atraso */
+const MAX_RETROATIVO = 30;
 
 // ─── Visão da Coordenação (UNIDADE / STAFF_CENTRAL) ──────────────────────────
 function ChamadaCoordenacaoView() {
@@ -313,6 +314,7 @@ export default function ControleFaltasPage() {
 // ─── Visão do Professor (extraída para componente separado) ───────────────────
 function ControleFaltasProfessorView() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [chamada, setChamada] = useState<ChamadaData | null>(null);
@@ -443,7 +445,12 @@ function ControleFaltasProfessorView() {
         registros: lista,
       });
       toast.success('Chamada salva com sucesso! ✅');
-      navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`);
+      // Correção 2: se veio do diário (?from=diario), retornar direto para o diário
+      if (searchParams.get('from') === 'diario') {
+        navigate(`/app/diario-de-bordo?date=${encodeURIComponent(selectedDate)}&aba=novo&classroomId=${encodeURIComponent(chamada.classroomId)}`);
+      } else {
+        navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`);
+      }
     } catch {
       toast.error('Erro ao salvar a chamada. Tente novamente.');
     } finally {
@@ -468,80 +475,144 @@ function ControleFaltasProfessorView() {
   const totalJustificados = chamada.alunos.filter((a) => registros[a.id]?.status === 'JUSTIFICADO').length;
   const chamadaCompleta = totalMarcados === chamada.totalAlunos;
 
-  // ─── Tela de Resumo ──────────────────────────────────────────────────────────
+  // ─── Tela de Resumo (Correção 7 — layout clean + ChildAvatar) ──────────────
   if (etapa === 'resumo') {
+    const taxaPresenca = chamada.totalAlunos > 0
+      ? Math.round((totalPresentes / chamada.totalAlunos) * 100)
+      : 0;
+    const ausentesEJustificados = chamada.alunos.filter(
+      (a) => registros[a.id]?.status === 'AUSENTE' || registros[a.id]?.status === 'JUSTIFICADO'
+    );
+    const presentesLista = chamada.alunos.filter((a) => registros[a.id]?.status === 'PRESENTE');
+
     return (
-      <PageShell title="Chamada Salva! ✅" description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}>
-        <div className="max-w-md mx-auto space-y-6">
-          {/* Resumo visual */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-6 bg-green-50 rounded-2xl border-2 border-green-200">
-              <p className="text-4xl font-bold text-green-600">{totalPresentes}</p>
-              <p className="text-sm text-green-700 mt-1 font-medium">Presentes</p>
+      <PageShell
+        title="Chamada registrada"
+        description={`${chamada.classroomName} · ${formatarData(selectedDate)}`}
+      >
+        <div className="max-w-lg mx-auto space-y-4">
+
+          {/* ─ Confirmação visual ─ */}
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="h-6 w-6 text-emerald-600" />
             </div>
-            <div className="text-center p-6 bg-red-50 rounded-2xl border-2 border-red-200">
-              <p className="text-4xl font-bold text-red-600">{totalAusentes}</p>
-              <p className="text-sm text-red-700 mt-1 font-medium">Ausentes</p>
-            </div>
-            <div className="text-center p-6 bg-yellow-50 rounded-2xl border-2 border-yellow-200">
-              <p className="text-4xl font-bold text-yellow-600">{totalJustificados}</p>
-              <p className="text-sm text-yellow-700 mt-1 font-medium">Justificados</p>
+            <div>
+              <p className="font-semibold text-emerald-800 text-sm">Chamada salva com sucesso</p>
+              <p className="text-xs text-emerald-600 mt-0.5">{formatarData(selectedDate)} · {chamada.classroomName}</p>
             </div>
           </div>
 
-          {/* Taxa de presença */}
-          <div className="p-5 bg-blue-50 rounded-2xl text-center">
-            <p className="text-sm text-blue-600 font-medium mb-1">Taxa de presença</p>
-            <p className="text-5xl font-bold text-blue-700">
-              {chamada.totalAlunos > 0 ? Math.round((totalPresentes / chamada.totalAlunos) * 100) : 0}%
-            </p>
+          {/* ─ Cards de contagem compactos ─ */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center py-4 px-2 bg-green-50 rounded-xl border border-green-200">
+              <p className="text-2xl font-semibold text-green-600 tabular-nums">{totalPresentes}</p>
+              <p className="text-xs text-green-600 mt-1 font-medium">Presentes</p>
+            </div>
+            <div className="text-center py-4 px-2 bg-red-50 rounded-xl border border-red-200">
+              <p className="text-2xl font-semibold text-red-500 tabular-nums">{totalAusentes}</p>
+              <p className="text-xs text-red-500 mt-1 font-medium">Ausentes</p>
+            </div>
+            <div className="text-center py-4 px-2 bg-amber-50 rounded-xl border border-amber-200">
+              <p className="text-2xl font-semibold text-amber-500 tabular-nums">{totalJustificados}</p>
+              <p className="text-xs text-amber-500 mt-1 font-medium">Justificados</p>
+            </div>
           </div>
 
-          {/* Lista de ausentes */}
-          {totalAusentes + totalJustificados > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-gray-600">Crianças que faltaram:</p>
-              {chamada.alunos
-                .filter((a) => registros[a.id]?.status === 'AUSENTE' || registros[a.id]?.status === 'JUSTIFICADO')
-                .map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {a.photoUrl ? (
-                        <img src={a.photoUrl} alt={a.nome} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold text-gray-400">{a.nome[0]}</span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{a.nome}</p>
+          {/* ─ Barra de taxa de presença ─ */}
+          <div className="p-4 bg-white border border-gray-100 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-slate-400">Taxa de presença</span>
+              <span className="text-lg font-bold text-blue-700">{taxaPresenca}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-2 rounded-full transition-all ${
+                  taxaPresenca >= 80 ? 'bg-emerald-500' : taxaPresenca >= 60 ? 'bg-amber-400' : 'bg-red-500'
+                }`}
+                style={{ width: `${taxaPresenca}%` }}
+              />
+            </div>
+          </div>
+
+          {/* ─ Avatares dos presentes (grid compacto com ChildAvatar) ─ */}
+          {presentesLista.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-slate-400 mb-2 tracking-wide">Presentes</p>
+              <div className="flex flex-wrap gap-2">
+                {presentesLista.map((a) => (
+                  <div key={a.id} className="flex flex-col items-center gap-1" title={a.nome}>
+                    <ChildAvatar
+                      child={{ nome: a.nome, photoUrl: a.photoUrl }}
+                      sizeClassName="w-10 h-10"
+                      imageClassName="rounded-full object-cover ring-2 ring-emerald-400"
+                      fallbackClassName="rounded-full bg-emerald-50 ring-2 ring-emerald-300 flex items-center justify-center"
+                      showInitials
+                      initialsClassName="text-xs font-medium text-emerald-700"
+                    />
+                    <span className="text-[10px] text-gray-500 truncate max-w-[44px] text-center leading-tight">
+                      {a.nome.split(' ')[0]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─ Lista de ausentes/justificados com ChildAvatar ─ */}
+          {ausentesEJustificados.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-slate-400 mb-2 tracking-wide">Faltaram</p>
+              <div className="space-y-2">
+                {ausentesEJustificados.map((a) => (
+                  <div key={a.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100">
+                    <ChildAvatar
+                      child={{ nome: a.nome, photoUrl: a.photoUrl }}
+                      sizeClassName="w-9 h-9"
+                      imageClassName="rounded-full object-cover"
+                      fallbackClassName="rounded-full bg-gray-100 flex items-center justify-center"
+                      showInitials
+                      initialsClassName="text-xs font-medium text-slate-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{a.nome}</p>
                       {registros[a.id]?.motivo && (
-                        <p className="text-xs text-gray-500">{registros[a.id].motivo}</p>
+                        <p className="text-xs text-gray-400 truncate">{registros[a.id].motivo}</p>
                       )}
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
                       registros[a.id]?.status === 'JUSTIFICADO'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-red-100 text-red-700'
+                        ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                        : 'bg-red-50 text-red-500 border border-red-200'
                     }`}>
                       {registros[a.id]?.status === 'JUSTIFICADO' ? 'Justificado' : 'Ausente'}
                     </span>
                   </div>
                 ))}
+              </div>
             </div>
           )}
 
-          <Button
-            onClick={() => setEtapa('chamada')}
-            variant="outline"
-            className="w-full"
-          >
-            Editar Chamada
-          </Button>
+          {/* ─ Botões de ação ─ */}
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              onClick={() => setEtapa('chamada')}
+              variant="outline"
+              className="flex-1"
+            >
+              Editar chamada
+            </Button>
+            <Button
+              onClick={() => navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(chamada.classroomId)}&date=${encodeURIComponent(selectedDate)}`)}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Voltar ao Diário
+            </Button>
+          </div>
         </div>
       </PageShell>
     );
   }
-
   // ─── Tela Principal de Chamada ────────────────────────────────────────────────
   return (
     <PageShell
@@ -560,7 +631,28 @@ function ControleFaltasProfessorView() {
         </button>
         <div className="flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-blue-500" />
-          <span className="font-semibold text-gray-700 text-sm">{formatarData(selectedDate)}</span>
+          <input
+            type="date"
+            value={selectedDate}
+            max={hoje}
+            min={(() => {
+              const m = new Date(hoje + 'T12:00:00');
+              m.setDate(m.getDate() - MAX_RETROATIVO);
+              return getLocalDateStr(m);
+            })()}
+            onChange={e => {
+              const val = e.target.value;
+              if (!val) return;
+              const d = new Date(val + 'T12:00:00').getDay();
+              if (d === 0 || d === 6) {
+                toast.error('Fins de semana não são dias letivos.');
+                return;
+              }
+              setSelectedDate(val);
+            }}
+            className="border-0 bg-transparent font-semibold text-gray-700 text-sm focus:outline-none cursor-pointer"
+            title="Clique para escolher a data"
+          />
           {isHoje && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Hoje</span>
           )}
@@ -645,91 +737,94 @@ function ControleFaltasProfessorView() {
         Todos estão presentes hoje
       </Button>
 
-      {/* Cards dos alunos */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+      {/* Cards dos alunos — grid responsivo mobile-first */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9 gap-2.5 mb-6">
         {chamada.alunos.map((aluno) => {
           const reg = registros[aluno.id];
           const status = reg?.status ?? null;
           const isExpanded = alunoSelecionado === aluno.id;
 
           return (
-            <div key={aluno.id} className="flex flex-col gap-2">
-              {/* Card do aluno */}
+            <div key={aluno.id} className="flex flex-col gap-1.5">
+              {/* Card compacto do aluno */}
               <div
-                className={`relative rounded-2xl border-2 overflow-hidden transition-all ${
+                className={`relative rounded-2xl border overflow-hidden transition-all shadow-sm ${
                   status === 'PRESENTE'
-                    ? 'border-green-400 bg-green-50'
+                    ? 'border-emerald-300 bg-emerald-50/60'
                     : status === 'AUSENTE'
-                    ? 'border-red-400 bg-red-50'
+                    ? 'border-red-300 bg-red-50/60'
                     : status === 'JUSTIFICADO'
-                    ? 'border-yellow-400 bg-yellow-50'
-                    : 'border-gray-200 bg-white'
+                    ? 'border-amber-300 bg-amber-50/60'
+                    : 'border-slate-200 bg-white'
                 }`}
               >
-                {/* Foto */}
-                <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-                  {aluno.photoUrl ? (
-                    <img src={aluno.photoUrl} alt={aluno.nome} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl font-bold text-gray-300">{aluno.nome[0]}</span>
-                  )}
-                  {/* Badge de status */}
+                {/* Avatar + badge de status */}
+                <div className="flex justify-center pt-2 pb-1 relative">
+                  <ChildAvatar
+                    child={{
+                      photoUrl: aluno.photoUrl,
+                      firstName: aluno.nome.split(' ')[0],
+                      lastName: aluno.nome.split(' ').slice(1).join(' ') || undefined,
+                    }}
+                    sizeClassName="w-13 h-13"
+                    imageClassName="rounded-full object-cover ring-2 ring-white"
+                    fallbackClassName="rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-sm"
+                    showInitials
+                    initialsClassName="text-xs font-medium text-indigo-600"
+                  />
                   {status && (
-                    <div className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center ${
-                      status === 'PRESENTE' ? 'bg-green-500' :
-                      status === 'AUSENTE' ? 'bg-red-500' : 'bg-yellow-500'
+                    <div className={`absolute top-1 right-1 w-4.5 h-4.5 rounded-full flex items-center justify-center shadow-sm ${
+                      status === 'PRESENTE' ? 'bg-emerald-500' :
+                      status === 'AUSENTE' ? 'bg-red-400' : 'bg-amber-400'
                     }`}>
-                      {status === 'PRESENTE' && <CheckCircle className="h-5 w-5 text-white" />}
-                      {status === 'AUSENTE' && <XCircle className="h-5 w-5 text-white" />}
-                      {status === 'JUSTIFICADO' && <AlertCircle className="h-5 w-5 text-white" />}
+                      {status === 'PRESENTE' && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+                      {status === 'AUSENTE' && <XCircle className="h-3.5 w-3.5 text-white" />}
+                      {status === 'JUSTIFICADO' && <AlertCircle className="h-3.5 w-3.5 text-white" />}
                     </div>
                   )}
                 </div>
 
-                {/* Nome */}
-                <div className="p-2 text-center">
-                  <p className="text-xs font-semibold text-gray-700 leading-tight line-clamp-2">
+                {/* Nome truncado em 1 linha */}
+                <div className="px-1 pb-1.5 text-center">
+                  <p className="text-[10px] font-medium text-slate-600 leading-tight truncate">
                     {aluno.nome.split(' ')[0]}
                   </p>
-                  {reg?.motivo && (
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">{reg.motivo}</p>
-                  )}
                 </div>
 
-                {/* Botões de marcação */}
+                {/* Botões de marcação menores */}
                 <div className="flex border-t">
                   <button
                     onClick={() => marcar(aluno.id, 'PRESENTE')}
-                    className={`flex-1 py-2.5 flex items-center justify-center transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${
                       status === 'PRESENTE'
                         ? 'bg-green-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-green-50 hover:text-green-600'
                     }`}
                     title="Presente"
                   >
-                    <CheckCircle className="h-5 w-5" />
+                    <CheckCircle className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => marcar(aluno.id, 'AUSENTE')}
-                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center border-l transition-colors ${
                       status === 'AUSENTE'
                         ? 'bg-red-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-red-50 hover:text-red-600'
                     }`}
                     title="Ausente"
                   >
-                    <XCircle className="h-5 w-5" />
+                    <XCircle className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => marcar(aluno.id, 'JUSTIFICADO')}
-                    className={`flex-1 py-2.5 flex items-center justify-center border-l transition-colors ${
+                    className={`flex-1 py-1.5 flex items-center justify-center border-l transition-colors ${
                       status === 'JUSTIFICADO'
                         ? 'bg-yellow-500 text-white'
                         : 'bg-white text-gray-400 hover:bg-yellow-50 hover:text-yellow-600'
                     }`}
                     title="Falta justificada"
                   >
-                    <AlertCircle className="h-5 w-5" />
+                    <AlertCircle className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>

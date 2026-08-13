@@ -13,14 +13,14 @@
 
 ```bash
 # DATABASE
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
+DIRECT_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
 
 # REDIS
-REDIS_URL=redis://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[DB]
+REDIS_URL=redis://[usuario]:[senha]@[host]:6379/0
 
 # JWT
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE] com: openssl rand -base64 32]
+JWT_SECRET=[gere com: openssl rand -base64 32]
 JWT_EXPIRATION=7d
 
 # APP
@@ -69,7 +69,7 @@ VITE_APP_VERSION=3.0.0
 **Variáveis necessárias** (4):
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
 API_URL=https://api.conexa3.casadf.com.br
 NODE_ENV=production
 PORT=5174

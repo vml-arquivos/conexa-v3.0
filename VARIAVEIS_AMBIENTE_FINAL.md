@@ -18,10 +18,10 @@
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Copie do PostgreSQL no Coolify
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 
 # DIRECT_URL (OPCIONAL - deixe igual ao DATABASE_URL se não usar pooling)
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 
 # ============================================================================
 # REDIS (OPCIONAL)
@@ -33,7 +33,7 @@ REDIS_URL=redis://redis-conexa:6379
 # JWT (OBRIGATÓRIO)
 # ============================================================================
 # Gere com: openssl rand -base64 32
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
+JWT_SECRET=sua-chave-secreta-super-segura-aqui-minimo-32-caracteres
 JWT_EXPIRES_IN=7d
 
 # ============================================================================
@@ -104,7 +104,7 @@ VITE_APP_VERSION=3.0.0
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Mesma do backend!
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 
 # ============================================================================
 # API CONFIGURATION (OBRIGATÓRIO)
@@ -169,12 +169,12 @@ PORT=5174
 
 Formato:
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://[USUARIO]:[SENHA]@[CONTAINER]:5432/[BANCO]
 ```
 
 Exemplo:
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres:minha_senha@postgres-conexa:5432/conexa
 ```
 
 **Onde encontrar**:

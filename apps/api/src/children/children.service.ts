@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Prisma, EnrollmentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -10,6 +11,43 @@ import * as crypto from 'crypto';
 
 const UPLOADS_ROOT_DIR = path.resolve(process.env.UPLOADS_DIR ?? 'uploads');
 const CHILDREN_UPLOADS_DIR = path.join(UPLOADS_ROOT_DIR, 'children');
+
+
+type ChildAdministrativeJsonFieldName =
+  | 'dadosResponsaveis'
+  | 'documentosMatricula'
+  | 'autorizadosRetirada'
+  | 'transporteEscolar'
+  | 'fichaAdministrativa';
+
+type PrismaJsonWriteValue =
+  | Prisma.InputJsonValue
+  | Prisma.NullableJsonNullValueInput
+  | undefined;
+
+function toPrismaJson(value: unknown): PrismaJsonWriteValue {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return Prisma.JsonNull;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function normalizeChildJsonFields(
+  dto: Partial<Record<ChildAdministrativeJsonFieldName, unknown>>,
+): Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput> {
+  return {
+    dadosResponsaveis: toPrismaJson(dto.dadosResponsaveis),
+    documentosMatricula: toPrismaJson(dto.documentosMatricula),
+    autorizadosRetirada: toPrismaJson(dto.autorizadosRetirada),
+    transporteEscolar: toPrismaJson(dto.transporteEscolar),
+    fichaAdministrativa: toPrismaJson(dto.fichaAdministrativa),
+  } as Partial<Prisma.ChildUncheckedCreateInput & Prisma.ChildUncheckedUpdateInput>;
+}
 
 @Injectable()
 export class ChildrenService {
@@ -24,11 +62,29 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
+    const {
+      dadosResponsaveis,
+      documentosMatricula,
+      autorizadosRetirada,
+      transporteEscolar,
+      fichaAdministrativa,
+      ...childBaseDto
+    } = createChildDto;
+
+    const data: Prisma.ChildUncheckedCreateInput = {
+      ...childBaseDto,
+      mantenedoraId: user.mantenedoraId,
+      ...normalizeChildJsonFields({
+        dadosResponsaveis,
+        documentosMatricula,
+        autorizadosRetirada,
+        transporteEscolar,
+        fichaAdministrativa,
+      }),
+    };
+
     const child = await this.prisma.child.create({
-      data: {
-        ...createChildDto,
-        mantenedoraId: user.mantenedoraId,
-      },
+      data,
       include: {
         unit: true,
       },
@@ -115,8 +171,16 @@ export class ChildrenService {
       include: {
         unit: true,
         enrollments: {
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
           include: {
-            classroom: true,
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         dietaryRestrictions: true,
@@ -144,14 +208,56 @@ export class ChildrenService {
   async update(id: string, updateChildDto: UpdateChildDto, user: any) {
     const child = await this.findOne(id, user);
 
+    const {
+      dadosResponsaveis,
+      documentosMatricula,
+      autorizadosRetirada,
+      transporteEscolar,
+      fichaAdministrativa,
+      ...childBaseUpdateDto
+    } = updateChildDto;
+
+    // FIX: Prisma rejeita string vazia em campos DateTime com "premature end of input".
+    // Se dateOfBirth vier vazio ou inválido, remover do payload — mantém o valor atual no banco.
+    const sanitizedBase = { ...childBaseUpdateDto } as Record<string, unknown>;
+    const dateFields: string[] = ['dateOfBirth'];
+    for (const field of dateFields) {
+      const val = sanitizedBase[field];
+      if (val === '' || val === null || val === undefined) {
+        delete sanitizedBase[field];
+      } else if (typeof val === 'string' && val.length === 10) {
+        // Converter "YYYY-MM-DD" → "YYYY-MM-DDT00:00:00.000Z" para o Prisma aceitar
+        sanitizedBase[field] = new Date(val + 'T00:00:00.000Z');
+      }
+    }
+
+    const data: Prisma.ChildUncheckedUpdateInput = {
+      ...(sanitizedBase as Prisma.ChildUncheckedUpdateInput),
+      ...normalizeChildJsonFields({
+        dadosResponsaveis,
+        documentosMatricula,
+        autorizadosRetirada,
+        transporteEscolar,
+        fichaAdministrativa,
+      }),
+    };
+
     const updated = await this.prisma.child.update({
       where: { id },
-      data: updateChildDto,
+      data,
       include: {
         unit: true,
         enrollments: {
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
           include: {
-            classroom: true,
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -280,6 +386,64 @@ export class ChildrenService {
     });
 
     return enrollment;
+  }
+
+  /**
+   * Atualizar matrícula ativa da criança (trocar turma ou data)
+   * Chamado pelo frontend após salvar os dados do aluno em modo edição.
+   *
+   * Lógica:
+   * 1. Se vier enrollmentId específico → atualiza esse enrollment
+   * 2. Senão → busca o enrollment ATIVA mais recente e atualiza
+   * 3. Se não existir nenhum ATIVO e vier classroomId → cria novo enrollment
+   */
+  async updateActiveEnrollment(
+    id: string,
+    data: { classroomId?: string; enrollmentDate?: string; enrollmentId?: string },
+    user: any,
+  ) {
+    await this.findOne(id, user); // valida acesso
+
+    // Sanitizar data
+    const enrollmentDate = data.enrollmentDate && data.enrollmentDate.length >= 10
+      ? new Date(data.enrollmentDate.length === 10
+          ? data.enrollmentDate + 'T00:00:00.000Z'
+          : data.enrollmentDate)
+      : undefined;
+
+    // Buscar enrollment para atualizar
+    let enrollment = data.enrollmentId
+      ? await this.prisma.enrollment.findFirst({ where: { id: data.enrollmentId, childId: id } })
+      : await this.prisma.enrollment.findFirst({
+          where: { childId: id, status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+        });
+
+    if (enrollment) {
+      // Atualizar enrollment existente
+      const updateData: any = {};
+      if (data.classroomId) updateData.classroomId = data.classroomId;
+      if (enrollmentDate) updateData.enrollmentDate = enrollmentDate;
+
+      return this.prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: updateData,
+        include: { classroom: { select: { id: true, name: true } } },
+      });
+    } else if (data.classroomId) {
+      // Criar novo enrollment se não existe ativo
+      return this.prisma.enrollment.create({
+        data: {
+          childId: id,
+          classroomId: data.classroomId,
+          status: 'ATIVA',
+          enrollmentDate: enrollmentDate ?? new Date(),
+        },
+        include: { classroom: { select: { id: true, name: true } } },
+      });
+    }
+
+    return { message: 'Nenhuma alteração realizada.' };
   }
 
   /**
@@ -604,5 +768,143 @@ export class ChildrenService {
     });
 
     return healthEvents;
+  }
+
+  /**
+   * Atualizar campos administrativos da Secretaria (PATCH /children/:id/secretaria)
+   *
+   * Atualiza apenas campos JSONB administrativos, sem tocar em dados pedagógicos,
+   * matrículas, diário, planos ou RDIC.
+   */
+  async updateSecretariaFields(
+    id: string,
+    updateData: Record<string, unknown>,
+    user: any,
+  ) {
+    // Verificar se a criança existe e o usuário tem acesso a ela
+    const child = await this.findOne(id, user);
+
+    const updated = await this.prisma.child.update({
+      where: { id },
+      data: {
+        ...(updateData.transporte_escolar !== undefined && {
+          transporte_escolar: updateData.transporte_escolar as any,
+        }),
+        ...(updateData.autorizados_retirada !== undefined && {
+          autorizados_retirada: updateData.autorizados_retirada as any,
+        }),
+        ...(updateData.documentos_matricula !== undefined && {
+          documentos_matricula: updateData.documentos_matricula as any,
+        }),
+        ...(updateData.ficha_administrativa !== undefined && {
+          ficha_administrativa: updateData.ficha_administrativa as any,
+        }),
+        ...(updateData.dados_responsaveis !== undefined && {
+          dados_responsaveis: updateData.dados_responsaveis as any,
+        }),
+        ...(updateData.nacionalidade !== undefined && {
+          nacionalidade: updateData.nacionalidade as string,
+        }),
+        ...(updateData.naturalidade !== undefined && {
+          naturalidade: updateData.naturalidade as string,
+        }),
+        ...(updateData.uf_nascimento !== undefined && {
+          uf_nascimento: updateData.uf_nascimento as string,
+        }),
+        ...(updateData.endereco !== undefined && {
+          endereco: updateData.endereco as string,
+        }),
+        ...(updateData.cep !== undefined && {
+          cep: updateData.cep as string,
+        }),
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        updatedAt: true,
+      },
+    });
+
+    return { success: true, child: updated };
+  }
+
+  /**
+   * Retorna ficha administrativa completa da criança para a Secretaria
+   * (GET /children/:id/ficha-completa)
+   */
+  async getFichaCompleta(id: string, user: any) {
+    const child = await this.prisma.child.findUnique({
+      where: { id },
+      include: {
+        enrollments: {
+          where: { status: EnrollmentStatus.ATIVA },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
+          include: {
+            classroom: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        unit: { select: { id: true, name: true, code: true } },
+      },
+    });
+
+    if (!child) {
+      throw new Error('Criança não encontrada');
+    }
+
+    // Buscar atendimentos aos pais
+    const atendimentos = await this.prisma.atendimentoPais.findMany({
+      where: { childId: id },
+      orderBy: { dataAtendimento: 'desc' },
+      take: 20,
+    }).catch(() => []);
+
+    // Buscar ocorrências de saúde no diário
+    const ocorrencias = await this.prisma.diaryEvent.findMany({
+      where: { childId: id, type: 'SAUDE' },
+      orderBy: { eventDate: 'desc' },
+      take: 20,
+    }).catch(() => []);
+
+    // Montar ficha completa
+    return {
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      dataNascimento: (child as any).dateOfBirth ?? null,
+      genero: (child as any).gender ?? null,
+      foto: (child as any).photoUrl ?? null,
+      // Dados pessoais (migration 20260603)
+      nacionalidade: (child as any).nacionalidade ?? null,
+      naturalidade: (child as any).naturalidade ?? null,
+      uf_nascimento: (child as any).uf_nascimento ?? null,
+      endereco: (child as any).endereco ?? null,
+      cep: (child as any).cep ?? null,
+      // Saúde
+      alergias: (child as any).allergies ?? null,
+      condicoesMedicas: (child as any).medicalConditions ?? null,
+      necessidadeMedicacao: (child as any).medicationNeeds ?? null,
+      laudado: (child as any).laudado ?? false,
+      // Dados JSONB administrativos
+      dadosResponsaveis: (child as any).dados_responsaveis ?? null,
+      documentosMatricula: (child as any).documentos_matricula ?? null,
+      autorizadosRetirada: (child as any).autorizados_retirada ?? null,
+      transporteEscolar: (child as any).transporte_escolar ?? null,
+      fichaAdministrativa: (child as any).ficha_administrativa ?? null,
+      // Turma ativa
+      turma: child.enrollments[0]?.classroom ?? null,
+      // Unidade
+      unidade: child.unit,
+      // Histórico
+      atendimentos,
+      ocorrenciasSaude: ocorrencias,
+    };
   }
 }

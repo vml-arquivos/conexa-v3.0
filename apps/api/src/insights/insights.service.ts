@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RoleLevel } from '@prisma/client';
+import { RoleLevel, AttendanceStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 function canAccessUnitInternal(user: JwtPayload, unitId: string): boolean {
@@ -547,4 +547,530 @@ export class InsightsService {
       alertas,
     };
   }
+
+  /**
+   * GET /insights/child/:childId/summary
+   * Camada somente leitura para análise da criança.
+   *
+   * Regras de integridade:
+   * - não altera matriz curricular;
+   * - não altera planos de aula;
+   * - não altera diário/RDIC/observações existentes;
+   * - não cria migrations;
+   * - não grava dados.
+   */
+  async getChildSummary(childId: string, user: JwtPayload) {
+    if (!childId) throw new ForbiddenException('Criança inválida');
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const child = await this.prisma.child.findFirst({
+      where: {
+        id: childId,
+        mantenedoraId: user.mantenedoraId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        unitId: true,
+        mantenedoraId: true,
+        allergies: true,
+        medicalConditions: true,
+        medicationNeeds: true,
+        enrollments: {
+          where: { status: 'ATIVA' },
+          orderBy: { enrollmentDate: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            classroomId: true,
+            classroom: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    if (!child) throw new ForbiddenException('Criança não encontrada no escopo permitido');
+
+    const activeEnrollment = child.enrollments?.[0] ?? null;
+    const classroomId = activeEnrollment?.classroomId ?? null;
+    const userRoles = Array.isArray(user.roles) ? user.roles : [];
+    const roleLevels = userRoles.map((role) => role.level);
+    const hasCentralAccess = roleLevels.some((level) =>
+      ([RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[]).includes(level),
+    );
+    const hasUnitAccess = roleLevels.includes(RoleLevel.UNIDADE);
+    const hasTeacherAccess = roleLevels.includes(RoleLevel.PROFESSOR);
+
+    if (hasCentralAccess) {
+      const scopedUnits = userRoles.flatMap((role) => role.unitScopes ?? []);
+      if (scopedUnits.length > 0 && !scopedUnits.includes(child.unitId)) {
+        throw new ForbiddenException('Usuário sem acesso à unidade da criança');
+      }
+    } else if (hasUnitAccess) {
+      if (!user.unitId || user.unitId !== child.unitId) {
+        throw new ForbiddenException('Usuário sem acesso à unidade da criança');
+      }
+    } else if (hasTeacherAccess) {
+      if (!classroomId) throw new ForbiddenException('Criança sem turma ativa para validação do professor');
+      const link = await this.prisma.classroomTeacher.findFirst({
+        where: {
+          classroomId,
+          teacherId: user.sub,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!link) throw new ForbiddenException('Professor sem vínculo com a turma da criança');
+    } else {
+      throw new ForbiddenException('Perfil sem acesso ao resumo da criança');
+    }
+
+    const now = new Date();
+    const since30 = new Date(now);
+    since30.setDate(since30.getDate() - 30);
+
+    const [diaryEvents, observations, rdics, attendance30, dietaryRestrictions, openAlerts] = await Promise.all([
+      this.prisma.diaryEvent.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+        },
+        orderBy: { eventDate: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          description: true,
+          observations: true,
+          developmentNotes: true,
+          behaviorNotes: true,
+          eventDate: true,
+          status: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.developmentObservation.findMany({
+        where: { childId },
+        orderBy: { date: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          category: true,
+          date: true,
+          behaviorDescription: true,
+          socialInteraction: true,
+          emotionalState: true,
+          motorSkills: true,
+          cognitiveSkills: true,
+          languageSkills: true,
+          learningProgress: true,
+          developmentAlerts: true,
+          recommendations: true,
+          nextSteps: true,
+          // Campos que faltavam — fecha o cruzamento com o mesmo nível
+          // de profundidade do intelligence-core (saúde, alimentação,
+          // sono, psicologia, interesses, desafios, participação).
+          healthNotes: true,
+          dietaryNotes: true,
+          sleepPattern: true,
+          psychologicalNotes: true,
+          interests: true,
+          challenges: true,
+          planningParticipation: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.rDIXInstancia.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+        },
+        orderBy: { criadoEm: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          periodo: true,
+          periodoEnum: true,
+          anoLetivo: true,
+          status: true,
+          submittedAt: true,
+          reviewedAt: true,
+          finalizadoEm: true,
+          publicadoEm: true,
+          criadoEm: true,
+          atualizadoEm: true,
+        },
+      }),
+      this.prisma.attendance.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          unitId: child.unitId,
+          date: { gte: since30, lte: now },
+        },
+        orderBy: { date: 'desc' },
+        select: {
+          id: true,
+          date: true,
+          status: true,
+          justification: true,
+        },
+      }),
+      this.prisma.dietaryRestriction.findMany({
+        where: { childId, isActive: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          type: true,
+          name: true,
+          description: true,
+          severity: true,
+          forbiddenFoods: true,
+        },
+      }),
+      this.prisma.alertaOperacional.findMany({
+        where: {
+          childId,
+          mantenedoraId: user.mantenedoraId,
+          resolvido: false,
+        },
+        orderBy: { criadoEm: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          tipo: true,
+          severidade: true,
+          titulo: true,
+          descricao: true,
+          criadoEm: true,
+        },
+      }),
+    ]);
+
+    const attendanceTotal = attendance30.length;
+    const presentes = attendance30.filter((item) => item.status === 'PRESENTE').length;
+    const ausentes = attendance30.filter((item) => item.status === 'AUSENTE').length;
+    const justificados = attendance30.filter((item) => item.status === 'JUSTIFICADO').length;
+    const atrasos = attendance30.filter((item) => item.status === 'ATRASO').length;
+    const presencaPercentual = attendanceTotal > 0 ? Math.round((presentes / attendanceTotal) * 100) : null;
+
+    const observationsWithAlerts = observations.filter((item) =>
+      Boolean(item.developmentAlerts && item.developmentAlerts.trim().length > 0),
+    );
+    // Sinais de saúde e psicologia merecem ponto de atenção próprio — antes
+    // ficavam fora do cálculo mesmo quando preenchidos pelo professor/coordenação.
+    const observationsWithHealthOrPsych = observations.filter((item: any) =>
+      Boolean(item.healthNotes?.trim() || item.psychologicalNotes?.trim()),
+    );
+
+    const pontosAtencao: Array<{ tipo: string; severidade: string; titulo: string; descricao: string }> = [];
+
+    if (observationsWithAlerts.length > 0) {
+      pontosAtencao.push({
+        tipo: 'DESENVOLVIMENTO',
+        severidade: observationsWithAlerts.length >= 3 ? 'ALTA' : 'MEDIA',
+        titulo: `${observationsWithAlerts.length} observação(ões) com alerta de desenvolvimento`,
+        descricao: 'Revisar registros recentes com coordenação ou psicologia antes de qualquer encaminhamento.',
+      });
+    }
+
+    if (observationsWithHealthOrPsych.length > 0) {
+      pontosAtencao.push({
+        tipo: 'SAUDE_PSICOLOGICO',
+        severidade: observationsWithHealthOrPsych.length >= 2 ? 'ALTA' : 'MEDIA',
+        titulo: `${observationsWithHealthOrPsych.length} observação(ões) com nota de saúde ou psicológica`,
+        descricao: 'Conteúdo sensível registrado — revisar com equipe responsável antes de qualquer comunicação à família.',
+      });
+    }
+
+    if (presencaPercentual !== null && presencaPercentual < 80) {
+      pontosAtencao.push({
+        tipo: 'FREQUENCIA',
+        severidade: presencaPercentual < 60 ? 'ALTA' : 'MEDIA',
+        titulo: `Presença em ${presencaPercentual}% nos últimos 30 dias registrados`,
+        descricao: 'Acompanhar justificativas e comunicação com responsáveis.',
+      });
+    }
+
+    if (dietaryRestrictions.length > 0 || child.allergies || child.medicalConditions || child.medicationNeeds) {
+      pontosAtencao.push({
+        tipo: 'SAUDE_NUTRICAO',
+        severidade: dietaryRestrictions.some((item) => String(item.severity ?? '').toLowerCase().includes('sever')) ? 'ALTA' : 'MEDIA',
+        titulo: 'Atenção de saúde/nutrição cadastrada',
+        descricao: 'Conferir restrições, alergias e observações de saúde antes de atividades e refeições.',
+      });
+    }
+
+    for (const alerta of openAlerts.slice(0, 5)) {
+      pontosAtencao.push({
+        tipo: String(alerta.tipo),
+        severidade: String(alerta.severidade),
+        titulo: alerta.titulo,
+        descricao: alerta.descricao,
+      });
+    }
+
+    const timeline = [
+      ...diaryEvents.map((item) => ({
+        id: item.id,
+        type: 'DIARIO',
+        date: item.eventDate,
+        title: item.title || String(item.type).replace(/_/g, ' '),
+        description: item.description || item.observations || item.developmentNotes || item.behaviorNotes || '',
+        status: item.status,
+        source: 'DiaryEvent',
+      })),
+      ...observations.map((item) => ({
+        id: item.id,
+        type: 'OBSERVACAO',
+        date: item.date,
+        title: String(item.category || 'GERAL').replace(/_/g, ' '),
+        description:
+          item.behaviorDescription ||
+          item.learningProgress ||
+          item.socialInteraction ||
+          item.emotionalState ||
+          item.motorSkills ||
+          item.cognitiveSkills ||
+          item.languageSkills ||
+          item.sleepPattern ||
+          item.interests ||
+          item.challenges ||
+          item.planningParticipation ||
+          '',
+        // Saúde e psicologia entram no alerta — são os sinais de maior prioridade
+        // para revisão humana, igual ao critério já usado no intelligence-core.
+        alert: item.developmentAlerts || item.healthNotes || item.psychologicalNotes || '',
+        recommendation: item.recommendations || item.nextSteps || '',
+        source: 'DevelopmentObservation',
+      })),
+      ...rdics.map((item) => ({
+        id: item.id,
+        type: 'RDIC',
+        date: item.publicadoEm || item.finalizadoEm || item.reviewedAt || item.submittedAt || item.criadoEm || item.atualizadoEm,
+        title: `RDIC ${item.periodoEnum || item.periodo || ''}`.trim(),
+        description: `Status: ${item.status}`,
+        status: item.status,
+        source: 'RDIXInstancia',
+      })),
+      ...openAlerts.map((item) => ({
+        id: item.id,
+        type: 'ALERTA',
+        date: item.criadoEm,
+        title: item.titulo,
+        description: item.descricao,
+        alert: item.descricao,
+        status: item.severidade,
+        source: 'AlertaOperacional',
+      })),
+    ].sort((a, b) => new Date(b.date as any).getTime() - new Date(a.date as any).getTime());
+
+    return {
+      child: {
+        id: child.id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        name: `${child.firstName} ${child.lastName}`.trim(),
+        dateOfBirth: child.dateOfBirth,
+        unitId: child.unitId,
+        classroomId,
+        classroomName: activeEnrollment?.classroom?.name ?? null,
+        health: {
+          allergies: child.allergies,
+          medicalConditions: child.medicalConditions,
+          medicationNeeds: child.medicationNeeds,
+        },
+      },
+      metrics: {
+        diary: diaryEvents.length,
+        observations: observations.length,
+        observationsWithAlerts: observationsWithAlerts.length,
+        rdic: rdics.length,
+        openAlerts: openAlerts.length,
+        dietaryRestrictions: dietaryRestrictions.length,
+        attendance30: {
+          total: attendanceTotal,
+          presentes,
+          ausentes,
+          justificados,
+          atrasos,
+          presencaPercentual,
+        },
+      },
+      attentionPoints: pontosAtencao,
+      dietaryRestrictions,
+      recent: {
+        diary: diaryEvents.slice(0, 5),
+        observations: observations.slice(0, 5),
+        rdic: rdics.slice(0, 5),
+        attendance: attendance30.slice(0, 10),
+        alerts: openAlerts.slice(0, 5),
+      },
+      timeline,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CENTRO DE MISSÕES INTELIGENTES
+  // Gera tarefas acionáveis determinísticas. Somente leitura. Multi-tenant.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async getMissions(
+    user: JwtPayload,
+    params: { unitId?: string; classroomId?: string; childId?: string; priority?: string; periodDays?: number },
+  ) {
+    const { unitId: resolvedUnit, mantenedoraId } = resolveUnitScope(user, params.unitId);
+    const periodDays = params.periodDays ?? 14;
+    const since = new Date(); since.setDate(since.getDate() - periodDays);
+    type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    type Mission = { id: string; type: string; title: string; description: string; priority: Priority; profile: string[]; evidence: Array<{ source: string; sourceId?: string; label: string; date?: string; value?: string | number }>; suggestedAction: string; targetRoute?: string; requiresHumanReview: true; generatedAt: string; tenantScope: { mantenedoraId?: string; unitId?: string }; };
+    const missions: Mission[] = [];
+    const prioOrder: Record<Priority, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+    const tenantWhere = { mantenedoraId, ...(resolvedUnit ? { unitId: resolvedUnit } : {}) };
+
+    const add = (m: Omit<Mission, 'requiresHumanReview' | 'generatedAt' | 'tenantScope'>) => {
+      if (params.priority && m.priority !== params.priority) return;
+      missions.push({ ...m, requiresHumanReview: true, generatedAt: new Date().toISOString(), tenantScope: { mantenedoraId, unitId: resolvedUnit ?? undefined } });
+    };
+
+    // 1. Alertas operacionais abertos
+    const alertas = await this.prisma.alertaOperacional.findMany({
+      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), resolvido: false },
+      orderBy: { criadoEm: 'desc' }, take: 20,
+      select: { id: true, tipo: true, titulo: true, severidade: true, criadoEm: true },
+    });
+    for (const a of alertas) {
+      add({ id: `alerta-${a.id}`, type: 'ALERTA_OPERACIONAL', title: a.titulo ?? `Alerta ${a.tipo}`,
+        description: `Alerta operacional "${a.tipo}" em aberto.`,
+        priority: (a.severidade === 'CRITICA' || a.severidade === 'ALTA') ? 'CRITICAL' : 'HIGH',
+        profile: ['COORDENACAO_PEDAGOGICA', 'DIRETOR', 'STAFF_CENTRAL'],
+        evidence: [{ source: 'AlertaOperacional', sourceId: a.id, label: a.tipo, date: a.criadoEm?.toISOString() }],
+        suggestedAction: 'Revisar e resolver na tela de ocorrências.', targetRoute: '/app/secretaria/ocorrencias' });
+    }
+
+    // 2. RDICs pendentes / devolvidos
+    const rdics = await this.prisma.rDIXInstancia.findMany({
+      where: { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), status: { in: ['RASCUNHO', 'EM_REVISAO', 'DEVOLVIDO'] as any } },
+      select: { id: true, status: true, periodo: true, anoLetivo: true }, take: 30,
+    });
+    for (const r of rdics) {
+      const dev = r.status === 'DEVOLVIDO';
+      add({ id: `rdic-${r.id}`, type: 'RDIC_PENDENTE', title: `RDIC ${dev ? 'devolvido' : 'pendente'}`,
+        description: `RDIC ${r.periodo ?? ''} (${r.anoLetivo ?? ''}) — ${r.status}.`,
+        priority: dev ? 'HIGH' : 'MEDIUM', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA'],
+        evidence: [{ source: 'RDIXInstancia', sourceId: r.id, label: 'Status', value: r.status }],
+        suggestedAction: dev ? 'Revisar e reenviar.' : 'Finalizar e publicar.', targetRoute: '/app/rdic' });
+    }
+
+    // 3. Baixa frequência (< 75%) — usar findMany e agregar em memória (evita tipo _count problemático)
+    const attWhere = { ...tenantWhere, ...(params.classroomId ? { classroomId: params.classroomId } : {}), ...(params.childId ? { childId: params.childId } : {}), date: { gte: since } };
+    const [attPresente, attTotal] = await Promise.all([
+      this.prisma.attendance.findMany({ where: { ...attWhere, status: AttendanceStatus.PRESENTE }, select: { childId: true } }),
+      this.prisma.attendance.findMany({ where: attWhere, select: { childId: true } }),
+    ]);
+    const pmMap = new Map<string, number>();
+    for (const a of attPresente) pmMap.set(a.childId, (pmMap.get(a.childId) ?? 0) + 1);
+    const tmMap = new Map<string, number>();
+    for (const a of attTotal) tmMap.set(a.childId, (tmMap.get(a.childId) ?? 0) + 1);
+    for (const [childId, total] of tmMap.entries()) {
+      if (total < 3) continue;
+      const taxa = (pmMap.get(childId) ?? 0) / total;
+      if (taxa < 0.75) {
+        add({ id: `freq-${childId}`, type: 'BAIXA_FREQUENCIA', title: 'Frequência abaixo de 75%',
+          description: `Frequência de ${Math.round(taxa * 100)}% nos últimos ${periodDays} dias.`,
+          priority: taxa < 0.5 ? 'CRITICAL' : 'HIGH', profile: ['PROFESSOR', 'COORDENACAO_PEDAGOGICA', 'SECRETARIA'],
+          evidence: [{ source: 'Attendance', label: 'Taxa', value: `${Math.round(taxa * 100)}%` }],
+          suggestedAction: 'Contactar responsável e registrar justificativas.', targetRoute: '/app/secretaria/faltas' });
+      }
+    }
+
+    // 4. Observações com alertas de desenvolvimento — lê o conjunto completo de
+    // campos estruturados (motor, cognitivo, linguagem, social, emocional,
+    // saúde, sono, alimentação), igual ao intelligence-core, em vez de só 2 campos.
+    const obsAlertas = await this.prisma.developmentObservation.findMany({
+      where: {
+        ...(resolvedUnit ? { classroom: { unit: { id: resolvedUnit } } } : {}),
+        ...(params.classroomId ? { classroomId: params.classroomId } : {}),
+        ...(params.childId ? { childId: params.childId } : {}),
+        date: { gte: since },
+        OR: [
+          { developmentAlerts: { not: null } },
+          { psychologicalNotes: { not: null } },
+          { healthNotes: { not: null } },
+          { motorSkills: { not: null } },
+          { cognitiveSkills: { not: null } },
+          { languageSkills: { not: null } },
+          { socialInteraction: { not: null } },
+          { emotionalState: { not: null } },
+          { sleepPattern: { not: null } },
+        ],
+      },
+      select: {
+        id: true, date: true, childId: true,
+        developmentAlerts: true, psychologicalNotes: true, healthNotes: true,
+        motorSkills: true, cognitiveSkills: true, languageSkills: true,
+        socialInteraction: true, emotionalState: true, sleepPattern: true,
+      },
+      take: 30,
+    });
+    for (const o of obsAlertas) {
+      const hp = !!o.psychologicalNotes;
+      const hasHealth = !!o.healthNotes;
+      // Sinais de habilidade (motor/cognitivo/linguagem/social/emocional/sono) contam
+      // como ponto de atenção mesmo sem developmentAlerts explícito — é exatamente
+      // o que o intelligence-core já fazia e o motor de missões antes ignorava.
+      const habilidadesComSinal = [o.motorSkills, o.cognitiveSkills, o.languageSkills, o.socialInteraction, o.emotionalState, o.sleepPattern].filter(Boolean).length;
+      const temAlertaExplicito = !!o.developmentAlerts;
+      if (!temAlertaExplicito && !hp && !hasHealth && habilidadesComSinal === 0) continue;
+
+      const prioridade: 'HIGH' | 'MEDIUM' = (hp || hasHealth || temAlertaExplicito) ? 'HIGH' : 'MEDIUM';
+      const categoriasAfetadas = [
+        o.motorSkills && 'motricidade', o.cognitiveSkills && 'cognição', o.languageSkills && 'linguagem',
+        o.socialInteraction && 'interação social', o.emotionalState && 'estado emocional', o.sleepPattern && 'sono',
+      ].filter(Boolean) as string[];
+
+      add({ id: `obs-${o.id}`, type: 'OBSERVACAO_DESENVOLVIMENTO',
+        title: temAlertaExplicito ? 'Alerta de desenvolvimento registrado' : 'Observação com sinais de acompanhamento',
+        description: categoriasAfetadas.length > 0
+          ? `Registros em: ${categoriasAfetadas.join(', ')}${hp ? ' (com notas psicológicas)' : ''}${hasHealth ? ' (com notas de saúde)' : ''}.`
+          : `Observação com indicadores de atenção${hp ? ' e notas psicológicas' : ''}.`,
+        priority: prioridade,
+        profile: hp ? ['PSICOLOGA', 'COORDENACAO_PEDAGOGICA'] : ['COORDENACAO_PEDAGOGICA', 'PROFESSOR'],
+        evidence: [{ source: 'DevelopmentObservation', sourceId: o.id, label: 'Alerta', date: o.date?.toISOString() }],
+        suggestedAction: hp ? 'Agendar avaliação com equipe de apoio.' : 'Acompanhar evolução e revisar no Perfil Integral da Criança.',
+        targetRoute: `/app/crianca/${o.childId}/perfil-integral` });
+    }
+
+    // 5. Restrições alimentares críticas
+    const restricoes = await this.prisma.dietaryRestriction.findMany({
+      where: { isActive: true, severity: { in: ['ALTA', 'CRITICA'] }, child: { enrollments: { some: { status: 'ATIVA', classroom: { unit: { mantenedoraId, ...(resolvedUnit ? { id: resolvedUnit } : {}) } } } } }, ...(params.childId ? { childId: params.childId } : {}) },
+      select: { id: true, severity: true, description: true }, take: 20,
+    });
+    for (const r of restricoes) {
+      add({ id: `rest-${r.id}`, type: 'RESTRICAO_ALIMENTAR_CRITICA', title: `Restrição alimentar ${r.severity}`,
+        description: r.description ?? 'Criança com restrição alimentar de alta severidade.',
+        priority: r.severity === 'CRITICA' ? 'CRITICAL' : 'HIGH', profile: ['NUTRICIONISTA', 'PROFESSOR'],
+        evidence: [{ source: 'DietaryRestriction', sourceId: r.id, label: 'Severidade', value: r.severity ?? undefined }],
+        suggestedAction: 'Verificar cardápio e orientar equipe.', targetRoute: '/app/painel-alergias' });
+    }
+
+    missions.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
+    return {
+      total: missions.length,
+      summary: { CRITICAL: missions.filter((m) => m.priority === 'CRITICAL').length, HIGH: missions.filter((m) => m.priority === 'HIGH').length, MEDIUM: missions.filter((m) => m.priority === 'MEDIUM').length, LOW: missions.filter((m) => m.priority === 'LOW').length },
+      missions,
+    };
+  }
+
+  async getMissionsSummary(user: JwtPayload, params: { unitId?: string }) {
+    const r = await this.getMissions(user, { ...params, periodDays: 14 });
+    return { total: r.total, summary: r.summary, topMissions: r.missions.slice(0, 5) };
+  }
+
 }

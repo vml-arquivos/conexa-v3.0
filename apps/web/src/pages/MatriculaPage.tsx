@@ -952,7 +952,9 @@ function EtapaCrianca({ form, atualizar, modoEdicao, enviandoFoto, onEnviarFoto 
       <TituloEtapa titulo="Dados da criança" subtitulo="Identificação conforme planilha oficial da unidade." />
       <div className="rounded-xl border border-slate-100 p-4 flex items-center gap-4">
         <ChildAvatar
-          child={{ firstName: form.firstName, lastName: form.lastName, photoUrl: form.photoUrl }}
+          firstName={form.firstName}
+          lastName={form.lastName}
+          photoUrl={form.photoUrl}
           sizeClassName="w-20 h-20"
           imageClassName="rounded-2xl object-cover border border-slate-200"
           fallbackClassName="w-20 h-20 rounded-2xl bg-slate-100 border border-dashed border-slate-300 flex items-center justify-center"

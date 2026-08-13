@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../app/AuthProvider';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,11 +7,12 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { toast } from 'sonner';
 import {
   Users, BookOpen, ShoppingCart,
-  Camera, UserCircle, CheckCircle,
+  Camera, UserCircle, CheckCircle, ClipboardList,
   ChevronRight, Bell, Calendar, X,
   Brain, Sparkles, TrendingUp, Award,
   Plus, Edit3, RefreshCw, FileText,
   Send, Download, Star, Lightbulb, ArrowRight, GraduationCap,
+  AlertTriangle, Shield,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import http, { isAuthExpiredError } from '../api/http';
@@ -231,11 +232,61 @@ export default function TeacherDashboardPage() {
 
   // ─── Widget Hoje (API /insights/teacher/today) ─────────────────────────────────
   const [insightsHoje, setInsightsHoje] = useState<any>(null);
-  useEffect(() => {
+  const loadInsightsHoje = useCallback(() => {
     http.get('/insights/teacher/today')
       .then(r => setInsightsHoje(r.data))
       .catch(() => setInsightsHoje(null));
   }, []);
+  useEffect(() => { loadInsightsHoje(); }, [loadInsightsHoje]);
+
+  // ─── Tarefa 1.5: Alertas de alergias da turma ────────────────────────────────
+  const [alertasAlergias, setAlertasAlergias] = useState<{
+    comAlergia: number;
+    casosCriticos: number;
+    nomes: string[];
+  } | null>(null);
+  useEffect(() => {
+    // Só busca após o dashboard carregar e a turma estar disponível
+    if (!data?.classroom?.id) return;
+    http.get('/children/health/dashboard', { params: { classroomId: data.classroom.id } })
+      .then(r => {
+        const children: any[] = r.data?.children ?? [];
+        const stats = r.data?.stats ?? {};
+        const comAlergia: number = stats.comAlergia ?? children.filter((c: any) =>
+          (c.dietaryRestrictions ?? []).some((dr: any) => dr.type === 'ALERGIA')
+        ).length;
+        const casosCriticos: number = stats.casosCriticos ?? children.filter((c: any) =>
+          (c.dietaryRestrictions ?? []).some((dr: any) => dr.severity === 'severa')
+        ).length;
+        const nomes: string[] = children
+          .filter((c: any) => (c.dietaryRestrictions ?? []).some((dr: any) => dr.type === 'ALERGIA' || dr.severity === 'severa'))
+          .map((c: any) => c.firstName ?? c.name ?? '')
+          .filter(Boolean)
+          .slice(0, 5);
+        if (comAlergia > 0 || casosCriticos > 0) {
+          setAlertasAlergias({ comAlergia, casosCriticos, nomes });
+        }
+      })
+      .catch(() => {
+        // Silencioso: não bloquear o dashboard se o endpoint falhar
+      });
+  }, [data?.classroom?.id]);
+
+  // Tarefa 2.4 — Alertas operacionais da turma (faltas consecutivas, etc.)
+  const [alertasOperacionais, setAlertasOperacionais] = useState<{
+    total: number;
+    criticos: number;
+    atencao: number;
+    alertas: any[];
+  } | null>(null);
+  useEffect(() => {
+    if (!data?.classroom?.id) return;
+    http.get('/alertas', { params: { classroomId: data.classroom.id, unread: 'true', limit: '20' } })
+      .then(r => {
+        if (r.data?.total > 0) setAlertasOperacionais(r.data);
+      })
+      .catch(() => { /* silencioso */ });
+  }, [data?.classroom?.id]);
 
   // Modal de microgesto rápido
   const [modalCriancaInfo, setModalCriancaInfo] = useState<string | null>(null);
@@ -245,6 +296,25 @@ export default function TeacherDashboardPage() {
   const [savingMicrogesto, setSavingMicrogesto] = useState(false);
 
   useEffect(() => { loadDashboard(); }, []);
+
+  // Tarefa 1.3 — Auto-refresh: recarregar dashboard a cada 5 minutos e ao voltar para a aba
+  useEffect(() => {
+    // Refetch ao focar na aba (visibilitychange)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadDashboard();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Refetch automático a cada 5 minutos
+    const interval = setInterval(() => {
+      loadDashboard();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Carregar RDICs da turma quando aba rdic é ativada
   useEffect(() => {
@@ -315,10 +385,62 @@ export default function TeacherDashboardPage() {
       setLoading(true);
       const response = await http.get('/teachers/dashboard');
       setData(response.data);
+      loadInsightsHoje();
     } catch {
       toast.error('Não foi possível carregar seu painel.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleEvidenciaRapidaUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
+
+    const classroomId = insightsHoje?.planejamentoAtivo?.classroomId || data?.classroom?.id;
+    if (!classroomId) {
+      toast.error('Turma não identificada para registrar evidências.');
+      return;
+    }
+
+    try {
+      const res = await http.get('/diary-events', {
+        params: {
+          classroomId,
+          startDate: new Date().toISOString().split('T')[0],
+          limit: 1,
+        },
+      });
+
+      const events = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+      const diarioHoje = events[0];
+
+      if (!diarioHoje?.id) {
+        toast.info('Crie o diário do dia antes de adicionar evidências.');
+        navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(classroomId)}`);
+        return;
+      }
+
+      let sucesso = 0;
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          await http.post(`/diary-events/${diarioHoje.id}/media`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          sucesso++;
+        } catch {
+          // continua tentando os demais arquivos
+        }
+      }
+
+      if (sucesso > 0) {
+        toast.success(`${sucesso} evidência${sucesso > 1 ? 's' : ''} registrada${sucesso > 1 ? 's' : ''} com sucesso!`);
+      } else {
+        toast.error('Não foi possível registrar as evidências. Tente no diário.');
+      }
+    } catch {
+      toast.error('Erro ao registrar evidência. Tente no diário.');
     }
   }
 
@@ -409,8 +531,8 @@ export default function TeacherDashboardPage() {
       )}
 
       {data?.hasClassroom && (
-        <div className="space-y-6">
-          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+        <div className="space-y-6 overflow-x-hidden">
+          <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr] max-w-full">
             <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-5 text-white shadow-xl shadow-slate-200/70">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-4">
@@ -604,8 +726,87 @@ export default function TeacherDashboardPage() {
                         </button>
                       </div>
                     )}
+
+                    {insightsHoje?.planejamentoAtivo?.id && (
+                      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          onClick={() => navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(insightsHoje.planejamentoAtivo.classroomId)}`)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                        >
+                          <ClipboardList className="h-4 w-4" />
+                          Registrar Diário do Dia
+                        </button>
+                        <button
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.multiple = true;
+                            input.onchange = async (e) => {
+                              const files = (e.target as HTMLInputElement).files;
+                              await handleEvidenciaRapidaUpload(files);
+                            };
+                            input.click();
+                          }}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                          title="Registrar evidência fotográfica do dia"
+                        >
+                          <Camera className="h-4 w-4" />
+                          Evidência
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tarefa 1.5 — Card de alertas de alergias */}
+          {alertasAlergias && (
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-800">
+                  {alertasAlergias.comAlergia} criança{alertasAlergias.comAlergia !== 1 ? 's' : ''} com alergia na turma
+                  {alertasAlergias.casosCriticos > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      <Shield className="h-3 w-3" />
+                      {alertasAlergias.casosCriticos} caso{alertasAlergias.casosCriticos !== 1 ? 's' : ''} crítico{alertasAlergias.casosCriticos !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                {alertasAlergias.nomes.length > 0 && (
+                  <p className="mt-0.5 text-xs text-red-700">
+                    {alertasAlergias.nomes.join(', ')}{alertasAlergias.nomes.length === 5 ? ' e outros' : ''}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => navigate('/app/painel-alergias')}
+                className="flex-shrink-0 rounded-full border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 transition-colors"
+              >
+                Ver detalhes
+              </button>
+            </div>
+          )}
+
+          {/* Tarefa 2.4 — Card de alertas operacionais */}
+          {alertasOperacionais && (
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+              <Bell className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-800">
+                  {alertasOperacionais.total} alerta{alertasOperacionais.total !== 1 ? 's' : ''} operacional{alertasOperacionais.total !== 1 ? 'is' : ''} na turma
+                  {alertasOperacionais.criticos > 0 && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                      {alertasOperacionais.criticos} crítico{alertasOperacionais.criticos !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+                {alertasOperacionais.alertas.slice(0, 3).map((a: any) => (
+                  <p key={a.id} className="mt-0.5 text-xs text-amber-700 truncate">• {a.titulo}</p>
+                ))}
               </div>
             </div>
           )}
@@ -747,6 +948,44 @@ export default function TeacherDashboardPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Tarefa 3.5 — Indicador de crianças com objetivos pendentes (sem RDIC no trimestre atual) */}
+              {!loadingRdics && alunos.length > 0 && (() => {
+                const trimestreAtual = Math.ceil((new Date().getMonth() + 1) / 4) || 1;
+                const semRdicTrimestre = alunos.filter(a => {
+                  const info = rdicsMap[a.id];
+                  if (!info || info.count === 0) return true;
+                  // Verifica se o último período é do trimestre atual
+                  const periodo = info.ultimoPeriodo?.toLowerCase() ?? '';
+                  const temTrimAtual = periodo.includes(`${trimestreAtual}º`) || periodo.includes(`${trimestreAtual}o`);
+                  return !temTrimAtual;
+                });
+                if (semRdicTrimestre.length === 0) return null;
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-800">
+                          {semRdicTrimestre.length} {semRdicTrimestre.length === 1 ? 'criança' : 'crianças'} sem RDIC no {trimestreAtual}º trimestre
+                        </p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          {semRdicTrimestre.slice(0, 3).map(a => a.firstName).join(', ')}
+                          {semRdicTrimestre.length > 3 ? ` e mais ${semRdicTrimestre.length - 3}` : ''}
+                        </p>
+                        <button
+                          onClick={() => navigate('/app/rdic-crianca')}
+                          className="mt-2 text-xs text-amber-700 underline hover:text-amber-900"
+                        >
+                          Registrar agora →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Barra de cobertura geral */}
               {alunos.length > 0 && (

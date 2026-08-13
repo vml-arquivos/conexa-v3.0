@@ -27,12 +27,12 @@ Copie e cole no Coolify (aba "Environment Variables"):
 # ============================================================================
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://conexa_user:SUA_SENHA_AQUI@conexa-v3-db:5432/conexa
 
 # ============================================================================
 # JWT (OBRIGATÓRIO)
 # ============================================================================
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
+JWT_SECRET=sua-chave-secreta-super-segura-aqui-minimo-32-caracteres-use-openssl-rand-base64-32
 JWT_EXPIRES_IN=7d
 
 # ============================================================================
@@ -81,12 +81,12 @@ LOG_FORMAT=json
 
 **Formato**:
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://[USUARIO]:[SENHA]@[CONTAINER]:5432/[BANCO]
 ```
 
 **Exemplo**:
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://conexa_user:Cx3@Pg$qL9#mN2vR@conexa-v3-db:5432/conexa
 ```
 
 **Passo a passo**:
@@ -378,7 +378,7 @@ Copie e cole no Coolify (aba "Environment Variables"):
 # ============================================================================
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://conexa_user:SUA_SENHA_AQUI@conexa-v3-db:5432/conexa
 
 # ============================================================================
 # API CONFIGURATION (OBRIGATÓRIO)
@@ -417,8 +417,8 @@ PORT=5174
 ### BACKEND API
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
+DATABASE_URL=postgresql://conexa_user:SUA_SENHA_AQUI@conexa-v3-db:5432/conexa
+JWT_SECRET=sua-chave-secreta-super-segura-aqui-minimo-32-caracteres
 JWT_EXPIRES_IN=7d
 NODE_ENV=production
 PORT=3000
@@ -452,7 +452,7 @@ VITE_APP_VERSION=3.0.0
 ### SITE INSTITUCIONAL
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://conexa_user:SUA_SENHA_AQUI@conexa-v3-db:5432/conexa
 API_URL=https://api.conexa.seu-dominio.com
 NODE_ENV=production
 PORT=5174

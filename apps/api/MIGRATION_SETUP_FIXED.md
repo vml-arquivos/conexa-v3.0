@@ -32,14 +32,14 @@ Arquivo SQL gerado via `prisma migrate diff` contendo todo o schema inicial.
 -Copie a URL que se parece com isto:
 -
 -```bash
--postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+-postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres
 -```
 -
 -E cole no seu arquivo `.env`:
 -
 -```bash
 -# .env
--DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
+-DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"
 -```
 +### 1. Configurar `DATABASE_URL`
 +
@@ -53,7 +53,7 @@ Arquivo SQL gerado via `prisma migrate diff` contendo todo o schema inicial.
 +
 +```bash
 +# .env
-+DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]"
++DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@[YOUR-HOST]:5432/postgres"
 +```
 +
 +**⚠️ IMPORTANTE:** Nunca comite o arquivo `.env` no Git. Use variáveis de ambiente no seu ambiente de produção.

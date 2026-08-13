@@ -15,9 +15,9 @@
 ### Database (Supabase)
 
 ```env
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres.ockzuvbnzfoqsiwmpixr:Conexaapiv1db@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
 
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://postgres.ockzuvbnzfoqsiwmpixr:Conexaapiv1db@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 ⚠️ **IMPORTANTE:**
@@ -29,8 +29,8 @@ DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ### JWT Secrets
 
 ```env
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE]
-JWT_REFRESH_SECRET=[CONFIGURE_NO_AMBIENTE]
+JWT_SECRET=seu_secret_seguro_aqui_minimo_32_caracteres
+JWT_REFRESH_SECRET=seu_refresh_secret_seguro_aqui_minimo_32_caracteres
 ```
 
 ⚠️ **GERE SECRETS FORTES:**
@@ -43,8 +43,8 @@ openssl rand -base64 32
 
 ```env
 SUPABASE_URL=https://ockzuvbnzfoqsiwmpixr.supabase.co
-SUPABASE_ANON_KEY=[CONFIGURE_NO_AMBIENTE]
-SUPABASE_SERVICE_ROLE_KEY=[CONFIGURE_NO_AMBIENTE]
+SUPABASE_ANON_KEY=sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF
+SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key_aqui
 ```
 
 ⚠️ **OBTER SERVICE_ROLE_KEY:**
@@ -180,8 +180,8 @@ No Coolify, verificar logs para:
 ```bash
 curl -X GET \
   'https://ockzuvbnzfoqsiwmpixr.supabase.co/rest/v1/_prisma_migrations?select=*' \
-  -H "apikey: [CONFIGURE_NO_AMBIENTE]" \
-  -H "Authorization: Bearer [CONFIGURE_NO_AMBIENTE]"
+  -H "apikey: sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF" \
+  -H "Authorization: Bearer sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF"
 ```
 
 ---

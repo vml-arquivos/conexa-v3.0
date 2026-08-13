@@ -1,3 +1,12 @@
+/**
+ * PageShell — Layout base padronizado de todas as páginas do Conexa
+ *
+ * Uso:
+ *   <PageShell title="Título" subtitle="Descrição" headerActions={<button>...</button>}>
+ *     conteúdo
+ *   </PageShell>
+ */
+
 import React from 'react';
 import { cn } from '../../lib/utils';
 
@@ -5,32 +14,61 @@ interface PageShellProps {
   children: React.ReactNode;
   title?: string;
   subtitle?: string;
+  titulo?: string;
+  subtitulo?: string;
   description?: string;
   headerActions?: React.ReactNode;
   className?: string;
+  /** Remove o padding horizontal/vertical para conteúdos full-bleed */
+  flush?: boolean;
 }
 
 export function PageShell({
   children,
   title,
   subtitle,
+  titulo,
+  subtitulo,
   description,
   headerActions,
   className,
+  flush = false,
 }: PageShellProps) {
+  const resolvedTitle    = title ?? titulo;
+  const resolvedSubtitle = subtitle ?? subtitulo ?? description;
+
   return (
-    <div className={cn("flex flex-col gap-8 p-4 md:p-8 max-w-7xl mx-auto w-full", className)}>
-      {(title || description || headerActions) && (
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            {title && <h1 className="text-3xl font-bold tracking-tight">{title}</h1>}
-            {subtitle && <p className="text-base text-muted-foreground">{subtitle}</p>}
-            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    <div className={cn(
+      'flex flex-col w-full max-w-[var(--content-max-w)] mx-auto',
+      flush ? '' : 'px-4 md:px-6 py-5 gap-5',
+      className,
+    )}>
+
+      {/* ── Header ── */}
+      {(resolvedTitle || resolvedSubtitle || headerActions) && (
+        <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
+            {resolvedTitle && (
+              <h1 className="text-[1.15rem] font-semibold tracking-tight leading-snug text-[var(--text-primary)] truncate">
+                {resolvedTitle}
+              </h1>
+            )}
+            {resolvedSubtitle && (
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                {resolvedSubtitle}
+              </p>
+            )}
           </div>
-          {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
+          {headerActions && (
+            <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+              {headerActions}
+            </div>
+          )}
         </header>
       )}
-      <main className="flex-1">
+
+      {/* ── Content ── */}
+      <main className="flex-1 min-w-0">
         {children}
       </main>
     </div>

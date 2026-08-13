@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { imprimirPlanejamento, gerarPDF } from '../components/PrintablePlan';
+import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor } from '../api/auth';
+import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -23,6 +24,8 @@ import {
   Printer,
   Download,
   ClipboardCheck,
+  Trash2,
+  Edit,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import http from '../api/http';
@@ -168,6 +171,7 @@ function getStatusVirtual(p: Planning, today: Date): string {
 export default function PlanoDeAulaListaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isDeveloper = normalizeRoles(user).includes('DEVELOPER');
   const today = new Date();
 
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -580,10 +584,26 @@ export default function PlanoDeAulaListaPage() {
                     <div className="space-y-4">
                       {v2.days!.map((day, idx) => (
                         <div key={day.date} className="border border-indigo-100 rounded-xl overflow-hidden">
-                          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200">
+                          <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between gap-2">
                             <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide">
                               Dia {idx + 1} — {day.date.split('-').reverse().join('/')}
                             </p>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => gerarPDFDia(selectedPlanning, day.date)}
+                                title="Gerar PDF deste dia"
+                                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                              >
+                                <Download className="h-3 w-3" /> PDF do dia
+                              </button>
+                              <button
+                                onClick={() => imprimirPlanejamentoDia(selectedPlanning, day.date)}
+                                title="Imprimir apenas este dia"
+                                className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
+                              >
+                                <Printer className="h-3 w-3" /> Imprimir dia
+                              </button>
+                            </div>
                           </div>
                           <div className="px-4 py-3 space-y-3 bg-white">
                             {day.objectives?.length > 0 && (
@@ -928,6 +948,39 @@ export default function PlanoDeAulaListaPage() {
                 </Button>
               )}
 
+              {isDeveloper && selectedPlanning && (
+                <div className="flex gap-2 pt-1 border-t border-gray-100">
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={() => {
+                      setSelectedPlanning(null);
+                      navigate(`/app/planejamento/${selectedPlanning.id}/editar`);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar (Dev)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={async () => {
+                      if (!window.confirm(`Apagar o planejamento "${selectedPlanning.title}"? Esta ação não pode ser desfeita.`)) return;
+                      try {
+                        await http.delete(`/plannings/${selectedPlanning.id}`);
+                        toast.success('Planejamento apagado.');
+                        setSelectedPlanning(null);
+                        setPlannings(prev => prev.filter(p => p.id !== selectedPlanning.id));
+                      } catch (err: any) {
+                        toast.error(err?.response?.data?.message || 'Erro ao apagar planejamento.');
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Apagar (Dev)
+                  </Button>
+                </div>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setSelectedPlanning(null)}

@@ -25,10 +25,10 @@
 **Variáveis** (14):
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 REDIS_URL=redis://redis-conexa:6379
-JWT_SECRET=[CONFIGURE_NO_AMBIENTE] com: openssl rand -base64 32]
+JWT_SECRET=[gere com: openssl rand -base64 32]
 JWT_EXPIRES_IN=7d
 NODE_ENV=production
 PORT=3000
@@ -66,7 +66,7 @@ VITE_APP_VERSION=3.0.0
 **Variáveis** (4):
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 API_URL=https://api.conexa3.casadf.com.br
 NODE_ENV=production
 PORT=5174
@@ -187,7 +187,7 @@ curl https://conexa3.casadf.com.br
 
 **Formato**:
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
 ```
 
 ---

@@ -702,7 +702,7 @@ export class ReportsService {
     if (!isStaffOrAbove && !resolvedUnitId) {
       throw new ForbiddenException('unitId obrigatório para este perfil');
     }
-    if (resolvedUnitId && !canAccessUnit(user, resolvedUnitId)) {
+    if (resolvedUnitId && !(await canAccessUnit(user, resolvedUnitId))) {
       throw new ForbiddenException('Acesso não autorizado à unidade');
     }
 

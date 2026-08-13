@@ -365,6 +365,33 @@ Responda em JSON:
       take: 30,
     });
 
+    // 4b. Buscar observações estruturadas de desenvolvimento — antes este
+    // relatório só usava o Diário de Bordo e ignorava por completo os campos
+    // de motricidade, cognição, linguagem, social, emocional, sono e saúde
+    // que professor/coordenação registram em DevelopmentObservation. Sem
+    // essa fonte, o relatório enviado às famílias perdia justamente os
+    // dados mais estruturados de desenvolvimento da criança.
+    const developmentObservations = await this.prisma.developmentObservation.findMany({
+      where: { childId: params.childId },
+      select: {
+        behaviorDescription: true,
+        socialInteraction: true,
+        emotionalState: true,
+        motorSkills: true,
+        cognitiveSkills: true,
+        languageSkills: true,
+        sleepPattern: true,
+        learningProgress: true,
+        interests: true,
+        challenges: true,
+        recommendations: true,
+        nextSteps: true,
+        date: true,
+      },
+      orderBy: { date: 'desc' },
+      take: 30,
+    });
+
     // 5. Montar observações anonimizadas (remover nomes próprios)
     const observacoes: string[] = [];
     const regexNome = new RegExp(`${crianca.firstName}|${crianca.lastName}`, 'gi');
@@ -377,10 +404,24 @@ Responda em JSON:
         observacoes.push(obs);
       }
     }
+    // Mesma anonimização aplicada aos campos estruturados de desenvolvimento
+    for (const obs of developmentObservations) {
+      const campos = [
+        obs.behaviorDescription, obs.socialInteraction, obs.emotionalState,
+        obs.motorSkills, obs.cognitiveSkills, obs.languageSkills, obs.sleepPattern,
+        obs.learningProgress, obs.interests, obs.challenges, obs.recommendations, obs.nextSteps,
+      ].filter(Boolean) as string[];
+      for (const campo of campos) {
+        const texto = campo
+          .replace(/\b[A-Z][a-z]{2,}\s[A-Z][a-z]{2,}\b/g, nomeAnonimizado)
+          .replace(regexNome, nomeAnonimizado);
+        observacoes.push(texto);
+      }
+    }
 
     if (observacoes.length === 0) {
       throw new ServiceUnavailableException(
-        'Não há observações suficientes. Registre pelo menos uma entrada no Diário de Bordo.',
+        'Não há observações suficientes. Registre pelo menos uma entrada no Diário de Bordo ou nas Observações de Desenvolvimento.',
       );
     }
 
@@ -388,7 +429,7 @@ Responda em JSON:
     const resultado = await this.gerarRelatorioAluno({
       nomeAluno: nomeAnonimizado,
       faixaEtaria,
-      observacoes: observacoes.slice(0, 20),
+      observacoes: observacoes.slice(0, 30),
       periodo: params.periodo,
     });
 

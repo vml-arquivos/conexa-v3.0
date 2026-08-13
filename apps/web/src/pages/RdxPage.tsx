@@ -109,6 +109,13 @@ interface RelatorioFoto {
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
+function formatarDataSegura(dataStr: string | undefined | null): { dia: number | string; mes: string } {
+  if (!dataStr) return { dia: '?', mes: '?' };
+  const d = new Date(dataStr.includes('T') ? dataStr : dataStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return { dia: '?', mes: '?' };
+  return { dia: d.getDate(), mes: MESES[d.getMonth()] };
+}
+
 export default function RdxPage() {
   const [loading, setLoading] = useState(true);
   const [relatorios, setRelatorios] = useState<RelatorioFoto[]>([]);
@@ -140,7 +147,13 @@ export default function RdxPage() {
     try {
       setLoading(true);
       const res = await http.get('/rdx');
-      setRelatorios(res.data ?? []);
+      const lista = (res.data ?? []).map((r: any) => ({
+        ...r,
+        dataAtividade: r.dataAtividade ?? r.date ?? r.data ?? r.createdAt?.substring(0, 10) ?? '',
+        fotos: Array.isArray(r.fotos) ? r.fotos : (Array.isArray(r.mediaUrls) ? r.mediaUrls.map((url: string) => ({ url })) : []),
+        titulo: r.titulo ?? r.title ?? 'Sem título',
+      }));
+      setRelatorios(lista);
     } catch {
       toast.error('Erro ao carregar relatórios');
     } finally {
@@ -253,11 +266,10 @@ export default function RdxPage() {
 
   // ─── Detalhe ──────────────────────────────────────────────────────────────────
   if (view === 'detalhe' && selected) {
-    const d = new Date(selected.dataAtividade + 'T12:00:00');
     return (
       <PageShell
         title={selected.titulo}
-        description={`${d.getDate()} de ${MESES[d.getMonth()]} · ${selected.fotos.length} foto(s)`}
+        description={(() => { const { dia, mes } = formatarDataSegura(selected.dataAtividade); return `${dia} de ${mes} · ${selected.fotos.length} foto(s)`; })()}
         headerActions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setView('lista')}>
@@ -614,7 +626,6 @@ export default function RdxPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {relatorios.map((r) => {
-            const d = new Date(r.dataAtividade + 'T12:00:00');
             return (
               <Card
                 key={r.id}
@@ -639,7 +650,7 @@ export default function RdxPage() {
                   </div>
 
                   <p className="text-xs text-gray-500 mb-3">
-                    {d.getDate()} de {MESES[d.getMonth()]} · {r.fotos.length} foto(s)
+                    {(() => { const { dia, mes } = formatarDataSegura(r.dataAtividade); return `${dia} de ${mes}`; })()} · {r.fotos.length} foto(s)
                   </p>
 
                   <div className="flex gap-2">

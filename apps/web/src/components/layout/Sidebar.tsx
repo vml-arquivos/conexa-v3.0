@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen, ClipboardList, BarChart2, ShoppingCart, GraduationCap,
-  ChevronRight, TrendingUp, Users, LayoutDashboard, ShoppingBag,
+  FileArchive, HeartPulse,
+  ChevronRight, ChevronDown, TrendingUp, Users, LayoutDashboard, ShoppingBag,
   FileText, Home, MessageCircle, Camera, UserCheck, Building2,
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
-  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle,
+  Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle, UserPlus, Bell, FolderCheck, Bus, Stethoscope,
+  Smartphone,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -21,6 +24,7 @@ interface MenuItem {
 // PROFESSOR / PROFESSOR_AUXILIAR ──────────────────────────────────────────────
 const PROFESSOR_PRINCIPAL: MenuItem[] = [
   { path: '/app/teacher-dashboard', label: 'Painel do Professor', icon: <GraduationCap className="h-4 w-4" /> },
+  { path: '/app/mobile',            label: 'App Mobile (PWA)',    icon: <Smartphone className="h-4 w-4" />, badge: 'Mobile' },
   { path: '/app/material-requests', label: 'Requisições de Materiais', icon: <ShoppingCart className="h-4 w-4" /> },
 ];
 const PROFESSOR_FERRAMENTAS: MenuItem[] = [
@@ -33,7 +37,7 @@ const PROFESSOR_FERRAMENTAS: MenuItem[] = [
   { path: '/app/rdx',                 label: 'Fotos da Turma',         icon: <Camera className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais',   label: 'Atendimentos Pais',      icon: <MessageCircle className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica',   label: 'Matriz 2026',            icon: <Layers className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/painel-alergias',     label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Importante' },
+  { path: '/app/painel-alergias',     label: 'Alergias e Dietas',      icon: <Apple className="h-4 w-4" />, badge: 'Atenção' },
 ];
 
 // UNIDADE — Coordenadora Pedagógica ────────────────────────────────────────────
@@ -44,7 +48,9 @@ const COORD_GESTAO: MenuItem[] = [
   { path: '/app/pedidos-compra',         label: 'Pedidos de Compra',        icon: <ShoppingBag className="h-4 w-4" /> },
 ];
 const COORD_PEDAGOGICO: MenuItem[] = [
-  { path: '/app/rdic-coord',      label: 'RDIC — Revisão',      icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
+  { path: '/app/diario-calendario', label: 'Diário',             icon: <ClipboardList className="h-4 w-4" />, badge: 'Novo' },
+  { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',  icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/rdic-coord',        label: 'RDIC — Revisão',     icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
   { path: '/app/rdic-crianca',    label: 'RDIC por Criança',    icon: <Brain className="h-4 w-4" /> },
   { path: '/app/inteligencia',    label: 'Inteligência',        icon: <Sparkles className="h-4 w-4" /> },
   { path: '/app/reports',         label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
@@ -78,13 +84,19 @@ const NUTRI_ITEMS: MenuItem[] = [
   { path: '/app/nutricionista?s=configuracoes',      label: 'Configurações',           icon: <Settings className="h-4 w-4" /> },
 ];
 
-// UNIDADE — Administrativo ─────────────────────────────────────────────────────
+// UNIDADE — Administrativo (Secretaria) ─────────────────────────────────────
 const ADMIN_UNIDADE_ITEMS: MenuItem[] = [
-  { path: '/app/unidade',                       label: 'Painel da Unidade',      icon: <Home className="h-4 w-4" /> },
-  { path: '/app/material-requests',             label: 'Requisições Pendentes',  icon: <ShoppingCart className="h-4 w-4" /> },
-  { path: '/app/pedidos-compra',                label: 'Pedidos de Compra',      icon: <ShoppingBag className="h-4 w-4" /> },
-  { path: '/app/relatorio-consumo-materiais',   label: 'Consumo de Materiais',   icon: <BarChart2 className="h-4 w-4" /> },
-  { path: '/app/coordenacao',                   label: 'Turmas',                 icon: <Users className="h-4 w-4" /> },
+  { path: '/app/secretaria',                    label: 'Painel da Secretaria',         icon: <Home className="h-4 w-4" /> },
+  { path: '/app/secretaria/matriculas',         label: 'Matrículas e Fichas',          icon: <UserCheck className="h-4 w-4" /> },
+  { path: '/app/secretaria/matriculas/nova',    label: 'Nova Matrícula',               icon: <UserPlus className="h-4 w-4" />, badge: 'Essencial' },
+  { path: '/app/secretaria/movimentacoes',      label: 'Cancelamentos/Transferências', icon: <FileArchive className="h-4 w-4" /> },
+  { path: '/app/secretaria/faltas',             label: 'Controle de Faltas',           icon: <ClipboardList className="h-4 w-4" /> },
+  { path: '/app/secretaria/atestados',          label: 'Atestados e Documentos',       icon: <FolderCheck className="h-4 w-4" /> },
+  { path: '/app/secretaria/ocorrencias',        label: 'Saúde e Ocorrências',          icon: <HeartPulse className="h-4 w-4" /> },
+  { path: '/app/atendimentos-pais',             label: 'Atendimento aos Pais',         icon: <MessageCircle className="h-4 w-4" /> },
+  { path: '/app/secretaria/transporte',         label: 'Transporte e Retirada',        icon: <Bus className="h-4 w-4" /> },
+  { path: '/app/secretaria/funcionarios',       label: 'Funcionários da Unidade',      icon: <Building2 className="h-4 w-4" /> },
+  { path: '/app/secretaria/comunicacao',        label: 'Comunicados Administrativos',  icon: <Bell className="h-4 w-4" /> },
 ];
 
 // UNIDADE — Genérico (sem roleType específico) ─────────────────────────────────
@@ -102,7 +114,6 @@ const UNIDADE_PEDAGOGICO: MenuItem[] = [
   { path: '/app/rdic-coord',        label: 'RDIC — Revisão e Aprovação', icon: <Brain className="h-4 w-4" />, badge: 'Coord' },
   { path: '/app/rdic-crianca',      label: 'RDIC por Criança',           icon: <Brain className="h-4 w-4" /> },
   { path: '/app/inteligencia',      label: 'Painel de Inteligência',     icon: <Sparkles className="h-4 w-4" />, badge: 'Novo' },
-  { path: '/app/chamada',           label: 'Chamada Diária',             icon: <UserCheck className="h-4 w-4" /> },
   { path: '/app/rdx',               label: 'Fotos da Turma',             icon: <Camera className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica', label: 'Matriz 2026',                icon: <Layers className="h-4 w-4" /> },
   { path: '/app/atendimentos-pais', label: 'Atendimentos Pais',          icon: <MessageCircle className="h-4 w-4" /> },
@@ -177,24 +188,29 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
     <Link
       to={item.path}
       onClick={onClick}
-      className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all ${
+      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-100 ${
         active
-          ? 'bg-blue-600 text-white'
-          : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+          ? 'bg-brand-600 text-white shadow-ds-sm'
+          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
       }`}
     >
-      <span className="flex items-center gap-2.5">
-        {item.icon}
-        {item.label}
+      <span className="flex items-center gap-2">
+        <span className={`flex-shrink-0 transition-colors ${
+          active ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+        }`}>
+          {item.icon}
+        </span>
+        <span className="truncate">{item.label}</span>
       </span>
-      <span className="flex items-center gap-1">
-        {item.badge && (
-          <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
-            {item.badge}
-          </span>
-        )}
-        {active && <ChevronRight className="h-3 w-3 opacity-70" />}
-      </span>
+      {item.badge && (
+        <span className={`ml-1 flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
+          active
+            ? 'bg-white/20 text-white'
+            : 'bg-brand-900/60 text-brand-300'
+        }`}>
+          {item.badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -204,10 +220,10 @@ function NavSection({
 }: { titulo: string; items: MenuItem[]; location: ReturnType<typeof useLocation>; onItemClick?: () => void }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.07em] px-2.5 mb-1.5">
         {titulo}
       </p>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {items.map((item) => (
           <NavItem key={item.path} item={item} active={isActiveForItem(location, item.path)} onClick={onItemClick} />
         ))}
@@ -253,13 +269,16 @@ export function Sidebar({ onClose }: SidebarProps) {
     : isDiretor                          ? 'Diretor(a)'
     : isNutricionista                    ? 'Nutricionista'
     : isCoordPedagogico                  ? 'Coord. Pedagógica'
-    : isAdministrativo                   ? 'Administrativo'
+    : isAdministrativo                   ? 'Secretaria'
     : isUnidade                          ? 'Unidade'
     : isProfessor                        ? 'Professor(a)'
     : 'Usuário';
 
   const configItem: MenuItem = { path: '/app/configuracoes', label: 'Configurações', icon: <Settings className="h-4 w-4" /> };
   const perfilItem: MenuItem = { path: '/app/meu-perfil',    label: 'Meu Perfil',    icon: <UserCircle className="h-4 w-4" /> };
+  const [configOpen, setConfigOpen] = useState(
+    () => location.pathname.startsWith('/app/meu-perfil') || location.pathname.startsWith('/app/configuracoes')
+  );
 
   // adminItems: exibido apenas para perfis com acesso administrativo real.
   // Nutricionista (isNutricionista) NÃO recebe este bloco — ela não gerencia
@@ -273,45 +292,59 @@ export function Sidebar({ onClose }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-gray-900 text-white h-full min-h-screen flex flex-col">
+    <aside className="w-64 bg-slate-950 text-white h-full min-h-screen flex flex-col">
       {/* Logo */}
-      <div className="p-5 border-b border-gray-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
+      <div className="px-4 py-4 border-b border-slate-800/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Logo institucional COCRIS */}
+              <img
+                src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+                alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+                className="h-9 w-auto object-contain flex-shrink-0"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = 'flex';
+                }}
+              />
+              {/* Fallback: ícone + texto */}
+              <div className="hidden items-center gap-2" aria-hidden="true">
+                <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-xs">C</span>
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-sm font-bold leading-tight text-white truncate">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Sistema Pedagógico</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold leading-none">Conexa V3</h1>
-              <p className="text-xs text-gray-400 mt-0.5">Sistema Pedagógico</p>
-            </div>
+            {/* Botão fechar — só aparece em mobile */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+                aria-label="Fechar menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-          {/* Botão fechar — só aparece em mobile */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="md:hidden p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              aria-label="Fechar menu"
-            >
-              <X className="h-5 w-5" />
-            </button>
+          {user && (
+            <div className="mt-3 px-2.5 py-2 bg-slate-900 rounded-lg border border-slate-800/60">
+              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Perfil ativo</p>
+              <p className="text-sm font-medium text-slate-100 truncate mt-0.5">
+                {(user.nome as string) || user.email}
+              </p>
+              <span className="inline-block mt-1.5 text-[10px] font-semibold bg-brand-900/70 text-brand-300 px-2 py-0.5 rounded-full tracking-wide">
+                {perfilLabel}
+              </span>
+            </div>
           )}
-        </div>
-        {user && (
-          <div className="mt-3 px-2 py-2 bg-gray-800 rounded-lg">
-            <p className="text-xs text-gray-400">Perfil</p>
-            <p className="text-sm font-medium text-gray-200 truncate">
-              {(user.nome as string) || user.email}
-            </p>
-            <span className="inline-block mt-1 text-xs bg-blue-900 text-blue-300 px-2 py-0.5 rounded-full">
-              {perfilLabel}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 p-3 space-y-5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
 
         {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
@@ -341,17 +374,17 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         {/* UNIDADE — Diretor */}
-        {!isDeveloper && isDiretor && (
+        {!isDeveloper && !isAdministrativo && isDiretor && (
           <NavSection titulo="Diretor" items={DIRETOR_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Nutricionista */}
-        {!isDeveloper && isNutricionista && (
+        {!isDeveloper && !isAdministrativo && isNutricionista && (
           <NavSection titulo="Nutricionista" items={NUTRI_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Coordenadora Pedagógica */}
-        {!isDeveloper && isCoordPedagogico && (
+        {!isDeveloper && !isAdministrativo && isCoordPedagogico && (
           <>
             <NavSection titulo="Gestão"      items={COORD_GESTAO}      location={location} onItemClick={onClose} />
             <NavSection titulo="Pedagógico"  items={COORD_PEDAGOGICO}  location={location} onItemClick={onClose} />
@@ -360,11 +393,11 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {/* UNIDADE — Administrativo */}
         {!isDeveloper && isAdministrativo && (
-          <NavSection titulo="Administrativo" items={ADMIN_UNIDADE_ITEMS} location={location} onItemClick={onClose} />
+          <NavSection titulo="Secretaria da Unidade" items={ADMIN_UNIDADE_ITEMS} location={location} onItemClick={onClose} />
         )}
 
         {/* UNIDADE — Genérico (sem roleType específico) */}
-        {!isDeveloper && isUnidadeGenerica && (
+        {!isDeveloper && !isAdministrativo && isUnidadeGenerica && (
           <>
             <NavSection titulo="Gestão"      items={UNIDADE_GESTAO}      location={location} onItemClick={onClose} />
             <NavSection titulo="Pedagógico"  items={UNIDADE_PEDAGOGICO}  location={location} onItemClick={onClose} />
@@ -380,22 +413,36 @@ export function Sidebar({ onClose }: SidebarProps) {
         )}
 
         {/* Fallback */}
-        {!isDeveloper && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
+        {!isDeveloper && !isAdministrativo && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 
       </nav>
 
       {/* Rodapé */}
-      <div className="p-3 border-t border-gray-800 space-y-1">
-        {(isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
+      <div className="px-3 py-3 border-t border-slate-800/60 space-y-2">
+        {!isAdministrativo && (isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
           <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
         )}
-        <div className="pt-1 space-y-1">
-          <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
-          <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
+        {/* Grupo recolhível — Configurações */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setConfigOpen(o => !o)}
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+          >
+            <Settings className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="flex-1 text-left">Configurações</span>
+            <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${configOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {configOpen && (
+            <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/60 space-y-0.5">
+              <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
+              <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
+            </div>
+          )}
         </div>
-        <p className="text-xs text-gray-600 text-center pt-1">Conexa V3 © 2026</p>
+        <p className="text-[10px] text-slate-700 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>
   );

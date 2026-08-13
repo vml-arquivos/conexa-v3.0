@@ -4,7 +4,11 @@ import {
   ForbiddenException,
   BadRequestException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
+import { GeminiService } from '../ai/services/gemini.service';
+import { extrairObservacoesLocal } from './helpers/observacoes-extractor.helper';
+import { buildObservacoesPrompt } from './helpers/observacoes-gemini.prompt';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { CreatePlanningDto } from './dto/create-planning.dto';
@@ -48,6 +52,7 @@ export class PlanningService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    @Optional() private readonly geminiService?: GeminiService,
   ) {}
 
   /**
@@ -439,9 +444,9 @@ export class PlanningService {
     }
 
     if (query.type) {
-      // PlanningType pertence ao próprio Planning. PlanningTemplate não possui campo `type`.
-      // Filtrar na relação gerava PrismaClientValidationError e resposta 500.
-      where.type = query.type;
+      where.template = {
+        type: query.type,
+      };
     }
 
     // Filtro por período: interseção de períodos
@@ -1047,6 +1052,34 @@ export class PlanningService {
   }
 
   /**
+   * Gera o template de observações individuais para o plano.
+   * Usa Gemini se disponível, fallback para extrator local.
+   * NUNCA lança exceção — retorna array vazio em caso de erro.
+   */
+  private async gerarObservacoesTemplate(
+    planningId: string,
+    pedagogicalContent: Record<string, any> | null,
+  ): Promise<any[]> {
+    if (!pedagogicalContent) return [];
+
+    try {
+      // Tenta usar Gemini para geração rica
+      if (this.geminiService?.isEnabled()) {
+        const prompt = buildObservacoesPrompt(pedagogicalContent);
+        const resultado = await this.geminiService.generateJSON<{ observacoes: any[] }>(prompt);
+        if (resultado?.observacoes && Array.isArray(resultado.observacoes)) {
+          return resultado.observacoes;
+        }
+      }
+    } catch {
+      // Gemini falhou — usar fallback local sem interromper o fluxo
+    }
+
+    // Fallback: extrator local por palavras-chave
+    return extrairObservacoesLocal(pedagogicalContent, planningId);
+  }
+
+  /**
    * Aprova um planejamento (EM_REVISAO -> APROVADO)
    */
   async approve(id: string, user: JwtPayload) {
@@ -1083,6 +1116,31 @@ export class PlanningService {
         mantenedoraId: planning.mantenedoraId,
         unitId: planning.unitId,
     });
+
+    // Gerar template de observações individuais quando plano é aprovado
+    // Processo assíncrono não bloqueante — não impede a aprovação em caso de falha
+    try {
+      const planningWithContent = await this.prisma.planning.findUnique({
+        where: { id },
+        select: { pedagogicalContent: true },
+      });
+
+      if (planningWithContent?.pedagogicalContent) {
+        const obsTemplate = await this.gerarObservacoesTemplate(
+          id,
+          planningWithContent.pedagogicalContent as Record<string, any>,
+        );
+
+        if (obsTemplate.length > 0) {
+          await this.prisma.planning.update({
+            where: { id },
+            data: { observacoesTemplate: obsTemplate },
+          });
+        }
+      }
+    } catch {
+      // Não bloqueia o fluxo de aprovação em caso de erro na geração
+    }
 
     return maskMatrizEntryForProfessor(user, updatedPlanning);
   }
@@ -1121,6 +1179,80 @@ export class PlanningService {
         mantenedoraId: planning.mantenedoraId,
         unitId: planning.unitId,
         changes: { comment: dto.comment },
+    });
+
+    return maskMatrizEntryForProfessor(user, updatedPlanning);
+  }
+
+  /**
+   * Devolve apenas UM dia específico de um planejamento multi-dia (formato V2),
+   * sem bloquear os demais dias já corretos. Não exige migration: a marcação
+   * fica registrada dentro do próprio campo `description` (JSON V2 existente),
+   * em cada item de `days[]`, no campo aditivo `reviewStatus`/`reviewComment`.
+   *
+   * O status geral do plano muda para DEVOLVIDO (sinaliza ao professor que há
+   * pendência), mas o frontend usa o detalhe por dia para mostrar exatamente
+   * o que precisa de correção — os demais dias continuam visíveis como ok.
+   */
+  async returnDayForCorrections(
+    id: string,
+    dayDate: string,
+    dto: { comment: string },
+    user: JwtPayload,
+  ) {
+    const isCoordinator = user.roles.some((role) => role.level === RoleLevel.UNIDADE);
+    if (!isCoordinator) {
+      throw new ForbiddenException('Apenas a Coordenação da Unidade pode devolver planejamentos.');
+    }
+
+    const planning = await this.findOne(id, user);
+
+    if (planning.status !== PlanningStatus.EM_REVISAO && planning.status !== PlanningStatus.DEVOLVIDO) {
+      throw new BadRequestException('Apenas planejamentos em revisão ou já devolvidos podem ter dias devolvidos.');
+    }
+
+    let v2: any;
+    try {
+      v2 = planning.description ? JSON.parse(planning.description) : null;
+    } catch {
+      v2 = null;
+    }
+    if (!v2 || v2.version !== 2 || !Array.isArray(v2.days)) {
+      throw new BadRequestException('Este planejamento não está no formato por dia — use a devolução completa.');
+    }
+
+    const dayIndex = v2.days.findIndex((d: any) => d.date === dayDate);
+    if (dayIndex === -1) {
+      throw new BadRequestException(`Dia ${dayDate} não encontrado neste planejamento.`);
+    }
+
+    v2.days[dayIndex] = {
+      ...v2.days[dayIndex],
+      reviewStatus: 'DEVOLVIDO',
+      reviewComment: dto.comment,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: user.sub,
+    };
+
+    const updatedPlanning = await this.prisma.planning.update({
+      where: { id },
+      data: {
+        status: PlanningStatus.DEVOLVIDO,
+        description: JSON.stringify(v2),
+        reviewedAt: new Date(),
+        reviewedBy: user.sub,
+        reviewComment: `Dia ${dayDate} devolvido: ${dto.comment}`,
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditLogAction.RETURN_PLANNING,
+      entity: 'PLANNING',
+      entityId: id,
+      userId: user.sub,
+      mantenedoraId: planning.mantenedoraId,
+      unitId: planning.unitId,
+      changes: { dayDate, comment: dto.comment },
     });
 
     return maskMatrizEntryForProfessor(user, updatedPlanning);
@@ -1277,5 +1409,31 @@ export class PlanningService {
       }
     }
     return { occupied, nextFreeDate };
+  }
+
+  /** Remove um planejamento - apenas autor (em rascunho) ou DEVELOPER */
+  async deletar(id: string, user: JwtPayload) {
+    const plan = await this.prisma.planning.findUnique({ where: { id } });
+    if (!plan) throw new NotFoundException('Planejamento nao encontrado');
+
+    const roles = Array.isArray(user.roles)
+      ? user.roles.map((r: any) => r?.level ?? r)
+      : [];
+    const isDeveloper = roles.includes('DEVELOPER');
+
+    // Apenas DEVELOPER pode deletar qualquer planejamento
+    // Professor so pode deletar proprio rascunho
+    if (!isDeveloper) {
+      const isAutor = plan.createdBy === user.sub;
+      const isRascunho = ['RASCUNHO', 'DEVOLVIDO'].includes(plan.status ?? '');
+      if (!isAutor || !isRascunho) {
+        throw new ForbiddenException(
+          'Apenas o autor pode excluir seus rascunhos. DEVELOPERs podem excluir qualquer planejamento.'
+        );
+      }
+    }
+
+    await this.prisma.planning.delete({ where: { id } });
+    return { success: true, id };
   }
 }

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsNumberString } from 'class-validator';
 import { EnrollmentStatus } from '@prisma/client';
 
 export class FilterChildDto {
@@ -13,4 +13,12 @@ export class FilterChildDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  limit?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  page?: string;
 }

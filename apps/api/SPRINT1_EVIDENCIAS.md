@@ -233,8 +233,8 @@ Path: /app/dist/main.js
 **Comando:**
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]" \
-  -e DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]" \
+  -e DATABASE_URL="postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+  -e DIRECT_URL="postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
   -p 3000:3000 \
   conexa-v2:local
 ```
@@ -316,13 +316,13 @@ $ curl -f http://localhost:3000/health/ready
 
 1. **Configurar variáveis de ambiente:**
    ```
-   DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-   DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-   JWT_SECRET=[CONFIGURE_NO_AMBIENTE] com: openssl rand -base64 32]
-   JWT_REFRESH_SECRET=[CONFIGURE_NO_AMBIENTE] com: openssl rand -base64 32]
+   DATABASE_URL=postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+   DIRECT_URL=postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+   JWT_SECRET=[gerar com: openssl rand -base64 32]
+   JWT_REFRESH_SECRET=[gerar com: openssl rand -base64 32]
    SUPABASE_URL=https://ockzuvbnzfoqsiwmpixr.supabase.co
-   SUPABASE_ANON_KEY=[CONFIGURE_NO_AMBIENTE]
-   SUPABASE_SERVICE_ROLE_KEY=[CONFIGURE_NO_AMBIENTE] no Dashboard]
+   SUPABASE_ANON_KEY=sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF
+   SUPABASE_SERVICE_ROLE_KEY=[obter no Dashboard]
    ```
 
 2. **Adicionar IP do Coolify na whitelist do Supabase:**

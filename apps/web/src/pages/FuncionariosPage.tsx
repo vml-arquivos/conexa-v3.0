@@ -36,7 +36,6 @@ interface Funcionario {
   lastLogin?: string;
   createdAt: string;
   roles: Array<{ roleType: string; unit?: { name: string; unitCode: string } }>;
-  unit?: { name: string; unitCode: string };
 }
 
 interface Unidade {
@@ -97,16 +96,19 @@ export default function FuncionariosPage() {
     setCarregando(true);
     setErro(null);
     try {
-      const [usersRes, unitsRes] = await Promise.all([
-        http.get('/admin/users', { params: { _ts: Date.now() } }),
+      const [usersRes, unitsRes] = await Promise.allSettled([
+        http.get('/admin/users'),
         http.get('/admin/units'),
       ]);
-      const usersData = usersRes.data;
-      const unitsData = unitsRes.data;
-      setFuncionarios(Array.isArray(usersData) ? usersData : usersData?.users ?? []);
-      setUnidades(Array.isArray(unitsData) ? unitsData : unitsData?.units ?? []);
+      if (usersRes.status === 'fulfilled') {
+        const data = usersRes.value.data;
+        setFuncionarios(Array.isArray(data) ? data : data?.users ?? []);
+      }
+      if (unitsRes.status === 'fulfilled') {
+        const data = unitsRes.value.data;
+        setUnidades(Array.isArray(data) ? data : data?.units ?? []);
+      }
     } catch (e) {
-      setFuncionarios([]);
       setErro(getErrorMessage(e));
     } finally {
       setCarregando(false);
@@ -131,11 +133,7 @@ export default function FuncionariosPage() {
   const abrirEdicao = (f: Funcionario) => {
     setEditando(f);
     const roleType = f.roles[0]?.roleType ?? 'PROFESSOR';
-    const unitCode =
-      f.unit?.unitCode ??
-      f.roles[0]?.unit?.unitCode ??
-      unidades[0]?.unitCode ??
-      '';
+    const unitCode = f.roles[0]?.unit?.unitCode ?? unidades[0]?.unitCode ?? '';
     setForm({ firstName: f.firstName, lastName: f.lastName, email: f.email, phone: f.phone ?? '', cpf: f.cpf ?? '', password: '', roleType, unitCode });
     setModalAberto(true);
   };
@@ -148,7 +146,7 @@ export default function FuncionariosPage() {
     setSalvando(true);
     try {
       if (editando) {
-        const response = await http.put(`/admin/users/${editando.id}`, {
+        await http.put(`/admin/users/${editando.id}`, {
           firstName: form.firstName,
           lastName: form.lastName,
           phone: form.phone || undefined,
@@ -156,12 +154,6 @@ export default function FuncionariosPage() {
           roleType: form.roleType,
           unitCode: form.unitCode || undefined,
         });
-        const persisted = response.data?.user as Funcionario | undefined;
-        if (persisted) {
-          setFuncionarios(current =>
-            current.map(item => item.id === persisted.id ? persisted : item),
-          );
-        }
         toast.success('Funcionário atualizado com sucesso.');
       } else {
         await http.post('/admin/users', {
@@ -177,7 +169,7 @@ export default function FuncionariosPage() {
         toast.success('Funcionário cadastrado com sucesso.');
       }
       setModalAberto(false);
-      await carregar();
+      carregar();
     } catch (e) {
       toast.error(getErrorMessage(e));
     } finally {

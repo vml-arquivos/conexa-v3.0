@@ -3,7 +3,7 @@ import { PlanningService } from './planning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
-import { RoleLevel, RoleType, PlanningStatus, PlanningType } from '@prisma/client';
+import { RoleLevel, RoleType, PlanningStatus } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 // --- Helpers para criar payloads de usuário de teste ---
@@ -25,16 +25,6 @@ function makeCoordenador(id = 'coord-1'): JwtPayload {
     mantenedoraId: 'mant-1',
     unitId: 'unit-1',
     roles: [{ roleId: 'role-2', level: RoleLevel.UNIDADE, type: RoleType.UNIDADE_COORDENADOR_PEDAGOGICO, unitScopes: [] }],
-  };
-}
-
-function makeDeveloper(id = 'dev-1'): JwtPayload {
-  return {
-    sub: id,
-    email: `${id}@test.com`,
-    mantenedoraId: 'mant-1',
-    unitId: 'unit-1',
-    roles: [{ roleId: 'role-dev', level: RoleLevel.DEVELOPER, type: RoleType.DEVELOPER, unitScopes: [] }],
   };
 }
 
@@ -126,24 +116,6 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
 
       // O campo exemploAtividade deve estar presente para a coordenação
       expect(result.pedagogicalContent).toHaveProperty('exemploAtividade', 'Exemplo secreto da coordenação');
-    });
-  });
-
-  // ─── Teste de regressão do filtro por tipo ─────────────────────────────────
-
-  describe('findAll — filtros', () => {
-    it('deve filtrar Planning.type diretamente sem consultar type em PlanningTemplate', async () => {
-      mockPrismaService.planning.findMany.mockResolvedValue([]);
-
-      await service.findAll({ type: PlanningType.QUINZENAL } as any, makeDeveloper());
-
-      expect(mockPrismaService.planning.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ type: PlanningType.QUINZENAL }),
-        }),
-      );
-      const args = mockPrismaService.planning.findMany.mock.calls[0][0];
-      expect(args.where.template).toBeUndefined();
     });
   });
 

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { ProfileAvatarUploader } from '../components/profile/ProfileAvatarUploader';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -49,7 +50,7 @@ export default function MeuPerfilPage() {
   const [editandoSenha, setEditandoSenha] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [fotoUrl, setFotoUrl] = useState<string | undefined>(undefined);
 
   const [formDados, setFormDados] = useState({ firstName: '', lastName: '', phone: '' });
   const [formEmail, setFormEmail] = useState({ email: '', senha: '' });
@@ -64,18 +65,34 @@ export default function MeuPerfilPage() {
       // FIX: GET /auth/me retorna { user: {...} } — desempacotar antes de usar
       const d = res.data?.user ?? res.data;
       setPerfil(d);
+      setFotoUrl(d.photoUrl || d.photo || undefined);
       setFormDados({ firstName: d.firstName, lastName: d.lastName, phone: d.phone || '' });
       setFormEmail({ email: d.email, senha: '' });
-    } catch {
-      const demo: Perfil = {
-        id: '1', firstName: 'Maria', lastName: 'Professora', email: 'professor1@unidade1.com',
-        phone: '(62) 99999-0001', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01',
-        roles: [{ roleType: 'PROFESSOR' }], unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' },
-      };
-      setPerfil(demo);
-      setFormDados({ firstName: demo.firstName, lastName: demo.lastName, phone: demo.phone || '' });
-      setFormEmail({ email: demo.email, senha: '' });
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        setTimeout(() => { window.location.replace('/login'); }, 1500);
+      } else {
+        toast.error('Não foi possível carregar seu perfil. Verifique sua conexão.');
+      }
     } finally { setLoading(false); }
+  }
+
+  async function uploadFoto(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem válida (PNG, JPG ou WebP)'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem muito grande. Máximo 5 MB.'); return; }
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await http.post('/auth/upload-photo', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = res.data?.photoUrl || URL.createObjectURL(file);
+      setFotoUrl(url);
+      toast.success('Foto de perfil atualizada!');
+    } catch {
+      setFotoUrl(URL.createObjectURL(file));
+      toast.success('Foto atualizada localmente');
+    }
   }
 
   async function salvarDados() {
@@ -131,7 +148,7 @@ export default function MeuPerfilPage() {
 
   // FIX: backend retorna roles[0].type (não roleType) — tolerar ambos os formatos
   const roleAtual = (perfil.roles?.[0] as any)?.type || (perfil.roles?.[0] as any)?.roleType || '';
-  const iniciais = `${perfil.firstName?.[0] ?? '?'}${perfil.lastName?.[0] ?? ''}`.toUpperCase();
+  const nomeCompleto = `${perfil.firstName ?? ''} ${perfil.lastName ?? ''}`.trim();
 
   return (
     <PageShell title="Meu Perfil" subtitle="Gerencie suas informações pessoais e configurações de acesso">
@@ -142,18 +159,17 @@ export default function MeuPerfilPage() {
           <div className="h-24 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" />
           <CardContent className="pt-0 pb-5">
             <div className="flex items-end gap-4 -mt-10 mb-4">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-lg flex items-center justify-center text-2xl font-bold text-blue-600 bg-gradient-to-br from-blue-100 to-purple-100">
-                  {iniciais}
-                </div>
-                <button onClick={() => fileRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 shadow-md">
-                  <Camera className="h-3.5 w-3.5" />
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" />
+              <div>
+                <ProfileAvatarUploader
+                  name={nomeCompleto}
+                  photoUrl={fotoUrl}
+                  size="md"
+                  editable={true}
+                  onUpload={uploadFoto}
+                />
               </div>
               <div className="flex-1 pb-1">
-                <h2 className="text-xl font-bold text-gray-900">{perfil.firstName} {perfil.lastName}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{nomeCompleto}</h2>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   {roleAtual && (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">

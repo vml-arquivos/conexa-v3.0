@@ -287,8 +287,10 @@ export default function FaltasSecretariaPage() {
                     {alertas.map((a) => (
                       <div key={a.childId} className="flex items-center gap-3 px-4 py-3">
                         <ChildAvatar
-                          child={{ firstName: a.firstName, lastName: a.lastName, photoUrl: a.photoUrl }}
-                          sizeClassName="w-8 h-8"
+                          firstName={a.firstName}
+                          lastName={a.lastName}
+                          photoUrl={a.photoUrl ?? undefined}
+                          size="sm"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">
@@ -327,8 +329,10 @@ export default function FaltasSecretariaPage() {
                       .map((a) => (
                         <div key={a.childId} className="flex items-center gap-3 px-4 py-2.5">
                           <ChildAvatar
-                            child={{ firstName: a.firstName, lastName: a.lastName, photoUrl: a.photoUrl }}
-                            sizeClassName="w-8 h-8"
+                            firstName={a.firstName}
+                            lastName={a.lastName}
+                            photoUrl={a.photoUrl ?? undefined}
+                            size="sm"
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-slate-700 truncate">
