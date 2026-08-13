@@ -564,6 +564,19 @@ model Child {
   // Foto do aluno
   photoUrl String? @db.Text
 
+  // Dossiê administrativo da matrícula (Secretaria)
+  // Campos aditivos para preservar dados exigidos nas planilhas oficiais da unidade.
+  nacionalidade       String? @db.VarChar(100)
+  naturalidade        String? @db.VarChar(100)
+  ufNascimento        String? @map("uf_nascimento") @db.VarChar(2)
+  endereco            String? @db.VarChar(255)
+  cep                 String? @db.VarChar(10)
+  dadosResponsaveis   Json?   @map("dados_responsaveis")
+  documentosMatricula Json?   @map("documentos_matricula")
+  autorizadosRetirada Json?   @map("autorizados_retirada")
+  transporteEscolar   Json?   @map("transporte_escolar")
+  fichaAdministrativa Json?   @map("ficha_administrativa")
+
   // Status
   isActive Boolean @default(true)
 
@@ -588,7 +601,9 @@ model Child {
   developmentObs              DevelopmentObservation[]
   developmentReports          DevelopmentReport[]
   acompanhamentosNutricionais AcompanhamentoNutricional[]
-
+  microgestosRegistros        MicrogestoRegistro[]
+  childProfileStats           ChildProfileStats?
+  alertasAluno                AlertaAluno[]
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([isActive])
@@ -2012,7 +2027,10 @@ model DevelopmentObservation {
   developmentAlerts     String? @map("development_alerts") @db.Text
   recommendations       String? @db.Text
   nextSteps             String? @map("next_steps") @db.Text
-
+  atividadeArquivoUrl  String? @map("atividade_arquivo_url") @db.Text
+  atividadeArquivoNome String? @map("atividade_arquivo_nome") @db.VarChar(255)
+  tags                 Json    @default("[]")
+  indicadores          Json    @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2313,4 +2331,404 @@ model DevelopmentReport {
   @@index([childId, createdAt(sort: Desc)])
   @@index([classroomId, period])
   @@map("development_report")
+}
+
+
+// ── Models adicionados para compatibilidade com código ──────────────────────
+model EmpresaTransporte {
+  id            String   @id @default(cuid())
+  mantenedoraId String
+  unitId        String?
+  nome          String   @db.VarChar(255)
+  cnpj          String?  @db.VarChar(20)
+  telefone      String?  @db.VarChar(20)
+  responsavel   String?  @db.VarChar(255)
+  placa         String?  @db.VarChar(20)
+  observacoes   String?  @db.Text
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?  @db.VarChar(255)
+  updatedBy     String?  @db.VarChar(255)
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@unique([mantenedoraId, unitId, nome])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([isActive])
+}
+model IaRequest {
+  id            String          @id @default(cuid())
+  mantenedoraId String
+  unitId        String
+  requesterId   String
+  type          IaRequestType
+  status        IaRequestStatus @default(PENDENTE)
+  payload       Json
+  promptId      String?
+  errorMessage  String?         @db.Text
+  createdAt     DateTime        @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  mantenedora Mantenedora    @relation("MantenedoraIaRequests", fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  unit        Unit           @relation("UnitIaRequests", fields: [unitId], references: [id], onDelete: Cascade)
+  requester   User           @relation("UserIaRequests", fields: [requesterId], references: [id], onDelete: Cascade)
+  prompt      PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  response    IaResponse?
+  logs        IaLog[]
+
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@index([requesterId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ia_request")
+}
+model IaResponse {
+  id                   String           @id @default(cuid())
+  requestId            String           @unique
+  result               Json
+  rawResponse          String?          @db.Text
+  promptUsed           String?          @db.Text
+  costTokensPrompt     Int?
+  costTokensCompletion Int?
+  totalCost            Float?
+  modelUsed            String?          @db.VarChar(100)
+  status               IaResponseStatus @default(PENDENTE_REVISAO)
+  reviewedBy           String?          @db.VarChar(255)
+  approved             Boolean?
+  createdAt            DateTime         @default(now())
+
+  request   IaRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  feedbacks IaFeedback[]
+
+  @@index([requestId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ia_response")
+}
+model IaLog {
+  id        String   @id @default(cuid())
+  requestId String
+  event     String   @db.VarChar(50)
+  message   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  request IaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([event])
+  @@index([createdAt])
+  @@map("ia_log")
+}
+model IaFeedback {
+  id         String   @id @default(cuid())
+  responseId String
+  userId     String
+  rating     Int
+  comment    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  response IaResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([userId])
+  @@map("ia_feedback")
+}
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  template    String   @db.Text
+  variables   Json     @default("[]")
+  version     Int      @default(1)
+  active      Boolean  @default(true)
+  createdBy   String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests IaRequest[]
+
+  @@index([active])
+  @@index([version])
+  @@map("prompt_template")
+}
+model AlertaAluno {
+  id            String       @id @default(cuid())
+  childId       String
+  classroomId   String
+  unitId        String
+  mantenedoraId String?
+  tipo          AlertaTipo
+  status        AlertaStatus @default(ATIVO)
+  titulo        String       @db.VarChar(255)
+  descricao     String       @db.Text
+  dados         Json         @default("{}
+model ChildProfileStats {
+  id                      String   @id @default(cuid())
+  childId                 String   @unique
+  unitId                  String
+  mantenedoraId           String
+  totalDiasRegistrados    Int      @default(0)
+  totalFaltas             Int      @default(0)
+  faltasUltimos30Dias     Int      @default(0)
+  faltasConsecutivas      Int      @default(0)
+  ultimaPresenca          DateTime?
+  totalMicrogestos        Int      @default(0)
+  microgestosCategoria    Json     @default("{}
+model FrameworkDimension {
+  id          String  @id @default(cuid())
+  frameworkId String
+  code        String  @db.VarChar(50) // "EO" (Eu, o Outro e o Nós) ou "Communication" (EYFS)
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  order       Int     @default(0)
+
+  framework  PedagogicalFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  objectives FrameworkObjective[]
+
+  @@unique([frameworkId, code])
+  @@index([frameworkId])
+}
+model FrameworkObjective {
+  id          String  @id @default(cuid())
+  frameworkId String
+  dimensionId String
+  code        String? @db.VarChar(20) // "EI01EO03" ou equivalente em outro framework
+  ageRangeMin Int // em meses — granularidade fina para 0 a 6 anos
+  ageRangeMax Int
+  text        String  @db.Text // transcrição literal do objetivo normativo
+
+  framework            PedagogicalFramework    @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  dimension            FrameworkDimension      @relation(fields: [dimensionId], references: [id], onDelete: Cascade)
+  curriculumMatrixEntries CurriculumMatrixEntry[]
+
+  @@index([frameworkId])
+  @@index([dimensionId])
+  @@index([ageRangeMin, ageRangeMax])
+}
+model IaConfig {
+  id            String   @id @default(cuid())
+  mantenedoraId String?
+  unitId        String?
+  key           String   @db.VarChar(100)
+  value         String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([mantenedoraId, unitId, key])
+  @@index([mantenedoraId])
+  @@index([unitId])
+  @@map("ia_config")
+}
+model InstitutionContentUpload {
+  id            String @id @default(cuid())
+  mantenedoraId String
+
+  type       ContentUploadType
+  title      String            @db.VarChar(255)
+  fileUrl    String            @db.Text
+  fileName   String            @db.VarChar(255)
+  mimeType   String            @db.VarChar(100)
+
+  status         ContentUploadStatus @default(ENVIADO)
+  extractedData  Json? // resultado estruturado do parser/IA, revisável antes de aprovar
+  reviewNotes    String?             @db.Text
+
+  // Quando aprovado, vira um destes (rastreabilidade da origem)
+  resultingPlanningTemplateId String?
+  resultingFrameworkId        String?
+
+  uploadedBy String   @db.VarChar(255)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  reviewedAt DateTime?
+  reviewedBy String?  @db.VarChar(255)
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
+  @@index([mantenedoraId])
+  @@index([status])
+  @@index([type])
+}
+model MicrogestoRegistro {
+  id              String              @id @default(cuid())
+  childId         String
+  classroomId     String
+  diaryEventId    String?
+  professorId     String
+  unitId          String
+  mantenedoraId   String
+  data            DateTime
+  categoria       MicrogestoCategoria
+  nivel           MicrogestoNivel
+  tags            Json                @default("[]")
+  descricao       String?             @db.VarChar(500)
+  campoExperiencia String?            @db.VarChar(100)
+  horario         String?             @db.VarChar(10)
+  createdAt       DateTime            @default(now())
+
+  child      Child      @relation(fields: [childId], references: [id])
+  classroom  Classroom  @relation(fields: [classroomId], references: [id])
+  professor  User       @relation("MicrogestosRegistrados", fields: [professorId], references: [id])
+
+  @@index([childId])
+  @@index([classroomId])
+  @@index([unitId])
+  @@index([mantenedoraId])
+  @@index([data])
+  @@map("microgesto_registro")
+}
+model PedagogicalFramework {
+  id            String  @id @default(cuid())
+  mantenedoraId String? // null = biblioteca global da plataforma
+
+  name        String  @db.VarChar(255) // "BNCC + Currículo em Movimento DF", "EYFS 2024"
+  country     String? @db.VarChar(2) // ISO 3166-1 alpha-2, null se não-nacional (ex: Montessori)
+  region      String? @db.VarChar(100) // "DF", "SP"... para currículos regionais dentro de um país
+  isOfficial  Boolean @default(false) // documento normativo oficial vs. abordagem própria
+  version     Int     @default(1)
+  description String? @db.Text
+  sourceUrl   String? @db.VarChar(500)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?  @db.VarChar(255)
+
+  mantenedora Mantenedora?          @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  dimensions  FrameworkDimension[]
+  objectives  FrameworkObjective[]
+
+  @@index([mantenedoraId])
+  @@index([country])
+  @@index([isActive])
+}
+model TenantBranding {
+  id            String @id @default(cuid())
+  mantenedoraId String @unique
+
+  displayName String  @db.VarChar(255) // nome comercial exibido (pode diferir da razão social)
+  slogan      String? @db.VarChar(255)
+  logoUrl     String? @db.Text
+  faviconUrl  String? @db.Text
+
+  primaryColor   String? @db.VarChar(7) // hex, ex: #1E3A8A
+  secondaryColor String? @db.VarChar(7)
+
+  customDomain   String? @unique @db.VarChar(255) // ex: app.escolaxyz.com.br
+  domainVerified Boolean @default(false)
+
+  emailFromName    String? @db.VarChar(255)
+  emailFromAddress String? @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
+  @@index([customDomain])
+}
+model TenantFeatureFlag {
+  id            String  @id @default(cuid())
+  mantenedoraId String
+  flagKey       String  @db.VarChar(100) // ex: "modulo_estoque", "ia_assistiva", "portal_familia"
+  enabled       Boolean @default(false)
+  config        Json? // parâmetros específicos da flag, quando necessário
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+
+  @@unique([mantenedoraId, flagKey])
+  @@index([mantenedoraId])
+}
+
+enum TaxIdType {
+  CNPJ // Brasil — pessoa jurídica
+  CPF // Brasil — pessoa física (ONGs pequenas, autônomos)
+  EIN // EUA
+  NIF // Portugal / vários países EU
+  VAT // Europa em geral
+  OTHER
+  NONE // instituição sem documento fiscal formal (ex: iniciativa comunitária)
+}
+
+enum ContentUploadType {
+  PLANO_DE_AULA
+  PROJETO_PEDAGOGICO
+  MATERIAL_DIDATICO
+  CURRICULO_PROPRIO
+  OUTRO
+}
+
+enum ContentUploadStatus {
+  ENVIADO // arquivo recebido, aguardando processamento
+  PROCESSANDO // parser/IA extraindo estrutura
+  PRONTO_PARA_REVISAO // extraído, aguardando validação humana
+  APROVADO // virou PlanningTemplate/FrameworkObjective utilizável
+  REJEITADO
+}
+
+enum MicrogestoCategoria {
+  DESENVOLVIMENTO_MOTOR
+  LINGUAGEM_COMUNICACAO
+  INTERACAO_SOCIAL
+  REGULACAO_EMOCIONAL
+  COGNICAO_EXPLORACAO
+  CUIDADO_SAUDE
+  ALIMENTACAO
+  AUTONOMIA
+}
+
+enum MicrogestoNivel {
+  ALCANCADO
+  EM_DESENVOLVIMENTO
+  REQUER_ATENCAO
+}
+
+enum AlertaTipo {
+  EVASAO_RISCO
+  FALTAS_CONSECUTIVAS
+  FALTAS_FREQUENTES
+  PADRAO_COMPORTAMENTO_NEGATIVO
+  PADRAO_ALIMENTACAO_NEGATIVO
+  PADRAO_SAUDE_NEGATIVO
+}
+
+enum AlertaStatus {
+  ATIVO
+  LIDO
+  RESOLVIDO
+}
+
+enum IaRequestType {
+  ATIVIDADE
+  MICROGESTOS
+  RELATORIO_ALUNO
+  RELATORIO_TURMA
+  ANALISE_PLANO
+  ANALISE_DIARIO
+  LEMBRETE
+  VARREDURA
+  TEXTO_PERSONALIZADO
+}
+
+enum IaRequestStatus {
+  PENDENTE
+  PROCESSANDO
+  SUCESSO
+  FALHA
+  CANCELADO
+}
+
+enum IaResponseStatus {
+  PENDENTE_REVISAO
+  APROVADO
+  REJEITADO
 }
