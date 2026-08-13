@@ -58,11 +58,11 @@ Vá em **"Environment Variables"** e configure:
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Copie do PostgreSQL que você instalou no Coolify
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # DIRECT_URL (OPCIONAL - use se tiver connection pooling)
 # Se não tiver, deixe igual ao DATABASE_URL
-DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # ============================================================================
 # REDIS (OPCIONAL - se estiver usando)
@@ -123,12 +123,12 @@ LOG_FORMAT=json
 
 **Formato**:
 ```
-postgresql://[USUARIO]:[SENHA]@[CONTAINER]:5432/[BANCO]
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]:[SENHA]@[CONTAINER]:5432/[BANCO]
 ```
 
 **Exemplo**:
 ```
-postgresql://postgres:minha_senha_forte@postgres-conexa:5432/conexa
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 **Opção 2: Construir manualmente**
@@ -141,7 +141,7 @@ Se você criou o PostgreSQL com:
 
 Então:
 ```
-DATABASE_URL=postgresql://postgres:sua_senha@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 ---
@@ -385,7 +385,7 @@ Na aba **"Environment Variables"**:
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Mesma do backend!
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # ============================================================================
 # API CONFIGURATION (OBRIGATÓRIO)
@@ -554,8 +554,8 @@ Deve aparecer o site institucional.
 ### Backend API (14 variáveis)
 
 ```bash
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
-DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 REDIS_URL=redis://redis-conexa:6379
 JWT_SECRET=sua-chave-secreta-super-segura-aqui-minimo-32-caracteres
 JWT_EXPIRES_IN=7d
@@ -583,7 +583,7 @@ VITE_APP_VERSION=3.0.0
 ### Site Institucional (4 variáveis)
 
 ```bash
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174
@@ -685,7 +685,7 @@ O Coolify gera SSL automaticamente via Let's Encrypt.
 2. Verifique senha
 3. Teste conexão manualmente no terminal do backend:
    ```bash
-   psql postgresql://postgres:senha@postgres-conexa:5432/conexa
+   psql postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
    ```
 
 ### Problema: IA não funciona

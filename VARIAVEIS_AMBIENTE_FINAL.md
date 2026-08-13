@@ -18,10 +18,10 @@
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Copie do PostgreSQL no Coolify
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # DIRECT_URL (OPCIONAL - deixe igual ao DATABASE_URL se não usar pooling)
-DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # ============================================================================
 # REDIS (OPCIONAL)
@@ -104,7 +104,7 @@ VITE_APP_VERSION=3.0.0
 # DATABASE (OBRIGATÓRIO)
 # ============================================================================
 # Mesma do backend!
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # ============================================================================
 # API CONFIGURATION (OBRIGATÓRIO)
@@ -169,12 +169,12 @@ PORT=5174
 
 Formato:
 ```
-postgresql://[USUARIO]:[SENHA]@[CONTAINER]:5432/[BANCO]
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]:[SENHA]@[CONTAINER]:5432/[BANCO]
 ```
 
 Exemplo:
 ```
-postgresql://postgres:minha_senha@postgres-conexa:5432/conexa
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 **Onde encontrar**:

@@ -266,6 +266,12 @@ export class ChildrenController {
    * Acesso: UNIDADE_ADMINISTRATIVO, UNIDADE_DIRETOR, STAFF_CENTRAL, MANTENEDORA, DEVELOPER
    */
   @Get(':id/ficha-completa')
+  @RequireRoles(
+    RoleLevel.UNIDADE,
+    RoleLevel.STAFF_CENTRAL,
+    RoleLevel.MANTENEDORA,
+    RoleLevel.DEVELOPER,
+  )
   async getFichaCompleta(@Param('id') id: string, @Request() req) {
     return this.childrenService.getFichaCompleta(id, req.user);
   }

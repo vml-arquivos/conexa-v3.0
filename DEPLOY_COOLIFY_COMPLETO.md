@@ -61,12 +61,12 @@ No painel do Supabase, vá em **Settings** → **Database** e copie:
 
 **Para runtime (Transaction Mode - Porta 6543)**:
 ```
-postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 **Para migrations (Session Mode - Porta 5432)**:
 ```
-postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 ---
@@ -109,8 +109,8 @@ PORT=3000
 APP_TIMEZONE=America/Sao_Paulo
 
 # Banco de Dados (OBRIGATÓRIAS)
-DATABASE_URL=postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
-DIRECT_URL=postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # JWT (OBRIGATÓRIAS - Gere com: openssl rand -base64 32)
 JWT_SECRET=SEU_SECRET_AQUI
@@ -282,7 +282,7 @@ cd apps/site && NODE_ENV=production node dist/index.js
 NODE_ENV=production
 
 # Banco de Dados (mesmo do backend)
-DATABASE_URL=postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 # AWS S3 (OPCIONAL)
 # AWS_REGION=us-east-1

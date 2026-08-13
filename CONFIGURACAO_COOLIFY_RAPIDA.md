@@ -26,8 +26,8 @@
 
 ### 4. Environment Variables (14)
 ```
-DATABASE_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
-DIRECT_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@[HOST_INTERNO_COOLIFY]:5432/postgres
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@[HOST_INTERNO_COOLIFY]:5432/postgres
 REDIS_URL=redis://default:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:6379/0
 JWT_SECRET=[REDACTED_ROTACIONAR — gerar novo com openssl rand -base64 48]
 JWT_EXPIRATION=7d
@@ -84,7 +84,7 @@ VITE_APP_VERSION=3.0.0
 
 ### 3. Environment Variables (4)
 ```
-DATABASE_URL=postgres://postgres:[REDACTED_ROTACIONAR]@[HOST_INTERNO_COOLIFY]:5432/postgres
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@[HOST_INTERNO_COOLIFY]:5432/postgres
 API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174

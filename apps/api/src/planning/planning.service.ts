@@ -443,8 +443,6 @@ export class PlanningService {
       where.status = query.status;
     }
 
-    // BUG RECORRENTE (já revertido 2x): `type` pertence ao model Planning (schema.prisma),
-    // NÃO ao PlanningTemplate. Filtrar via where.template.type causa PrismaClientValidationError → HTTP 500.
     if (query.type) {
       where.type = query.type;
     }

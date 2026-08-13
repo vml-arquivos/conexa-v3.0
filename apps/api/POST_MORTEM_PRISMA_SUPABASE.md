@@ -80,7 +80,7 @@ async check() {
 
 #### DATABASE_URL (Runtime)
 ```
-postgresql://postgres.ockzuvbnzfoqsiwmpixr:Conexaapiv1db@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 - Pooler Transaction Mode (porta 6543)
@@ -89,7 +89,7 @@ postgresql://postgres.ockzuvbnzfoqsiwmpixr:Conexaapiv1db@aws-1-sa-east-1.pooler.
 
 #### DIRECT_URL (Migrations)
 ```
-postgresql://postgres.ockzuvbnzfoqsiwmpixr:Conexaapiv1db@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 - Pooler Session Mode (porta 5432)
