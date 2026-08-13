@@ -42,9 +42,9 @@
 ### 1.1 Informações do Projeto
 
 ```
-Project Reference: ockzuvbnzfoqsiwmpixr
+Project Reference: <SUPABASE_PROJECT_REF_REDACTED>
 Região: sa-east-1 (São Paulo)
-Supabase URL: https://ockzuvbnzfoqsiwmpixr.supabase.co
+Supabase URL: https://<SUPABASE_PROJECT_REF_REDACTED>.supabase.co
 Status: ✅ ATIVO
 ```
 
@@ -52,7 +52,7 @@ Status: ✅ ATIVO
 
 #### DATABASE_URL (Runtime - Pooler Transaction Mode)
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
 ```
 
 **Características:**
@@ -63,7 +63,7 @@ postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 #### DIRECT_URL (Migrations - Pooler Session Mode)
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 **Características:**
@@ -191,7 +191,7 @@ FATAL: Circuit breaker open: Unable to establish connection to upstream database
    ```
 
 2. **Adicionar IP na whitelist do Supabase**
-   - Acessar: https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/database
+   - Acessar: https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/database
    - Ir em: **Connection Pooling > Allowed IP addresses**
    - Adicionar o IP do Coolify
    - Salvar
@@ -259,7 +259,7 @@ npm install -g supabase
 set -eu
 
 echo "Linking to Supabase project..."
-supabase link --project-ref ockzuvbnzfoqsiwmpixr
+supabase link --project-ref <SUPABASE_PROJECT_REF_REDACTED>
 
 echo "Running migrations via Supabase CLI..."
 supabase db push
@@ -307,8 +307,8 @@ exec node /app/dist/src/main.js
 
 ### Arquivo .env atualizado
 ```env
-DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL="postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require"
+DIRECT_URL="postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
 ```
 
 ### Comandos testados

@@ -170,42 +170,16 @@ export default function ConfiguracoesPage() {
   async function loadUsuarios() {
     try {
       const res = await http.get('/admin/users?limit=50');
-      const rows = Array.isArray(res.data) ? res.data : res.data?.users ?? [];
-      setUsuarios(rows.map((u: any) => ({
-        id: u.id,
-        nome: u.nome ?? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim(),
-        email: u.email,
-        role: u.role ?? u.roles?.[0]?.roleType ?? '',
-        ativo: u.ativo ?? u.status === 'ATIVO',
-        ultimoAcesso: u.ultimoAcesso ?? u.lastLogin,
-        unidade: u.unidade ?? u.unit,
-      })));
-    } catch {
-      setUsuarios([]);
-    }
+      const d = res.data;
+      setUsuarios(Array.isArray(d) ? d : d?.data ?? []);
+    } catch { /* silencioso */ }
   }
 
   async function loadUnidade() {
-    const unitId = user?.unitId ?? user?.unit?.id;
-    if (!unitId) {
-      setUnidade({});
-      return;
-    }
     try {
-      const res = await http.get(`/units/${unitId}`);
-      const u = res.data || {};
-      setUnidade({
-        id: u.id,
-        name: u.name,
-        unitCode: u.unitCode ?? u.code,
-        endereco: u.endereco ?? u.address,
-        telefone: u.telefone ?? u.phone,
-        email: u.email,
-        capacidade: u.capacidade ?? u.capacity,
-      });
-    } catch {
-      setUnidade({});
-    }
+      const res = await http.get('/units/my');
+      setUnidade(res.data || {});
+    } catch { /* silencioso */ }
   }
 
   async function salvarPerfil() {
@@ -259,15 +233,9 @@ export default function ConfiguracoesPage() {
   }
 
   async function salvarUnidade() {
-    if (!unidade.id) { toast.error('Unidade não identificada'); return; }
     setSaving(true);
     try {
-      await http.put(`/units/${unidade.id}`, {
-        name: unidade.name,
-        address: unidade.endereco,
-        email: unidade.email,
-        phone: unidade.telefone,
-      });
+      await http.put('/units/my', unidade);
       toast.success('Dados da unidade atualizados!');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Erro ao salvar dados da unidade');
@@ -293,7 +261,7 @@ export default function ConfiguracoesPage() {
 
   async function toggleUsuario(id: string, ativo: boolean) {
     try {
-      await http.put(`/admin/users/${id}`, { status: ativo ? 'INATIVO' : 'ATIVO' });
+      await http.put(`/users/${id}`, { ativo: !ativo });
       setUsuarios(prev => prev.map(u => u.id === id ? { ...u, ativo: !ativo } : u));
       toast.success(ativo ? 'Usuário desativado' : 'Usuário ativado');
     } catch {

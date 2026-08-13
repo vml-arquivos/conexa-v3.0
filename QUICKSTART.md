@@ -49,8 +49,8 @@ cp apps/api/.env.example apps/api/.env
 Edite `apps/api/.env` e configure:
 
 ```env
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://seu_usuario:sua_senha@localhost:5432/conexa_v3
+DIRECT_URL=postgresql://seu_usuario:sua_senha@localhost:5432/conexa_v3
 ```
 
 ### Opção B: Supabase (Recomendado)
@@ -60,8 +60,8 @@ DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 3. Configure no `.env`:
 
 ```env
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+DIRECT_URL=postgresql://postgres.SEU_PROJECT_REF:SENHA@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 ---

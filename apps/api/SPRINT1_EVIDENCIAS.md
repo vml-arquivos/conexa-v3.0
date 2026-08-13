@@ -159,8 +159,8 @@ Configure esta variável no Coolify (Environment Variables).
 **Comando:**
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
-  -e DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
+  -e DATABASE_URL="postgresql://invalid:..." \
+  -e DIRECT_URL="postgresql://invalid:..." \
   conexa-v2:local
 ```
 
@@ -193,8 +193,8 @@ Deploy abortado. Configure MIGRATE_BEST_EFFORT=true para subir mesmo com migrati
 **Comando:**
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
-  -e DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
+  -e DATABASE_URL="postgresql://invalid:..." \
+  -e DIRECT_URL="postgresql://invalid:..." \
   -e MIGRATE_BEST_EFFORT=true \
   conexa-v2:local
 ```
@@ -233,8 +233,8 @@ Path: /app/dist/main.js
 **Comando:**
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
-  -e DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO] \
+  -e DATABASE_URL="postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require" \
+  -e DIRECT_URL="postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require" \
   -p 3000:3000 \
   conexa-v2:local
 ```
@@ -316,18 +316,18 @@ $ curl -f http://localhost:3000/health/ready
 
 1. **Configurar variáveis de ambiente:**
    ```
-   DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-   DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+   DATABASE_URL=postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+   DIRECT_URL=postgresql://postgres.{ref}:{pwd}@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
    JWT_SECRET=[gerar com: openssl rand -base64 32]
    JWT_REFRESH_SECRET=[gerar com: openssl rand -base64 32]
-   SUPABASE_URL=https://ockzuvbnzfoqsiwmpixr.supabase.co
+   SUPABASE_URL=https://<SUPABASE_PROJECT_REF_REDACTED>.supabase.co
    SUPABASE_ANON_KEY=sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF
    SUPABASE_SERVICE_ROLE_KEY=[obter no Dashboard]
    ```
 
 2. **Adicionar IP do Coolify na whitelist do Supabase:**
    - Obter IP: `curl -4 ifconfig.me`
-   - Adicionar em: https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/database
+   - Adicionar em: https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/database
 
 3. **Configurar healthcheck:**
    ```
@@ -354,8 +354,8 @@ Para executar o teste completo em ambiente com Docker:
 
 ```bash
 # Definir variáveis de ambiente
-export DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-export DIRECT_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+export DATABASE_URL="postgresql://..."
+export DIRECT_URL="postgresql://..."
 
 # Executar script de teste
 ./test-container.sh

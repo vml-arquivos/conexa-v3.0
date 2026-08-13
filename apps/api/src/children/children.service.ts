@@ -58,7 +58,7 @@ export class ChildrenService {
    */
   async create(createChildDto: CreateChildDto, user: any) {
     // Verificar acesso à unidade
-    if (!(await canAccessUnit(user, createChildDto.unitId))) {
+    if (!canAccessUnit(user, createChildDto.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -103,7 +103,7 @@ export class ChildrenService {
 
     // Filtro por unidade
     if (filters.unitId) {
-      if (!(await canAccessUnit(user, filters.unitId))) {
+      if (!canAccessUnit(user, filters.unitId)) {
         throw new ForbiddenException('Você não tem acesso a esta unidade');
       }
       where.unitId = filters.unitId;
@@ -163,6 +163,51 @@ export class ChildrenService {
   }
 
   /**
+   * Resumo (contagens) de crianças da unidade/mantenedora do usuário.
+   * GET /children/summary — usado pelo painel da Secretaria.
+   * Mesma lógica de escopo de findAll(), mas retornando apenas contadores
+   * (evita trazer a lista completa só para exibir dois números).
+   */
+  async getSummary(user: any, unitId?: string) {
+    const where: any = {
+      mantenedoraId: user.mantenedoraId,
+    };
+
+    if (unitId) {
+      if (!canAccessUnit(user, unitId)) {
+        throw new ForbiddenException('Você não tem acesso a esta unidade');
+      }
+      where.unitId = unitId;
+    } else {
+      const isUnitOrProfessor = user.roles?.some(
+        (r: any) => r.level === 'UNIDADE' || r.level === 'PROFESSOR',
+      );
+      if (isUnitOrProfessor && user.unitId) {
+        where.unitId = user.unitId;
+      }
+      const isStaffCentral = user.roles?.some((r: any) => r.level === 'STAFF_CENTRAL');
+      if (isStaffCentral) {
+        const scopes = user.roles?.find((r: any) => r.level === 'STAFF_CENTRAL')?.unitScopes ?? [];
+        if (scopes.length > 0) {
+          where.unitId = { in: scopes };
+        }
+      }
+    }
+
+    const [total, totalAtivos, semTurma] = await Promise.all([
+      this.prisma.child.count({ where }),
+      this.prisma.child.count({
+        where: { ...where, enrollments: { some: { status: EnrollmentStatus.ATIVA } } },
+      }),
+      this.prisma.child.count({
+        where: { ...where, enrollments: { none: { status: EnrollmentStatus.ATIVA } } },
+      }),
+    ]);
+
+    return { total, totalAtivos, semTurma };
+  }
+
+  /**
    * Buscar criança por ID
    */
   async findOne(id: string, user: any) {
@@ -195,7 +240,7 @@ export class ChildrenService {
       throw new ForbiddenException('Você não tem acesso a esta criança');
     }
 
-    if (!(await canAccessUnit(user, child.unitId))) {
+    if (!canAccessUnit(user, child.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -301,7 +346,7 @@ export class ChildrenService {
       throw new NotFoundException('Criança não encontrada');
     }
 
-    if (!(await canAccessUnit(user, child.unitId))) {
+    if (!canAccessUnit(user, child.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 
@@ -859,14 +904,14 @@ export class ChildrenService {
       throw new NotFoundException('Criança não encontrada');
     }
 
-    // A ficha completa contém dados administrativos, de saúde e responsáveis.
-    // Aplicar o mesmo isolamento multi-tenant usado em findOne antes de retornar
-    // qualquer informação sensível.
+    // Isolamento multi-tenant: sem esta checagem, qualquer usuário autenticado
+    // conseguia ler a ficha completa (saúde, documentos, responsáveis) de
+    // crianças de outras mantenedoras/unidades. Mesmo padrão usado em findOne().
     if (child.mantenedoraId !== user.mantenedoraId) {
       throw new ForbiddenException('Você não tem acesso a esta criança');
     }
 
-    if (!(await canAccessUnit(user, child.unitId))) {
+    if (!canAccessUnit(user, child.unitId)) {
       throw new ForbiddenException('Você não tem acesso a esta unidade');
     }
 

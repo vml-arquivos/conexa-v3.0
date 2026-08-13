@@ -1,8 +1,6 @@
 -- Migration: 20260812000000_fix_planning_type_quinzenal_schema
--- Garante que o valor QUINZENAL existe no enum PlanningType do banco.
--- A migration 20260228120000 adicionou QUINZENAL ao banco mas o schema.prisma
--- não foi atualizado, causando Internal Server Error ao desserializar plannings.
--- Esta migration é idempotente (IF NOT EXISTS).
+-- Sincroniza o enum PlanningType com o banco.
+-- Idempotente: só executa se QUINZENAL ainda não existir.
 DO $$
 BEGIN
   IF NOT EXISTS (

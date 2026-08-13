@@ -80,7 +80,7 @@ async check() {
 
 #### DATABASE_URL (Runtime)
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
 ```
 
 - Pooler Transaction Mode (porta 6543)
@@ -89,7 +89,7 @@ postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
 #### DIRECT_URL (Migrations)
 ```
-postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 - Pooler Session Mode (porta 5432)
@@ -176,7 +176,7 @@ Criados os seguintes documentos:
    ```
 
 2. **Adicionar IP no Supabase:**
-   - Acessar: https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/database
+   - Acessar: https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/database
    - Ir em: **Connection Pooling > Allowed IP addresses**
    - Adicionar o IP do Coolify
    - Salvar

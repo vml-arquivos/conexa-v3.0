@@ -30,7 +30,7 @@ Antes de executar qualquer comando do Prisma, você precisa configurar a URL de 
 
     ```env
     # .env
-    DATABASE_URL="postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@[ID_DO_PROJETO].db.supabase.co:5432/postgres"
+    DATABASE_URL="postgresql://postgres:[SUA_SENHA]@[ID_DO_PROJETO].db.supabase.co:5432/postgres"
     ```
 
     **Importante:** Substitua `[SUA_SENHA]` e `[ID_DO_PROJETO]` pelos valores corretos do seu projeto Supabase. Certifique-se de que o arquivo `.env` esteja no seu `.gitignore` para não vazar suas credenciais.

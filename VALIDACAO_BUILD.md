@@ -121,8 +121,8 @@ NODE_ENV=production node dist/index.js
 ```env
 NODE_ENV=production
 PORT=3000
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://...
+DIRECT_URL=postgresql://...
 JWT_SECRET=...
 JWT_REFRESH_SECRET=...
 GEMINI_API_KEY=... (opcional)
@@ -136,7 +136,7 @@ VITE_API_BASE_URL=https://api.conexa.com
 **Site (apps/site/.env)**:
 ```env
 NODE_ENV=production
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DATABASE_URL=postgresql://...
 ```
 
 ### 2. Executar Migrations

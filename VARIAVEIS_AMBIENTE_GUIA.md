@@ -13,8 +13,8 @@
 
 ```bash
 # DATABASE
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]:[senha]@[host]:5432/[banco]
-DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]:[senha]@[host]:5432/[banco]
+DATABASE_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
+DIRECT_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
 
 # REDIS
 REDIS_URL=redis://[usuario]:[senha]@[host]:6379/0
@@ -69,7 +69,7 @@ VITE_APP_VERSION=3.0.0
 **Variáveis necessárias** (4):
 
 ```bash
-DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]:[senha]@[host]:5432/[banco]
+DATABASE_URL=postgresql://[usuario]:[senha]@[host]:5432/[banco]
 API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174

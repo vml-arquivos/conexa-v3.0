@@ -40,7 +40,7 @@ Antes de começar, tenha em mãos:
 4. **Copie a Connection String**
    - Clique no banco criado
    - Copie a **"Connection String"**
-   - Exemplo: `postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]`
+   - Exemplo: `postgresql://conexa_user:senha@conexa-v3-db:5432/conexa`
    - **ANOTE!** Você vai usar várias vezes
 
 ✅ **Banco criado!**
@@ -67,7 +67,7 @@ Antes de começar, tenha em mãos:
    Clique em **"Environment Variables"** e adicione:
 
    ```bash
-   DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+   DATABASE_URL=postgresql://conexa_user:SUA_SENHA@conexa-v3-db:5432/conexa
    JWT_SECRET=[gere com: openssl rand -base64 32]
    JWT_EXPIRES_IN=7d
    NODE_ENV=production
@@ -184,7 +184,7 @@ Antes de começar, tenha em mãos:
 3. **Configure Variáveis de Ambiente**
    
    ```bash
-   DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+   DATABASE_URL=postgresql://conexa_user:SUA_SENHA@conexa-v3-db:5432/conexa
    API_URL=https://api.conexa.seu-dominio.com
    NODE_ENV=production
    PORT=5174

@@ -294,8 +294,8 @@ model Mantenedora {
   materiais            Material[]
   cardapios                    Cardapio[]
   acompanhamentosNutricionais  AcompanhamentoNutricional[]
-    iaRequests           IaRequest[] @relation("MantenedoraIaRequests")
-  empresasTransporte   EmpresaTransporte[]
+  iaRequests                   IaRequest[] @relation("MantenedoraIaRequests")
+  empresasTransporte           EmpresaTransporte[]
 
   @@index([cnpj])
   @@index([isActive])

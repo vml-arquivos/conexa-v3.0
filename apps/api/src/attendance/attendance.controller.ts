@@ -60,4 +60,15 @@ export class AttendanceController {
   getUnitSummary(@Query('date') date: string, @CurrentUser() user: JwtPayload) {
     return this.svc.getUnitSummary(date, user);
   }
+
+  /**
+   * GET /attendance/weekly-summary
+   * Taxa de presença geral da unidade nos dias úteis da semana atual.
+   * Usado pelo painel da Secretaria (antes chamava uma rota inexistente).
+   */
+  @Get('weekly-summary')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getWeeklySummary(@CurrentUser() user: JwtPayload) {
+    return this.svc.getWeeklySummary(user);
+  }
 }

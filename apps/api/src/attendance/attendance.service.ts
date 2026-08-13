@@ -307,4 +307,44 @@ export class AttendanceService {
       turmas: results,
     };
   }
+
+  /**
+   * GET /attendance/weekly-summary
+   * Taxa de presença geral da unidade para os dias úteis (Seg-Sex) da semana atual.
+   * Reaproveita getUnitSummary por dia. Usado pelo gráfico de frequência semanal
+   * da SecretariaPage.
+   */
+  async getWeeklySummary(user: JwtPayload) {
+    if (!user?.mantenedoraId || !user?.unitId) {
+      throw new ForbiddenException('Escopo inválido');
+    }
+
+    // Calcula a segunda-feira da semana atual (UTC) e monta Seg..Sex.
+    const now = new Date();
+    const utcNow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const dayOfWeek = utcNow.getUTCDay(); // 0=Dom ... 6=Sáb
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(utcNow);
+    monday.setUTCDate(utcNow.getUTCDate() + diffToMonday);
+
+    const weekdayDates: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday);
+      d.setUTCDate(monday.getUTCDate() + i);
+      weekdayDates.push(d.toISOString().slice(0, 10));
+    }
+
+    const dias = await Promise.all(
+      weekdayDates.map(async (dateStr) => {
+        const summary = await this.getUnitSummary(dateStr, user);
+        return {
+          date: dateStr,
+          pct: summary.taxaPresencaGeral,
+          taxaPresenca: summary.taxaPresencaGeral,
+        };
+      }),
+    );
+
+    return { unitId: user.unitId, dias };
+  }
 }
