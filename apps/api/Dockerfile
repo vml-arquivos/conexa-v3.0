@@ -5,6 +5,10 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV CI=true
+# ARG BUILD_DATE force-invalida o cache Docker a cada redeploy no Coolify
+# quando a variável BUILD_DATE muda (configurar no Coolify como variável de build)
+ARG BUILD_DATE=unknown
+LABEL build-date=$BUILD_DATE
 # Prisma em Debian slim precisa do openssl para geração do client
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
