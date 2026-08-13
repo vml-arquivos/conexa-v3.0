@@ -3,7 +3,7 @@ import { PlanningService } from './planning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/services/audit.service';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
-import { RoleLevel, RoleType, PlanningStatus } from '@prisma/client';
+import { RoleLevel, RoleType, PlanningStatus, PlanningType } from '@prisma/client';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 // --- Helpers para criar payloads de usuário de teste ---
@@ -279,6 +279,25 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
       await expect(
         service.returnForCorrections('planning-1', { comment: 'Comentário' }, professor),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('findAll — filtro por type', () => {
+    it('deve filtrar por Planning.type (não por template.type) quando query.type é informado', async () => {
+      const coordenador = makeCoordenador();
+      mockPrismaService.planning.findMany.mockResolvedValue([]);
+
+      await service.findAll({ type: PlanningType.SEMANAL }, coordenador);
+
+      expect(mockPrismaService.planning.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            type: PlanningType.SEMANAL,
+          }),
+        }),
+      );
+      const callArgs = mockPrismaService.planning.findMany.mock.calls[0][0];
+      expect(callArgs.where.template).toBeUndefined();
     });
   });
 });
