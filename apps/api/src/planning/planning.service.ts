@@ -23,6 +23,31 @@ function sanitizePlanningType(p: any): any {
   return p;
 }
 
+/** Executa uma query Prisma de planning com proteção contra erro de enum desconhecido.
+ *  Se o Prisma Client falhar ao desserializar (ex: QUINZENAL não registrado),
+ *  retorna null/[] em vez de lançar 500. */
+async function safePlanningRead<T>(
+  fn: () => Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: any) {
+    // P2023 = inconsistent column data; outros erros de enum do Prisma
+    if (
+      err?.code === 'P2023' ||
+      err?.message?.includes('Invalid value for enum') ||
+      err?.message?.includes('Unknown enum value') ||
+      err?.message?.includes('Expected') ||
+      err?.message?.includes('enum')
+    ) {
+      console.error('[planning] Prisma enum error (enum desconhecido no client):', err?.message);
+      return fallback;
+    }
+    throw err; // re-lança erros que não são de enum
+  }
+}
+
 import { assertSchoolDay, formatPedagogicalDate } from '../common/utils/date.utils';
 
 function parsePedagogicalDateInput(value: string): Date {
@@ -284,20 +309,23 @@ export class PlanningService {
     }
 
     // Verificar se já existe um planejamento ACTIVE para a turma no período
-    const existingActivePlanning = await this.prisma.planning.findFirst({
-      where: {
-        classroomId: createDto.classroomId,
-        status: PlanningStatus.EM_EXECUCAO,
-        OR: [
-          {
-            AND: [
-              { startDate: { lte: endDate } },
-              { endDate: { gte: startDate } },
-            ],
-          },
-        ],
-      },
-    });
+    const existingActivePlanning = await safePlanningRead(
+      () => this.prisma.planning.findFirst({
+        where: {
+          classroomId: createDto.classroomId,
+          status: PlanningStatus.EM_EXECUCAO,
+          OR: [
+            {
+              AND: [
+                { startDate: { lte: endDate } },
+                { endDate: { gte: startDate } },
+              ],
+            },
+          ],
+        },
+      }),
+      null,
+    );
 
     if (existingActivePlanning) {
       throw new ConflictException(
@@ -544,29 +572,32 @@ export class PlanningService {
   async findOne(id: string, user: JwtPayload) {
     const scopedWhere = getScopedWhereForPlanning(user);
 
-    const planning = await this.prisma.planning.findFirst({
-      where: {
-        id,
-        ...scopedWhere,
-      },
-      include: {
-        template: true,
-        classroom: true,
-        createdByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+    const planning = await safePlanningRead(
+      () => this.prisma.planning.findFirst({
+        where: {
+          id,
+          ...scopedWhere,
+        },
+        include: {
+          template: true,
+          classroom: true,
+          createdByUser: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              diaryEvents: true,
+            },
           },
         },
-        _count: {
-          select: {
-            diaryEvents: true,
-          },
-        },
-      },
-    });
+      }),
+      null,
+    );
 
     if (!planning) {
       throw new NotFoundException('Planejamento não encontrado');
@@ -737,7 +768,8 @@ export class PlanningService {
 
     // Se ativando, verificar conflitos
     if (changeStatusDto.status === PlanningStatus.EM_EXECUCAO) {
-      const existingActivePlanning = await this.prisma.planning.findFirst({
+      const existingActivePlanning = await safePlanningRead(
+        () => this.prisma.planning.findFirst({
         where: {
           classroomId: planning.classroomId,
           status: PlanningStatus.EM_EXECUCAO,
@@ -751,7 +783,9 @@ export class PlanningService {
             },
           ],
         },
-      });
+      }),
+        null,
+      );
 
       if (existingActivePlanning) {
         throw new ConflictException(
@@ -1174,7 +1208,8 @@ export class PlanningService {
     const dayEndUTC   = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
     // Escopo multi-tenant
     const scopeWhere = getScopedWhereForPlanning(user);
-    const planning = await this.prisma.planning.findFirst({
+    const planning = await safePlanningRead(
+      () => this.prisma.planning.findFirst({
       where: {
         ...scopeWhere,
         classroomId,
@@ -1192,7 +1227,9 @@ export class PlanningService {
       },
       // Preferir EM_EXECUCAO sobre APROVADO
       orderBy: { status: 'asc' },
-    });
+    }),
+      null,
+    );
     if (!planning) {
       return { hasActivePlanning: false };
     }
@@ -1250,7 +1287,8 @@ export class PlanningService {
     const lastDate = dates[dates.length - 1].split('-').map(Number);
     const rangeEnd = getPedagogicalUtcRange(dates[dates.length - 1]).end;
     // Busca planejamentos existentes que se sobrepõem ao range
-    const existing = await this.prisma.planning.findMany({
+    const existing = await safePlanningRead(
+      () => this.prisma.planning.findMany({
       where: {
         classroomId,
         status: { notIn: [PlanningStatus.CANCELADO] },
@@ -1260,7 +1298,9 @@ export class PlanningService {
         ],
       },
       select: { startDate: true, endDate: true },
-    });
+    }),
+      [],
+    );
     // Determina quais datas do range estão ocupadas
     const occupied: string[] = [];
     for (const dateStr of dates) {
