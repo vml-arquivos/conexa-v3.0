@@ -195,45 +195,13 @@ run_migrate_deploy() {
   exit 1
 }
 
-
-# ── Função: correção operacional de acessos (idempotente) ────────────────────
-run_operational_access_fix() {
-  local ACCESS_FIX_SQL="/app/prisma/manual-sql/correcao-acessos-operacionais/04_auto_deploy_corrigir_acessos_operacionais.sql"
-  if [ "${RUN_ACCESS_FIX_ON_DEPLOY:-true}" != "true" ]; then
-    echo "ℹ️  Correção operacional de acessos desativada."; return 0; fi
-  if [ ! -f "$ACCESS_FIX_SQL" ]; then
-    echo "⚠️  SQL de acessos não encontrado. Pulando."; return 0; fi
-  echo "🔐 Corrigindo acessos operacionais..."
-  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$ACCESS_FIX_SQL"; then
-    echo "✅ Acessos operacionais corrigidos."
-  else
-    echo "⚠️  Correção de acessos falhou (não crítico)."
-  fi
-}
-
-
-# ── Função: corrigir faixas etárias das turmas (idempotente) ─────────────────
-run_faixas_etarias_fix() {
-  local SQL_FILE="/app/prisma/manual-sql/correcao-faixas-etarias/01_auto_deploy_corrigir_faixas_etarias.sql"
-  if [ ! -f "$SQL_FILE" ]; then
-    echo "⚠️  SQL de faixas etárias não encontrado. Pulando."; return 0; fi
-  echo "📐 Corrigindo faixas etárias (EI01/EI02/EI03)..."
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -f "$SQL_FILE" &&     echo "✅ Faixas etárias corrigidas." ||     echo "⚠️  Faixas etárias: falhou (não crítico)."
-}
-
 # ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
 resolve_failed_migrations
 
 # ── Passo 2: Aplicar migrations (com retry inteligente em P3009 e P3018) ──────
 run_migrate_deploy
 
-# ── Passo 3: Executar correção operacional idempotente de acessos ─────────────
-run_operational_access_fix
-
-# ── Passo 3.5: Corrigir faixas etárias das turmas (EI01/EI02/EI03) ───────────
-run_faixas_etarias_fix
-
-# ── Passo 4: Regenerar Prisma client com o schema atual ──────────────────────
+# ── Passo 3: Regenerar Prisma client com o schema atual ──────────────────────
 # CRÍTICO: o Prisma client é gerado no build, mas novas migrations podem adicionar
 # modelos que o client buildado não conhece (ex: MaterialRequestItem, Material).
 # Sem este passo, qualquer 'include' em relações novas lança PrismaClientValidationError → 500.
@@ -241,7 +209,7 @@ echo "Regenerando Prisma client com schema atual..."
 npx prisma generate --schema=./prisma/schema.prisma
 echo "✅ Prisma client regenerado."
 
-# ── Passo 5: Popular banco de alimentos (idempotente) ─────────────────────────
+# ── Passo 4: Popular banco de alimentos (idempotente) ─────────────────────────
 # Executa o seed de alimentos a cada deploy — é idempotente (upsert por nome).
 # Garante que novos alimentos adicionados ao CSV sejam inseridos automaticamente.
 if [ -f /app/scripts/seed-alimentos.js ]; then
@@ -249,7 +217,7 @@ if [ -f /app/scripts/seed-alimentos.js ]; then
   node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
 fi
 
-# ── Passo 6: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 5: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js

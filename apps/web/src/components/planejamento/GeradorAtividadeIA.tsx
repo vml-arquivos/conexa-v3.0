@@ -37,7 +37,7 @@ export function GeradorAtividadeIA({
   campoDeExperiencia,
   objetivoBNCC,
   objetivoCurriculo,
-  faixaEtariaPadrao = 'EI01',
+  faixaEtariaPadrao = 'EI03',
   matrizEntradaId,
   onAtividadeGerada,
 }: Props) {
