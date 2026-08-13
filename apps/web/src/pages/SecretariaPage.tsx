@@ -121,25 +121,18 @@ export default function SecretariaPage() {
     setCarregando(true);
     setErro(null);
     try {
-      const [summaryRes, chamadaRes, atendRes, alertasRes, semanalRes] = await Promise.allSettled([
-        http.get('/children/summary'),
+      const [summaryRes, chamadaRes, atendRes, alertasRes] = await Promise.allSettled([
+        http.get('/children', { params: { limit: 500 } }),
         http.get('/attendance/unit-summary', { params: { date: hojeISO() } }),
         http.get('/atendimentos-pais'),
         http.get('/alertas', { params: { unread: 'true', limit: 20 } }),
-        http.get('/attendance/weekly-summary'),
       ]);
 
       if (summaryRes.status === 'fulfilled') {
         const d = summaryRes.value.data;
-        setTotalAlunos(d?.totalAtivos ?? d?.total ?? 0);
-        setSemTurma(d?.semTurma ?? 0);
-      } else {
-        try {
-          const r = await http.get('/children', { params: { limit: 500 } });
-          const lista = Array.isArray(r.data) ? r.data : r.data?.data ?? r.data?.children ?? [];
-          setTotalAlunos(lista.filter((a: any) => a.enrollments?.some((e: any) => e.status === 'ATIVA') ?? true).length);
-          setSemTurma(lista.filter((a: any) => !a.enrollments?.some((e: any) => e.status === 'ATIVA' && e.classroomId)).length);
-        } catch { /* mantém zero */ }
+        const lista = Array.isArray(d) ? d : d?.data ?? d?.children ?? [];
+        setTotalAlunos(lista.filter((a: any) => a.enrollments?.some((e: any) => e.status === 'ATIVA') ?? true).length);
+        setSemTurma(lista.filter((a: any) => !a.enrollments?.some((e: any) => e.status === 'ATIVA' && e.classroomId)).length);
       }
 
       if (chamadaRes.status === 'fulfilled') {
@@ -157,17 +150,10 @@ export default function SecretariaPage() {
         setAlertas(Array.isArray(d?.alertas) ? d.alertas : []);
       }
 
+      // O backend ainda não expõe /attendance/weekly-summary. Não mascarar um
+      // 404 como dado real: exibir o estado vazio até a API semanal existir.
       const diasLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
-      if (semanalRes.status === 'fulfilled') {
-        const d = semanalRes.value.data;
-        if (Array.isArray(d?.dias)) {
-          setFrequenciaSemanal(d.dias.map((x: any, i: number) => ({ dia: diasLabels[i] ?? `D${i+1}`, pct: x.pct ?? x.taxaPresenca ?? 0 })));
-        } else {
-          setFrequenciaSemanal(diasLabels.map((dia) => ({ dia, pct: 0 })));
-        }
-      } else {
-        setFrequenciaSemanal(diasLabels.map((dia) => ({ dia, pct: 0 })));
-      }
+      setFrequenciaSemanal(diasLabels.map((dia) => ({ dia, pct: 0 })));
     } catch (e) {
       setErro(getErrorMessage(e));
     } finally {

@@ -27,11 +27,11 @@ Port: 3000
 
 **Variáveis de Ambiente:**
 ```env
-DATABASE_URL=postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
-DIRECT_URL=postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 JWT_SECRET=[mesmo da produção]
 JWT_REFRESH_SECRET=[mesmo da produção]
-SUPABASE_URL=https://<SUPABASE_PROJECT_REF_REDACTED>.supabase.co
+SUPABASE_URL=https://ockzuvbnzfoqsiwmpixr.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF
 SUPABASE_SERVICE_ROLE_KEY=[obter no Dashboard]
 NODE_ENV=staging

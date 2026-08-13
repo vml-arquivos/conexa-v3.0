@@ -60,14 +60,14 @@ O Coolify automaticamente:
 
 Após criado, o Coolify fornece:
 ```
-postgresql://conexa_user:[SENHA]@conexa-v3-db:5432/conexa
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@conexa-v3-db:5432/conexa
 ```
 
 ### Passo 4: Você Usa no Backend
 
 Configure a variável de ambiente no backend:
 ```bash
-DATABASE_URL=postgresql://conexa_user:[SENHA]@conexa-v3-db:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]]@conexa-v3-db:5432/conexa
 ```
 
 ### Passo 5: Execute as Migrations

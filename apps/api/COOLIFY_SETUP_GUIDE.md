@@ -15,16 +15,16 @@
 ### Database (Supabase)
 
 ```env
-DATABASE_URL=postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 
-DIRECT_URL=postgresql://postgres.<SUPABASE_PROJECT_REF_REDACTED>:<DB_PASSWORD_REDACTED>@aws-1-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 ⚠️ **IMPORTANTE:**
 - `DATABASE_URL` usa porta **6543** (Transaction Mode) para runtime
 - `DIRECT_URL` usa porta **5432** (Session Mode) para migrations
 - Ambas usam `sslmode=require` (obrigatório no Supabase)
-- Usuário é `postgres.<SUPABASE_PROJECT_REF_REDACTED>` (com project_ref)
+- Usuário é `postgres.ockzuvbnzfoqsiwmpixr` (com project_ref)
 
 ### JWT Secrets
 
@@ -42,13 +42,13 @@ openssl rand -base64 32
 ### Supabase API
 
 ```env
-SUPABASE_URL=https://<SUPABASE_PROJECT_REF_REDACTED>.supabase.co
+SUPABASE_URL=https://ockzuvbnzfoqsiwmpixr.supabase.co
 SUPABASE_ANON_KEY=sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF
 SUPABASE_SERVICE_ROLE_KEY=sua_service_role_key_aqui
 ```
 
 ⚠️ **OBTER SERVICE_ROLE_KEY:**
-1. Acessar: https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/api
+1. Acessar: https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/api
 2. Copiar "service_role" key (secret)
 
 ### Port
@@ -79,7 +79,7 @@ curl -4 ifconfig.me
 
 #### 2.2 Adicionar IP na whitelist do Supabase
 
-1. Acessar: https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/database
+1. Acessar: https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/database
 2. Rolar até **Connection Pooling**
 3. Em **Allowed IP addresses**, clicar em **Add IP**
 4. Adicionar o IP do Coolify
@@ -179,7 +179,7 @@ No Coolify, verificar logs para:
 **Via API REST do Supabase:**
 ```bash
 curl -X GET \
-  'https://<SUPABASE_PROJECT_REF_REDACTED>.supabase.co/rest/v1/_prisma_migrations?select=*' \
+  'https://ockzuvbnzfoqsiwmpixr.supabase.co/rest/v1/_prisma_migrations?select=*' \
   -H "apikey: sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF" \
   -H "Authorization: Bearer sb_publishable_HvSlvhTCWY2j9dgKqiSGuQ_3t03hIvF"
 ```
@@ -211,8 +211,8 @@ curl -X GET \
 **Causa:** Usuário ou senha incorretos na connection string
 
 **Solução:**
-1. Verificar se usuário é `postgres.<SUPABASE_PROJECT_REF_REDACTED>` (com project_ref)
-2. Verificar se senha está correta: `<DB_PASSWORD_REDACTED>`
+1. Verificar se usuário é `postgres.ockzuvbnzfoqsiwmpixr` (com project_ref)
+2. Verificar se senha está correta: `Conexaapiv1db`
 3. Verificar se host é `aws-1-sa-east-1.pooler.supabase.com` (não aws-0)
 
 ### App não sobe após deploy
@@ -239,9 +239,9 @@ curl -X GET \
 
 ## 8. LINKS ÚTEIS
 
-- **Supabase Dashboard:** https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>
-- **Database Settings:** https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/database
-- **API Settings:** https://supabase.com/dashboard/project/<SUPABASE_PROJECT_REF_REDACTED>/settings/api
+- **Supabase Dashboard:** https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr
+- **Database Settings:** https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/database
+- **API Settings:** https://supabase.com/dashboard/project/ockzuvbnzfoqsiwmpixr/settings/api
 - **Prisma Docs:** https://www.prisma.io/docs
 
 ---

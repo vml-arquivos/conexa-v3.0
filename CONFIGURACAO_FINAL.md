@@ -25,8 +25,8 @@
 **Variáveis** (14):
 
 ```bash
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
-DIRECT_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
+DIRECT_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 REDIS_URL=redis://redis-conexa:6379
 JWT_SECRET=[gere com: openssl rand -base64 32]
 JWT_EXPIRES_IN=7d
@@ -66,7 +66,7 @@ VITE_APP_VERSION=3.0.0
 **Variáveis** (4):
 
 ```bash
-DATABASE_URL=postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+DATABASE_URL=postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 API_URL=https://apicocris.casadf.com.br
 NODE_ENV=production
 PORT=5174
@@ -187,7 +187,7 @@ curl https://cocris.casadf.com.br
 
 **Formato**:
 ```
-postgresql://postgres:SUA_SENHA@postgres-conexa:5432/conexa
+postgresql://[USUARIO]:[SENHA]@[HOST]:[PORTA]/[BANCO]
 ```
 
 ---

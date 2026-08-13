@@ -48,16 +48,6 @@ export class ChildrenController {
   }
 
   /**
-   * Resumo de contagens (total, ativos, sem turma) da unidade/mantenedora.
-   * GET /children/summary — precisa vir ANTES de ":id" para não ser capturada
-   * como um id literal "summary".
-   */
-  @Get('summary')
-  async getSummary(@Request() req, @Query('unitId') unitId?: string) {
-    return this.childrenService.getSummary(req.user, unitId);
-  }
-
-  /**
    * Buscar criança por ID
    */
   @Get(':id')
@@ -217,12 +207,6 @@ export class ChildrenController {
    * Não altera dados pedagógicos (planos, diário, RDIC, matrículas).
    */
   @Patch(':id/secretaria')
-  @RequireRoles(
-    RoleLevel.UNIDADE,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.MANTENEDORA,
-    RoleLevel.DEVELOPER,
-  )
   async updateSecretariaFields(
     @Param('id') id: string,
     @Body() body: {

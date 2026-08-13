@@ -10,7 +10,6 @@ import {
   Query,
   Request,
   UseGuards,
-  BadRequestException,
 } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import type { CreateUnitDto, UpdateUnitDto } from './units.dto';
@@ -21,8 +20,6 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
  *
  * Rotas:
  *   GET    /units                — lista unidades da mantenedora
- *   GET    /units/my             — unidade do usuário autenticado
- *   PUT    /units/my             — atualiza a unidade do usuário autenticado
  *   GET    /units/:id            — detalhe de uma unidade
  *   POST   /units                — criar nova unidade
  *   PATCH  /units/:id            — atualizar unidade (parcial)
@@ -32,9 +29,6 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
  * RBAC:
  *   Leitura: DEVELOPER, MANTENEDORA, STAFF_CENTRAL, UNIDADE
  *   Escrita: DEVELOPER, MANTENEDORA, STAFF_CENTRAL
- *
- * Nota: as rotas estáticas ("my") precisam vir ANTES de ":id" nesta classe,
- * caso contrário o Nest interpreta "my" como o parâmetro :id.
  */
 @Controller('units')
 @UseGuards(JwtAuthGuard)
@@ -58,35 +52,6 @@ export class UnitsController {
       includeCounts: include === 'counts',
       limit: limit ? parseInt(limit, 10) : 100,
     });
-  }
-
-  /**
-   * GET /units/my
-   * Retorna a unidade do usuário autenticado (req.user.unitId).
-   * Usado pela tela "Minha Unidade" em Configurações.
-   */
-  @Get('my')
-  async findMy(@Request() req: any) {
-    if (!req.user?.unitId) {
-      throw new BadRequestException(
-        'Usuário autenticado não está vinculado a nenhuma unidade.',
-      );
-    }
-    return this.unitsService.findOne(req.user, req.user.unitId);
-  }
-
-  /**
-   * PUT /units/my
-   * Atualiza a unidade do usuário autenticado (req.user.unitId).
-   */
-  @Put('my')
-  async updateMy(@Request() req: any, @Body() body: UpdateUnitDto) {
-    if (!req.user?.unitId) {
-      throw new BadRequestException(
-        'Usuário autenticado não está vinculado a nenhuma unidade.',
-      );
-    }
-    return this.unitsService.update(req.user, req.user.unitId, body);
   }
 
   /**
