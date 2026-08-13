@@ -75,17 +75,7 @@ export interface AtualizarStatusPedidoDto {
  * Idempotente: se já existir RASCUNHO para unidade+mês, retorna o existente.
  */
 export async function criarPedido(dto: CriarPedidoDto): Promise<PedidoCompra> {
-  const response = await http.post('/material-requests', {
-    titulo: `Pedido ${dto.mesReferencia}`,
-    justificativa: dto.observacoes ?? '',
-    urgencia: 'MEDIA',
-    categoria: 'PEDAGOGICO',
-    itens: dto.itens.map(i => ({
-      item: i.descricao,
-      quantidade: i.quantidade,
-      unidade: i.unidadeMedida ?? 'un',
-    })),
-  });
+  const response = await http.post('/pedidos-compra', dto);
   return response.data;
 }
 
@@ -123,61 +113,8 @@ export async function listarPedidosCompra(filtros?: {
   unitId?: string;
   status?: StatusPedidoCompra;
 }): Promise<PedidoCompra[]> {
-  try {
-    const params: Record<string, string | undefined> = {};
-    if (filtros?.status) params.status = filtros.status;
-    if (filtros?.unitId) params.unitId = filtros.unitId;
-    const response = await http.get('/material-requests', { params });
-    const data = response.data;
-    if (!Array.isArray(data)) return [];
-    return data.map((r: any): PedidoCompra => ({
-      id: r.id ?? '',
-      mesReferencia: r.code ?? r.title ?? '',
-      status: (r.status as StatusPedidoCompra) ?? 'RASCUNHO',
-      observacoes: (() => {
-        if (!r.description) return undefined;
-        try {
-          const parsed = JSON.parse(r.description);
-          if (parsed._review && parsed._originalData?.justificativa) {
-            return String(parsed._originalData.justificativa);
-          }
-          if (parsed._review && parsed.notes) {
-            return String(parsed.notes);
-          }
-          if (parsed.justificativa) {
-            return String(parsed.justificativa);
-          }
-          return undefined;
-        } catch {
-          return r.description.length < 200 ? r.description : undefined;
-        }
-      })(),
-      criadoEm: r.requestedDate ?? r.createdAt ?? new Date().toISOString(),
-      atualizadoEm: r.updatedAt ?? r.createdAt ?? new Date().toISOString(),
-      unit: r.unit ?? { id: '', name: '' },
-      itens: Array.isArray(r.items) && r.items.length > 0
-        ? r.items.map((it: any): ItemPedidoCompra => ({
-            id: it.id ?? '',
-            categoria: r.type ?? 'OUTRO',
-            descricao: it.productName ?? it.materialName ?? it.item ?? '',
-            quantidade: Number(it.quantity ?? it.quantidade ?? 1),
-            unidadeMedida: it.unit ?? it.unidade ?? undefined,
-            custoEstimado: it.unitPrice ?? it.unit_price ?? undefined,
-          }))
-        : Array.isArray(r.originalItens) && r.originalItens.length > 0
-        ? r.originalItens.map((it: any, idx: number): ItemPedidoCompra => ({
-            id: `legacy-${idx}`,
-            categoria: r.type ?? 'OUTRO',
-            descricao: it.item ?? '',
-            quantidade: Number(it.quantidade ?? 1),
-            unidadeMedida: it.unidade ?? undefined,
-            custoEstimado: undefined,
-          }))
-        : [],
-    }));
-  } catch {
-    return [];
-  }
+  const response = await http.get('/pedidos-compra', { params: filtros });
+  return response.data;
 }
 
 /**

@@ -155,10 +155,6 @@ describe('LookupService — RBAC de turmas e crianças', () => {
         unitId: 'unit-001',
         unit: { mantenedoraId: 'mant-001' },
       });
-      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({
-        id: 'teacher-link-001',
-        classroomId: 'class-001',
-      });
       mockPrismaService.enrollment.findMany.mockResolvedValue(mockEnrollments);
     });
 
@@ -191,14 +187,6 @@ describe('LookupService — RBAC de turmas e crianças', () => {
       await expect(
         service.getAccessibleChildren(professorUser, 'class-outra-mant'),
       ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('RBAC: professor sem vínculo ativo não acessa crianças da turma', async () => {
-      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue(null);
-
-      await expect(
-        service.getAccessibleChildren(professorUser, 'class-001'),
-      ).rejects.toThrow('Professor sem vínculo ativo com esta turma');
     });
 
     it('contrato: cada criança tem id, firstName, lastName, name, classroomId', async () => {

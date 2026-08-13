@@ -1,5 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
@@ -11,10 +10,7 @@ import { RdxService } from './rdx.service';
 @Controller('rdx')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RdxController {
-  constructor(
-    private readonly svc: RdxService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly svc: RdxService) {}
 
   /**
    * POST /rdx
@@ -68,44 +64,5 @@ export class RdxController {
   @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   adicionarFotos(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: JwtPayload) {
     return this.svc.adicionarFotos(id, dto, user);
-  }
-
-  /**
-   * POST /rdx/enviar-semanal
-   * Marcar todas as fotos do mês como enviadas ao Regional de Ensino.
-   * body.semana: string no formato "YYYY-MM" (ex: "2026-04")
-   */
-  @Post('enviar-semanal')
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  async enviarSemanal(
-    @Body() body: { classroomId: string; semana: string },
-    @CurrentUser() user: JwtPayload,
-  ) {
-    if (!body.classroomId || !body.semana) {
-      throw new BadRequestException('classroomId e semana são obrigatórios');
-    }
-    // Calcular início e fim do mês a partir de "YYYY-MM"
-    const [ano, mes] = body.semana.split('-').map(Number);
-    if (!ano || !mes || mes < 1 || mes > 12) {
-      throw new BadRequestException('semana deve estar no formato YYYY-MM (ex: 2026-04)');
-    }
-    const inicio = new Date(ano, mes - 1, 1, 0, 0, 0);
-    const fim    = new Date(ano, mes, 0, 23, 59, 59); // último dia do mês
-    await this.prisma.relatorioFoto.updateMany({
-      where: {
-        classroomId: body.classroomId,
-        weeklyReportSent: false,
-        dataAtividade: {
-          gte: inicio,
-          lte: fim,
-        },
-      },
-      data: {
-        weeklyReportSent: true,
-        weeklyReportSentAt: new Date(),
-        weeklyReportRecipient: `Regional — enviado por ${user.sub}`,
-      },
-    });
-    return { success: true, message: 'Fotos da semana marcadas como enviadas ao Regional.' };
   }
 }

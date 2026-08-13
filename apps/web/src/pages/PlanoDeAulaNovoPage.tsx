@@ -22,8 +22,6 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
-// Tarefa 3.1 — IA no planejamento
-import { GeradorAtividadeIA } from '../components/planejamento/GeradorAtividadeIA';
 import {
   Save,
   Send,
@@ -38,19 +36,12 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  Printer,
-  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { imprimirPlanejamento, gerarPDF, imprimirPlanejamentoDia, gerarPDFDia } from '../components/PrintablePlan';
-import type { Planning } from '../api/plannings';
 import http from '../api/http';
 import { submitPlanningForReview, getPlanning } from '../api/plannings';
 import { safeJsonParse, safeJsonStringify } from '../lib/safeJson';
-import { useAuth } from '../app/AuthProvider';
-import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { toPedagogicalISODate } from '../lib/formatDate';
-import { useAutoSave } from '../hooks/useAutoSave';
 import { extractErrorMessage } from '../lib/utils';
 // Fallback local: usado SOMENTE quando o backend retornar objectives vazio
 import { MATRIZ_2026, type EntradaMatriz, type SegmentoKey } from '../data/matrizCompleta2026';
@@ -149,10 +140,6 @@ interface DayState {
   matrizMessage?: string;
   teacher: DayTeacherData;
   expanded: boolean;
-  // Aditivo — preenchido quando a coordenação devolve apenas este dia.
-  // Não existia antes; lido do mesmo JSON description (formato V2).
-  reviewStatus?: 'DEVOLVIDO';
-  reviewComment?: string;
 }
 
 /** Contrato de retorno do endpoint by-classroom-day */
@@ -345,36 +332,6 @@ export default function PlanoDeAulaNovoPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id?: string }>();
   const isEditing = Boolean(id);
-  const { user } = useAuth();
-  const userRoles = normalizeRoles(user);
-
-  // ─── Roles de coordenação/direção — não criam nem enviam planejamento ────────
-  // Coordenação acessa o planejamento para revisar (aprovar/devolver), não para criar.
-  const userRoleTypes: string[] = (() => {
-    if (!user || typeof user !== 'object') return [];
-    const u = user as Record<string, unknown>;
-    const roles = (u.roles ?? (u.user as Record<string, unknown> | undefined)?.roles) as unknown[] | undefined;
-    if (!Array.isArray(roles)) return [];
-    return roles
-      .filter((r): r is Record<string, unknown> => typeof r === 'object' && r !== null)
-      .map((r) => (typeof r.type === 'string' ? r.type : null))
-      .filter((t): t is string => t !== null);
-  })();
-  const COORD_ROLES_PLAN = [
-    'UNIDADE', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO',
-    'UNIDADE_NUTRICIONISTA', 'UNIDADE_ADMINISTRATIVO',
-    'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER',
-  ];
-  const allRolesPlan = [...new Set([...userRoles, ...userRoleTypes])];
-  // isCoordRole: true quando o usuário é coordenação/direção/central — não deve criar/enviar
-  const isCoordRole = allRolesPlan.some((r) => COORD_ROLES_PLAN.includes(r));
-
-  // Coordenadores podem aprovar/devolver planejamentos em revisão
-  const canApprove = ['UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER'].some(r => userRoles.includes(r));
-  const [aprovando, setAprovando] = useState(false);
-  const [modalDevolver, setModalDevolver] = useState(false);
-  const [motivoDevolver, setMotivoDevolver] = useState('');
-  const [diaParaDevolver, setDiaParaDevolver] = useState<string | null>(null);
 
   // ─── Estado principal ─────────────────────────────────────────────────────
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -393,24 +350,6 @@ export default function PlanoDeAulaNovoPage() {
   // Datas ocupadas (já existem planejamentos nessas datas)
   const [occupiedDates, setOccupiedDates] = useState<string[]>([]);
   const [checkingDates, setCheckingDates] = useState(false);
-
-  // ─── Auto-save no localStorage (apenas para novos planos — planningId nulo) ──
-  const autoSaveKey = `plano-aula-rascunho-${user?.id ?? 'anon'}-${classroomId || 'sem-turma'}`;
-  const autoSaveData = { classroomId, startDate, numDays, title, days };
-  const { hasDraft, clearDraft, lastSaved } = useAutoSave({
-    key: autoSaveKey,
-    data: autoSaveData,
-    enabled: !planningId && !loading, // só salva rascunhos locais (não planos já persistidos)
-    onRestore: (saved) => {
-      if (planningId) return; // não restaurar se já há um plano carregado do servidor
-      if (saved.classroomId) setClassroomId(saved.classroomId);
-      if (saved.startDate)   setStartDate(saved.startDate);
-      if (saved.numDays)     setNumDays(saved.numDays);
-      if (saved.title)       setTitle(saved.title);
-      if (Array.isArray(saved.days) && saved.days.length > 0) setDays(saved.days);
-      toast.info('Rascunho recuperado automaticamente. Revise antes de enviar.');
-    },
-  });
 
   // Cache de matriz: chave = "classroomId|YYYY-MM-DD"
   const matrizCache = useRef<Map<string, MatrizByDayResponse>>(new Map());
@@ -496,8 +435,6 @@ export default function PlanoDeAulaNovoPage() {
               matrizLoading: false,
               teacher: day.teacher ?? { ...TEACHER_EMPTY },
               expanded: true,
-              reviewStatus: (day as any).reviewStatus,
-              reviewComment: (day as any).reviewComment,
             }));
             setDays(restored);
           } else {
@@ -787,7 +724,6 @@ export default function PlanoDeAulaNovoPage() {
       if (!currentId) throw new Error('ID do planejamento não encontrado');
       await submitPlanningForReview(currentId);
       setStatus('EM_REVISAO');
-      clearDraft(); // limpar rascunho local após envio bem-sucedido
       toast.success('Planejamento enviado para revisão!');
       navigate('/app/planejamentos');
     } catch (err: any) {
@@ -810,35 +746,11 @@ export default function PlanoDeAulaNovoPage() {
   };
   const statusInfo = statusConfig[status] ?? statusConfig.RASCUNHO;
   // Bloqueado: não pode editar quando em revisão, aprovado, em execução ou concluído
-  // Coordenação também é sempre bloqueada para edição — acessa apenas para revisão
-  const bloqueado = isCoordRole || ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
-
-  // ─── Objeto Planning para impressão/PDF — reaproveita PrintablePlan.tsx ─────
-  // Monta a partir do estado já carregado em tela, sem nova chamada à API.
-  const planningForPrint: Planning | null = (planningId && days.length > 0)
-    ? ({
-        id: planningId,
-        title: title || `Planejamento ${turmaSelecionada?.name ?? ''} — ${startDate?.split('-').reverse().join('/') ?? ''}`,
-        status: status as Planning['status'],
-        type: 'ROTINA',
-        classroomId,
-        curriculumMatrixId: '',
-        startDate,
-        endDate: days[days.length - 1]?.date ?? startDate,
-        classroom: turmaSelecionada ? { id: turmaSelecionada.id, name: turmaSelecionada.name } : undefined,
-        createdByUser: user ? { id: user.id, firstName: user.nome ?? '', lastName: '', email: user.email ?? '' } : undefined,
-        description: JSON.stringify({
-          version: 2,
-          classroomId,
-          range: { start: startDate, end: days[days.length - 1]?.date ?? startDate, days: days.length },
-          days: days.map((d) => ({ date: d.date, objectives: d.objectives, teacher: d.teacher })),
-        } satisfies PlanningV2Json),
-      } as unknown as Planning)
-    : null;
+  const bloqueado = ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
 
   if (loading) {
     return (
-      <PageShell title={isCoordRole ? 'Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
+      <PageShell title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
         </div>
@@ -846,24 +758,14 @@ export default function PlanoDeAulaNovoPage() {
     );
   }
 
-  // Título e subtítulo contextuais ao status real do plano — revisão é uma
-  // etapa, não um estado permanente. Plano já aprovado é só visualização.
-  const emRevisaoOuPendente = ['EM_REVISAO', 'RASCUNHO', 'DEVOLVIDO'].includes(status);
-  const tituloCoord = isCoordRole
-    ? (emRevisaoOuPendente ? 'Revisar Planejamento' : 'Visualizar Planejamento')
-    : (isEditing ? 'Editar Planejamento' : 'Novo Planejamento');
-  const subtituloCoord = isCoordRole
-    ? (emRevisaoOuPendente ? 'Aguardando sua análise — aprove ou devolva' : 'Planejamento aprovado — visualização e impressão')
-    : 'Planejamento por data com Matriz Pedagógica 2026 automática';
-
   return (
     <PageShell
-      title={tituloCoord}
-      subtitle={subtituloCoord}
+      title={isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}
+      subtitle="Planejamento por data com Matriz Pedagógica 2026 automática"
     >
       <div className="max-w-2xl mx-auto space-y-6">
         {/* ─── Cabeçalho com status ─── */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/app/planejamentos')}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
           </Button>
@@ -873,166 +775,20 @@ export default function PlanoDeAulaNovoPage() {
             {statusInfo.icon}
             {statusInfo.label}
           </span>
-
-          {/* Visualizar e imprimir — disponível sempre que o plano já existe */}
-          {planningForPrint && (
-            <div className="flex items-center gap-1.5 ml-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => gerarPDF(planningForPrint)}
-                title="Gerar PDF do plano completo"
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" /> PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => imprimirPlanejamento(planningForPrint)}
-                title="Imprimir o plano completo"
-              >
-                <Printer className="h-3.5 w-3.5 mr-1.5" /> Imprimir
-              </Button>
-            </div>
-          )}
         </div>
 
-        {/* Banner de auto-save */}
-        {hasDraft && !planningId && (
-          <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
-            <Save className="h-4 w-4 flex-shrink-0 text-blue-500" />
-            <span className="flex-1">
-              Rascunho salvo automaticamente
-              {lastSaved && ` às ${lastSaved.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}.
-              Seus dados não serão perdidos.
-            </span>
-          </div>
-        )}
         {/* Aviso quando bloqueado */}
         {bloqueado && (
           <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span>
-              {status === 'RASCUNHO' && isCoordRole && 'Este planejamento ainda é um rascunho do professor — ainda não foi enviado para revisão.'}
-              {status === 'EM_REVISAO' && (isCoordRole ? 'Aguardando sua aprovação ou devolução.' : 'Este planejamento está aguardando aprovação da coordenação. Edição bloqueada.')}
-              {status === 'APROVADO' && (isCoordRole ? 'Planejamento já aprovado — disponível apenas para visualização e impressão.' : 'Planejamento aprovado. Para editar, solicite devolução à coordenação.')}
+              {status === 'EM_REVISAO' && 'Este planejamento está aguardando aprovação da coordenação. Edição bloqueada.'}
+              {status === 'APROVADO' && 'Planejamento aprovado. Para editar, solicite devolução à coordenação.'}
               {status === 'EM_EXECUCAO' && 'Planejamento em execução. Edição bloqueada.'}
               {status === 'CONCLUIDO' && 'Planejamento concluído. Visualização somente leitura.'}
               {status === 'PUBLICADO' && 'Planejamento publicado. Edição bloqueada.'}
               {status === 'CANCELADO' && 'Planejamento cancelado.'}
             </span>
-          </div>
-        )}
-
-        {/* ─── Ações de revisão para coordenação ─── */}
-        {canApprove && status === 'EM_REVISAO' && planningId && (
-          <div className="flex flex-col gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-            <p className="text-sm font-semibold text-blue-800">Ações da Coordenação</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                disabled={aprovando}
-                onClick={async () => {
-                  try {
-                    setAprovando(true);
-                    await http.post(`/plannings/${planningId}/aprovar`);
-                    setStatus('APROVADO');
-                    toast.success('Planejamento aprovado!');
-                  } catch (err: any) {
-                    toast.error(err?.response?.data?.message ?? 'Erro ao aprovar');
-                  } finally {
-                    setAprovando(false);
-                  }
-                }}
-              >
-                <CheckCircle className="h-4 w-4 mr-1" /> Aprovar plano completo
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-red-300 text-red-700 hover:bg-red-50"
-                onClick={() => { setModalDevolver(true); setDiaParaDevolver(null); }}
-              >
-                Devolver plano completo
-              </Button>
-              {days.length > 1 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                  onClick={() => { setModalDevolver(true); setDiaParaDevolver(days[0]?.date ?? null); }}
-                >
-                  Devolver só um dia
-                </Button>
-              )}
-            </div>
-            {/* Modal devolução inline — plano completo ou dia específico */}
-            {modalDevolver && (
-              <div className="mt-2 space-y-2">
-                {days.length > 1 && (
-                  <div>
-                    <label className="text-xs font-medium text-gray-600 block mb-1">
-                      O que devolver?
-                    </label>
-                    <select
-                      className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white"
-                      value={diaParaDevolver ?? ''}
-                      onChange={e => setDiaParaDevolver(e.target.value || null)}
-                    >
-                      <option value="">Plano completo (todos os {days.length} dias)</option>
-                      {days.map((d, idx) => (
-                        <option key={d.date} value={d.date}>
-                          Dia {idx + 1} — {formatDateBR(d.date)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <textarea
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm resize-none"
-                  rows={3}
-                  placeholder="Descreva o motivo da devolução..."
-                  value={motivoDevolver}
-                  onChange={e => setMotivoDevolver(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    disabled={aprovando || motivoDevolver.trim().length < 5}
-                    onClick={async () => {
-                      try {
-                        setAprovando(true);
-                        if (diaParaDevolver) {
-                          await http.post(
-                            `/plannings/${planningId}/devolver-dia/${diaParaDevolver}`,
-                            { comment: motivoDevolver.trim() },
-                          );
-                          toast.success(`Dia ${formatDateBR(diaParaDevolver)} devolvido para correção.`);
-                        } else {
-                          await http.post(`/plannings/${planningId}/devolver`, { comment: motivoDevolver.trim() });
-                          toast.success('Planejamento devolvido para correção.');
-                        }
-                        setStatus('DEVOLVIDO');
-                        setModalDevolver(false);
-                        setMotivoDevolver('');
-                        setDiaParaDevolver(null);
-                      } catch (err: any) {
-                        toast.error(err?.response?.data?.message ?? 'Erro ao devolver');
-                      } finally {
-                        setAprovando(false);
-                      }
-                    }}
-                  >
-                    {diaParaDevolver ? `Confirmar devolução do dia` : 'Confirmar devolução completa'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setModalDevolver(false); setMotivoDevolver(''); setDiaParaDevolver(null); }}>
-                    Cancelar
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -1086,13 +842,6 @@ export default function PlanoDeAulaNovoPage() {
                   disabled={bloqueado}
                   className={occupiedDates.length > 0 ? 'border-amber-400' : ''}
                 />
-                {startDate && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(startDate + 'T12:00:00').toLocaleDateString('pt-BR', {
-                      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-                    })}
-                  </p>
-                )}
               </div>
               <div>
                 <Label>
@@ -1176,36 +925,10 @@ export default function PlanoDeAulaNovoPage() {
                       Dia {idx + 1} — {formatDateBR(day.date)}
                     </span>
                     <div className="flex items-center gap-2">
-                      {day.reviewStatus === 'DEVOLVIDO' && (
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 border border-orange-300">
-                          Devolvido pela coordenação
-                        </Badge>
-                      )}
                       {day.teacher.atividade.trim() && (
                         <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
                           Preenchido
                         </Badge>
-                      )}
-                      {planningForPrint && (
-                        <div
-                          className="flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() => gerarPDFDia(planningForPrint, day.date)}
-                            title="Gerar PDF deste dia"
-                            className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
-                          >
-                            <Download className="h-3 w-3" /> PDF
-                          </button>
-                          <button
-                            onClick={() => imprimirPlanejamentoDia(planningForPrint, day.date)}
-                            title="Imprimir apenas este dia"
-                            className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50 transition-colors"
-                          >
-                            <Printer className="h-3 w-3" /> Imprimir
-                          </button>
-                        </div>
                       )}
                       {day.expanded ? (
                         <ChevronUp className="h-4 w-4 text-gray-400" />
@@ -1218,16 +941,6 @@ export default function PlanoDeAulaNovoPage() {
 
                 {day.expanded && (
                   <CardContent className="space-y-4">
-                    {/* Motivo da devolução deste dia específico, se houver */}
-                    {day.reviewStatus === 'DEVOLVIDO' && day.reviewComment && (
-                      <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl text-orange-800 text-sm">
-                        <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-semibold">Motivo da devolução deste dia:</p>
-                          <p className="text-xs mt-0.5">{day.reviewComment}</p>
-                        </div>
-                      </div>
-                    )}
                     {/* Objetivos da Matriz (somente leitura) */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -1279,30 +992,6 @@ export default function PlanoDeAulaNovoPage() {
                           Planejamento do Professor
                         </p>
                       </div>
-
-                      {/* Tarefa 3.1 — Sugestão de atividade via IA (opcional e editável) */}
-                      {!bloqueado && day.objectives.length > 0 && (() => {
-                        const obj = day.objectives[0];
-                        return (
-                          <GeradorAtividadeIA
-                            campoDeExperiencia={obj.campoExperiencia}
-                            objetivoBNCC={obj.objetivoBNCC}
-                            objetivoCurriculo={obj.objetivoCurriculoDF}
-                            faixaEtariaPadrao={turmaSelecionada ? (inferirSegmento(turmaSelecionada) ?? 'EI01') : 'EI01'}
-                            onAtividadeGerada={(atividade) => {
-                              // Preenche o campo de atividade como rascunho editável
-                              // O professor sempre revisa antes de salvar
-                              if (!day.teacher.atividade.trim()) {
-                                updateTeacherField(day.date, 'atividade', atividade.descricao ?? '');
-                                if (atividade.materiais?.length) {
-                                  updateTeacherField(day.date, 'recursos', atividade.materiais.join(', '));
-                                }
-                              }
-                            }}
-                          />
-                        );
-                      })()}
-
                       <div>
                         <Label>
                           Desenvolvimento da Atividade <span className="text-red-500">*</span>
@@ -1351,8 +1040,7 @@ export default function PlanoDeAulaNovoPage() {
         )}
 
         {/* ─── Ações ─── */}
-        {/* Professor: pode salvar rascunho e enviar para revisão */}
-        {!bloqueado && !isCoordRole && (
+        {!bloqueado && (
           <div className="flex flex-col sm:flex-row gap-3 pb-8">
             <Button
               variant="outline"
@@ -1376,18 +1064,6 @@ export default function PlanoDeAulaNovoPage() {
               ) : (
                 <><Send className="h-4 w-4 mr-2" /> Enviar para Revisão</>
               )}
-            </Button>
-          </div>
-        )}
-        {/* Coordenação: apenas botão Voltar na área de ações (aprovação/devolução já está acima) */}
-        {isCoordRole && (
-          <div className="flex pb-8">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/app/planejamentos')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" /> Voltar para Planejamentos
             </Button>
           </div>
         )}

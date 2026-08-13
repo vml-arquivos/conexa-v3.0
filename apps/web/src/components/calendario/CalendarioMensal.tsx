@@ -56,12 +56,6 @@ function diasNoMes(ano: number, mes: number): number {
   return new Date(ano, mes + 1, 0).getDate();
 }
 
-/** Retorna true se o dia for sábado (6) ou domingo (0) */
-function isFimDeSemana(ano: number, mes: number, dia: number): boolean {
-  const d = new Date(ano, mes, dia).getDay();
-  return d === 0 || d === 6;
-}
-
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function CalendarioMensal({
@@ -96,8 +90,6 @@ export function CalendarioMensal({
     const dataStr = formatarData(ano, mes, dia);
     // Bloquear dias futuros
     if (dataStr > hojeStr) return;
-    // Bloquear fins de semana (dias não letivos)
-    if (isFimDeSemana(ano, mes, dia)) return;
     const evento = eventoMap.get(dataStr);
     onDiaClick(dataStr, evento);
   }
@@ -112,8 +104,8 @@ export function CalendarioMensal({
 
     let base = 'relative flex flex-col items-center justify-start rounded-xl p-1.5 min-h-[52px] text-sm font-medium transition-all select-none ';
 
-    if (isFuturo || isFimDeSemana(ano, mes, dia)) {
-      base += 'bg-gray-50/40 text-gray-200 cursor-not-allowed';
+    if (isFuturo) {
+      base += 'bg-gray-50/40 text-gray-300 cursor-default';
     } else if (temPublicado) {
       base += 'bg-green-50 text-green-700 cursor-pointer hover:bg-green-100';
     } else if (temRascunho) {
@@ -192,7 +184,7 @@ export function CalendarioMensal({
                 type="button"
                 onClick={() => handleDiaClick(dia)}
                 className={getCelulaClasses(dia)}
-                disabled={formatarData(ano, mes, dia) > hojeStr || isFimDeSemana(ano, mes, dia)}
+                disabled={formatarData(ano, mes, dia) > hojeStr}
                 aria-label={`Dia ${dia} de ${NOMES_MESES[mes]}`}
               >
                 <span className="leading-none">{dia}</span>

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { MetricsModule } from './metrics/metrics.module';
 import { AppService } from './app.service';
@@ -45,12 +45,6 @@ import { AlimentosModule } from './alimentos/alimentos.module';
 import { ConfiguracaoRefeicaoModule } from './configuracao-refeicao/configuracao-refeicao.module';
 import { AcompanhamentoNutricionalModule } from './acompanhamento-nutricional/acompanhamento-nutricional.module';
 import { PlanningConferenciaModule } from './planning-conferencia/planning-conferencia.module';
-import { ScheduleModule } from '@nestjs/schedule';
-import { AlertasModule } from './alertas/alertas.module';
-import { AuditLogModule } from './audit-log/audit-log.module';
-import { AuditLogInterceptor } from './audit-log/audit-log.interceptor';
-import { EmpresasTransporteModule } from './empresas-transporte/empresas-transporte.module';
-import { IntelligenceCoreModule } from './intelligence-core/intelligence-core.module';
 
 @Module({
   imports: [
@@ -99,11 +93,6 @@ import { IntelligenceCoreModule } from './intelligence-core/intelligence-core.mo
     ConfiguracaoRefeicaoModule,
     AcompanhamentoNutricionalModule,
     PlanningConferenciaModule,
-    ScheduleModule.forRoot(),
-    AlertasModule,
-    AuditLogModule,
-    EmpresasTransporteModule,
-    IntelligenceCoreModule,
   ],
   controllers: [AppController],
   providers: [
@@ -111,10 +100,6 @@ import { IntelligenceCoreModule } from './intelligence-core/intelligence-core.mo
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: AuditLogInterceptor,
     },
   ],
 })

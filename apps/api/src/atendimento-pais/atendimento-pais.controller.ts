@@ -68,7 +68,6 @@ export class AtendimentoPaisController {
    */
   @Patch(':id/status')
   @RequireRoles(
-    RoleLevel.PROFESSOR,
     RoleLevel.UNIDADE,
     RoleLevel.STAFF_CENTRAL,
     RoleLevel.MANTENEDORA,

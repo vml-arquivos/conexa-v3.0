@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Post,
   Put,
   HttpCode,
@@ -48,7 +47,6 @@ export class AuthController {
    */
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: JwtPayload) {
     return this.authService.getMe(user.sub);

@@ -1,23 +1,14 @@
 import axios, { AxiosHeaders } from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import {
-  getAccessToken,
-  getRefreshToken,
-  setAccessToken,
-  clearSession as clearTokenSession,
-} from './tokenStorage';
 
-// VITE_API_URL continua sendo a configuração recomendada e usada em produção.
-// O fallback relativo evita que uma variável ausente derrube todo o bundle antes
-// de o React conseguir exibir uma mensagem. Nesse cenário, a API responderá em
-// /api (ou falhará de forma visível na tela de login), nunca como página branca.
-const configuredBaseURL = String(import.meta.env.VITE_API_URL ?? '').trim();
-const baseURL = configuredBaseURL || '/api';
+// Validar VITE_API_URL obrigatório
+const baseURL = import.meta.env.VITE_API_URL;
 
-if (!configuredBaseURL) {
-  console.error(
-    '[Conexa] VITE_API_URL não está configurado; usando /api como fallback seguro. ' +
-    'Configure VITE_API_URL no build de produção.',
+if (!baseURL) {
+  throw new Error(
+    'VITE_API_URL não está configurado. ' +
+    'Defina a variável de ambiente VITE_API_URL no arquivo .env ou nas configurações do Coolify. ' +
+    'Exemplo: VITE_API_URL=https://api.conexa3.casadf.com.br'
   );
 }
 
@@ -30,11 +21,6 @@ type AuthExpiredAxiosError = AxiosError & {
   isAuthExpired?: boolean;
 };
 
-type RefreshAccessTokenResult = {
-  accessToken: string | null;
-  shouldLogout: boolean;
-};
-
 const http = axios.create({
   baseURL,
 });
@@ -43,10 +29,13 @@ const refreshClient = axios.create({
   baseURL,
 });
 
-let refreshPromise: Promise<RefreshAccessTokenResult> | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
 function clearSession() {
-  clearTokenSession();
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  sessionStorage.clear();
+  document.cookie = 'access_token=; Max-Age=0; path=/';
 }
 
 function redirectToLogin() {
@@ -56,15 +45,9 @@ function redirectToLogin() {
   }
 }
 
-function isSessionExpiredStatus(status?: number): boolean {
-  return status === 401 || status === 403;
-}
-
-async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    return { accessToken: null, shouldLogout: true };
-  }
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return null;
 
   if (!refreshPromise) {
     refreshPromise = refreshClient
@@ -74,19 +57,14 @@ async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
       .then((response) => {
         const newAccessToken = response.data?.accessToken || response.data?.access_token || response.data?.token;
         if (!newAccessToken) {
-          clearSession();
-          return { accessToken: null, shouldLogout: true };
+          throw new Error('Resposta de refresh sem accessToken');
         }
-        setAccessToken(newAccessToken);
-        return { accessToken: newAccessToken as string, shouldLogout: false };
+        localStorage.setItem('accessToken', newAccessToken);
+        return newAccessToken as string;
       })
-      .catch((refreshError) => {
-        const refreshStatus = axios.isAxiosError(refreshError) ? refreshError.response?.status : undefined;
-        if (isSessionExpiredStatus(refreshStatus)) {
-          clearSession();
-          return { accessToken: null, shouldLogout: true };
-        }
-        throw refreshError;
+      .catch(() => {
+        clearSession();
+        return null;
       })
       .finally(() => {
         refreshPromise = null;
@@ -99,7 +77,7 @@ async function refreshAccessToken(): Promise<RefreshAccessTokenResult> {
 // Request interceptor: adiciona Bearer token
 http.interceptors.request.use(
   (config) => {
-    const token = getAccessToken();
+    const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -138,19 +116,17 @@ http.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const refreshResult = await refreshAccessToken();
+    const newAccessToken = await refreshAccessToken();
 
-    if (!refreshResult.accessToken) {
-      if (refreshResult.shouldLogout) {
-        error.isAuthExpired = true;
-        setTimeout(() => redirectToLogin(), 0);
-      }
+    if (!newAccessToken) {
+      error.isAuthExpired = true;
+      setTimeout(() => redirectToLogin(), 0);
       return Promise.reject(error);
     }
 
     originalRequest._retry = true;
     originalRequest.headers = originalRequest.headers ?? new AxiosHeaders();
-    originalRequest.headers.Authorization = `Bearer ${refreshResult.accessToken}`;
+    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
     return http(originalRequest);
   }

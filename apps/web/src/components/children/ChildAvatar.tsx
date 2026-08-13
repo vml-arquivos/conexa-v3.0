@@ -94,24 +94,8 @@ export function hasChildPhoto(child?: ChildAvatarSource): boolean {
   return Boolean(resolveChildPhotoUrl(child));
 }
 
-type ChildAvatarSize = 'xs' | 'sm' | 'md' | 'lg';
-
-const SIZE_CLASS: Record<ChildAvatarSize, string> = {
-  xs: 'w-8 h-8',
-  sm: 'w-9 h-9',
-  md: 'w-11 h-11',
-  lg: 'w-14 h-14',
-};
-
 type ChildAvatarProps = {
   child?: ChildAvatarSource;
-  // Compatibilidade com chamadas antigas: <ChildAvatar firstName=... photoUrl=... size="sm" />
-  firstName?: string | null;
-  lastName?: string | null;
-  nome?: string | null;
-  photoUrl?: string | null;
-  fotoUrl?: string | null;
-  size?: ChildAvatarSize;
   alt?: string;
   sizeClassName?: string;
   imageClassName?: string;
@@ -121,36 +105,19 @@ type ChildAvatarProps = {
   showInitials?: boolean;
 };
 
-/**
- * ChildAvatar — avatar de criança com fallback de iniciais.
- *
- * Defaults refinados para visual mais acolhedor e humano:
- * - tamanho padrão w-11 h-11 (ligeiramente maior)
- * - gradiente suave azul-índigo no fallback
- * - iniciais font-medium (sem bold pesado)
- * - sombra leve para profundidade
- */
 export function ChildAvatar({
   child,
-  firstName,
-  lastName,
-  nome,
-  photoUrl,
-  fotoUrl,
-  size,
   alt,
-  sizeClassName,
+  sizeClassName = 'w-10 h-10',
   imageClassName = 'rounded-full object-cover',
-  fallbackClassName = 'rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shadow-sm',
-  iconClassName = 'w-5 h-5 text-slate-400',
-  initialsClassName = 'text-sm font-medium text-indigo-600',
+  fallbackClassName = 'rounded-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center',
+  iconClassName = 'w-6 h-6 text-slate-400',
+  initialsClassName = 'text-sm font-bold text-slate-600',
   showInitials = false,
 }: ChildAvatarProps) {
-  const resolvedChild = useMemo(() => child ?? { firstName, lastName, nome, photoUrl, fotoUrl }, [child, firstName, lastName, nome, photoUrl, fotoUrl]);
-  const resolvedSizeClassName = sizeClassName ?? (size ? SIZE_CLASS[size] : 'w-11 h-11');
-  const src = useMemo(() => resolveChildPhotoUrl(resolvedChild), [resolvedChild]);
+  const src = useMemo(() => resolveChildPhotoUrl(child), [child]);
   const [imageError, setImageError] = useState(false);
-  const label = alt ?? getChildDisplayName(resolvedChild);
+  const label = alt ?? getChildDisplayName(child);
 
   useEffect(() => {
     setImageError(false);
@@ -162,16 +129,16 @@ export function ChildAvatar({
         src={src}
         alt={label}
         loading="lazy"
-        className={`${resolvedSizeClassName} ${imageClassName}`.trim()}
+        className={`${sizeClassName} ${imageClassName}`.trim()}
         onError={() => setImageError(true)}
       />
     );
   }
 
   return (
-    <div className={`${resolvedSizeClassName} ${fallbackClassName}`.trim()} aria-label={label}>
+    <div className={`${sizeClassName} ${fallbackClassName}`.trim()} aria-label={label}>
       {showInitials ? (
-        <span className={initialsClassName}>{getChildInitials(resolvedChild)}</span>
+        <span className={initialsClassName}>{getChildInitials(child)}</span>
       ) : (
         <UserCircle className={iconClassName} />
       )}

@@ -16,16 +16,6 @@ import DashboardCoordenacaoPedagogicaPage from '../pages/DashboardCoordenacaoPed
 import DashboardCoordenacaoGeralPage from '../pages/DashboardCoordenacaoGeralPage';
 import ControleFaltasPage from '../pages/ControleFaltasPage';
 import RdxPage from '../pages/RdxPage';
-
-// ─── Módulo Mobile PWA ────────────────────────────────────────────────────────
-import MobileShell from '../components/mobile/MobileShell';
-import MobileChamadaPage from '../pages/mobile/MobileChamadaPage';
-import MobileDiarioPage from '../pages/mobile/MobileDiarioPage';
-import MobileObservacaoPage from '../pages/mobile/MobileObservacaoPage';
-import MobileOcorrenciaPage from '../pages/mobile/MobileOcorrenciaPage';
-import MobileMaterialPage from '../pages/mobile/MobileMaterialPage';
-import MobileAlunosPage from '../pages/mobile/MobileAlunosPage';
-import MobileFichaAlunoPage from '../pages/mobile/MobileFichaAlunoPage';
 // ─── Novas páginas implementadas ─────────────────────────────────────────────
 import PlanejamentosPage from '../pages/PlanejamentosPage';
 import RdicRiaPage from '../pages/RdicRiaPage';
@@ -52,33 +42,14 @@ import CentralRdicCriancaPage from '../pages/CentralRdicCriancaPage';
 import PainelAnaliticoCriancaPage from '../pages/PainelAnaliticoCriancaPage';
 import PainelTurmaPage from '../pages/PainelTurmaPage';
 import PainelInteligenciaPage from '../pages/PainelInteligenciaPage';
-import MissoesInteligentesPage from '../pages/MissoesInteligentesPage';
 import ConferenciaPlanejamentoPage from '../pages/ConferenciaPlanejamentoPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
 import DesenvolvimentoInfantilPage from '../pages/DesenvolvimentoInfantilPage';
-// Timeline e observações da criança
-import TimelineCriancaPage from '../pages/TimelineCriancaPage';
-import ObservacaoCriancaPage from '../pages/ObservacaoCriancaPage';
 // ─── Módulo de Planejamento — Oficina e Painel de Planejamentos ─────────────────────
 import PlanoDeAulaNovoPage from '../pages/PlanoDeAulaNovoPage';
-import { CurriculumImportPage } from '../pages/CurriculumImportPage';
 import PlanoDeAulaListaPage from '../pages/PlanoDeAulaListaPage';
-// ─── Módulo da Secretaria ────────────────────────────────────────────────────
-import SecretariaPage from '../pages/SecretariaPage';
-import MatriculaPage from '../pages/MatriculaPage';
-import MatriculasListPage from '../pages/MatriculasListPage';
-import FichaAlunoPage from '../pages/FichaAlunoPage';
-import MovimentacoesPage from '../pages/MovimentacoesPage';
-import FuncionariosPage from '../pages/FuncionariosPage';
-import ComunicacaoPage from '../pages/ComunicacaoPage';
-import FaltasSecretariaPage from '../pages/FaltasSecretariaPage';
-import OcorrenciasSecretariaPage from '../pages/OcorrenciasSecretariaPage';
-import PedidosAdministrativosPage from '../pages/PedidosAdministrativosPage';
-// FIX: páginas de Transporte/Retirada e Atestados/Documentos (antes causavam 404)
-import TransporteRetiradaPage from '../pages/TransporteRetiradaPage';
-import AtestadosDocumentosPage from '../pages/AtestadosDocumentosPage';
 import { AppLayout } from '../components/layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleProtectedRoute } from './RoleProtectedRoute';
@@ -127,12 +98,6 @@ export const router = createBrowserRouter([
         errorElement: <RouteErrorBoundary />,
       },
       {
-        // Tarefa 3.3 — Importação de Matriz Curricular via CSV
-        path: 'curriculum-import',
-        element: <CurriculumImportPage />,
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
         path: 'reports',
         element: <ReportsPage />,
         errorElement: <RouteErrorBoundary />,
@@ -146,7 +111,7 @@ export const router = createBrowserRouter([
       {
         path: 'teacher-dashboard',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'COORDENADOR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
             <TeacherDashboardPage />
           </RoleProtectedRoute>
         ),
@@ -390,7 +355,7 @@ export const router = createBrowserRouter([
       {
         path: 'chamada',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'DEVELOPER']}>
             <ControleFaltasPage />
           </RoleProtectedRoute>
         ),
@@ -551,7 +516,7 @@ export const router = createBrowserRouter([
       {
         path: 'planejamento/:planningId/conferir',
         element: (
-          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'DEVELOPER']}>
             <ConferenciaPlanejamentoPage />
           </RoleProtectedRoute>
         ),
@@ -577,148 +542,10 @@ export const router = createBrowserRouter([
         ),
         errorElement: <RouteErrorBoundary />,
       },
-      // ─── Módulo da Secretaria ──────────────────────────────────────────────
-      {
-        path: 'secretaria',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <SecretariaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/matriculas',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MatriculasListPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/matriculas/nova',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MatriculaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/matriculas/:id',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MatriculaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/matriculas/:id/ficha',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_NUTRICIONISTA', 'UNIDADE', 'STAFF_CENTRAL', 'STAFF_CENTRAL_PEDAGOGICO', 'MANTENEDORA', 'DEVELOPER']}>
-            <FichaAlunoPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/movimentacoes',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <MovimentacoesPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/funcionarios',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <FuncionariosPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/comunicacao',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <ComunicacaoPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/faltas',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <FaltasSecretariaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/ocorrencias',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <OcorrenciasSecretariaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/pedidos',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <PedidosAdministrativosPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      // FIX: rotas ausentes que causavam 404 ao clicar no menu da Secretaria
-      {
-        path: 'secretaria/transporte',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <TransporteRetiradaPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
-      {
-        path: 'secretaria/atestados',
-        element: (
-          <RoleProtectedRoute allowedRoles={['UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
-            <AtestadosDocumentosPage />
-          </RoleProtectedRoute>
-        ),
-        errorElement: <RouteErrorBoundary />,
-      },
       { path:'turma/:classroomId/painel', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelTurmaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/rdic-central', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><CentralRdicCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'crianca/:childId/painel-analitico', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelAnaliticoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-      // Nova rota: linha do tempo consolidada da criança
-      { path:'crianca/:childId/timeline', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><TimelineCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-      { path:'crianca/:childId/observacoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','PROFESSOR_AUXILIAR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><ObservacaoCriancaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
       { path:'inteligencia', element:(<RoleProtectedRoute allowedRoles={['UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><PainelInteligenciaPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-      { path:'inteligencia/missoes', element:(<RoleProtectedRoute allowedRoles={['PROFESSOR','UNIDADE','STAFF_CENTRAL','MANTENEDORA','DEVELOPER']}><MissoesInteligentesPage/></RoleProtectedRoute>), errorElement:<RouteErrorBoundary/> },
-    ],
-  },
-  // ─── PWA Mobile — layout próprio, sem AppLayout desktop ────────────────────
-  {
-    path: '/app/mobile',
-    element: <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'UNIDADE_ADMINISTRATIVO', 'UNIDADE_DIRETOR', 'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_NUTRICIONISTA', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}><MobileShell /></RoleProtectedRoute>,
-    children: [
-      { index: true, element: <Navigate to="/app/mobile/chamada" replace /> },
-      { path: 'chamada',          element: <MobileChamadaPage /> },
-      { path: 'diario',           element: <MobileDiarioPage /> },
-      { path: 'observacao',       element: <MobileObservacaoPage /> },
-      { path: 'ocorrencia',       element: <MobileOcorrenciaPage /> },
-      { path: 'material',         element: <MobileMaterialPage /> },
-      { path: 'alunos',           element: <MobileAlunosPage /> },
-      { path: 'alunos/:childId',  element: <MobileFichaAlunoPage /> },
     ],
   },
 ]);

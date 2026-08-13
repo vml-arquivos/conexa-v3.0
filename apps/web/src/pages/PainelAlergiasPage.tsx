@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { PageShell } from '@/components/ui/PageShell';
-import { ChildAvatar } from '@/components/children/ChildAvatar';
 import http from '../api/http';
 import {
   AlertTriangle,
@@ -47,7 +46,7 @@ interface ChildHealth {
   medicationNeeds?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  enrollments: { status?: string; classroom?: Classroom }[];
+  enrollments: { classroom: Classroom }[];
   dietaryRestrictions: DietaryRestriction[];
 }
 
@@ -95,13 +94,9 @@ function isCritico(child: ChildHealth): boolean {
 }
 
 // ─── Componente: Card de Criança ──────────────────────────────────────────────
-function matriculaAtiva(child: ChildHealth) {
-  return child.enrollments?.find((e) => e.status === 'ATIVA') ?? child.enrollments?.[0];
-}
-
 function ChildHealthCard({ child, critico }: { child: ChildHealth; critico: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const turma = matriculaAtiva(child)?.classroom?.name ?? '—';
+  const turma = child.enrollments[0]?.classroom?.name ?? '—';
 
   const temAlergiasDiretas = !!child.allergies;
   const temCondicaoMedica = !!child.medicalConditions;
@@ -117,14 +112,13 @@ function ChildHealthCard({ child, critico }: { child: ChildHealth; critico: bool
       {/* Cabeçalho do card */}
       <div className={`px-4 py-3 flex items-center justify-between gap-3 ${critico ? 'bg-red-50' : 'bg-gray-50'}`}>
         <div className="flex items-center gap-3 min-w-0">
-          <ChildAvatar
-            firstName={child.firstName}
-            lastName={child.lastName}
-            photoUrl={child.photoUrl}
-            sizeClassName="h-10 w-10"
-            imageClassName="h-10 w-10 rounded-full object-cover"
-            fallbackClassName={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${critico ? 'bg-red-200 text-red-600' : 'bg-indigo-100 text-indigo-600'}`}
-          />
+          <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${critico ? 'bg-red-200' : 'bg-indigo-100'}`}>
+            {child.photoUrl ? (
+              <img src={child.photoUrl} alt={child.firstName} className="h-10 w-10 rounded-full object-cover" />
+            ) : (
+              <User className={`h-5 w-5 ${critico ? 'text-red-600' : 'text-indigo-600'}`} />
+            )}
+          </div>
           <div className="min-w-0">
             <p className="font-bold text-gray-900 truncate text-base">
               {child.firstName} {child.lastName}
@@ -364,7 +358,7 @@ export default function PainelAlergiasPage() {
       c.medicalConditions?.toLowerCase().includes(busca.toLowerCase()) ||
       c.dietaryRestrictions.some(r => r.name.toLowerCase().includes(busca.toLowerCase()));
 
-    const matchTurma = !filtroTurma || matriculaAtiva(c)?.classroom?.id === filtroTurma;
+    const matchTurma = !filtroTurma || c.enrollments[0]?.classroom?.id === filtroTurma;
 
     const matchSev = !filtroSeveridade || (
       filtroSeveridade === 'severa' ? isCritico(c) :

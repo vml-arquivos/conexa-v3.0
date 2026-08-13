@@ -17,7 +17,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
-import { isUnidade, hasRole } from '../api/auth';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -142,11 +141,6 @@ function StatusBadge({ status }: { status: StatusDia }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function DiarioCalendarioPage() {
   const { user } = useAuth();
-  // Cobre todos os papéis de supervisão já liberados nesta rota (UNIDADE,
-  // STAFF_CENTRAL, MANTENEDORA) — isUnidade() sozinho detectava só UNIDADE,
-  // deixando STAFF_CENTRAL/MANTENEDORA tratados como professor (podendo
-  // tentar criar diário, e sem o seletor de turma obrigatório).
-  const isCoord = isUnidade(user) || hasRole(user, 'STAFF_CENTRAL') || hasRole(user, 'MANTENEDORA');
   const navigate = useNavigate();
   const hoje = getPedagogicalToday();
 
@@ -164,58 +158,29 @@ export default function DiarioCalendarioPage() {
   const [loading, setLoading] = useState(true);
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [turmaNome, setTurmaNome] = useState<string>('');
-  // Lista completa de turmas acessíveis — usada para o seletor exibido à
-  // coordenação (UNIDADE/STAFF_CENTRAL/MANTENEDORA), que supervisiona
-  // várias turmas e não deve cair automaticamente na primeira da lista.
-  const [turmasDisponiveis, setTurmasDisponiveis] = useState<{ id: string; name: string }[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO' | 'SEM_DIARIO'>('TODOS');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [futurosExpandidos, setFuturosExpandidos] = useState(false);
 
-  // ─── Carregar turma do professor / lista de turmas para a coordenação ──────
+  // ─── Carregar turma do professor ────────────────────────────────────────────
   useEffect(() => {
     async function loadTurma() {
       try {
         const res = await http.get('/lookup/classrooms/accessible');
         const turmas: { id: string; name: string }[] = Array.isArray(res.data) ? res.data : [];
-        setTurmasDisponiveis(turmas);
-
-        // CORREÇÃO CRÍTICA: a coordenação (UNIDADE/STAFF_CENTRAL/MANTENEDORA)
-        // supervisiona várias turmas — antes, esta tela sempre auto-selecionava
-        // turmas[0] (a primeira em ordem alfabética), abrindo direto no Diário
-        // de uma turma que a coordenação nunca escolheu. Agora, com múltiplas
-        // turmas disponíveis, a coordenação precisa selecionar explicitamente
-        // no seletor abaixo. Professor com 1 turma só continua sem fricção.
-        if (turmas.length === 1) {
-          setClassroomId(turmas[0].id);
-          setTurmaNome(turmas[0].name);
-        } else if (turmas.length > 1 && !isCoord) {
-          // Professor com mais de uma turma vinculada (caso raro, ex: auxiliar
-          // em duas salas): mantém o comportamento anterior como fallback,
-          // mas isso não se aplica a perfis de coordenação.
+        if (turmas.length > 0) {
           setClassroomId(turmas[0].id);
           setTurmaNome(turmas[0].name);
         }
-        // Coordenação com múltiplas turmas: classroomId fica undefined até
-        // seleção explícita — o seletor abaixo cuida disso.
       } catch {
         // silencioso — continua sem classroomId
       }
     }
     loadTurma();
-  }, [user, isCoord]);
+  }, []);
 
   // ─── Carregar diários do ano letivo ─────────────────────────────────────────
   useEffect(() => {
-    // CORREÇÃO: coordenação com múltiplas turmas e nenhuma selecionada ainda
-    // não deve disparar a busca — sem isso, a chamada saía sem classroomId e
-    // misturava diários de todas as turmas da unidade no mesmo calendário.
-    if (isCoord && turmasDisponiveis.length > 1 && !classroomId) {
-      setDiasMap({});
-      setLoading(false);
-      return;
-    }
-
     async function loadDiarios() {
       setLoading(true);
       try {
@@ -303,7 +268,7 @@ export default function DiarioCalendarioPage() {
     }
 
     loadDiarios();
-  }, [classroomId, user, turmasDisponiveis, isCoord]);
+  }, [classroomId, user]);
 
   // ─── Dias do mês selecionado ─────────────────────────────────────────────────
   const diasDoMes = useMemo(() => {
@@ -343,9 +308,8 @@ export default function DiarioCalendarioPage() {
   }, [diasDoMes, diasMap]);
 
   // ─── Separar passados/hoje vs futuros ────────────────────────────────────────
-  // Ordem decrescente: hoje primeiro, depois dias anteriores
   const diasPassados = useMemo(
-    () => diasDoMes.filter(d => d <= hoje).slice().reverse(),
+    () => diasDoMes.filter(d => d <= hoje),
     [diasDoMes, hoje],
   );
   const diasFuturos = useMemo(
@@ -393,98 +357,6 @@ export default function DiarioCalendarioPage() {
         <ChevronRight className="h-3 w-3" />
         <span className="text-gray-800 font-medium">Diário da Turma</span>
       </nav>
-
-      {/* Seletor de turma — visível apenas para coordenação (UNIDADE/STAFF_CENTRAL/
-          MANTENEDORA) quando há mais de uma turma disponível. Sem isso, a tela
-          abria fixada na primeira turma em ordem alfabética, sem a coordenação
-          ter escolhido nada — turmas e diários de colegas ficavam misturados. */}
-      {isCoord && turmasDisponiveis.length > 1 && (
-        <div className="mb-4 bg-white border border-gray-200 rounded-2xl p-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-            Selecione a turma que deseja fiscalizar
-          </label>
-          <select
-            value={classroomId ?? ''}
-            onChange={(e) => {
-              const turma = turmasDisponiveis.find((t) => t.id === e.target.value);
-              setClassroomId(turma?.id);
-              setTurmaNome(turma?.name ?? '');
-            }}
-            className="w-full sm:w-80 text-sm border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-          >
-            <option value="">Selecione uma turma...</option>
-            {turmasDisponiveis.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          {!classroomId && (
-            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" /> Escolha uma turma para ver o diário correspondente.
-            </p>
-          )}
-        </div>
-      )}
-
-      {!classroomId && isCoord && turmasDisponiveis.length > 1 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-gray-400">
-          <BookOpen className="h-10 w-10 mb-3 opacity-30" />
-          <p className="text-sm">Selecione uma turma acima para visualizar o diário.</p>
-        </div>
-      ) : (
-      <>
-
-      {/* ── Card de destaque: Diário de Hoje ── */}
-      {mesSelecionado === mesAtual.substring(0, 7) && (() => {
-        const diaHoje = diasMap[hoje];
-        const statusHoje: StatusDia = diaHoje?.status ?? 'SEM_DIARIO';
-        const podeAbrir = !isCoord || statusHoje !== 'SEM_DIARIO';
-        return (
-          <div
-            onClick={() => podeAbrir && abrirDiario(hoje)}
-            className={`mb-5 flex items-center gap-4 p-4 rounded-2xl border-2 shadow-md transition-all ${
-              podeAbrir ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'
-            } ${
-              statusHoje === 'PUBLICADO'
-                ? 'border-emerald-400 bg-gradient-to-r from-emerald-50 to-white'
-                : statusHoje === 'RASCUNHO'
-                ? 'border-amber-400 bg-gradient-to-r from-amber-50 to-white'
-                : 'border-blue-400 bg-gradient-to-r from-blue-50 to-white'
-            }`}
-          >
-            {/* Ícone de status */}
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-              statusHoje === 'PUBLICADO' ? 'bg-emerald-100' :
-              statusHoje === 'RASCUNHO' ? 'bg-amber-100' : 'bg-blue-100'
-            }`}>
-              {statusHoje === 'PUBLICADO' && <CheckCircle2 className="h-7 w-7 text-emerald-600" />}
-              {statusHoje === 'RASCUNHO' && <Clock className="h-7 w-7 text-amber-600" />}
-              {statusHoje === 'SEM_DIARIO' && <Plus className="h-7 w-7 text-blue-600" />}
-            </div>
-            {/* Texto */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Hoje</span>
-                <StatusBadge status={statusHoje} />
-              </div>
-              <p className="text-base font-bold text-gray-800 mt-0.5">
-                {statusHoje === 'PUBLICADO' ? 'Diário publicado' :
-                 statusHoje === 'RASCUNHO' ? 'Continuar rascunho' :
-                 isCoord ? 'Sem diário registrado' : 'Registrar diário de hoje'}
-              </p>
-              {diaHoje?.momentoDestaque && (
-                <p className="text-xs text-gray-500 mt-0.5 truncate max-w-sm">{diaHoje.momentoDestaque}</p>
-              )}
-            </div>
-            {/* Seta */}
-            {podeAbrir && (
-              <ArrowRight className={`h-5 w-5 flex-shrink-0 ${
-                statusHoje === 'PUBLICADO' ? 'text-emerald-500' :
-                statusHoje === 'RASCUNHO' ? 'text-amber-500' : 'text-blue-500'
-              }`} />
-            )}
-          </div>
-        );
-      })()}
 
       {/* ── Resumo do mês ── */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -681,8 +553,8 @@ export default function DiarioCalendarioPage() {
               return (
                 <div
                   key={data}
-                  onClick={() => { if (!isCoord || dia.status !== 'SEM_DIARIO') abrirDiario(data); }}
-                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 ${isCoord && dia.status === 'SEM_DIARIO' ? 'cursor-default' : 'cursor-pointer'} ${
+                  onClick={() => abrirDiario(data)}
+                  className={`group relative flex items-center gap-3 px-4 py-3 rounded-2xl border cursor-pointer transition-all duration-150 ${
                     isHoje
                       ? 'border-2 border-blue-400 bg-blue-50 shadow-md hover:shadow-lg'
                       : dia.status === 'PUBLICADO'
@@ -726,7 +598,7 @@ export default function DiarioCalendarioPage() {
                       </p>
                     ) : !isHoje && dia.status === 'SEM_DIARIO' ? (
                       <p className="text-xs text-red-400 mt-1 font-medium">Diário não registrado</p>
-                    ) : isHoje && dia.status === 'SEM_DIARIO' && !isCoord ? (
+                    ) : isHoje && dia.status === 'SEM_DIARIO' ? (
                       <p className="text-xs text-blue-500 mt-1 font-medium">Toque para registrar o diário de hoje</p>
                     ) : null}
                   </div>
@@ -742,11 +614,6 @@ export default function DiarioCalendarioPage() {
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-lg group-hover:bg-amber-200 transition-colors">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Continuar</span>
-                      </span>
-                    ) : isCoord ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Pendente</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg group-hover:bg-blue-200 transition-colors">
@@ -798,30 +665,20 @@ export default function DiarioCalendarioPage() {
         </div>
       )}
 
-      {/* ── Legenda ── */}
-      {!loading && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 pb-2 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-            Publicado
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-            Rascunho
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full border-2 border-blue-400 flex-shrink-0" />
-            Hoje
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-gray-200 flex-shrink-0" />
-            Fins de semana (não letívo)
-          </span>
+      {/* ── CTA Diário de Hoje ── */}
+      {!loading && hoje >= `${ANO_LETIVO}-02-01` && hoje <= `${ANO_LETIVO}-12-31` && (
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <button
+            onClick={() => abrirDiario(hoje)}
+            className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm py-3.5 rounded-2xl shadow-sm hover:shadow-md transition-all duration-150"
+          >
+            <BookOpen className="h-4 w-4" />
+            Abrir Diário de Hoje
+            <span className="hidden sm:inline text-blue-200 font-normal">
+              · {new Date(hoje + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+            </span>
+          </button>
         </div>
-      )}
-
-      {/* CTA duplicado removido — o card 'Diário de Hoje' no topo já cobre este caso */}
-      </>
       )}
     </PageShell>
   );

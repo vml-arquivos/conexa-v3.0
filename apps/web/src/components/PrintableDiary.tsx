@@ -11,7 +11,6 @@
 
 export interface DiaryObjective {
   campoExperiencia?: string;
-  camposExperiencia?: string[];
   codigoBNCC?: string;
   objetivoBNCC?: string;
   objetivoCurriculo?: string;
@@ -22,22 +21,13 @@ export interface DiaryObjective {
 
 export interface DiaryObservacaoIndividual {
   /** ID do descritor comportamental */
-  comportamento?: string;
+  comportamento: string;
   /** Label legível do descritor */
-  label?: string;
+  label: string;
   /** Grupo: desempenho | comportamento | alerta */
-  grupo?: string;
-  /** Tipo de observação: DESCRITIVA | MICROGESTO | ALERTA | NARRATIVA */
-  tipo?: string;
+  grupo: string;
   /** IDs das crianças que se enquadram */
-  criancaIds?: string[];
-  /** Formato narrativo salvo em alguns registros */
-  criancaNome?: string;
-  childId?: string;
-  marcacaoRapida?: string;
-  focoObservado?: string;
-  observacao?: string;
-  proximoPasso?: string;
+  criancaIds: string[];
 }
 
 export interface DiaryPrintData {
@@ -61,16 +51,13 @@ export interface DiaryPrintData {
   avaliacaoPlanoAula?: string;
   momentoDestaque?: string;
   reflexaoPedagogica?: string;
-  /** Encaminhamentos pedagógicos (campo observations no backend) */
-  encaminhamentos?: string;
 
   // Presença e Rotina
   presencas: number;
   ausencias: number;
   totalAlunos?: number;
   climaEmocional?: string;
-  /** Aceita Record<string,boolean> (novo) ou RotinaItem[] legado {momento, concluido} */
-  rotina?: Record<string, boolean> | Array<{ momento: string; concluido: boolean; descricao?: string }>;
+  rotina?: Record<string, boolean>;
 
   // Observações individuais (descritores)
   observacoesIndividuais?: DiaryObservacaoIndividual[];
@@ -131,13 +118,6 @@ const ROTINA_LABELS: Record<string, string> = {
   rodaEncerramento: 'Roda de Encerramento',
 };
 
-const TIPO_OBS_LABELS: Record<string, { label: string; cor: string }> = {
-  DESCRITIVA:  { label: 'Descritiva',  cor: '#4f46e5' },
-  MICROGESTO:  { label: 'Microgesto', cor: '#0891b2' },
-  ALERTA:      { label: 'Alerta',     cor: '#dc2626' },
-  NARRATIVA:   { label: 'Narrativa',  cor: '#7c3aed' },
-};
-
 const GRUPO_LABELS: Record<string, string> = {
   desempenho: 'Desempenho e Aprendizagem',
   comportamento: 'Comportamento e Regulação',
@@ -148,38 +128,20 @@ function nomeCrianca(
   id: string,
   criancas?: Array<{ id: string; firstName: string; lastName: string }>,
 ): string {
-  if (!id) return '';
+  if (!id) return '—';
   const c = criancas?.find(c => c.id === id);
-  if (!c) return ''; // nunca exibir IDs criptografados
+  if (!c) return ''; // retorna vazio ao invés de mostrar o ID
   const nome = `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim();
-  return nome || '';
+  return nome || '—';
 }
 
 function esc(s?: string | null): string {
   if (!s) return '';
-  const normalized = String(s).trim();
-  if (!normalized || ['undefined', 'null'].includes(normalized.toLowerCase())) return '';
-  return normalized
+  return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function formatCampoExperiencia(obj: DiaryObjective): string {
-  const campos = Array.isArray(obj.camposExperiencia)
-    ? obj.camposExperiencia.filter(Boolean)
-    : [];
-  const campoPrincipal = esc(obj.campoExperiencia?.replace(/_/g, ' '));
-  const camposLista = campos
-    .map(campo => esc(String(campo).replace(/_/g, ' ')))
-    .filter(Boolean);
-
-  if (camposLista.length > 0) {
-    return camposLista.join(' • ');
-  }
-
-  return campoPrincipal || 'Não informado';
 }
 
 // ─── Gerador de HTML ──────────────────────────────────────────────────────────
@@ -197,7 +159,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
           <div class="section-title">Objetivos da Matriz Pedagógica 2026</div>
           ${(d.planejamentoObjetivos ?? []).map(obj => `
             <div class="objective-card">
-              <div class="obj-campo">${formatCampoExperiencia(obj)}</div>
+              <div class="obj-campo">${esc((obj.campoExperiencia ?? '').replace(/_/g, ' ') || 'Não informado')}</div>
               ${obj.codigoBNCC ? `<div class="obj-codigo">Código BNCC: ${esc(obj.codigoBNCC)}</div>` : ''}
               ${obj.objetivoBNCC ? `<div class="obj-text"><strong>Objetivo BNCC:</strong> ${esc(obj.objetivoBNCC)}</div>` : ''}
               ${(obj.objetivoCurriculoDF ?? obj.objetivoCurriculo) ? `<div class="obj-text"><strong>Currículo em Movimento — DF:</strong> ${esc(obj.objetivoCurriculoDF ?? obj.objetivoCurriculo ?? '')}</div>` : ''}
@@ -244,7 +206,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
   // ── Bloco: Avaliação da Prática ──
   let avaliacaoHTML = '';
-  const temAvaliacao = d.avaliacaoPlanoAula || d.momentoDestaque || d.reflexaoPedagogica || d.encaminhamentos;
+  const temAvaliacao = d.avaliacaoPlanoAula || d.momentoDestaque || d.reflexaoPedagogica;
   if (temAvaliacao) {
     avaliacaoHTML = `
       <div class="block">
@@ -264,32 +226,12 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
             <div class="section-title">Reflexão Pedagógica</div>
             <div class="field-value">${esc(d.reflexaoPedagogica).replace(/\n/g, '<br>')}</div>
           </div>` : ''}
-        ${d.encaminhamentos ? `
-          <div class="section">
-            <div class="section-title">Encaminhamentos Pedagógicos</div>
-            <div class="field-value">${esc(d.encaminhamentos).replace(/\n/g, '<br>')}</div>
-          </div>` : ''}
       </div>`;
   }
 
   // ── Bloco: Presença e Rotina ──
-  // Normalizar rotina: aceita Record<string,boolean> ou RotinaItem[] legado
-  const rotinaItems: Array<{ label: string; realizado: boolean }> = (() => {
-    const r = d.rotina;
-    if (!r) return [];
-    if (Array.isArray(r)) {
-      // Formato legado: [{momento, concluido, descricao}]
-      return r.map(item => ({
-        label: ROTINA_LABELS[item.momento] ?? item.momento,
-        realizado: Boolean(item.concluido),
-      }));
-    }
-    // Formato novo: Record<string, boolean>
-    return Object.entries(r).map(([key, val]) => ({
-      label: ROTINA_LABELS[key] ?? key,
-      realizado: Boolean(val),
-    }));
-  })();
+  const rotinaItems = Object.entries(d.rotina ?? {})
+    .map(([key, val]) => ({ label: ROTINA_LABELS[key] ?? key, realizado: Boolean(val) }));
 
   const rotinaHTML = rotinaItems.length > 0
     ? `<div class="rotina-grid">
@@ -337,31 +279,13 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
   // ── Bloco: Observações Individuais ──
   let obsHTML = '';
-  const observacoes = d.observacoesIndividuais ?? [];
-
-  const obsDescritor = observacoes.filter(o =>
-    Array.isArray(o.criancaIds) &&
-    o.criancaIds.length > 0 &&
-    o.criancaIds.some(id => nomeCrianca(id, d.criancas).length > 0)
-  );
-
-  const obsNarrativas = observacoes.filter(o =>
-    !Array.isArray(o.criancaIds) &&
-    Boolean(
-      esc(o.criancaNome)
-      || esc(o.marcacaoRapida)
-      || esc(o.focoObservado)
-      || esc(o.observacao)
-      || esc(o.proximoPasso)
-    )
-  );
-
-  if (obsDescritor.length > 0 || obsNarrativas.length > 0) {
+  const obs = (d.observacoesIndividuais ?? []).filter(o => o.criancaIds.length > 0);
+  if (obs.length > 0) {
+    // Agrupar por grupo
     const grupos: Record<string, DiaryObservacaoIndividual[]> = {};
-    for (const o of obsDescritor) {
-      const grupo = esc(o.grupo) || 'desempenho';
-      if (!grupos[grupo]) grupos[grupo] = [];
-      grupos[grupo].push(o);
+    for (const o of obs) {
+      if (!grupos[o.grupo]) grupos[o.grupo] = [];
+      grupos[o.grupo].push(o);
     }
 
     const gruposHTML = Object.entries(grupos).map(([grupo, items]) => `
@@ -369,40 +293,18 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
         <div class="obs-grupo-title">${esc(GRUPO_LABELS[grupo] ?? grupo)}</div>
         ${items.map(item => `
           <div class="obs-item">
-            ${item.tipo && TIPO_OBS_LABELS[item.tipo] ? `<span style="display:inline-block;padding:1px 7px;border-radius:9px;font-size:7.5pt;font-weight:700;color:#fff;background:${TIPO_OBS_LABELS[item.tipo].cor};margin-bottom:3px">${TIPO_OBS_LABELS[item.tipo].label}</span>` : ''}
-            <div class="obs-comportamento">${esc(item.label) || 'Observação registrada'}</div>
+            <div class="obs-comportamento">${esc(item.label)}</div>
             <div class="obs-criancas">
-              ${(item.criancaIds ?? [])
-                .map(id => nomeCrianca(id, d.criancas))
-                .filter(n => n.length > 0)
-                .map(n => `<span class="obs-chip">${esc(n)}</span>`)
-                .join('')}
+              ${item.criancaIds.map(id => `<span class="obs-chip">${esc(nomeCrianca(id, d.criancas))}</span>`).join('')}
             </div>
           </div>`).join('')}
       </div>`).join('');
-
-    const narrativasHTML = obsNarrativas.length > 0
-      ? `<div class="obs-grupo">
-          <div class="obs-grupo-title">Registros Descritivos</div>
-          ${obsNarrativas.map(item => `
-            <div class="obs-item">
-              <div class="obs-comportamento">${esc(item.criancaNome) || esc(nomeCrianca(item.childId ?? '', d.criancas)) || 'Criança'}</div>
-              <div class="field-value" style="font-size:9pt;">
-                ${esc(item.marcacaoRapida) ? `<div><strong>Marcação:</strong> ${esc(item.marcacaoRapida)}</div>` : ''}
-                ${esc(item.focoObservado) ? `<div><strong>Foco observado:</strong> ${esc(item.focoObservado)}</div>` : ''}
-                ${esc(item.observacao) ? `<div>${esc(item.observacao)}</div>` : ''}
-                ${esc(item.proximoPasso) ? `<div><strong>Próximo passo:</strong> ${esc(item.proximoPasso)}</div>` : ''}
-              </div>
-            </div>`).join('')}
-        </div>`
-      : '';
 
     obsHTML = `
       <div class="block">
         <div class="block-header amber-header">Observações Individuais por Criança</div>
         <div class="section">
           ${gruposHTML}
-          ${narrativasHTML}
         </div>
       </div>`;
   }
@@ -698,7 +600,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   <div class="page">
     <!-- Cabeçalho -->
     <div class="header">
-      <div class="header-logo">COCRIS Pedagógico — Sistema de Gestão Pedagógica</div>
+      <div class="header-logo">Conexa — Sistema de Gestão Pedagógica</div>
       <div class="header-title">Diário da Turma</div>
       <div class="header-subtitle">${esc(dataFormatada)}</div>
     </div>
@@ -733,7 +635,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
     <!-- Rodapé -->
     <div class="footer">
-      <span>COCRIS Pedagógico — Sistema de Gestão Pedagógica</span>
+      <span>Conexa V3 — Sistema de Gestão Pedagógica</span>
       <span>Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
     </div>
   </div>

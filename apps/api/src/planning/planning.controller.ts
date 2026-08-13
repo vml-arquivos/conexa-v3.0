@@ -5,7 +5,6 @@ import {
   Body,
   Put,
   Patch,
-  Delete,
   Param,
   Query,
   UseGuards,
@@ -260,39 +259,5 @@ export class PlanningController {
     @CurrentUser() user: JwtPayload
   ) {
     return this.planningService.returnForCorrections(id, dto, user);
-  }
-
-  /**
-   * POST /plannings/:id/devolver-dia/:date
-   * Devolve apenas um dia específico de um planejamento multi-dia,
-   * sem bloquear os demais dias já corretos/aprovados.
-   */
-  @Post(":id/devolver-dia/:date")
-  @HttpCode(HttpStatus.OK)
-  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  returnDayForCorrections(
-    @Param("id") id: string,
-    @Param("date") date: string,
-    @Body() dto: ReturnPlanningDto,
-    @CurrentUser() user: JwtPayload
-  ) {
-    return this.planningService.returnDayForCorrections(id, date, dto, user);
-  }
-
-  /**
-   * DELETE /plannings/:id
-   * Remove um planejamento (apenas DEVELOPER e autor em RASCUNHO)
-   */
-  @Delete(':id')
-  @RequireRoles(
-    RoleLevel.PROFESSOR,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
-  async deletar(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.planningService.deletar(id, user);
   }
 }

@@ -195,52 +195,30 @@ run_migrate_deploy() {
   exit 1
 }
 
-# ── Função: executar correção operacional de acessos no deploy ────────────────
+
+# ── Função: correção operacional de acessos (idempotente) ────────────────────
 run_operational_access_fix() {
   local ACCESS_FIX_SQL="/app/prisma/manual-sql/correcao-acessos-operacionais/04_auto_deploy_corrigir_acessos_operacionais.sql"
-
   if [ "${RUN_ACCESS_FIX_ON_DEPLOY:-true}" != "true" ]; then
-    echo "ℹ️  Correção operacional de acessos desativada por RUN_ACCESS_FIX_ON_DEPLOY=${RUN_ACCESS_FIX_ON_DEPLOY:-}."
-    return 0
-  fi
-
+    echo "ℹ️  Correção operacional de acessos desativada."; return 0; fi
   if [ ! -f "$ACCESS_FIX_SQL" ]; then
-    echo "⚠️  SQL de correção operacional não encontrado em $ACCESS_FIX_SQL. Pulando."
-    return 0
-  fi
-
-  echo "🔐 Executando correção operacional idempotente de acessos..."
+    echo "⚠️  SQL de acessos não encontrado. Pulando."; return 0; fi
+  echo "🔐 Corrigindo acessos operacionais..."
   if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$ACCESS_FIX_SQL"; then
-    echo "✅ Correção operacional de acessos concluída."
+    echo "✅ Acessos operacionais corrigidos."
   else
-    echo "⚠️  Correção operacional de acessos falhou; aplicação continuará para não derrubar o serviço. Verifique os logs do deploy."
-    return 0
+    echo "⚠️  Correção de acessos falhou (não crítico)."
   fi
 }
 
 
 # ── Função: corrigir faixas etárias das turmas (idempotente) ─────────────────
-# Garante que ageGroupMin/Max de cada turma correspondem às faixas do
-# Currículo em Movimento DF para derivação correta do segmento EI01/EI02/EI03.
 run_faixas_etarias_fix() {
   local SQL_FILE="/app/prisma/manual-sql/correcao-faixas-etarias/01_auto_deploy_corrigir_faixas_etarias.sql"
-
-  if [ "${RUN_FAIXAS_ETARIAS_FIX_ON_DEPLOY:-true}" != "true" ]; then
-    echo "ℹ️  Correção de faixas etárias desativada por RUN_FAIXAS_ETARIAS_FIX_ON_DEPLOY."
-    return 0
-  fi
-
   if [ ! -f "$SQL_FILE" ]; then
-    echo "⚠️  SQL de faixas etárias não encontrado em $SQL_FILE. Pulando."
-    return 0
-  fi
-
-  echo "📐 Corrigindo faixas etárias das turmas (EI01/EI02/EI03)..."
-  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$SQL_FILE"; then
-    echo "✅ Faixas etárias corrigidas."
-  else
-    echo "⚠️  Correção de faixas etárias falhou (não crítico — aplicação continuará)."
-  fi
+    echo "⚠️  SQL de faixas etárias não encontrado. Pulando."; return 0; fi
+  echo "📐 Corrigindo faixas etárias (EI01/EI02/EI03)..."
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -f "$SQL_FILE" &&     echo "✅ Faixas etárias corrigidas." ||     echo "⚠️  Faixas etárias: falhou (não crítico)."
 }
 
 # ── Passo 1: Resolver migrations FAILED via SQL ───────────────────────────────
@@ -253,9 +231,6 @@ run_migrate_deploy
 run_operational_access_fix
 
 # ── Passo 3.5: Corrigir faixas etárias das turmas (EI01/EI02/EI03) ───────────
-# Garante ageGroupMin/Max corretos conforme Currículo em Movimento DF/BNCC.
-# Corrige Maternal 1 (midpoint errado → EI01) e Berçário II (faixa incorreta).
-# Idempotente: só altera turmas com valores incorretos.
 run_faixas_etarias_fix
 
 # ── Passo 4: Regenerar Prisma client com o schema atual ──────────────────────
@@ -274,29 +249,7 @@ if [ -f /app/scripts/seed-alimentos.js ]; then
   node /app/scripts/seed-alimentos.js && echo "✅ Banco de alimentos atualizado." || echo "⚠️  Seed de alimentos falhou (não crítico — aplicação continuará)."
 fi
 
-# ── Passo 6.5: Importar dados de responsáveis das planilhas (idempotente) ─────
-# Preenche dados_responsaveis (CPF, celular, telefone, endereço da mãe/pai/resp),
-# além de tipo sanguíneo/endereço/CEP da criança quando vazios.
-# É idempotente: nunca sobrescreve dados já preenchidos, pode rodar a cada deploy.
-# Controlável por RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY (default: true).
-if [ "${RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY:-true}" = "true" ]; then
-  IMPORT_SCRIPT=""
-  if [ -f /app/dist/src/scripts/import-dados-responsaveis.js ]; then
-    IMPORT_SCRIPT=/app/dist/src/scripts/import-dados-responsaveis.js
-  elif [ -f /app/dist/scripts/import-dados-responsaveis.js ]; then
-    IMPORT_SCRIPT=/app/dist/scripts/import-dados-responsaveis.js
-  fi
-  if [ -n "$IMPORT_SCRIPT" ]; then
-    echo "📋 Importando dados de responsáveis (idempotente)..."
-    node "$IMPORT_SCRIPT" || echo "⚠️  Import de responsáveis falhou (não crítico — aplicação continuará)."
-  else
-    echo "ℹ️  Script de import de responsáveis não encontrado em dist — pulando."
-  fi
-else
-  echo "ℹ️  Import de responsáveis desativado por RUN_IMPORT_RESPONSAVEIS_ON_DEPLOY."
-fi
-
-# ── Passo 7: Iniciar aplicação NestJS ─────────────────────────────────────────
+# ── Passo 6: Iniciar aplicação NestJS ─────────────────────────────────────────
 echo "🚀 Iniciando aplicação..."
 if [ -f /app/dist/src/main.js ]; then
   exec node /app/dist/src/main.js

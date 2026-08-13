@@ -87,7 +87,6 @@ enum EnrollmentStatus {
   PAUSADA
   CONCLUIDA
   CANCELADA
-  TRANSFERIDA
 }
 
 /// Tipo de evento no diário de bordo
@@ -294,36 +293,8 @@ model Mantenedora {
   materiais            Material[]
   cardapios                    Cardapio[]
   acompanhamentosNutricionais  AcompanhamentoNutricional[]
-  iaRequests                   IaRequest[] @relation("MantenedoraIaRequests")
-  empresasTransporte           EmpresaTransporte[]
 
   @@index([cnpj])
-  @@index([isActive])
-}
-
-/// Empresa de transporte escolar cadastrada pela secretaria
-model EmpresaTransporte {
-  id            String   @id @default(cuid())
-  mantenedoraId String
-  unitId        String?
-  nome          String   @db.VarChar(255)
-  cnpj          String?  @db.VarChar(20)
-  telefone      String?  @db.VarChar(20)
-  responsavel   String?  @db.VarChar(255)
-  placa         String?  @db.VarChar(20)
-  observacoes   String?  @db.Text
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     String?  @db.VarChar(255)
-  updatedBy     String?  @db.VarChar(255)
-
-  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit        Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
-
-  @@unique([mantenedoraId, unitId, nome])
-  @@index([mantenedoraId])
-  @@index([unitId])
   @@index([isActive])
 }
 
@@ -382,8 +353,6 @@ model Unit {
   cardapios             Cardapio[]
    configuracoesRefeicao ConfiguracaoRefeicao[]
   developmentReports    DevelopmentReport[]
-  iaRequests            IaRequest[] @relation("UnitIaRequests")
-  empresasTransporte    EmpresaTransporte[]
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
@@ -432,8 +401,6 @@ model User {
   materialRequestsCreated MaterialRequest[]  @relation("CreatedBy")
    auditLogs               AuditLog[]         @relation("User")
   developmentReports      DevelopmentReport[]
-  microgestosRegistrados  MicrogestoRegistro[] @relation("MicrogestosRegistrados")
-  iaRequests              IaRequest[]          @relation("UserIaRequests")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([email])
@@ -597,19 +564,6 @@ model Child {
   // Foto do aluno
   photoUrl String? @db.Text
 
-  // Dossiê administrativo da matrícula (Secretaria)
-  // Campos aditivos para preservar dados exigidos nas planilhas oficiais da unidade.
-  nacionalidade       String? @db.VarChar(100)
-  naturalidade        String? @db.VarChar(100)
-  ufNascimento        String? @map("uf_nascimento") @db.VarChar(2)
-  endereco            String? @db.VarChar(255)
-  cep                 String? @db.VarChar(10)
-  dadosResponsaveis   Json?   @map("dados_responsaveis")
-  documentosMatricula Json?   @map("documentos_matricula")
-  autorizadosRetirada Json?   @map("autorizados_retirada")
-  transporteEscolar   Json?   @map("transporte_escolar")
-  fichaAdministrativa Json?   @map("ficha_administrativa")
-
   // Status
   isActive Boolean @default(true)
 
@@ -634,9 +588,7 @@ model Child {
   developmentObs              DevelopmentObservation[]
   developmentReports          DevelopmentReport[]
   acompanhamentosNutricionais AcompanhamentoNutricional[]
-  microgestosRegistros        MicrogestoRegistro[]
-  childProfileStats           ChildProfileStats?
-  alertasAluno                AlertaAluno[]
+
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([isActive])
@@ -711,8 +663,6 @@ model Classroom {
   reportBases      ReportBase[]
    classroomPosts       ClassroomPost[]
   developmentReports   DevelopmentReport[]
-  microgestosRegistros MicrogestoRegistro[]
-  alertasAluno         AlertaAluno[]
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -875,11 +825,6 @@ model Planning {
   // Conteúdo Pedagógico de Autoria Docente (NOVO)
   pedagogicalContent Json? // Experiências, materiais e estratégias por dia
 
-  // NOVO: Template de observações gerado automaticamente ao aprovar o plano
-  // Gerado a partir do pedagogicalContent + IA ou extrator local
-  // Formato: Array<{ id: string, label: string, emoji: string, grupo: string, origemObjetivo: string }>
-  observacoesTemplate Json? @map("observacoes_template")
-
   // Status
   status PlanningStatus @default(RASCUNHO)
 
@@ -984,10 +929,6 @@ model DiaryEvent {
 
   // Mídia (JSONB)
   mediaUrls Json? // array de URLs de mídia
-
-  // Edição retroativa
-  retroactiveEdit Boolean @default(false)
-  retroactiveNote String? @db.Text
 
   // Status
   status DiaryEventStatus @default(RASCUNHO)
@@ -1248,7 +1189,7 @@ model AuditLog {
 /// Base para geração de relatórios oficiais
 model ReportBase {
   id            String @id @default(cuid())
-  mantenedoraId String?
+  mantenedoraId String
   unitId        String
   classroomId   String
   childId       String
@@ -1274,7 +1215,7 @@ model ReportBase {
   updatedAt DateTime @updatedAt
 
   // Relações
-  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   classroom   Classroom   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
@@ -1295,7 +1236,7 @@ model ReportBase {
 /// Histórico de contexto para agentes IA (suporte, não decisão)
 model AIContext {
   id            String @id @default(cuid())
-  mantenedoraId String?
+  mantenedoraId String
   unitId        String
   childId       String
 
@@ -1314,7 +1255,7 @@ model AIContext {
   updatedAt DateTime @updatedAt
 
   // Relações
-  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
 
@@ -1461,7 +1402,7 @@ enum TipoAlvoCorrecao {
 model SolicitacaoCorrecao {
   id String @id @default(cuid())
 
-  mantenedoraId String?
+  mantenedoraId String
   unitId        String
 
   criadoPorId   String @db.VarChar(255)
@@ -1480,7 +1421,7 @@ model SolicitacaoCorrecao {
   atualizadoEm DateTime  @updatedAt
   resolvidaEm  DateTime?
 
-  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   unit        Unit        @relation(fields: [unitId], references: [id], onDelete: Cascade)
 
   @@index([mantenedoraId])
@@ -1679,13 +1620,6 @@ model RelatorioFoto {
   criadoPorId   String      @db.VarChar(255)
   publicado     Boolean     @default(false)
   publicadoEm   DateTime?
-  // Vínculo com diário e metadados pedagógicos
-  diaryEventId            String?  // vincula foto ao diário do dia
-  activityDescription     String?  @db.VarChar(500) // descrição da atividade fotografada
-  campoExperiencia        String?  @db.VarChar(100) // campo da BNCC
-  weeklyReportSent        Boolean  @default(false)
-  weeklyReportSentAt      DateTime?
-  weeklyReportRecipient   String?  @db.VarChar(255)
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
   mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
@@ -2078,10 +2012,7 @@ model DevelopmentObservation {
   developmentAlerts     String? @map("development_alerts") @db.Text
   recommendations       String? @db.Text
   nextSteps             String? @map("next_steps") @db.Text
-  atividadeArquivoUrl  String? @map("atividade_arquivo_url") @db.Text
-  atividadeArquivoNome String? @map("atividade_arquivo_nome") @db.VarChar(255)
-  tags                 Json    @default("[]")
-  indicadores          Json    @default("{}")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2334,7 +2265,7 @@ model AcompanhamentoNutricional {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   // Relações
-  mantenedora Mantenedora? @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
+  mantenedora Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)
   child       Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
 
   @@unique([childId]) // uma criança tem no máximo 1 caso ativo por vez
@@ -2382,287 +2313,4 @@ model DevelopmentReport {
   @@index([childId, createdAt(sort: Desc)])
   @@index([classroomId, period])
   @@map("development_report")
-}
-
-// ============================================================================
-// MICROGESTOS, CHILD STATS E ALERTAS — feat/diario-zero-digitacao
-// ============================================================================
-
-enum MicrogestoCategoria {
-  DESENVOLVIMENTO_MOTOR
-  LINGUAGEM_COMUNICACAO
-  INTERACAO_SOCIAL
-  REGULACAO_EMOCIONAL
-  COGNICAO_EXPLORACAO
-  CUIDADO_SAUDE
-  ALIMENTACAO
-  AUTONOMIA
-}
-
-enum MicrogestoNivel {
-  ALCANCADO
-  EM_DESENVOLVIMENTO
-  REQUER_ATENCAO
-}
-
-enum AlertaTipo {
-  EVASAO_RISCO
-  FALTAS_CONSECUTIVAS
-  FALTAS_FREQUENTES
-  PADRAO_COMPORTAMENTO_NEGATIVO
-  PADRAO_ALIMENTACAO_NEGATIVO
-  PADRAO_SAUDE_NEGATIVO
-}
-
-enum AlertaStatus {
-  ATIVO
-  LIDO
-  RESOLVIDO
-}
-
-model MicrogestoRegistro {
-  id              String              @id @default(cuid())
-  childId         String
-  classroomId     String
-  diaryEventId    String?
-  professorId     String
-  unitId          String
-  mantenedoraId   String
-  data            DateTime
-  categoria       MicrogestoCategoria
-  nivel           MicrogestoNivel
-  tags            Json                @default("[]")
-  descricao       String?             @db.VarChar(500)
-  campoExperiencia String?            @db.VarChar(100)
-  horario         String?             @db.VarChar(10)
-  createdAt       DateTime            @default(now())
-
-  child      Child      @relation(fields: [childId], references: [id])
-  classroom  Classroom  @relation(fields: [classroomId], references: [id])
-  professor  User       @relation("MicrogestosRegistrados", fields: [professorId], references: [id])
-
-  @@index([childId])
-  @@index([classroomId])
-  @@index([unitId])
-  @@index([mantenedoraId])
-  @@index([data])
-  @@map("microgesto_registro")
-}
-
-model ChildProfileStats {
-  id                      String   @id @default(cuid())
-  childId                 String   @unique
-  unitId                  String
-  mantenedoraId           String
-  totalDiasRegistrados    Int      @default(0)
-  totalFaltas             Int      @default(0)
-  faltasUltimos30Dias     Int      @default(0)
-  faltasConsecutivas      Int      @default(0)
-  ultimaPresenca          DateTime?
-  totalMicrogestos        Int      @default(0)
-  microgestosCategoria    Json     @default("{}")
-  microgestosNivel        Json     @default("{}")
-  totalObservacoes        Int      @default(0)
-  observacoesPorCategoria Json     @default("{}")
-  alertasAtivos           Int      @default(0)
-  
-  // Campos de evolução pedagógica — série histórica
-  obsUltimos7dias       Int     @default(0) @map("obs_ultimos_7_dias")
-  obsUltimos30dias      Int     @default(0) @map("obs_ultimos_30_dias")
-  participacaoMedia     Float?  @map("participacao_media")
-  ultimaObservacao      DateTime? @map("ultima_observacao")
-  tendenciaComportamento String? @map("tendencia_comportamento") // ESTAVEL, MELHORA, ATENCAO
-  
-  ultimaAtualizacao       DateTime @default(now()) @updatedAt
-
-  child Child @relation(fields: [childId], references: [id])
-
-  @@index([unitId])
-  @@index([mantenedoraId])
-  @@map("child_profile_stats")
-}
-
-model AlertaAluno {
-  id            String       @id @default(cuid())
-  childId       String
-  classroomId   String
-  unitId        String
-  mantenedoraId String?
-  tipo          AlertaTipo
-  status        AlertaStatus @default(ATIVO)
-  titulo        String       @db.VarChar(255)
-  descricao     String       @db.Text
-  dados         Json         @default("{}")
-  geradoEm      DateTime     @default(now())
-  lidoEm        DateTime?
-  resolvidoEm   DateTime?
-  resolvidoPor  String?
-
-  child     Child     @relation(fields: [childId], references: [id])
-  classroom Classroom @relation(fields: [classroomId], references: [id])
-
-  @@index([childId])
-  @@index([classroomId])
-  @@index([unitId])
-  @@index([status])
-  @@map("alerta_aluno")
-}
-
-// ============================================================================
-// IA — FUNDAÇÃO TÉCNICA (Fase 1 do Plano de IA)
-// Modelos para orquestração, histórico, logs, prompts, configuração e feedback
-// Todas as tabelas são ADITIVAS — zero impacto nos dados existentes
-// ============================================================================
-
-/// Tipos de requisição de IA
-enum IaRequestType {
-  ATIVIDADE
-  MICROGESTOS
-  RELATORIO_ALUNO
-  RELATORIO_TURMA
-  ANALISE_PLANO
-  ANALISE_DIARIO
-  LEMBRETE
-  VARREDURA
-  TEXTO_PERSONALIZADO
-}
-
-/// Status do ciclo de vida de uma requisição de IA
-enum IaRequestStatus {
-  PENDENTE
-  PROCESSANDO
-  SUCESSO
-  FALHA
-  CANCELADO
-}
-
-/// Status de aprovação humana de uma resposta de IA
-enum IaResponseStatus {
-  PENDENTE_REVISAO
-  APROVADO
-  REJEITADO
-}
-
-/// Registro de cada solicitação feita ao motor de IA
-model IaRequest {
-  id            String          @id @default(cuid())
-  mantenedoraId String
-  unitId        String
-  requesterId   String
-  type          IaRequestType
-  status        IaRequestStatus @default(PENDENTE)
-  payload       Json
-  promptId      String?
-  errorMessage  String?         @db.Text
-  createdAt     DateTime        @default(now())
-  startedAt     DateTime?
-  completedAt   DateTime?
-
-  mantenedora Mantenedora    @relation("MantenedoraIaRequests", fields: [mantenedoraId], references: [id], onDelete: Cascade)
-  unit        Unit           @relation("UnitIaRequests", fields: [unitId], references: [id], onDelete: Cascade)
-  requester   User           @relation("UserIaRequests", fields: [requesterId], references: [id], onDelete: Cascade)
-  prompt      PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
-  response    IaResponse?
-  logs        IaLog[]
-
-  @@index([mantenedoraId])
-  @@index([unitId])
-  @@index([requesterId])
-  @@index([type])
-  @@index([status])
-  @@index([createdAt])
-  @@map("ia_request")
-}
-
-/// Resposta gerada pela IA para uma requisição
-model IaResponse {
-  id                   String           @id @default(cuid())
-  requestId            String           @unique
-  result               Json
-  rawResponse          String?          @db.Text
-  promptUsed           String?          @db.Text
-  costTokensPrompt     Int?
-  costTokensCompletion Int?
-  totalCost            Float?
-  modelUsed            String?          @db.VarChar(100)
-  status               IaResponseStatus @default(PENDENTE_REVISAO)
-  reviewedBy           String?          @db.VarChar(255)
-  approved             Boolean?
-  createdAt            DateTime         @default(now())
-
-  request   IaRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  feedbacks IaFeedback[]
-
-  @@index([requestId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("ia_response")
-}
-
-/// Log de eventos do ciclo de vida de uma requisição de IA
-model IaLog {
-  id        String   @id @default(cuid())
-  requestId String
-  event     String   @db.VarChar(50)
-  message   String?  @db.Text
-  createdAt DateTime @default(now())
-
-  request IaRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-
-  @@index([requestId])
-  @@index([event])
-  @@index([createdAt])
-  @@map("ia_log")
-}
-
-/// Template de prompt versionado e parametrizável
-model PromptTemplate {
-  id          String   @id @default(cuid())
-  name        String   @db.VarChar(255)
-  description String?  @db.Text
-  template    String   @db.Text
-  variables   Json     @default("[]")
-  version     Int      @default(1)
-  active      Boolean  @default(true)
-  createdBy   String?  @db.VarChar(255)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  requests IaRequest[]
-
-  @@index([active])
-  @@index([version])
-  @@map("prompt_template")
-}
-
-/// Configuração de IA por unidade ou mantenedora
-model IaConfig {
-  id            String   @id @default(cuid())
-  mantenedoraId String?
-  unitId        String?
-  key           String   @db.VarChar(100)
-  value         String   @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@unique([mantenedoraId, unitId, key])
-  @@index([mantenedoraId])
-  @@index([unitId])
-  @@map("ia_config")
-}
-
-/// Feedback do usuário sobre uma resposta de IA
-model IaFeedback {
-  id         String   @id @default(cuid())
-  responseId String
-  userId     String
-  rating     Int
-  comment    String?  @db.Text
-  createdAt  DateTime @default(now())
-
-  response IaResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
-
-  @@index([responseId])
-  @@index([userId])
-  @@map("ia_feedback")
 }

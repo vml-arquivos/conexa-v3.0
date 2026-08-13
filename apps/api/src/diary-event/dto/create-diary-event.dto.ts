@@ -130,11 +130,4 @@ export class CreateDiaryEventDto {
   @IsEnum(DiaryEventStatus)
   @IsOptional()
   status?: DiaryEventStatus;
-
-  @IsOptional()
-  retroactiveEdit?: boolean;
-
-  @IsString()
-  @IsOptional()
-  retroactiveNote?: string;
 }

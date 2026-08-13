@@ -12,7 +12,6 @@ import type { PlanningTemplateCocris } from '../types/lookup';
 import { UnitSelect } from '../components/select/UnitSelect';
 import { ClassroomSelect } from '../components/select/ClassroomSelect';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
-import { UnifiedDashboard } from '../components/dashboard/UnifiedDashboard';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -81,12 +80,6 @@ export function DashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Tarefa 1.3 — Refetch ao voltar para a aba (equivalente a refetchOnWindowFocus do TanStack Query)
-  // O DashboardPage usa handlers manuais (handleLoadUnitDashboard / handleLoadTeacherDashboard)
-  // que dependem de seleções do usuário, por isso não fazemos auto-refresh automático aqui.
-  // O UnifiedDashboard (hub visual) não faz chamadas de API — apenas navega por widgets.
-  // O auto-refresh real está no TeacherDashboardPage (Tarefa 1.3) e nos dashboards específicos.
-
   // Handler: Carregar Dashboard da Unidade
   const handleLoadUnitDashboard = useCallback(async () => {
     try {
@@ -153,22 +146,18 @@ export function DashboardPage() {
   }, [teacherDate, classroomId, isProfessor]);
 
   return (
-    <div className="space-y-0">
-      {/* ── Hub visual premium por perfil ── */}
-      <UnifiedDashboard />
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Bem-vindo, {(user?.nome as string)?.split(' ')[0] || user?.email}!</h1>
 
-      {/* ── Seções legadas: visíveis apenas para DEVELOPER ── */}
-      {isDeveloper && (
-        <div className="space-y-6 px-6 py-6">
-          <h2 className="text-base font-semibold text-slate-700">Debug — Dados Brutos</h2>
-          <div className="bg-white p-4 rounded-lg shadow border">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Email:</span> {user?.email}
-            </p>
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Perfil:</span> {userRoles.join(', ')}
-            </p>
-          </div>
+      {/* Informações do Usuário */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <p className="text-sm text-gray-600">
+          <span className="font-medium">Email:</span> {user?.email}
+        </p>
+        <p className="text-sm text-gray-600">
+          <span className="font-medium">Perfil:</span> {userRoles.join(', ')}
+        </p>
+      </div>
 
       {/* ========== Dashboard da Unidade ========== */}
       {canViewUnitDashboard && (
@@ -543,8 +532,6 @@ export function DashboardPage() {
               )}
             </div>
           )}
-        </div>
-      )}
         </div>
       )}
     </div>

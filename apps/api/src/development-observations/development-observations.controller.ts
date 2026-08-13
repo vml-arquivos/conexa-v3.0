@@ -1,11 +1,10 @@
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors,
+  Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
 import { RoleLevel } from '@prisma/client';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { DevelopmentObservationsService } from './development-observations.service';
@@ -42,26 +41,6 @@ export class DevelopmentObservationsController {
   }
 
   /**
-   * GET /development-observations/evolucao/:childId
-   * Evolução detalhada por período para dashboard analítico da coordenação
-   */
-  @Get('evolucao/:childId')
-  @RequireRoles(
-    RoleLevel.PROFESSOR,
-    RoleLevel.UNIDADE,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.MANTENEDORA,
-    RoleLevel.DEVELOPER,
-  )
-  evolucaoAluno(
-    @Param('childId') childId: string,
-    @Query('meses') meses: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.svc.evolucaoAluno(childId, Number(meses) || 3);
-  }
-
-  /**
    * GET /development-observations/resumo/:childId
    * Resumo de desenvolvimento de um aluno (para coordenadora)
    */
@@ -89,26 +68,6 @@ export class DevelopmentObservationsController {
   )
   resumoTurma(@Param('classroomId') classroomId: string) {
     return this.svc.resumoTurma(classroomId);
-  }
-
-
-  /**
-   * POST /development-observations/:id/attachment
-   * Upload de anexo da observação via multipart/form-data.
-   * Campo: file
-   * Limite: 10 MB
-   *
-   * Importante: evita envio de base64 no JSON, que gerava erro 413.
-   */
-  @Post(':id/attachment')
-  @RequireRoles(RoleLevel.PROFESSOR, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
-  uploadAttachment(
-    @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
-    @CurrentUser() user: JwtPayload,
-  ) {
-    return this.svc.uploadAttachment(id, file, user);
   }
 
   /**

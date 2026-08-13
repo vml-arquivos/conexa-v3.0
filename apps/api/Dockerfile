@@ -5,20 +5,13 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 ENV CI=true
-# ARG BUILD_DATE force-invalida o cache Docker a cada redeploy no Coolify
-# quando a variável BUILD_DATE muda (configurar no Coolify como variável de build).
-# O valor default abaixo também muda o SHA do commit a cada bump manual, o que
-# por si só já força o Coolify a rebuildar em vez de reaproveitar a imagem
-# cacheada pelo mesmo Git Commit SHA (ver Coolify: "Build step skipped").
-ARG BUILD_DATE=2026-08-13T03-58-00Z
-LABEL build-date=$BUILD_DATE
 # Prisma em Debian slim precisa do openssl para geração do client
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-# Copiar o schema.prisma antes do npm install para que qualquer mudanca no schema
-# invalide o cache do Docker e force rebuild completo (npm install + prisma generate).
+# Copiar o schema.prisma antes do npm ci para que qualquer mudanca no schema
+# invalide o cache do Docker e force rebuild completo (npm ci + prisma generate).
 # Sem isto, o Docker pode usar o Prisma Client cacheado de um build anterior
 # que nao conhece modelos adicionados por migrations recentes (ex: MaterialRequestItem).
 COPY prisma ./prisma

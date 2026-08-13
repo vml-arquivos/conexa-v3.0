@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isCentral, isMantenedora, isUnidade } from '../api/auth';
@@ -75,35 +75,11 @@ interface ObservacaoHistorico {
   atividadeDescricao?: string;
   atividadeArquivoUrl?: string;
   atividadeArquivoNome?: string;
-  atividadeArquivoMimeType?: string;
-  atividadeArquivoSize?: number;
-  nextSteps?: string;
 }
 
 interface Turma {
   id: string;
   name: string;
-}
-
-
-
-function resolveApiFileUrl(url?: string): string {
-  if (!url) return '';
-  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-  const baseURL = String(http.defaults.baseURL ?? '').replace(/\/$/, '');
-  if (url.startsWith('/')) return `${baseURL}${url}`;
-  return `${baseURL}/${url}`;
-}
-
-function isImageAttachment(url?: string, name?: string, mimeType?: string): boolean {
-  if (!url && !name && !mimeType) return false;
-  if (url?.startsWith('data:image')) return true;
-  if (mimeType?.startsWith('image/')) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(url ?? name ?? '');
-}
-
-function joinNonEmpty(parts: Array<string | false | null | undefined>): string {
-  return parts.filter((part): part is string => Boolean(part && part.trim())).join('\n\n');
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -114,24 +90,6 @@ const TIPOS_POST = [
   { id: 'MATERIAL', label: 'Material', emoji: '📚', cor: 'bg-purple-100 text-purple-700' },
   { id: 'REGISTRO', label: 'Registro', emoji: '📸', cor: 'bg-pink-100 text-pink-700' },
   { id: 'PLANEJAMENTO', label: 'Planejamento', emoji: '🎯', cor: 'bg-indigo-100 text-indigo-700' },
-];
-
-const QUICK_TAGS = [
-  { id: 'PARTICIPOU_ATIVAMENTE', label: 'Participou ativamente', categoria: 'participacao', cor: 'bg-green-100 text-green-700 border-green-300' },
-  { id: 'PRECISOU_ESTIMULO', label: 'Precisou de estímulo', categoria: 'participacao', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  { id: 'NAO_PARTICIPOU', label: 'Não participou', categoria: 'participacao', cor: 'bg-red-100 text-red-700 border-red-300' },
-  { id: 'ALEGRE', label: 'Alegre', categoria: 'emocional', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  { id: 'TRANQUILO', label: 'Tranquilo', categoria: 'emocional', cor: 'bg-blue-100 text-blue-700 border-blue-300' },
-  { id: 'AGITADO', label: 'Agitado', categoria: 'emocional', cor: 'bg-orange-100 text-orange-700 border-orange-300' },
-  { id: 'TRISTE', label: 'Triste', categoria: 'emocional', cor: 'bg-gray-100 text-gray-600 border-gray-300' },
-  { id: 'CHOROSO', label: 'Choroso', categoria: 'emocional', cor: 'bg-purple-100 text-purple-700 border-purple-300' },
-  { id: 'SOCIALIZOU_BEM', label: 'Socializou bem', categoria: 'social', cor: 'bg-teal-100 text-teal-700 border-teal-300' },
-  { id: 'ISOLADO', label: 'Isolado', categoria: 'social', cor: 'bg-slate-100 text-slate-700 border-slate-300' },
-  { id: 'CONFLITO_COM_COLEGA', label: 'Conflito com colega', categoria: 'social', cor: 'bg-red-100 text-red-700 border-red-300' },
-  { id: 'COMEU_BEM', label: 'Comeu bem', categoria: 'saude', cor: 'bg-lime-100 text-lime-700 border-lime-300' },
-  { id: 'RECUSOU_REFEICAO', label: 'Recusou refeição', categoria: 'saude', cor: 'bg-amber-100 text-amber-700 border-amber-300' },
-  { id: 'DORMIU_BEM', label: 'Dormiu bem', categoria: 'saude', cor: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
-  { id: 'DIFICULDADE_SONO', label: 'Dificuldade no sono', categoria: 'saude', cor: 'bg-violet-100 text-violet-700 border-violet-300' },
 ];
 
 const DESEMPENHOS = [
@@ -151,9 +109,6 @@ export default function SalaDeAulaVirtualPage() {
   const modoLeitura = isCentral(user) || isMantenedora(user) || isUnidade(user);
   const [aba, setAba] = useState<'feed' | 'novo' | 'desempenho' | 'alunos'>('feed');
   const [posts, setPosts] = useState<ClassroomPost[]>([]);
-  const [feedUnificado, setFeedUnificado] = useState<any[]>([]);
-  const [loadingFeedUnificado, setLoadingFeedUnificado] = useState(false);
-  const [filtroFeedTipo, setFiltroFeedTipo] = useState<'' | 'TURMA' | 'INDIVIDUAL' | 'COM_FOTO'>('');
   const [criancas, setCriancas] = useState<Crianca[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmaId, setTurmaId] = useState<string>('');
@@ -169,7 +124,6 @@ export default function SalaDeAulaVirtualPage() {
   const [estadoEmocional, setEstadoEmocional] = useState('');
   const [notasPsicologicas, setNotasPsicologicas] = useState('');
   const [alertasDesenvolvimento, setAlertasDesenvolvimento] = useState('');
-  const [tagsSelecionadas, setTagsSelecionadas] = useState<string[]>([]);
   const [recomendacoes, setRecomendacoes] = useState('');
   const [arquivoAtividade, setArquivoAtividade] = useState<File | null>(null);
   const [arquivoPreview, setArquivoPreview] = useState<string>('');
@@ -257,25 +211,6 @@ export default function SalaDeAulaVirtualPage() {
     }
   }
 
-  async function montarFeedUnificado(postsData: any[], observacoesData: any[]) {
-    const itensPosts = postsData.map((p: any) => ({
-      _feedTipo: 'TURMA' as const,
-      _data: p.createdAt,
-      _id: `post-${p.id}`,
-      ...p,
-    }));
-    const itensObs = observacoesData.map((o: any) => ({
-      _feedTipo: 'INDIVIDUAL' as const,
-      _data: o.date ?? o.createdAt,
-      _id: `obs-${o.id}`,
-      ...o,
-    }));
-    const tudo = [...itensPosts, ...itensObs].sort(
-      (a, b) => new Date(b._data).getTime() - new Date(a._data).getTime()
-    );
-    setFeedUnificado(tudo);
-  }
-
   async function loadPosts() {
     setLoading(true);
     try {
@@ -284,21 +219,9 @@ export default function SalaDeAulaVirtualPage() {
       if (turmaId) params.classroomId = turmaId;
       if (filterType) params.type = filterType;
       const res = await http.get('/classroom-posts', { params });
-      const postsCarregados = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
-      setPosts(postsCarregados);
-      // Buscar observações individuais da turma para mesclar no feed
-      try {
-        const obsRes = await http.get('/development-observations', {
-          params: { classroomId: turmaId, limit: 100 },
-        });
-        const obsData = Array.isArray(obsRes.data) ? obsRes.data : obsRes.data?.data ?? [];
-        montarFeedUnificado(postsCarregados, obsData);
-      } catch {
-        montarFeedUnificado(postsCarregados, []);
-      }
+      setPosts(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
     } catch {
       setPosts([]);
-      montarFeedUnificado([], []);
     } finally {
       setLoading(false);
     }
@@ -352,7 +275,6 @@ export default function SalaDeAulaVirtualPage() {
     setEstadoEmocional('');
     setNotasPsicologicas('');
     setAlertasDesenvolvimento('');
-    setTagsSelecionadas([]);
     setRecomendacoes('');
     setArquivoAtividade(null);
     setArquivoPreview('');
@@ -469,43 +391,39 @@ export default function SalaDeAulaVirtualPage() {
     }
     setSavingAluno(true);
     try {
-      const behaviorDescription = joinNonEmpty([
-        atividadeTitulo.trim() ? `Atividade: ${atividadeTitulo.trim()}` : undefined,
-        atividadeDescricao.trim() ? `Descrição da atividade: ${atividadeDescricao.trim()}` : undefined,
-        anotacaoAluno.trim() ? `Observação: ${anotacaoAluno.trim()}` : undefined,
-      ]);
+      // Upload de arquivo como base64 se houver
+      let arquivoUrl = '';
+      let arquivoNome = '';
+      if (arquivoAtividade) {
+        arquivoNome = arquivoAtividade.name;
+        // Converte para base64 para envio
+        arquivoUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target?.result as string);
+          reader.readAsDataURL(arquivoAtividade);
+        });
+      }
 
-      // Correção de produção: não converter arquivo para base64 no JSON.
-      // O registro textual é criado primeiro; se houver arquivo, ele é enviado depois via multipart.
-      const createRes = await http.post('/development-observations', {
+      await http.post('/development-observations', {
         childId: alunoSelecionado.id,
         classroomId: turmaId,
         date: new Date().toISOString(),
         category: 'ATIVIDADE',
         learningProgress: avaliacaoAluno !== 'NAO_AVALIADO' ? avaliacaoAluno : undefined,
-        behaviorDescription: behaviorDescription || undefined,
+        behaviorDescription: anotacaoAluno || undefined,
         planningParticipation: participacaoAtividade || undefined,
         emotionalState: estadoEmocional || undefined,
         psychologicalNotes: notasPsicologicas || undefined,
         developmentAlerts: alertasDesenvolvimento || undefined,
-        interests: tagsSelecionadas.length > 0 ? tagsSelecionadas.join(', ') : undefined,
         recommendations: recomendacoes || undefined,
+        // Campos extras para atividade
+        atividadeTitulo: atividadeTitulo || undefined,
+        atividadeDescricao: atividadeDescricao || undefined,
+        atividadeArquivoUrl: arquivoUrl || undefined,
+        atividadeArquivoNome: arquivoNome || undefined,
       });
 
-      const observationId = createRes?.data?.id;
-      if (arquivoAtividade && observationId) {
-        try {
-          const formData = new FormData();
-          formData.append('file', arquivoAtividade);
-          await http.post(`/development-observations/${observationId}/attachment`, formData);
-          toast.success(`Registro de ${alunoSelecionado.firstName} salvo com anexo!`);
-        } catch (uploadErr: any) {
-          toast.error(uploadErr?.response?.data?.message || 'Registro salvo, mas houve erro ao enviar o anexo.');
-        }
-      } else {
-        toast.success(`Registro de ${alunoSelecionado.firstName} salvo com sucesso!`);
-      }
-
+      toast.success(`Registro de ${alunoSelecionado.firstName} salvo com sucesso!`);
       // Limpa o formulário
       setAnotacaoAluno('');
       setAvaliacaoAluno('NAO_AVALIADO');
@@ -515,11 +433,9 @@ export default function SalaDeAulaVirtualPage() {
       setEstadoEmocional('');
       setNotasPsicologicas('');
       setAlertasDesenvolvimento('');
-      setTagsSelecionadas([]);
       setRecomendacoes('');
       setArquivoAtividade(null);
       setArquivoPreview('');
-      if (fileInputAlunoRef.current) fileInputAlunoRef.current.value = '';
       // Recarrega histórico
       carregarHistoricoAluno(alunoSelecionado.id);
       setAbaAluno('historico');
@@ -635,100 +551,14 @@ export default function SalaDeAulaVirtualPage() {
             />
           )}
 
-          {/* Filtros do feed unificado */}
-          <div className="flex flex-wrap gap-2 mb-2">
-            {[
-              { id: '', label: '📋 Tudo' },
-              { id: 'TURMA', label: '👥 Da Turma' },
-              { id: 'INDIVIDUAL', label: '👤 Individual' },
-              { id: 'COM_FOTO', label: '📸 Com Foto' },
-            ].map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFiltroFeedTipo(f.id as any)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-all ${
-                  filtroFeedTipo === f.id
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {feedUnificado
-            .filter(item => {
-              if (filtroFeedTipo === 'TURMA') return item._feedTipo === 'TURMA';
-              if (filtroFeedTipo === 'INDIVIDUAL') return item._feedTipo === 'INDIVIDUAL';
-              if (filtroFeedTipo === 'COM_FOTO')
-                return !!(item.atividadeArquivoUrl ?? item.mediaUrls?.[0]);
-              return true;
-            })
-            .map(item => {
-            if (item._feedTipo === 'INDIVIDUAL') {
-              return (
-                <div key={item._id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700 flex-shrink-0">
-                      {(item.child?.firstName?.[0] ?? '?').toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {item.child?.firstName ?? ''} {item.child?.lastName ?? ''}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {item._data
-                          ? new Date(item._data).toLocaleDateString('pt-BR', {
-                              weekday: 'short', day: '2-digit', month: 'short',
-                            })
-                          : ''}
-                      </p>
-                    </div>
-                    <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
-                      👤 Individual
-                    </span>
-                  </div>
-                  {item.atividadeArquivoUrl && isImageAttachment(item.atividadeArquivoUrl, item.atividadeArquivoNome, item.atividadeArquivoMimeType) && (
-                    <img
-                      src={resolveApiFileUrl(item.atividadeArquivoUrl)}
-                      alt={item.atividadeArquivoNome ?? 'Registro'}
-                      className="w-full max-h-64 object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="px-4 py-3 space-y-1.5">
-                    {item.atividadeTitulo && (
-                      <p className="text-sm font-semibold text-gray-800">{item.atividadeTitulo}</p>
-                    )}
-                    {item.behaviorDescription && (
-                      <p className="text-sm text-gray-600">{item.behaviorDescription}</p>
-                    )}
-                    {item.developmentAlerts && (
-                      <div className="bg-amber-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-amber-700">⚠️ {item.developmentAlerts}</p>
-                      </div>
-                    )}
-                    {item.psychologicalNotes && (
-                      <div className="bg-purple-50 rounded-lg px-3 py-2">
-                        <p className="text-xs text-purple-700">🧠 {item.psychologicalNotes}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            // Card de post da turma — lógica original preservada
-            const post = item;
+          {posts.map(post => {
             const tipoInfo = getTipoInfo(post.type);
             const isExpanded = expandedPost === post.id;
             const totalAlunos = criancas.length;
-            const avaliados = post.performances?.filter((p: any) => p.performance !== 'NAO_AVALIADO').length ?? 0;
+            const avaliados = post.performances?.filter(p => p.performance !== 'NAO_AVALIADO').length ?? 0;
 
             return (
-              <Card key={item._id} className="border-2 hover:border-indigo-100 transition-all">
+              <Card key={post.id} className="border-2 hover:border-indigo-100 transition-all">
                 <CardContent className="pt-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -971,17 +801,9 @@ export default function SalaDeAulaVirtualPage() {
                   <h2 className="font-bold text-gray-900">{alunoSelecionado.firstName} {alunoSelecionado.lastName}</h2>
                   <p className="text-xs text-gray-500">{turmas[0]?.name} · {historicoAluno.length} registro(s)</p>
                 </div>
-                <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" onClick={() => navigate('/app/diario-de-bordo')}>
-                    <FileText className="h-3 w-3 mr-1" /> Diário
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/app/painel-analitico-crianca/${alunoSelecionado.id}`)}>
-                    <TrendingUp className="h-3 w-3 mr-1" /> Painel
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/app/atendimentos-pais')}>
-                    <Users className="h-3 w-3 mr-1" /> Atend.
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate('/app/diario-de-bordo')}>
+                  <FileText className="h-3 w-3 mr-1" /> Diário
+                </Button>
               </div>
 
               {/* ─── Alerta de Alergia ─── */}
@@ -995,6 +817,8 @@ export default function SalaDeAulaVirtualPage() {
               <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
                 {[
                   { id: 'registro', label: 'Registrar', icon: <Plus className="h-3.5 w-3.5" /> },
+                  { id: 'hoje', label: 'Hoje', icon: <Clock className="h-3.5 w-3.5" /> },
+                  { id: 'mes', label: 'Este Mês', icon: <BarChart2 className="h-3.5 w-3.5" /> },
                   { id: 'historico', label: 'Histórico', icon: <History className="h-3.5 w-3.5" /> },
                   { id: 'desenvolvimento', label: 'Evolução', icon: <TrendingUp className="h-3.5 w-3.5" /> },
                   { id: 'rdic', label: 'RDIC', icon: <FileText className="h-3.5 w-3.5" /> },
@@ -1045,28 +869,6 @@ export default function SalaDeAulaVirtualPage() {
                       </div>
                     </div>
 
-                    {/* Quick Tags — zero digitação */}
-                    <div>
-                      <Label className="mb-2 block font-semibold text-sm">Tags Rápidas <span className="text-xs font-normal text-gray-500">(clique para selecionar)</span></Label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {QUICK_TAGS.map(tag => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            onClick={() => setTagsSelecionadas(prev =>
-                              prev.includes(tag.id) ? prev.filter(t => t !== tag.id) : [...prev, tag.id]
-                            )}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-                              tagsSelecionadas.includes(tag.id)
-                                ? tag.cor + ' ring-2 ring-offset-1 ring-current'
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-                            }`}
-                          >
-                            {tag.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                     {/* Participação e comportamento */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -1200,39 +1002,14 @@ export default function SalaDeAulaVirtualPage() {
               )}
 
               {/* ─── ABA: HISTÓRICO ─── */}
-              {abaAluno === 'historico' && (() => {
-                const [filtroHistPeriodo, setFiltroHistPeriodo] = React.useState<'tudo' | 'hoje' | 'mes'>('tudo');
-                const agora = new Date();
-                const obsFiltradas = historicoAluno.filter(h => {
-                  const d = new Date(h.date);
-                  if (filtroHistPeriodo === 'hoje') return d.toDateString() === agora.toDateString();
-                  if (filtroHistPeriodo === 'mes') return d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear();
-                  return true;
-                });
-                return (
+              {abaAluno === 'historico' && (
                 <div className="space-y-3">
-                  <div className="flex gap-2">
-                    {[
-                      { id: 'tudo', label: 'Tudo' },
-                      { id: 'hoje', label: 'Hoje' },
-                      { id: 'mes', label: 'Este Mês' },
-                    ].map(f => (
-                      <button key={f.id} type="button"
-                        onClick={() => setFiltroHistPeriodo(f.id as any)}
-                        className={`px-3 py-1 rounded-xl border text-xs font-medium transition-all ${
-                          filtroHistPeriodo === f.id
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-white border-gray-200 text-gray-500 hover:border-indigo-300'
-                        }`}
-                      >{f.label}</button>
-                    ))}
-                  </div>
                   {loadingHistorico ? (
                     <LoadingState message="Carregando histórico..." />
-                  ) : obsFiltradas.length === 0 ? (
+                  ) : historicoAluno.length === 0 ? (
                     <EmptyState title="Nenhum registro ainda" description="Os registros de atividades e observações aparecerão aqui." />
                   ) : (
-                    obsFiltradas.map(obs => (
+                    historicoAluno.map(obs => (
                       <Card key={obs.id} className="border hover:border-indigo-200 transition-all">
                         <CardContent className="pt-4">
                           <div className="flex items-start justify-between mb-2">
@@ -1270,10 +1047,10 @@ export default function SalaDeAulaVirtualPage() {
                           )}
                           {obs.atividadeArquivoUrl && (
                             <div className="mt-3">
-                              {isImageAttachment(obs.atividadeArquivoUrl, obs.atividadeArquivoNome, obs.atividadeArquivoMimeType) ? (
-                                <img src={resolveApiFileUrl(obs.atividadeArquivoUrl)} className="w-full max-h-48 object-contain rounded-lg border" alt="atividade" />
+                              {obs.atividadeArquivoUrl.startsWith('data:image') ? (
+                                <img src={obs.atividadeArquivoUrl} className="w-full max-h-48 object-contain rounded-lg border" alt="atividade" />
                               ) : (
-                                <a href={resolveApiFileUrl(obs.atividadeArquivoUrl)} target="_blank" rel="noopener noreferrer"
+                                <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
                                   className="flex items-center gap-2 text-indigo-600 text-xs hover:underline">
                                   <Paperclip className="h-3.5 w-3.5" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
                                 </a>
@@ -1284,9 +1061,9 @@ export default function SalaDeAulaVirtualPage() {
                       </Card>
                     ))
                   )}
-                 </div>
-                );
-              })()}
+                </div>
+              )}
+
               {/* ─── ABA: DESENVOLVIMENTO ─── */}
               {/* ─── ABA: HOJE ─── */}
               {abaAluno === 'hoje' && (
@@ -1329,7 +1106,7 @@ export default function SalaDeAulaVirtualPage() {
                               </div>
                             )}
                             {obs.atividadeArquivoUrl && (
-                              <a href={resolveApiFileUrl(obs.atividadeArquivoUrl)} target="_blank" rel="noopener noreferrer"
+                              <a href={obs.atividadeArquivoUrl} target="_blank" rel="noopener noreferrer"
                                 className="flex items-center gap-2 text-sm text-indigo-600 hover:underline">
                                 <Paperclip className="h-4 w-4" /> {obs.atividadeArquivoNome || 'Ver arquivo'}
                               </a>

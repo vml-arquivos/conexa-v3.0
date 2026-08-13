@@ -2,9 +2,7 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
-  Patch,
   Post,
   Put,
   UploadedFile,
@@ -36,13 +34,7 @@ export class AdminController {
    *   - UNIDADE: apenas usuários da própria unidade
    */
   @Get('users')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
-  @RequireRoles(
-    RoleLevel.MANTENEDORA,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   async listUsers(
     @Request() req: any,
     @Query('limit') limit?: string,
@@ -57,16 +49,10 @@ export class AdminController {
   /**
    * POST /admin/users
    * Cria um novo usuário com role e vínculo de unidade.
-   * RBAC: DEVELOPER, MANTENEDORA, STAFF_CENTRAL e gestores de UNIDADE.
-   * O service impede promoção acima do nível do ator e mudança de unidade.
+   * RBAC: MANTENEDORA, DEVELOPER
    */
   @Post('users')
-  @RequireRoles(
-    RoleLevel.MANTENEDORA,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
   async createUser(
     @Request() req: any,
     @Body() body: CreateUserDto,
@@ -80,32 +66,8 @@ export class AdminController {
    * RBAC: MANTENEDORA, DEVELOPER
    */
   @Put('users/:id')
-  @RequireRoles(
-    RoleLevel.MANTENEDORA,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   async updateUser(
-    @Request() req: any,
-    @Param('id') userId: string,
-    @Body() body: UpdateUserDto,
-  ) {
-    return this.adminService.updateUser(req.user, userId, body);
-  }
-
-  /**
-   * PATCH /admin/users/:id
-   * Alias parcial do PUT. Mantém um contrato único para todas as telas.
-   */
-  @Patch('users/:id')
-  @RequireRoles(
-    RoleLevel.MANTENEDORA,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
-  async patchUser(
     @Request() req: any,
     @Param('id') userId: string,
     @Body() body: UpdateUserDto,
@@ -119,13 +81,7 @@ export class AdminController {
    * RBAC: MANTENEDORA, DEVELOPER (todas); UNIDADE (só a própria)
    */
   @Get('units')
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, private')
-  @RequireRoles(
-    RoleLevel.MANTENEDORA,
-    RoleLevel.STAFF_CENTRAL,
-    RoleLevel.UNIDADE,
-    RoleLevel.DEVELOPER,
-  )
+  @RequireRoles(RoleLevel.MANTENEDORA, RoleLevel.UNIDADE, RoleLevel.DEVELOPER)
   async listUnits(@Request() req: any) {
     return this.adminService.listUnits(req.user);
   }
