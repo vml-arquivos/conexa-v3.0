@@ -1,4 +1,4 @@
--- AlterTable: adicionar campo observacoes_template no modelo Planning
--- Campo Json? (opcional) — migration aditiva, zero impacto nos dados existentes
--- NOTA: tabela usa nome "Planning" com P maiúsculo (sem @@map no schema.prisma)
+-- Migration: 20260531000000_add_observacoes_template_to_planning
+-- Adiciona coluna observacoes_template ao model Planning
+-- Aditiva, idempotente, zero impacto nos dados existentes
 ALTER TABLE "Planning" ADD COLUMN IF NOT EXISTS "observacoes_template" JSONB;

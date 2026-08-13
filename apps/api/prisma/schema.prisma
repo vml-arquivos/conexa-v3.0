@@ -87,6 +87,7 @@ enum EnrollmentStatus {
   PAUSADA
   CONCLUIDA
   CANCELADA
+  TRANSFERIDA
 }
 
 /// Tipo de evento no diário de bordo
@@ -240,10 +241,16 @@ enum CampoDeExperiencia {
 model Mantenedora {
   id      String  @id @default(cuid())
   name    String  @db.VarChar(255)
-  cnpj    String  @unique @db.VarChar(18)
   email   String  @unique @db.VarChar(255)
   phone   String? @db.VarChar(20)
   website String? @db.VarChar(255)
+
+  // Identificação fiscal (genérica — não presume mais Brasil/CNPJ)
+  // cnpj mantido por compatibilidade com dados existentes (COCRIS e outros tenants BR já migrados)
+  cnpj       String?      @unique @db.VarChar(18)
+  taxIdType  TaxIdType    @default(CNPJ)
+  taxId      String?      @db.VarChar(50) // valor livre: CNPJ, EIN, NIF, VAT, ou vazio p/ instituições sem doc. fiscal formal
+  country    String       @default("BR") @db.VarChar(2) // ISO 3166-1 alpha-2
 
   // Endereço
   address String? @db.VarChar(255)
@@ -264,6 +271,10 @@ model Mantenedora {
   updatedBy String?  @db.VarChar(255)
 
   // Relações
+  branding             TenantBranding?
+  featureFlags         TenantFeatureFlag[]
+  pedagogicalFrameworks PedagogicalFramework[]
+  contentUploads       InstitutionContentUpload[]
   units                Unit[]
   users                User[]
   roles                Role[]
@@ -293,6 +304,8 @@ model Mantenedora {
   materiais            Material[]
   cardapios                    Cardapio[]
   acompanhamentosNutricionais  AcompanhamentoNutricional[]
+  iaRequests                   IaRequest[] @relation("MantenedoraIaRequests")
+  empresasTransporte           EmpresaTransporte[]
 
   @@index([cnpj])
   @@index([isActive])
@@ -353,6 +366,8 @@ model Unit {
   cardapios             Cardapio[]
    configuracoesRefeicao ConfiguracaoRefeicao[]
   developmentReports    DevelopmentReport[]
+  iaRequests            IaRequest[] @relation("UnitIaRequests")
+  empresasTransporte    EmpresaTransporte[]
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
@@ -401,6 +416,8 @@ model User {
   materialRequestsCreated MaterialRequest[]  @relation("CreatedBy")
    auditLogs               AuditLog[]         @relation("User")
   developmentReports      DevelopmentReport[]
+  microgestosRegistrados  MicrogestoRegistro[] @relation("MicrogestosRegistrados")
+  iaRequests              IaRequest[]          @relation("UserIaRequests")
   @@index([mantenedoraId])
   @@index([unitId])
   @@index([email])
@@ -678,6 +695,8 @@ model Classroom {
   reportBases      ReportBase[]
    classroomPosts       ClassroomPost[]
   developmentReports   DevelopmentReport[]
+  microgestosRegistros MicrogestoRegistro[]
+  alertasAluno         AlertaAluno[]
   @@unique([unitId, code])
   @@index([unitId])
   @@index([isActive])
@@ -758,11 +777,16 @@ model CurriculumMatrixEntry {
   dayOfWeek  Int // 1=Segunda, 2=Terça, ..., 5=Sexta
   bimester   Int? // 1, 2, 3, 4
 
-  // Conteúdo Normativo (IMUTÁVEL)
-  campoDeExperiencia CampoDeExperiencia
-  objetivoBNCC       String             @db.Text // Transcrição literal
-  objetivoBNCCCode   String?            @db.VarChar(20) // Ex: "EI01EO03"
-  objetivoCurriculo  String             @db.Text // Transcrição literal do Currículo em Movimento DF
+  // Conteúdo Normativo — BNCC/DF (MANTIDO para compatibilidade com dados existentes,
+  // agora OPCIONAL: tenants novos usam frameworkObjectiveId em vez destes campos)
+  campoDeExperiencia CampoDeExperiencia?
+  objetivoBNCC       String?             @db.Text // Transcrição literal
+  objetivoBNCCCode   String?             @db.VarChar(20) // Ex: "EI01EO03"
+  objetivoCurriculo  String?             @db.Text // Transcrição literal do Currículo em Movimento DF
+
+  // Conteúdo Normativo — motor plugável (NOVO)
+  // Framework-agnóstico: aponta pro objetivo dentro do framework que o tenant escolheu.
+  frameworkObjectiveId String?
 
   // Sugestões Pedagógicas (EDITÁVEIS na prática)
   intencionalidade String? @db.Text
@@ -773,8 +797,9 @@ model CurriculumMatrixEntry {
   updatedAt DateTime @updatedAt
 
   // Relações
-  matrix      CurriculumMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
-  diaryEvents DiaryEvent[]
+  matrix             CurriculumMatrix     @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  frameworkObjective FrameworkObjective?  @relation(fields: [frameworkObjectiveId], references: [id], onDelete: SetNull)
+  diaryEvents        DiaryEvent[]
 
   @@unique([matrixId, date])
   @@index([matrixId])
@@ -782,6 +807,7 @@ model CurriculumMatrixEntry {
   @@index([weekOfYear])
   @@index([campoDeExperiencia])
   @@index([objetivoBNCCCode])
+  @@index([frameworkObjectiveId])
 }
 
 /// Template de planejamento (reutilizável)
@@ -839,6 +865,9 @@ model Planning {
 
   // Conteúdo Pedagógico de Autoria Docente (NOVO)
   pedagogicalContent Json? // Experiências, materiais e estratégias por dia
+
+  // Observações por template (campo adicionado em 20260531)
+  observacoesTemplate Json? @map("observacoes_template")
 
   // Status
   status PlanningStatus @default(RASCUNHO)
@@ -944,6 +973,10 @@ model DiaryEvent {
 
   // Mídia (JSONB)
   mediaUrls Json? // array de URLs de mídia
+
+  // Edição retroativa
+  retroactiveEdit Boolean @default(false)
+  retroactiveNote String? @db.Text
 
   // Status
   status DiaryEventStatus @default(RASCUNHO)
@@ -1635,6 +1668,13 @@ model RelatorioFoto {
   criadoPorId   String      @db.VarChar(255)
   publicado     Boolean     @default(false)
   publicadoEm   DateTime?
+  // Vínculo com diário e metadados pedagógicos
+  diaryEventId            String?  // vincula foto ao diário do dia
+  activityDescription     String?  @db.VarChar(500) // descrição da atividade fotografada
+  campoExperiencia        String?  @db.VarChar(100) // campo da BNCC
+  weeklyReportSent        Boolean  @default(false)
+  weeklyReportSentAt      DateTime?
+  weeklyReportRecipient   String?  @db.VarChar(255)
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
   mantenedora   Mantenedora @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)

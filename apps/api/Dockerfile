@@ -15,7 +15,7 @@ COPY package.json package-lock.json ./
 # Sem isto, o Docker pode usar o Prisma Client cacheado de um build anterior
 # que nao conhece modelos adicionados por migrations recentes (ex: MaterialRequestItem).
 COPY prisma ./prisma
-RUN npm install --include=dev --ignore-scripts --legacy-peer-deps
+RUN npm ci --include=dev --ignore-scripts
 COPY . .
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
