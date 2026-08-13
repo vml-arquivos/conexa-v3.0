@@ -10,12 +10,21 @@ RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
-# Copiar o schema.prisma antes do npm install para que qualquer mudanca no schema
-# invalide o cache do Docker e force rebuild completo (npm install + prisma generate).
+# Copiar o schema.prisma antes do npm ci para que qualquer mudanca no schema
+# invalide o cache do Docker e force rebuild completo (npm ci + prisma generate).
 # Sem isto, o Docker pode usar o Prisma Client cacheado de um build anterior
 # que nao conhece modelos adicionados por migrations recentes (ex: MaterialRequestItem).
 COPY prisma ./prisma
-RUN npm install --include=dev --ignore-scripts
+# npm ci (não "npm install"): instala exatamente o que está no package-lock.json,
+# sem rodar o algoritmo de resolução de dependências do npm install. É mais
+# rápido, determinístico, e falha imediatamente com um erro claro se o
+# lockfile estiver dessincronizado do package.json — em vez de arriscar picos
+# de memória maiores durante a resolução, que em servidores com pouca RAM
+# podem terminar em OOM-kill silencioso no meio do build (sem nenhuma
+# mensagem de erro do npm, só o processo morrendo — foi o que aconteceu no
+# deploy de 2026-08-13 14:55: o log parava logo após os avisos de pacotes
+# depreciados, sem nenhum "npm ERR!", com exit code 255).
+RUN npm ci --include=dev --ignore-scripts
 COPY . .
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npm run build
