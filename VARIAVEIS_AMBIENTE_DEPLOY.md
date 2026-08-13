@@ -203,7 +203,7 @@ https://app.conexa.seu-dominio.com,https://conexa.seu-dominio.com
 
 **Formato**:
 ```
-SUA_CHAVE_GEMINI_AQUI
+AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 **Funcionalidades que usam Gemini**:
