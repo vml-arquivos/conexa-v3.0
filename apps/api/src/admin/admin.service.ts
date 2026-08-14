@@ -33,10 +33,6 @@ function norm(v: unknown): string {
   return String(v ?? '').trim();
 }
 
-function userHasAnyLevel(user: JwtPayload, levels: RoleLevel[]): boolean {
-  return Array.isArray(user?.roles) && user.roles.some((role) => levels.includes(role.level));
-}
-
 function splitName(full: string): { firstName: string; lastName: string } {
   const parts = full.split(/\s+/).filter(Boolean);
   const firstName = parts[0] ?? '';
@@ -164,11 +160,11 @@ export class AdminService {
    * Garante que o Role do tipo informado existe para a mantenedora.
    * Retorna o Role encontrado ou criado.
    */
-  private async ensureRole(mantenedoraId: string, roleType: RoleType, client: any = this.prisma) {
+  private async ensureRole(mantenedoraId: string, roleType: RoleType) {
     const level = ROLE_TYPE_TO_LEVEL[roleType];
     if (!level) throw new BadRequestException(`roleType inválido: ${roleType}`);
 
-    return client.role.upsert({
+    return this.prisma.role.upsert({
       where: { mantenedoraId_type: { mantenedoraId, type: roleType } },
       create: {
         mantenedoraId,
@@ -222,13 +218,9 @@ export class AdminService {
         unitId: true,
         unit: { select: { name: true, code: true } },
         roles: {
-          where: { isActive: true },
           select: {
             scopeLevel: true,
-            role: { select: { type: true, level: true } },
-            unitScopes: {
-              select: { unit: { select: { name: true, code: true } } },
-            },
+            role: { select: { type: true } },
           },
         },
       },
@@ -250,14 +242,7 @@ export class AdminService {
       createdAt: u.createdAt,
       unitId: u.unitId,
       unit: u.unit ? { name: u.unit.name, unitCode: u.unit.code } : undefined,
-      roles: u.roles.map((r) => ({
-        roleType: r.role?.type ?? r.scopeLevel,
-        unit: r.unitScopes?.[0]?.unit
-          ? { name: r.unitScopes[0].unit.name, unitCode: r.unitScopes[0].unit.code }
-          : u.unit
-            ? { name: u.unit.name, unitCode: u.unit.code }
-            : undefined,
-      })),
+      roles: u.roles.map((r) => ({ roleType: r.role?.type ?? r.scopeLevel })),
     }));
 
     return { ok: true, total: normalized.length, users: normalized };
@@ -316,12 +301,6 @@ export class AdminService {
     const roleLevel = ROLE_TYPE_TO_LEVEL[dto.roleType];
     if (!roleLevel) throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
 
-    const actorIsRestricted = userHasAnyLevel(actor, [RoleLevel.UNIDADE, RoleLevel.PROFESSOR]);
-    const allowedRestrictedTargets: RoleLevel[] = [RoleLevel.UNIDADE, RoleLevel.PROFESSOR];
-    if (actorIsRestricted && !allowedRestrictedTargets.includes(roleLevel)) {
-      throw new ForbiddenException('Seu perfil não pode criar usuários com este papel');
-    }
-
     const needsUnit =
       roleLevel === RoleLevel.UNIDADE || roleLevel === RoleLevel.PROFESSOR;
 
@@ -347,12 +326,10 @@ export class AdminService {
     if (existing) throw new ConflictException('Já existe um usuário com este e-mail');
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const role = await this.ensureRole(actor.mantenedoraId, dto.roleType);
 
     const created = await this.prisma.$transaction(async (tx) => {
-      // 1. Garantir o papel na mesma transação do usuário e dos escopos.
-      const role = await this.ensureRole(actor.mantenedoraId, dto.roleType, tx);
-
-      // 2. Criar usuário
+      // 1. Criar usuário
       const newUser = await tx.user.create({
         data: {
           mantenedoraId: actor.mantenedoraId,
@@ -369,7 +346,7 @@ export class AdminService {
         select: { id: true, email: true, firstName: true, lastName: true, unitId: true, status: true },
       });
 
-      // 3. Criar UserRole
+      // 2. Criar UserRole
       const userRole = await tx.userRole.create({
         data: {
           userId: newUser.id,
@@ -380,7 +357,7 @@ export class AdminService {
         select: { id: true },
       });
 
-      // 4. Criar UserRoleUnitScope
+      // 3. Criar UserRoleUnitScope
       if (unitId) {
         // Role de unidade: escopo apenas na unidade
         await tx.userRoleUnitScope.create({
@@ -430,25 +407,11 @@ export class AdminService {
 
     const target = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, mantenedoraId: true, email: true, unitId: true },
+      select: { id: true, mantenedoraId: true, email: true },
     });
     if (!target) throw new NotFoundException('Usuário não encontrado');
     if (target.mantenedoraId !== actor.mantenedoraId)
       throw new ForbiddenException('Sem permissão para editar este usuário');
-    if (userHasAnyLevel(actor, [RoleLevel.UNIDADE]) && target.unitId !== actor.unitId)
-      throw new ForbiddenException('Sem permissão para editar usuário de outra unidade');
-
-    if (dto.roleType) {
-      const requestedLevel = ROLE_TYPE_TO_LEVEL[dto.roleType];
-      if (!requestedLevel) throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
-      const allowedRestrictedTargets: RoleLevel[] = [RoleLevel.UNIDADE, RoleLevel.PROFESSOR];
-      if (
-        userHasAnyLevel(actor, [RoleLevel.UNIDADE, RoleLevel.PROFESSOR]) &&
-        !allowedRestrictedTargets.includes(requestedLevel)
-      ) {
-        throw new ForbiddenException('Seu perfil não pode atribuir este papel');
-      }
-    }
 
     // Verificar e-mail duplicado (se estiver mudando)
     if (dto.email && dto.email.trim().toLowerCase() !== target.email) {
@@ -504,13 +467,7 @@ export class AdminService {
         const roleLevel = ROLE_TYPE_TO_LEVEL[dto.roleType];
         if (!roleLevel) throw new BadRequestException(`roleType inválido: ${dto.roleType}`);
 
-        const role = await this.ensureRole(actor.mantenedoraId, dto.roleType, tx);
-
-        // Preservar os IDs antigos para limpar seus escopos antes da troca.
-        const previousAssignments = await tx.userRole.findMany({
-          where: { userId },
-          select: { id: true },
-        });
+        const role = await this.ensureRole(actor.mantenedoraId, dto.roleType);
 
         // Desativar roles anteriores
         await tx.userRole.updateMany({
@@ -526,87 +483,26 @@ export class AdminService {
           select: { id: true },
         });
 
-        if (previousAssignments.length > 0) {
-          await tx.userRoleUnitScope.deleteMany({
-            where: { userRoleId: { in: previousAssignments.map((assignment) => assignment.id) } },
-          });
-        }
-
-        // Recriar escopos para unidade, staff central ou mantenedora.
+        // Recriar escopos se unitId foi alterado
         if (unitId !== undefined && unitId !== null) {
+          await tx.userRoleUnitScope.deleteMany({ where: { userRoleId: userRole.id } });
           await tx.userRoleUnitScope.create({ data: { userRoleId: userRole.id, unitId } });
-        } else if (roleLevel === RoleLevel.STAFF_CENTRAL || roleLevel === RoleLevel.MANTENEDORA) {
-          const allUnits = await tx.unit.findMany({
-            where: { mantenedoraId: actor.mantenedoraId },
-            select: { id: true },
-          });
-          if (allUnits.length > 0) {
-            await tx.userRoleUnitScope.createMany({
-              data: allUnits.map((unit) => ({ userRoleId: userRole.id, unitId: unit.id })),
-            });
-          }
         }
       }
 
       return u;
     });
 
-    // Relê após o commit para que a resposta represente o estado persistido,
-    // incluindo unidade e papéis ativos, e não apenas o retorno do UPDATE.
-    const persisted = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        unitId: true,
-        status: true,
-        unit: { select: { name: true, code: true } },
-        roles: {
-          where: { isActive: true },
-          select: {
-            scopeLevel: true,
-            role: { select: { type: true } },
-            unitScopes: {
-              select: { unit: { select: { name: true, code: true } } },
-            },
-          },
-        },
-      },
-    });
-
-    const responseUser = persisted ?? {
-      ...updated,
-      unit: null,
-      roles: [],
-    };
-
-    this.logger.log(`Usuário atualizado: ${responseUser.email} por ${actor.email}`);
+    this.logger.log(`Usuário atualizado: ${updated.email} por ${actor.email}`);
     return {
       ok: true,
-      persisted: true,
       user: {
-        id: responseUser.id,
-        email: responseUser.email,
-        firstName: responseUser.firstName,
-        lastName: responseUser.lastName,
-        unitId: responseUser.unitId,
-        status: responseUser.status,
-        unit: responseUser.unit
-          ? { name: responseUser.unit.name, unitCode: responseUser.unit.code }
-          : undefined,
-        roles: responseUser.roles.map((r) => ({
-          roleType: r.role?.type ?? r.scopeLevel,
-          unit: r.unitScopes?.[0]?.unit
-            ? {
-                name: r.unitScopes[0].unit.name,
-                unitCode: r.unitScopes[0].unit.code,
-              }
-            : responseUser.unit
-              ? { name: responseUser.unit.name, unitCode: responseUser.unit.code }
-              : undefined,
-        })),
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        unitId: updated.unitId,
+        status: updated.status,
       },
     };
   }
