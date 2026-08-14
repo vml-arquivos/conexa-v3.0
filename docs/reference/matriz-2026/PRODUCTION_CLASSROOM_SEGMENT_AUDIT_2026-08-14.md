@@ -86,3 +86,21 @@ O deployment do frontend `h6y6j3rn76jju6sqwlobujm2` terminou como `Deployment Fa
 Na sessão autenticada como `COORDENADORA PILOTO`, a unidade `CEPI PILOTO — Ambiente de Testes` mostrou somente uma turma: `Maternal II — PILOTO (Turma de Teste)`, configurada como `EI02 — Crianças Bem Pequenas (1a 7m a 3a 11m)`, com 10 crianças. O `Maternal II C` não está disponível nessa unidade/perfil, portanto não é possível atribuir sua faixa etária usando apenas essa sessão.
 
 O perfil `DIRETORA PILOTO` também está limitado à unidade `CEPI PILOTO — Ambiente de Testes` e informa 1 turma, 10 crianças e 1 professor. O `Maternal II C` não aparece nesse escopo de teste. Portanto, o sistema não deve inferir a faixa etária pelo nome “Maternal II C”; deve usar as datas de nascimento das matrículas ativas e, quando houver composição mista, solicitar a decisão pedagógica explícita.
+
+Após o push de `ffd1322`, a aplicação `conexa-frontend` no Coolify ainda estava `Running (healthy)` na revisão anterior `ee7f1d6c`, com `16 unapplied configuration changes` referentes às variáveis `VITE_*` sendo retiradas do runtime. O frontend precisa ser redeployado para importar a nova revisão e usar o Dockerfile com instalação filtrada.
+
+Em 14/08/2026 às 05:34:24, o Coolify iniciou o redeploy do frontend no deployment `wcomrq842zp2nrfqt597hwgy` a partir de `vml-arquivos/conexa-v3.0:main`. O processo entrou em `Deployment is In Progress`; o aviso `No such container` refere-se apenas ao helper efêmero que não existia antes do `docker run` e não é falha da aplicação.
+
+No segundo redeploy, o Coolify importou corretamente `ffd13223987643472bb82a1b648116420afa3d8c` e iniciou `pnpm install --filter @conexa/web --frozen-lockfile`. O pnpm emitiu apenas o aviso de `pnpm` configurado em `apps/site/package.json`; a etapa seguia baixando dependências, sem a falha imediata observada no primeiro deployment.
+
+O redeploy do frontend continuou sem erro: a instalação filtrada já havia resolvido 1.704 pacotes e avançava até adicionar as dependências necessárias. O aviso de atualização do pnpm permanece não bloqueante; a compilação Vite ainda não havia iniciado no último acompanhamento.
+
+O build do frontend avançou além da resolução de dependências e chegou aos postinstall de `@prisma/client`, `prisma`, `esbuild` e `@nestjs/core`. O log mostrou avisos de detecção de `libssl`/binários opcionais do Prisma, que precisam ser distinguidos do resultado final do processo antes de qualquer nova alteração.
+
+Os postinstall de Prisma concluíram com `Generated Prisma Client (v5.22.0)` e `Done`, e o deployment avançou para `COPY packages/`. Os avisos de OpenSSL/libssl no Alpine são não bloqueantes neste estágio; não houve falha de código ou de migração.
+
+O deployment avançou para `RUN pnpm build` e `vite v7.2.0 building client environment for production`, confirmando que a instalação filtrada não falhou. Os avisos de OpenSSL/libssl ficaram limitados aos postinstall de Prisma e não impediram o build.
+
+O redeploy do frontend `wcomrq842zp2nrfqt597hwgy` terminou com sucesso. O Coolify criou o novo container, marcou-o `Started`, executou o healthcheck HTTP em `localhost:80` com retorno 0 e estado `healthy`, e removeu os containers antigos. O aviso sobre `swappiness` do kernel é não bloqueante.
+
+Após o redeploy, o login público e o painel de coordenação abriram normalmente. No menu lateral, os rótulos passaram a aparecer como `Relatório — Revisão Coord` e `Relatório da Criança`, enquanto as rotas técnicas permaneceram `/app/rdic-coord` e `/app/rdic-crianca`.

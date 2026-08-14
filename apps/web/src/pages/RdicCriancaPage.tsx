@@ -276,8 +276,8 @@ const AVATAR_PALETTE: Record<string, string> = {
   W:'from-blue-400 to-cyan-500', X:'from-fuchsia-400 to-violet-500',
   Y:'from-yellow-400 to-lime-500', Z:'from-rose-400 to-fuchsia-500',
 };
-function getAvatarGradient(nome: string): string {
-  return AVATAR_PALETTE[nome[0]?.toUpperCase() ?? 'A'] ?? 'from-indigo-400 to-purple-500';
+function getAvatarGradient(nome?: string | null): string {
+  return AVATAR_PALETTE[nome?.[0]?.toUpperCase() ?? 'A'] ?? 'from-indigo-400 to-purple-500';
 }
 
 // ─── Componente de Card de Criança ────────────────────────────────────────────
@@ -292,8 +292,8 @@ function CardCrianca({
   onClick: () => void;
   rdicsCount: number;
 }) {
-  const iniciais = `${aluno.firstName[0] ?? ''}${aluno.lastName[0] ?? ''}`.toUpperCase();
-  const gradient = getAvatarGradient(aluno.firstName);
+  const iniciais = `${aluno.firstName?.[0] ?? ''}${aluno.lastName?.[0] ?? ''}`.toUpperCase();
+  const gradient = getAvatarGradient(aluno.firstName || aluno.nome);
   const genero = aluno.gender === 'FEMININO' ? 'Menina' : aluno.gender === 'MASCULINO' ? 'Menino' : '';
   const generoIcon = aluno.gender === 'FEMININO' ? '♀' : aluno.gender === 'MASCULINO' ? '♂' : '';
   const generoColor = aluno.gender === 'FEMININO' ? 'text-pink-400' : 'text-blue-400';
@@ -509,9 +509,9 @@ export default function RdicCriancaPage() {
         const childrenRes = await http.get(`/lookup/classrooms/${turmaInfo.id}/children`);
         const lista: Aluno[] = (Array.isArray(childrenRes.data) ? childrenRes.data : childrenRes.data?.data ?? []).map((c: any) => ({
           id: c.id,
-          nome: `${c.firstName} ${c.lastName}`,
-          firstName: c.firstName,
-          lastName: c.lastName,
+          nome: c.name ?? `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim(),
+          firstName: c.firstName ?? String(c.name ?? '').split(' ')[0] ?? '',
+          lastName: c.lastName ?? String(c.name ?? '').split(' ').slice(1).join(' '),
           dateOfBirth: c.dateOfBirth ?? null,
           idade: calcularIdade(c.dateOfBirth),
           gender: c.gender ?? '',
