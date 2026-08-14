@@ -71,8 +71,23 @@ export class ChildrenService {
       ...childBaseDto
     } = createChildDto;
 
+    const dateOfBirthValue = childBaseDto.dateOfBirth;
+    const normalizedDateOfBirth =
+      typeof dateOfBirthValue === 'string'
+        ? new Date(
+            dateOfBirthValue.length === 10
+              ? `${dateOfBirthValue}T00:00:00.000Z`
+              : dateOfBirthValue,
+          )
+        : dateOfBirthValue;
+
+    if (!normalizedDateOfBirth || Number.isNaN(normalizedDateOfBirth.getTime())) {
+      throw new BadRequestException('Data de nascimento inválida');
+    }
+
     const data: Prisma.ChildUncheckedCreateInput = {
       ...childBaseDto,
+      dateOfBirth: normalizedDateOfBirth,
       mantenedoraId: user.mantenedoraId,
       ...normalizeChildJsonFields({
         dadosResponsaveis,

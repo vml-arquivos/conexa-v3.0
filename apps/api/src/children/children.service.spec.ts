@@ -19,6 +19,7 @@ describe('ChildrenService — getHealthDashboard', () => {
   const mockPrisma = {
     child: {
       findMany: jest.fn(),
+      create: jest.fn(),
     },
     classroomTeacher: {
       findFirst: jest.fn(),
@@ -216,5 +217,25 @@ describe('ChildrenService — getHealthDashboard', () => {
 
     const callArgs = mockPrisma.child.findMany.mock.calls[0][0];
     expect(callArgs.where.unitId).toBe('unit-C');
+  });
+
+  // ─── Regressão: criação recebe data HTML date-only ─────────────────────────
+  it('deve converter dateOfBirth YYYY-MM-DD para Date antes do Prisma', async () => {
+    mockPrisma.child.create.mockResolvedValue({ id: 'child-new' });
+
+    const result = await service.create(
+      {
+        firstName: 'DEMONSTRAÇÃO',
+        lastName: 'APRESENTAÇÃO 2026',
+        dateOfBirth: '2021-05-10',
+        gender: 'FEMININO',
+        unitId: 'unit-A',
+      } as any,
+      mockUserCoord,
+    );
+
+    const callArgs = mockPrisma.child.create.mock.calls[0][0];
+    expect(callArgs.data.dateOfBirth).toEqual(new Date('2021-05-10T00:00:00.000Z'));
+    expect(result).toMatchObject({ id: 'child-new' });
   });
 });
