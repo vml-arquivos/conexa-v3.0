@@ -1,15 +1,11 @@
 /**
- * MobileFichaAlunoPage — Ficha completa do aluno no PWA
+ * MobileFichaAlunoPage — Ficha operacional do aluno no PWA.
  *
- * Objetivo (pedido do Marcio):
- * - Consultar dados do aluno de forma fácil e organizada no mobile.
- * - Mesma fonte de dados do painel web dos professores (GET /children/:id/ficha-completa).
- * - Avatar com foto + botão de CÂMERA para tirar/trocar a foto do aluno
- *   (usa o endpoint já existente POST /children/:id/photo).
- * - Saúde (alergias, laudo, condições, medicação), matrícula/turma,
- *   responsáveis (mãe/pai/legal) com telefones clicáveis, autorizados e dados pessoais.
+ * A tela usa os endpoints de consulta já autorizados ao professor
+ * (GET /children/:id e GET /children/:id/dietary-restrictions), sem solicitar
+ * a ficha administrativa completa, que é exclusiva da Secretaria e da gestão.
  *
- * Funciona online (ficha completa) e cai para o cache local quando offline (dados básicos).
+ * Funciona online e cai para o cache local quando offline (dados básicos).
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -17,7 +13,7 @@ import type { ChangeEvent, ComponentType, ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, Camera, Loader2, Phone, AlertTriangle, FileText,
-  HeartPulse, GraduationCap, Users, MapPin, ShieldCheck, Pill,
+  HeartPulse, GraduationCap, Users, ShieldCheck, Pill,
 } from 'lucide-react';
 import http from '../../api/http';
 import { childrenCache } from '../../services/offlineDB';
@@ -26,15 +22,16 @@ import {
   resolveChildPhotoUrl, getChildDisplayName, getChildInitials,
 } from '../../components/children/ChildAvatar';
 
-// ─── Tipos (espelham GET /children/:id/ficha-completa) ─────────────────────────
-interface Responsavel {
-  nome?: string; parentesco?: string; cpf?: string; celular?: string;
-  telefoneResidencial?: string; telefoneTrabalho?: string; email?: string;
-  profissao?: string;
+// ─── Tipos do contrato resumido para o professor ─────────────────────────────
+interface RestricaoAlimentar {
+  id: string;
+  name?: string | null;
+  severity?: string | null;
+  description?: string | null;
+  forbiddenFoods?: string | null;
+  isActive?: boolean;
 }
-interface Autorizado {
-  nome?: string; parentesco?: string; telefone?: string; documento?: string;
-}
+
 interface Ficha {
   id: string;
   firstName: string;
@@ -43,19 +40,22 @@ interface Ficha {
   genero?: string | null;
   foto?: string | null;
   photoUrl?: string | null;
-  nacionalidade?: string | null;
-  naturalidade?: string | null;
-  uf_nascimento?: string | null;
-  endereco?: string | null;
-  cep?: string | null;
+  bloodType?: string | null;
+  raca?: string | null;
   alergias?: string | null;
   condicoesMedicas?: string | null;
   necessidadeMedicacao?: string | null;
   laudado?: boolean;
-  dadosResponsaveis?: { mae?: Responsavel; pai?: Responsavel; responsavelLegal?: Responsavel } | null;
-  autorizadosRetirada?: Autorizado[] | null;
+  tipoLaudo?: string | null;
+  descricaoLaudo?: string | null;
+  nomeMae?: string | null;
+  nomePai?: string | null;
+  celPai?: string | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
   turma?: { id: string; name: string } | null;
   unidade?: { id: string; name: string; code?: string } | null;
+  restricoesAlimentares?: RestricaoAlimentar[];
 }
 
 const ACCENT = '#4f46e5';
@@ -103,8 +103,40 @@ export default function MobileFichaAlunoPage() {
     setErro(null);
     try {
       if (isOnline) {
-        const res = await http.get(`/children/${childId}/ficha-completa`);
-        setFicha(res.data);
+        const [childRes, restricoesRes] = await Promise.all([
+          http.get(`/children/${childId}`),
+          http.get(`/children/${childId}/dietary-restrictions`),
+        ]);
+        const child = childRes.data;
+        const restricoes = Array.isArray(restricoesRes.data)
+          ? restricoesRes.data.filter((r: RestricaoAlimentar) => r?.isActive !== false)
+          : [];
+
+        setFicha({
+          id: child.id,
+          firstName: child.firstName,
+          lastName: child.lastName,
+          dataNascimento: child.dateOfBirth,
+          genero: child.gender,
+          foto: child.photoUrl,
+          photoUrl: child.photoUrl,
+          bloodType: child.bloodType,
+          raca: child.raca,
+          alergias: child.allergies,
+          condicoesMedicas: child.medicalConditions,
+          necessidadeMedicacao: child.medicationNeeds,
+          laudado: child.laudado,
+          tipoLaudo: child.tipoLaudo,
+          descricaoLaudo: child.descricaoLaudo,
+          nomeMae: child.nomeMae,
+          nomePai: child.nomePai,
+          celPai: child.celPai,
+          emergencyContactName: child.emergencyContactName,
+          emergencyContactPhone: child.emergencyContactPhone,
+          turma: child.enrollments?.[0]?.classroom ?? null,
+          unidade: child.unit ?? null,
+          restricoesAlimentares: restricoes,
+        });
       } else {
         // Offline: dados básicos do cache local
         const todos = await childrenCache.getAll();
@@ -275,9 +307,23 @@ export default function MobileFichaAlunoPage() {
             ) : (
               <Campo label="Alergias" valor="Nenhuma registrada" />
             )}
+            {ficha.restricoesAlimentares?.map((restricao) => (
+              <Alerta key={restricao.id} cor="#b45309" bg="#fffbeb">
+                <AlertTriangle size={15} color="#b45309" style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <strong>Restrição alimentar:</strong>{' '}
+                  {restricao.name || 'Não especificada'}
+                  {restricao.severity ? ` (${restricao.severity})` : ''}
+                  {restricao.description ? ` — ${restricao.description}` : ''}
+                  {restricao.forbiddenFoods ? ` Alimentos proibidos: ${restricao.forbiddenFoods}` : ''}
+                </div>
+              </Alerta>
+            ))}
             <Campo label="Condições médicas" valor={ficha.condicoesMedicas} />
             <Campo label="Necessidade de medicação" valor={ficha.necessidadeMedicacao} icon={<Pill size={13} color="#94a3b8" />} />
             <Campo label="Possui laudo" valor={ficha.laudado ? 'Sim' : 'Não'} />
+            <Campo label="Tipo de laudo" valor={ficha.tipoLaudo} />
+            <Campo label="Descrição do laudo" valor={ficha.descricaoLaudo} />
           </Secao>
 
           {/* ── Matrícula / Turma ───────────────────────────────────── */}
@@ -287,45 +333,25 @@ export default function MobileFichaAlunoPage() {
             <Campo label="Matrícula (ID)" valor={ficha.id} mono />
           </Secao>
 
-          {/* ── Responsáveis ────────────────────────────────────────── */}
-          <Secao titulo="Responsáveis" Icon={Users} cor="#7c3aed">
-            {!ficha.dadosResponsaveis?.mae?.nome
-              && !ficha.dadosResponsaveis?.pai?.nome
-              && !ficha.dadosResponsaveis?.responsavelLegal?.nome && (
-              <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0' }}>Nenhum responsável cadastrado.</p>
+          {/* ── Contatos operacionais ───────────────────────────────── */}
+          <Secao titulo="Contatos operacionais" Icon={Users} cor="#7c3aed">
+            {!ficha.nomeMae && !ficha.nomePai && !ficha.emergencyContactName
+              && !ficha.emergencyContactPhone && !ficha.celPai && (
+              <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0' }}>Nenhum contato cadastrado.</p>
             )}
-            {ficha.dadosResponsaveis?.mae?.nome && (
-              <CardResponsavel rotulo="Mãe" resp={ficha.dadosResponsaveis.mae} />
-            )}
-            {ficha.dadosResponsaveis?.pai?.nome && (
-              <CardResponsavel rotulo="Pai" resp={ficha.dadosResponsaveis.pai} />
-            )}
-            {ficha.dadosResponsaveis?.responsavelLegal?.nome && (
-              <CardResponsavel rotulo="Responsável legal" resp={ficha.dadosResponsaveis.responsavelLegal} />
-            )}
+            <Campo label="Nome da mãe" valor={ficha.nomeMae} />
+            <Campo label="Nome do pai" valor={ficha.nomePai} />
+            <Campo label="Contato de emergência" valor={ficha.emergencyContactName} />
+            {ficha.emergencyContactPhone && <TelLink tel={ficha.emergencyContactPhone} />}
+            {!ficha.emergencyContactPhone && ficha.celPai && <TelLink tel={ficha.celPai} />}
           </Secao>
 
-          {/* ── Autorizados a retirar ───────────────────────────────── */}
-          {Array.isArray(ficha.autorizadosRetirada) && ficha.autorizadosRetirada.filter(a => a?.nome?.trim()).length > 0 && (
-            <Secao titulo="Autorizados a retirar" Icon={ShieldCheck} cor="#059669">
-              {ficha.autorizadosRetirada.filter(a => a?.nome?.trim()).map((a, i) => (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, margin: 0, color: '#0f172a' }}>
-                    {a.nome} {a.parentesco ? <span style={{ color: '#94a3b8', fontWeight: 400 }}>· {a.parentesco}</span> : null}
-                  </p>
-                  {a.telefone && <TelLink tel={a.telefone} />}
-                </div>
-              ))}
-            </Secao>
-          )}
-
-          {/* ── Dados pessoais ──────────────────────────────────────── */}
-          <Secao titulo="Dados pessoais" Icon={FileText} cor="#64748b">
+          {/* ── Identificação ───────────────────────────────────────── */}
+          <Secao titulo="Identificação" Icon={FileText} cor="#64748b">
             <Campo label="Data de nascimento" valor={fmtData(ficha.dataNascimento)} />
             <Campo label="Gênero" valor={ficha.genero} />
-            <Campo label="Naturalidade" valor={[ficha.naturalidade, ficha.uf_nascimento].filter(Boolean).join(' / ')} />
-            <Campo label="Nacionalidade" valor={ficha.nacionalidade} />
-            <Campo label="Endereço" valor={[ficha.endereco, ficha.cep].filter(Boolean).join(' · ')} icon={<MapPin size={13} color="#94a3b8" />} />
+            <Campo label="Tipagem sanguínea" valor={ficha.bloodType} />
+            <Campo label="Raça/Cor" valor={ficha.raca} />
           </Secao>
         </>
       )}
@@ -406,20 +432,5 @@ function TelLink({ tel }: { tel: string }) {
     }}>
       <Phone size={13} /> {tel}
     </a>
-  );
-}
-
-function CardResponsavel({ rotulo, resp }: { rotulo: string; resp: Responsavel }) {
-  const tels = [resp.celular, resp.telefoneResidencial, resp.telefoneTrabalho].filter(Boolean) as string[];
-  return (
-    <div style={{ padding: '8px 0', borderBottom: '0.5px solid #f1f5f9' }}>
-      <p style={{ fontSize: 11, color: '#94a3b8', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: 0.4 }}>{rotulo}</p>
-      <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: '#0f172a' }}>{resp.nome}</p>
-      {resp.parentesco && <p style={{ fontSize: 12, color: '#64748b', margin: '1px 0 0' }}>{resp.parentesco}</p>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
-        {tels.map((t, i) => <TelLink key={i} tel={t} />)}
-      </div>
-      {resp.email && <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0', wordBreak: 'break-all' }}>{resp.email}</p>}
-    </div>
   );
 }
