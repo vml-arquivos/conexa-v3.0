@@ -160,6 +160,10 @@ export default function DiarioCalendarioPage() {
   const [loading, setLoading] = useState(true);
   const [classroomId, setClassroomId] = useState<string | undefined>();
   const [turmaNome, setTurmaNome] = useState<string>('');
+  // Evita a consulta inicial do histórico antes de a turma acessível estar resolvida.
+  // Sem esta guarda, o primeiro efeito dispara /diary-events sem classroomId e pode
+  // exibir um erro transitório mesmo quando a consulta correta retorna 200.
+  const [turmaCarregada, setTurmaCarregada] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'PUBLICADO' | 'RASCUNHO' | 'SEM_DIARIO'>('TODOS');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [futurosExpandidos, setFuturosExpandidos] = useState(false);
@@ -175,7 +179,10 @@ export default function DiarioCalendarioPage() {
           setTurmaNome(turmas[0].name);
         }
       } catch {
-        // silencioso — continua sem classroomId
+        // silencioso — continua sem classroomId; o efeito do histórico será liberado
+        // após esta tentativa para preservar o fallback de escopo já existente.
+      } finally {
+        setTurmaCarregada(true);
       }
     }
     loadTurma();
@@ -183,6 +190,10 @@ export default function DiarioCalendarioPage() {
 
   // ─── Carregar diários do ano letivo ─────────────────────────────────────────
   useEffect(() => {
+    // Só consultar o histórico depois que a tentativa de resolução da turma terminou.
+    // Isso evita uma chamada concorrente no primeiro render e mantém o escopo correto.
+    if (!turmaCarregada) return;
+
     async function loadDiarios() {
       setLoading(true);
       try {
@@ -270,7 +281,7 @@ export default function DiarioCalendarioPage() {
     }
 
     loadDiarios();
-  }, [classroomId, user]);
+  }, [classroomId, turmaCarregada, user]);
 
   // ─── Dias do mês selecionado ─────────────────────────────────────────────────
   const diasDoMes = useMemo(() => {
