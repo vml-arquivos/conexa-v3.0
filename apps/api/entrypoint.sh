@@ -163,7 +163,7 @@ PLANNING_CHECK=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 -c "
     (SELECT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid=(SELECT oid FROM pg_type WHERE typname='PlanningType') AND enumlabel='QUINZENAL'))::text;
 ")
 
-if [ "$PLANNING_CHECK" != "t|t|t|t" ]; then
+if [ "$PLANNING_CHECK" != "t|t|t|t" ] && [ "$PLANNING_CHECK" != "true|true|true|true" ]; then
   echo "❌ ERRO: schema runtime incompleto após migrate deploy (observacoes_template/anoLetivo/Child.dados_responsaveis/QUINZENAL: $PLANNING_CHECK)."
   echo "❌ Deploy abortado para não subir a API servindo Planning ou Child quebrados."
   exit 1
