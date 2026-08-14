@@ -59,7 +59,8 @@ const LABELS_TIPO: Record<TipoAtividade, string> = {
 @Injectable()
 export class IaAssistivaService {
   private readonly logger = new Logger(IaAssistivaService.name);
-  private readonly aiRequestTimeoutMs = 30_000;
+  private readonly aiRequestTimeoutMs = 15_000;
+  private readonly fallbackModel = 'gemini-3.6-flash';
   // Inicialização LAZY: o cliente só é criado quando realmente for usado.
   // Isso garante que o servidor sobe normalmente mesmo sem chave de IA configurada.
   private _cliente: OpenAI | null = null;
@@ -133,8 +134,13 @@ export class IaAssistivaService {
     return (
       process.env.GEMINI_MODEL ||
       process.env.OPENAI_MODEL ||
-      'gemini-2.5-flash'
+      'gemini-3.6-flash'
     );
+  }
+
+  private isRetryableProviderError(error: unknown): boolean {
+    const status = (error as { status?: number } | null)?.status;
+    return status === 429 || (typeof status === 'number' && status >= 500);
   }
 
   /**
@@ -189,52 +195,69 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
   "registroSugerido": "Como o professor pode registrar e documentar esta atividade (fotos, portfólio, diário, etc.)"
 }`;
 
-    try {
-      const resposta = await cliente.chat.completions.create({
-        model: this.getModelo(),
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Você é uma especialista em Educação Infantil brasileira. Responda APENAS com JSON válido, sem markdown, sem texto adicional.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      });
+    const modelos = Array.from(new Set([this.getModelo(), this.fallbackModel]));
+    let ultimoErro: unknown;
 
-      const conteudo = resposta.choices[0]?.message?.content;
-      if (!conteudo) {
+    for (let indice = 0; indice < modelos.length; indice += 1) {
+      const modelo = modelos[indice];
+      try {
+        const resposta = await cliente.chat.completions.create({
+          model: modelo,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Você é uma especialista em Educação Infantil brasileira. Responda APENAS com JSON válido, sem markdown, sem texto adicional.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 1500,
+        });
+
+        const conteudo = resposta.choices[0]?.message?.content;
+        if (!conteudo) {
+          throw new ServiceUnavailableException(
+            'A IA não retornou conteúdo. Tente novamente.',
+          );
+        }
+
+        // Extrair JSON mesmo que venha com markdown
+        const jsonLimpo = conteudo
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '')
+          .trim();
+
+        const atividade = JSON.parse(jsonLimpo);
+
+        // Garantir que os campos fixos da Sequência Piloto sejam preservados
+        return {
+          ...atividade,
+          campoDeExperiencia: dto.campoDeExperiencia,
+          objetivoBNCC: dto.objetivoBNCC,
+          objetivoCurriculo: dto.objetivoCurriculo,
+          faixaEtaria: faixaLabel,
+          geradoPorIA: true,
+        };
+      } catch (error) {
+        ultimoErro = error;
+        const podeTentarFallback = indice < modelos.length - 1 && this.isRetryableProviderError(error);
+        if (podeTentarFallback) {
+          this.logger.warn(`Modelo ${modelo} indisponível; tentando fallback ${modelos[indice + 1]}.`);
+          continue;
+        }
+        this.logger.error('Erro ao gerar atividade com IA:', error);
+        if (error instanceof ServiceUnavailableException) throw error;
         throw new ServiceUnavailableException(
-          'A IA não retornou conteúdo. Tente novamente.',
+          'Serviço de IA temporariamente indisponível. Tente novamente em instantes.',
         );
       }
-
-      // Extrair JSON mesmo que venha com markdown
-      const jsonLimpo = conteudo
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-
-      const atividade = JSON.parse(jsonLimpo);
-
-      // Garantir que os campos fixos da Sequência Piloto sejam preservados
-      return {
-        ...atividade,
-        campoDeExperiencia: dto.campoDeExperiencia,
-        objetivoBNCC: dto.objetivoBNCC,
-        objetivoCurriculo: dto.objetivoCurriculo,
-        faixaEtaria: faixaLabel,
-        geradoPorIA: true,
-      };
-    } catch (error) {
-      this.logger.error('Erro ao gerar atividade com IA:', error);
-      if (error instanceof ServiceUnavailableException) throw error;
-      throw new ServiceUnavailableException(
-        'Serviço de IA temporariamente indisponível. Tente novamente em instantes.',
-      );
     }
+
+    this.logger.error('Todos os modelos de IA falharam:', ultimoErro);
+    throw new ServiceUnavailableException(
+      'Serviço de IA temporariamente indisponível. Tente novamente em instantes.',
+    );
   }
 
   /**
