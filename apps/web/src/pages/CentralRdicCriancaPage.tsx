@@ -88,7 +88,7 @@ const STATUS_CFG: Record<string, { label: string; cor: string }> = {
   APROVADO:   { label: '✓ Aprovado',  cor: 'bg-emerald-100 text-emerald-700' },
   FINALIZADO: { label: 'Finalizado',  cor: 'bg-blue-100 text-blue-700' },
   PUBLICADO:  { label: 'Publicado',   cor: 'bg-green-100 text-green-700' },
-  PENDENTE:   { label: 'Sem RDIC',    cor: 'bg-slate-100 text-slate-500' },
+  PENDENTE:   { label: 'Sem relatório',    cor: 'bg-slate-100 text-slate-500' },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -123,7 +123,7 @@ export default function CentralRdicCriancaPage() {
 
   if (!data) {
     return (
-      <PageShell title="Central do RDIC" subtitle="Dados não encontrados">
+      <PageShell title="Central do Relatório da Criança" subtitle="Dados não encontrados">
         <EmptyState icon={<Brain className="h-12 w-12 text-gray-300" />} title="Dados não encontrados" description="Não foi possível carregar os dados desta criança." />
         <Button variant="outline" onClick={() => navigate(-1)} className="mt-4 flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar
@@ -137,7 +137,7 @@ export default function CentralRdicCriancaPage() {
   const temAlertas = (child?.restricoesAlimentares?.length ?? 0) > 0 || !!child?.allergies || !!child?.medicalConditions || !!child?.medicationNeeds;
 
   return (
-    <PageShell title={`Central RDIC — ${nome}`} subtitle={`${child?.turma?.name ?? '—'} · ${calcularIdade(child?.dateOfBirth)}`}>
+    <PageShell title={`Central do Relatório da Criança — ${nome}`} subtitle={`${child?.turma?.name ?? '—'} · ${calcularIdade(child?.dateOfBirth)}`}>
       <div className="space-y-5">
 
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -149,7 +149,7 @@ export default function CentralRdicCriancaPage() {
             classroomId={child?.turma?.id}
             current="central"
             canCreateRdic={podeCriar}
-            rdicLabel={rdicAtual ? 'Editar RDIC' : 'Criar RDIC'}
+            rdicLabel={rdicAtual ? 'Editar relatório' : 'Criar relatório'}
             onRefresh={carregar}
           />
         </div>
@@ -179,7 +179,7 @@ export default function CentralRdicCriancaPage() {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-xs text-gray-400 mb-1">RDIC actual</p>
+                <p className="text-xs text-gray-400 mb-1">Relatório atual</p>
                 <StatusBadge status={rdicAtual?.status ?? 'PENDENTE'} />
                 {rdicAtual && <p className="text-xs text-gray-400 mt-1">{rdicAtual.periodo}</p>}
               </div>
@@ -229,17 +229,17 @@ export default function CentralRdicCriancaPage() {
           <Card className="sm:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <Brain className="h-4 w-4 text-indigo-500" /> RDIC Actual
+                <Brain className="h-4 w-4 text-indigo-500" /> Relatório atual
               </CardTitle>
             </CardHeader>
             <CardContent>
               {!rdicAtual ? (
                 <div className="text-center py-6">
                   <Brain className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm text-gray-500">Nenhum RDIC criado ainda.</p>
+                  <p className="text-sm text-gray-500">Nenhum relatório criado ainda.</p>
                   {podeCriar && (
                     <Button size="sm" onClick={() => navigate(`/app/rdic-crianca?childId=${childId}`)} className="mt-3 bg-indigo-600 text-white text-xs">
-                      Criar Primeiro RDIC
+                      Criar primeiro relatório
                     </Button>
                   )}
                 </div>
@@ -271,7 +271,7 @@ export default function CentralRdicCriancaPage() {
               <CardContent className="p-4 text-center">
                 <BookOpen className="h-6 w-6 mx-auto mb-1 text-indigo-400" />
                 <p className="text-2xl font-bold text-gray-800">{rdics.length}</p>
-                <p className="text-xs text-gray-500">RDICs registados</p>
+                <p className="text-xs text-gray-500">Relatórios registrados</p>
               </CardContent>
             </Card>
             <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/app/diario-de-bordo?childId=${childId}`)}>
@@ -310,7 +310,7 @@ export default function CentralRdicCriancaPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-400" /> Histórico de RDICs
+                <FileText className="h-4 w-4 text-gray-400" /> Histórico de relatórios
               </CardTitle>
             </CardHeader>
             <CardContent>

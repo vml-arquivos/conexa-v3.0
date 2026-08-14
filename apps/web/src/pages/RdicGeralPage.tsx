@@ -63,7 +63,7 @@ export default function RdicGeralPage() {
       const res = await http.get('/rdic/geral', { params });
       setRdics(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
     } catch {
-      toast.error('Erro ao carregar RDICs');
+      toast.error('Erro ao carregar os relatórios da criança');
     } finally {
       setLoading(false);
     }
@@ -88,7 +88,7 @@ export default function RdicGeralPage() {
 
     return (
       <PageShell
-        title={`RDIC — ${nome}`}
+        title={`Relatório da Criança — ${nome}`}
         subtitle={`${selecionado.periodo} / ${selecionado.anoLetivo} · Somente Leitura`}
       >
         <div className="space-y-6">
@@ -120,7 +120,7 @@ export default function RdicGeralPage() {
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
             <Eye className="h-4 w-4 text-blue-500 flex-shrink-0" />
             <p className="text-sm text-blue-700">
-              <strong>Visualização somente leitura.</strong> Este RDIC foi aprovado e publicado pela coordenação pedagógica da unidade. Não é possível fazer alterações.
+              <strong>Visualização somente leitura.</strong> Este relatório da criança foi aprovado e publicado pela coordenação pedagógica da unidade. Não é possível fazer alterações.
             </p>
           </div>
 
@@ -192,11 +192,11 @@ export default function RdicGeralPage() {
   }
 
   // ─── Lista de RDICs publicados ─────────────────────────────────────────────
-  if (loading) return <LoadingState message="Carregando RDICs publicados..." />;
+  if (loading) return <LoadingState message="Carregando relatórios publicados..." />;
 
   return (
     <PageShell
-      title="RDICs Publicados"
+      title="Relatórios da Criança Publicados"
       subtitle="Coordenação Geral — Visualização somente leitura"
     >
       <div className="space-y-6">
@@ -209,7 +209,7 @@ export default function RdicGeralPage() {
         <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
           <Eye className="h-4 w-4 text-blue-500 flex-shrink-0" />
           <p className="text-sm text-blue-700">
-            Aqui você visualiza apenas os RDICs que foram <strong>aprovados e publicados</strong> pela coordenação pedagógica de cada unidade. Nenhuma alteração pode ser feita nesta tela.
+            Aqui você visualiza apenas os relatórios da criança que foram <strong>aprovados e publicados</strong> pela coordenação pedagógica de cada unidade. Nenhuma alteração pode ser feita nesta tela.
           </p>
         </div>
 
@@ -218,7 +218,7 @@ export default function RdicGeralPage() {
           <Globe className="h-8 w-8 text-green-500" />
           <div>
             <p className="text-2xl font-bold text-green-700">{rdics.length}</p>
-            <p className="text-sm text-green-600">RDICs publicados disponíveis</p>
+            <p className="text-sm text-green-600">Relatórios publicados disponíveis</p>
           </div>
         </div>
 
@@ -246,8 +246,8 @@ export default function RdicGeralPage() {
         {rdicsFiltrados.length === 0 ? (
           <EmptyState
             icon={<Brain className="h-12 w-12 text-gray-400" />}
-            title="Nenhum RDIC publicado ainda"
-            description="Os RDICs aparecerão aqui após serem aprovados e publicados pela coordenação pedagógica de cada unidade."
+            title="Nenhum relatório publicado ainda"
+            description="Os relatórios da criança aparecerão aqui após serem aprovados e publicados pela coordenação pedagógica de cada unidade."
           />
         ) : (
           <div className="space-y-3">

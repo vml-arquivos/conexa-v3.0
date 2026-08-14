@@ -295,14 +295,14 @@ export default function RdicCoordPage() {
 
   // ─── Aprovar RDIC ──────────────────────────────────────────────────────────
   const handleAprovar = async (id: string) => {
-    if (!confirm('Aprovar este RDIC? O professor não poderá mais editá-lo.')) return;
+    if (!confirm('Aprovar este relatório? O professor não poderá mais editá-lo.')) return;
     setSalvandoId(id);
     try {
       await http.post(`/rdic/${id}/aprovar`);
-      toast.success('✓ RDIC aprovado com sucesso!');
+      toast.success('✓ Relatório da Criança aprovado com sucesso!');
       await carregarStatus();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Erro ao aprovar RDIC.');
+      toast.error(err?.response?.data?.message ?? 'Erro ao aprovar o relatório da criança.');
     } finally {
       setSalvandoId(null);
     }
@@ -313,11 +313,11 @@ export default function RdicCoordPage() {
     setSalvandoId(id);
     try {
       await http.post(`/rdic/${id}/devolver`, { comment });
-      toast.success('RDIC devolvido ao professor.');
+      toast.success('Relatório da Criança devolvido ao professor.');
       setModalDevolucaoId(null);
       await carregarStatus();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? 'Erro ao devolver RDIC.');
+      toast.error(err?.response?.data?.message ?? 'Erro ao devolver o relatório da criança.');
     } finally {
       setSalvandoId(null);
     }
@@ -340,7 +340,7 @@ export default function RdicCoordPage() {
 
   return (
     <PageShell
-      title="Revisão de RDICs"
+      title="Revisão de Relatórios da Criança"
       subtitle="Coordenação Pedagógica — Relatórios de Desenvolvimento Individual"
     >
       {modalDevolucaoId && (
@@ -410,7 +410,7 @@ export default function RdicCoordPage() {
           <EmptyState
             icon={<Users className="h-12 w-12 text-gray-300" />}
             title="Selecione uma turma para começar"
-            description="Escolha a turma acima para visualizar o painel Kanban de RDICs."
+            description="Escolha a turma acima para visualizar o painel de relatórios da criança."
           />
         )}
 

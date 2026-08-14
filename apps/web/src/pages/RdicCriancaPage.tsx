@@ -202,21 +202,21 @@ const KANBAN_TABS = [
   {
     key:         RDIC_STATUS.PENDING,
     label:       'Pendentes',
-    description: 'Sem RDIC iniciado neste trimestre',
+    description: 'Sem relatório iniciado neste trimestre',
     color:       'text-red-600 border-red-400',
     badge:       'bg-red-100 text-red-700',
   },
   {
     key:         RDIC_STATUS.EM_ANDAMENTO,
     label:       'Em Andamento',
-    description: 'RDIC em rascunho ou devolvido para correção',
+    description: 'Relatório em rascunho ou devolvido para correção',
     color:       'text-yellow-600 border-yellow-400',
     badge:       'bg-yellow-100 text-yellow-700',
   },
   {
     key:         RDIC_STATUS.CONCLUIDO,
     label:       'Concluídos',
-    description: 'RDIC enviado para revisão, aprovado ou publicado',
+    description: 'Relatório enviado para revisão, aprovado ou publicado',
     color:       'text-green-600 border-green-400',
     badge:       'bg-green-100 text-green-700',
   },
@@ -347,7 +347,7 @@ function CardCrianca({
             ? 'bg-green-50 text-green-700 border-green-200'
             : 'bg-gray-50 text-gray-400 border-gray-200'
         }`}>
-          {rdicsCount > 0 ? `✓ ${rdicsCount}` : 'Sem RDIC'}
+          {rdicsCount > 0 ? `✓ ${rdicsCount}` : 'Sem relatório'}
         </div>
       </div>
     </button>
@@ -445,7 +445,7 @@ export default function RdicCriancaPage() {
       if (saved.dimensoes && Array.isArray(saved.dimensoes)) setDimensoes(saved.dimensoes);
       if (typeof saved.observacaoGeral === 'string') setObservacaoGeral(saved.observacaoGeral);
       if (typeof saved.proximosPassos === 'string') setProximosPassos(saved.proximosPassos);
-      toast.info('Rascunho do RDIC recuperado automaticamente.');
+      toast.info('Rascunho do relatório recuperado automaticamente.');
     },
   });
   const [dimensaoAberta, setDimensaoAberta] = useState<string | null>('eu-outro-nos');
@@ -746,12 +746,12 @@ export default function RdicCriancaPage() {
       } else {
         await http.post('/rdic', payload);
       }
-      toast.success(`RDIC de ${alunoSelecionado.firstName} salvo com sucesso!`);
+      toast.success(`Relatório da Criança de ${alunoSelecionado.firstName} salvo com sucesso!`);
       rdicClearDraft();
       await carregarRdicsDoAluno(alunoSelecionado.id);
       setEtapa('historico');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Erro ao salvar RDIC');
+      toast.error(err?.response?.data?.message || 'Erro ao salvar o relatório da criança');
     } finally {
       setSaving(false);
     }
@@ -781,12 +781,12 @@ export default function RdicCriancaPage() {
   // ─── Render: Sem turma ────────────────────────────────────────────────────
   if (!turma) {
     return (
-      <PageShell title="RDIC por Criança" subtitle="Registro de Desenvolvimento Individual">
+      <PageShell title="Relatório da Criança" subtitle="Registro de Desenvolvimento Individual">
         <EmptyState
           icon={<Users className="h-12 w-12 text-gray-400" />}
           title={isProf ? 'Você ainda não tem turma' : 'Nenhuma turma encontrada'}
           description={isProf
-            ? 'Aguarde a coordenação vincular você a uma turma para acessar os RDICs.'
+            ? 'Aguarde a coordenação vincular você a uma turma para acessar os relatórios da criança.'
             : 'Não foi possível carregar as turmas desta unidade. Verifique se há turmas ativas cadastradas.'}
         />
       </PageShell>
@@ -795,7 +795,7 @@ export default function RdicCriancaPage() {
 
   return (
     <PageShell
-      title="RDIC por Criança"
+      title="Relatório da Criança"
       subtitle={`${turma.name} · ${turma.unit?.name}`}
     >
       {/* ─── Cabeçalho informativo ─── */}
@@ -803,10 +803,10 @@ export default function RdicCriancaPage() {
         <div className="flex items-start gap-3">
           <Brain className="h-6 w-6 text-indigo-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-indigo-800">RDIC — Registro de Desenvolvimento Individual da Criança</h3>
+            <h3 className="font-semibold text-indigo-800">Relatório da Criança — Desenvolvimento Individual (RDIC)</h3>
             <p className="text-sm text-indigo-600 mt-0.5">
               Avaliação bimestral por dimensões de desenvolvimento baseada nos <strong>5 Campos de Experiência da BNCC</strong>.
-              Selecione uma criança da sua turma para iniciar ou continuar o RDIC.
+              Selecione uma criança da sua turma para iniciar ou continuar o relatório.
             </p>
           </div>
         </div>
@@ -1009,7 +1009,7 @@ export default function RdicCriancaPage() {
                 ) : (
                   <>
                     <p className="text-xs text-indigo-600 mb-2">
-                      Clique em “Gerar Rascunho IA” abaixo para usar estas evidências como base para o RDIC.
+                      Clique em “Gerar Rascunho IA” abaixo para usar estas evidências como base para o relatório.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {evidencias.map(ev => (
@@ -1292,7 +1292,7 @@ export default function RdicCriancaPage() {
                     const rdic = rdics.find((r: any) => r.periodo === periodo && r.anoLetivo === ano && (r.status === 'RASCUNHO' || r.status === 'DEVOLVIDO'));
                     if (rdic) {
                       await http.patch(`/rdic/${rdic.id}/enviar-revisao`);
-                      toast.success('RDIC enviado para revisão da coordenação pedagógica!');
+                      toast.success('Relatório da Criança enviado para revisão da coordenação pedagógica!');
                       await carregarRdicsDoAluno(alunoSelecionado.id);
                       setEtapa('historico');
                     }
@@ -1321,13 +1321,13 @@ export default function RdicCriancaPage() {
               <ArrowLeft className="h-4 w-4" /> Voltar ao formulário
             </button>
             <h2 className="text-lg font-semibold text-gray-800 flex-1">
-              Histórico de RDICs — {alunoSelecionado.firstName} {alunoSelecionado.lastName}
+              Histórico de Relatórios da Criança — {alunoSelecionado.firstName} {alunoSelecionado.lastName}
             </h2>
             <Button
               onClick={() => setEtapa('formulario')}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm"
             >
-              <Plus className="h-4 w-4" /> Novo RDIC
+              <Plus className="h-4 w-4" /> Novo relatório
             </Button>
             <Button
               onClick={() => {
@@ -1344,7 +1344,7 @@ export default function RdicCriancaPage() {
                   }).join('');
                   return `<div style="page-break-inside:avoid;margin-bottom:32px;border:1px solid #e5e7eb;border-radius:8px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="font-size:15px;font-weight:700;margin:0">${rdic.periodo}</h3><span style="font-size:12px;padding:2px 8px;border-radius:12px;background:${rdic.status==='PUBLICADO'?'#dcfce7':rdic.status==='REVISAO'?'#fef9c3':'#f3f4f6'};color:${rdic.status==='PUBLICADO'?'#15803d':rdic.status==='REVISAO'?'#854d0e':'#6b7280'}">${rdic.status}</span></div>${dimHtml}<div style="margin-top:12px;padding:12px;background:#f8fafc;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Observação Geral:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.rascunhoJson?.observacaoGeral || '—'}</p></div>${rdic.rascunhoJson?.proximosPassos?`<div style="margin-top:8px;padding:12px;background:#f0fdf4;border-radius:6px"><p style="font-size:12px;font-weight:700;margin:0 0 4px">Próximos Passos:</p><p style="font-size:12px;color:#374151;margin:0">${rdic.rascunhoJson?.proximosPassos}</p></div>`:''}<p style="font-size:11px;color:#9ca3af;margin-top:8px">Progresso: ${prog.pct}% preenchido · Registrado em ${new Date(rdic.criadoEm).toLocaleDateString('pt-BR')}</p></div>`;
                 }).join('');
-                printWindow.document.write(`<!DOCTYPE html><html><head><title>RDIC — ${alunoSelecionado.firstName} ${alunoSelecionado.lastName}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;font-weight:400;color:#6b7280;margin:0 0 24px}@media print{.no-print{display:none}}</style></head><body><h1>RDIC — Relatório de Desenvolvimento Individual da Criança</h1><h2>${alunoSelecionado.firstName} ${alunoSelecionado.lastName} · ${turma?.name ?? ''} · ${turma?.unit?.name ?? ''}</h2><p style="font-size:12px;color:#9ca3af;margin-bottom:24px">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>${rdicsHtml}</body></html>`);
+                printWindow.document.write(`<!DOCTYPE html><html><head><title>Relatório da Criança — ${alunoSelecionado.firstName} ${alunoSelecionado.lastName}</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#111}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;font-weight:400;color:#6b7280;margin:0 0 24px}@media print{.no-print{display:none}}</style></head><body><h1>Relatório da Criança — Desenvolvimento Individual (RDIC)</h1><h2>${alunoSelecionado.firstName} ${alunoSelecionado.lastName} · ${turma?.name ?? ''} · ${turma?.unit?.name ?? ''}</h2><p style="font-size:12px;color:#9ca3af;margin-bottom:24px">Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>${rdicsHtml}</body></html>`);
                 printWindow.document.close();
                 printWindow.focus();
                 setTimeout(() => printWindow.print(), 500);
@@ -1361,8 +1361,8 @@ export default function RdicCriancaPage() {
           {!loadingRdics && rdicsDoAluno.length === 0 && (
             <EmptyState
               icon={<FileText className="h-12 w-12 text-gray-400" />}
-              title="Nenhum RDIC registrado"
-              description={`${alunoSelecionado.firstName} ainda não tem RDICs. Clique em "Novo RDIC" para criar o primeiro.`}
+              title="Nenhum relatório registrado"
+              description={`${alunoSelecionado.firstName} ainda não tem um relatório da criança. Clique em "Novo relatório" para criar o primeiro.`}
             />
           )}
 
