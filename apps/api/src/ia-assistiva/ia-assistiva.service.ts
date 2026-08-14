@@ -59,6 +59,7 @@ const LABELS_TIPO: Record<TipoAtividade, string> = {
 @Injectable()
 export class IaAssistivaService {
   private readonly logger = new Logger(IaAssistivaService.name);
+  private readonly aiRequestTimeoutMs = 30_000;
   // Inicialização LAZY: o cliente só é criado quando realmente for usado.
   // Isso garante que o servidor sobe normalmente mesmo sem chave de IA configurada.
   private _cliente: OpenAI | null = null;
@@ -101,6 +102,8 @@ export class IaAssistivaService {
         baseURL:
           process.env.GEMINI_BASE_URL ||
           'https://generativelanguage.googleapis.com/v1beta/openai/',
+        timeout: this.aiRequestTimeoutMs,
+        maxRetries: 0,
       });
       return this._cliente;
     }
@@ -110,6 +113,8 @@ export class IaAssistivaService {
       this._cliente = new OpenAI({
         apiKey: openaiKey,
         baseURL: process.env.OPENAI_BASE_URL || undefined,
+        timeout: this.aiRequestTimeoutMs,
+        maxRetries: 0,
       });
       return this._cliente;
     }

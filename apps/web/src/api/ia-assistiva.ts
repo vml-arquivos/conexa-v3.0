@@ -57,7 +57,9 @@ export interface RelatorioAlunoGerado {
 export async function gerarAtividade(
   dto: GerarAtividadeDto,
 ): Promise<AtividadeGerada> {
-  const response = await http.post('/ia/gerar-atividade', dto);
+  const response = await http.post('/ia/gerar-atividade', dto, {
+    timeout: 35_000,
+  });
   return response.data;
 }
 
