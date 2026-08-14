@@ -104,3 +104,11 @@ O deployment avançou para `RUN pnpm build` e `vite v7.2.0 building client envir
 O redeploy do frontend `wcomrq842zp2nrfqt597hwgy` terminou com sucesso. O Coolify criou o novo container, marcou-o `Started`, executou o healthcheck HTTP em `localhost:80` com retorno 0 e estado `healthy`, e removeu os containers antigos. O aviso sobre `swappiness` do kernel é não bloqueante.
 
 Após o redeploy, o login público e o painel de coordenação abriram normalmente. No menu lateral, os rótulos passaram a aparecer como `Relatório — Revisão Coord` e `Relatório da Criança`, enquanto as rotas técnicas permaneceram `/app/rdic-coord` e `/app/rdic-crianca`.
+
+O redeploy do hotfix `544507c0d5d68d1c3c12fe493a9275a4a655fbf2` foi importado corretamente pelo Coolify. As camadas do Dockerfile, incluindo `pnpm install --filter @conexa/web --frozen-lockfile`, foram recuperadas do cache nesta execução, sem erro de preparação até o último acompanhamento.
+
+O deployment do hotfix `544507c` concluiu a construção da imagem e iniciou o rolling update. O novo container foi criado e marcado como `Started`; o Coolify manteve a aplicação `conexa-frontend` em `Running (healthy)`. Os avisos de `swappiness` do kernel e do helper efêmero são não bloqueantes.
+
+O hotfix `544507c` foi importado no Coolify e o build avançou até `vite v7.3.0`, transformação de módulos e cálculo de gzip, sem erro de compilação. A aplicação permaneceu saudável durante o rolling update; a validação funcional da rota RDIC continua sendo feita separadamente.
+
+Após o redeploy de `544507c`, a rota pública `/app/rdic-crianca` deixou de exibir o Erro 500 e passou a carregar a interface `Relatório da Criança`. Entretanto, a reprodução em produção ainda mostra `1 alunos na turma` e um cartão com o nome da turma. A chamada manual autenticada por XHR ao endpoint `https://apicocris.casadf.com.br/lookup/classrooms/cmnu5ey2v000pa10psdzqgmox/children` retorna HTTP 200 com 10 crianças; a captura da chamada automática do app registrou uma resposta de 1 item com formato de turma, indicando possível discrepância de runtime/cache ou de chamada automática que precisa ser isolada antes de novo commit.

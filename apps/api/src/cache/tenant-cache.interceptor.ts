@@ -10,8 +10,15 @@ export class TenantCacheInterceptor extends CacheInterceptor {
     const http = context.switchToHttp();
     const req = http.getRequest();
 
-    if (req?.__cacheKey) return req.__cacheKey;
+    // Matrículas e crianças mudam durante o dia e não podem compartilhar uma
+    // entrada de cache com listas de turmas. A rota é deliberadamente dinâmica:
+    // o resultado precisa refletir as Enrollment ativas no momento da consulta.
+    const requestUrl = String(req?.originalUrl ?? req?.url ?? '');
+    if (/\/children(?:\/|$)/.test(requestUrl)) {
+      return undefined;
+    }
 
+    if (req?.__cacheKey) return req.__cacheKey;
 
     // CacheInterceptor base gera key pela URL (path + query)
     const baseKey = super.trackBy(context);
