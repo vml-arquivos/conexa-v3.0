@@ -112,3 +112,13 @@ O deployment do hotfix `544507c` concluiu a construção da imagem e iniciou o r
 O hotfix `544507c` foi importado no Coolify e o build avançou até `vite v7.3.0`, transformação de módulos e cálculo de gzip, sem erro de compilação. A aplicação permaneceu saudável durante o rolling update; a validação funcional da rota RDIC continua sendo feita separadamente.
 
 Após o redeploy de `544507c`, a rota pública `/app/rdic-crianca` deixou de exibir o Erro 500 e passou a carregar a interface `Relatório da Criança`. Entretanto, a reprodução em produção ainda mostra `1 alunos na turma` e um cartão com o nome da turma. A chamada manual autenticada por XHR ao endpoint `https://apicocris.casadf.com.br/lookup/classrooms/cmnu5ey2v000pa10psdzqgmox/children` retorna HTTP 200 com 10 crianças; a captura da chamada automática do app registrou uma resposta de 1 item com formato de turma, indicando possível discrepância de runtime/cache ou de chamada automática que precisa ser isolada antes de novo commit.
+
+O redeploy da API foi iniciado no Coolify com o commit `39d13a694f65219e36185cfcd432a127691d5ab2`. O log confirma a importação correta da revisão e o início do Docker build; as etapas de base Node, instalação de OpenSSL e cópia do schema Prisma estavam em cache, sem erro bloqueante no último acompanhamento.
+
+O build da API no Coolify avançou até a geração do Prisma Client e a execução de `npm run build` no commit `39d13a6`. As etapas registradas foram concluídas sem erro bloqueante; ainda aguardava a criação da imagem e o rolling update do container.
+
+O build da API avançou até `npm prune --omit=dev` após compilar a aplicação e copiar os datasets para `dist/data`. O npm reportou cinco vulnerabilidades do conjunto de dependências como aviso de auditoria; não houve falha de compilação ou de geração do Prisma Client.
+
+O deployment da API `39d13a6` foi concluído no Coolify. O log confirma `Building docker image completed`, `Rolling update started` e `New container started`; o aviso sobre `swappiness` do kernel é não bloqueante.
+
+Validação pós-redeploy em `2026-08-14`: `/health` retornou `status: ok`; `/health/ready` retornou `status: ready`, `database: up` e `planning: ready`. No frontend público, `/app/rdic-crianca` passou a exibir `10 alunos na turma`, os dez cards das crianças matriculadas e a nomenclatura visual `Relatório da Criança`. O hotfix de cache eliminou a discrepância observada entre a chamada automática da tela e a consulta manual autenticada.
