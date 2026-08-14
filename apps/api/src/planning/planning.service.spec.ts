@@ -58,8 +58,18 @@ const mockPlanningBase = {
 const mockPrismaService = {
   planning: {
     findFirst: jest.fn(),
-    update: jest.fn(),
     findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+  classroom: {
+    findUnique: jest.fn(),
+  },
+  curriculumMatrix: {
+    findFirst: jest.fn(),
+  },
+  unit: {
+    findUnique: jest.fn(),
   },
   classroomTeacher: {
     findFirst: jest.fn(),
@@ -121,6 +131,65 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
 
   // ─── Testes de Edição por Status ─────────────────────────────────────────
 
+  describe('create — criação segura por professora', () => {
+    const createDto = {
+      classroomId: 'class-1',
+      title: 'Plano de aula de regressão',
+      startDate: '2026-08-20T12:00:00.000Z',
+      endDate: '2026-08-20T12:00:00.000Z',
+      type: 'SEMANAL',
+      description: '{"version":2}',
+    };
+
+    beforeEach(() => {
+      mockPrismaService.classroom.findUnique.mockResolvedValue({
+        id: 'class-1',
+        unitId: 'unit-1',
+        ageGroupMin: 24,
+        unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
+      });
+      mockPrismaService.curriculumMatrix.findFirst.mockResolvedValue({ id: 'matrix-1' });
+      mockPrismaService.unit.findUnique.mockResolvedValue({ nonSchoolDays: [] });
+      mockPrismaService.planning.findFirst.mockResolvedValue(null);
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue({ id: 'ct-1' });
+      mockPrismaService.planning.create.mockResolvedValue({
+        ...mockPlanningBase,
+        id: 'planning-created',
+        title: createDto.title,
+        classroom: { id: 'class-1', name: 'Maternal II A' },
+        template: null,
+      });
+    });
+
+    it('cria o planejamento para professora vinculada à turma', async () => {
+      const result = await service.create(createDto as any, makeProfessor('professor-2'));
+
+      expect(mockPrismaService.planning.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            classroomId: 'class-1',
+            mantenedoraId: 'mant-1',
+            unitId: 'unit-1',
+            professorId: 'professor-2',
+            createdBy: 'professor-2',
+          }),
+        }),
+      );
+      expect(result.id).toBe('planning-created');
+      expect(mockAuditService.logCreate).toHaveBeenCalled();
+    });
+
+    it('nega com ForbiddenException quando a professora não está vinculada à turma', async () => {
+      mockPrismaService.classroomTeacher.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.create(createDto as any, makeProfessor('professor-sem-vinculo')),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrismaService.planning.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Testes de Edição por Status ─────────────────────────────────────────
   describe('update — regras de edição por status', () => {
     it('deve lançar ForbiddenException se PROFESSOR tentar editar planejamento EM_REVISAO', async () => {
       const professor = makeProfessor();
