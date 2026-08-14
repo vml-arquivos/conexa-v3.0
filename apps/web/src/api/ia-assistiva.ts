@@ -58,7 +58,8 @@ export async function gerarAtividade(
   dto: GerarAtividadeDto,
 ): Promise<AtividadeGerada> {
   const response = await http.post('/ia/gerar-atividade', dto, {
-    timeout: 35_000,
+    // O backend aguarda até 30 s pelo Gemini; a margem evita cancelamento prematuro no navegador.
+    timeout: 45_000,
   });
   return response.data;
 }

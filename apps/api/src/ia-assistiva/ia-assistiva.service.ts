@@ -59,7 +59,9 @@ const LABELS_TIPO: Record<TipoAtividade, string> = {
 @Injectable()
 export class IaAssistivaService {
   private readonly logger = new Logger(IaAssistivaService.name);
-  private readonly aiRequestTimeoutMs = 15_000;
+  // O Gemini pode levar cerca de 9–10 s para concluir um JSON pedagógico completo.
+  // Mantemos margem para prompts maiores sem deixar a requisição presa indefinidamente.
+  private readonly aiRequestTimeoutMs = 30_000;
   private readonly fallbackModel = 'gemini-3.6-flash';
   // Inicialização LAZY: o cliente só é criado quando realmente for usado.
   // Isso garante que o servidor sobe normalmente mesmo sem chave de IA configurada.
@@ -128,7 +130,7 @@ export class IaAssistivaService {
 
   /**
    * Retorna o nome do modelo a ser usado.
-   * Prioridade: GEMINI_MODEL > OPENAI_MODEL > gemini-2.5-flash (padrão)
+   * Prioridade: GEMINI_MODEL > OPENAI_MODEL > gemini-3.6-flash (padrão)
    */
   private getModelo(): string {
     return (
@@ -139,8 +141,22 @@ export class IaAssistivaService {
   }
 
   private isRetryableProviderError(error: unknown): boolean {
-    const status = (error as { status?: number } | null)?.status;
-    return status === 429 || (typeof status === 'number' && status >= 500);
+    const providerError = error as {
+      status?: number;
+      code?: string;
+      name?: string;
+    } | null;
+    const status = providerError?.status;
+    const isTimeout =
+      providerError?.name === 'APIConnectionTimeoutError' ||
+      providerError?.code === 'ETIMEDOUT' ||
+      providerError?.code === 'UND_ERR_CONNECT_TIMEOUT';
+
+    return (
+      status === 429 ||
+      (typeof status === 'number' && status >= 500) ||
+      isTimeout
+    );
   }
 
   /**
