@@ -228,10 +228,19 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
             { role: 'user', content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 1500,
+          // O Gemini utiliza parte do orçamento para raciocínio; 1.500 tokens
+          // truncava o JSON antes do fechamento. 4.000 mantém margem segura.
+          max_tokens: 4000,
         });
 
-        const conteudo = resposta.choices[0]?.message?.content;
+        const escolha = resposta.choices[0];
+        if (escolha?.finish_reason === 'length') {
+          throw new ServiceUnavailableException(
+            'A IA retornou conteúdo incompleto. Tente novamente.',
+          );
+        }
+
+        const conteudo = escolha?.message?.content;
         if (!conteudo) {
           throw new ServiceUnavailableException(
             'A IA não retornou conteúdo. Tente novamente.',
@@ -244,7 +253,39 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
           .replace(/```\n?/g, '')
           .trim();
 
-        const atividade = JSON.parse(jsonLimpo);
+        let atividade: Partial<AtividadeGerada>;
+        try {
+          atividade = JSON.parse(jsonLimpo) as Partial<AtividadeGerada>;
+        } catch {
+          throw new ServiceUnavailableException(
+            'A IA retornou um formato incompleto. Tente novamente.',
+          );
+        }
+
+        const camposTexto = [
+          'titulo',
+          'descricao',
+          'intencionalidade',
+          'duracao',
+          'adaptacoes',
+          'registroSugerido',
+        ] as const;
+        const respostaCompleta = camposTexto.every(
+          (campo) =>
+            typeof atividade[campo] === 'string' &&
+            atividade[campo].trim().length > 0,
+        );
+        const listasCompletas =
+          Array.isArray(atividade.materiais) &&
+          atividade.materiais.every((item) => typeof item === 'string') &&
+          Array.isArray(atividade.etapas) &&
+          atividade.etapas.every((item) => typeof item === 'string');
+
+        if (!respostaCompleta || !listasCompletas) {
+          throw new ServiceUnavailableException(
+            'A IA retornou uma atividade incompleta. Tente novamente.',
+          );
+        }
 
         // Garantir que os campos fixos da Sequência Piloto sejam preservados
         return {
@@ -254,7 +295,7 @@ ${dto.contextoAdicional ? `- **Contexto Adicional:** ${dto.contextoAdicional}` :
           objetivoCurriculo: dto.objetivoCurriculo,
           faixaEtaria: faixaLabel,
           geradoPorIA: true,
-        };
+        } as AtividadeGerada;
       } catch (error) {
         ultimoErro = error;
         const podeTentarFallback = indice < modelos.length - 1 && this.isRetryableProviderError(error);
