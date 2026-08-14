@@ -20,6 +20,7 @@ import { getScopedWhereForPlanning } from './planning-scope.helper';
 import { maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 import { RoleLevel, PlanningStatus, AuditLogAction } from '@prisma/client';
 import { assertSchoolDay, formatPedagogicalDate } from '../common/utils/date.utils';
+import { resolveCurriculumContext } from '../common/utils/curriculum-segment';
 
 function parsePedagogicalDateInput(value: string): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -72,26 +73,46 @@ export class PlanningService {
       throw new NotFoundException('Template não encontrado');
     }
 
-    // 2. Validar classroom
+    // 2. Validar classroom e calcular o contexto na data do planejamento
+    const targetDate = parsePedagogicalDateInput(dto.date);
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: dto.classroomId },
       include: {
         unit: true,
+        enrollments: {
+          where: {
+            status: 'ATIVA',
+            enrollmentDate: { lte: targetDate },
+            OR: [
+              { withdrawalDate: null },
+              { withdrawalDate: { gte: targetDate } },
+            ],
+          },
+          select: {
+            child: { select: { id: true, dateOfBirth: true } },
+          },
+        },
       },
-      // ageGroupMin/Max são campos diretos do Classroom, retornados automaticamente
     });
 
     if (!classroom) {
       throw new NotFoundException('Turma não encontrada');
     }
 
-    // 3. Buscar matriz curricular ativa da mantenedora
-    // FIX C3.2: filtrar por segment derivado da turma para pegar a matriz correta
-    const ageGroupMin = classroom.ageGroupMin ?? 0;
-    let segment: string | null = null;
-    if (ageGroupMin <= 18) segment = 'EI01';
-    else if (ageGroupMin <= 47) segment = 'EI02';
-    else if (ageGroupMin <= 71) segment = 'EI03';
+    // 3. Resolver o segmento pela composição real da turma na data do planejamento.
+    // A configuração da turma só é fallback quando não há matrículas válidas.
+    const curriculumContext = resolveCurriculumContext({
+      referenceDate: targetDate,
+      children: (classroom.enrollments ?? []).map((enrollment) => enrollment.child),
+      configuredAgeGroupMin: classroom.ageGroupMin,
+      configuredAgeGroupMax: classroom.ageGroupMax,
+    });
+    if (curriculumContext.status === 'MIXED') {
+      throw new BadRequestException(
+        `Turma com composição etária mista (${curriculumContext.candidateSegments.join(', ')}). Selecione uma matriz pedagógica explicitamente ou revise a composição da turma.`,
+      );
+    }
+    const segment = curriculumContext.resolvedSegment;
     const matrizWhere: Record<string, unknown> = {
       mantenedoraId: user.mantenedoraId,
       isActive: true,
@@ -111,7 +132,6 @@ export class PlanningService {
     // 4. Buscar entrada da matriz para a data
     // FIX C3.1: usar intervalo UTC do dia para cobrir tanto T00:00Z (new Date('YYYY-MM-DD'))
     // quanto T03:00Z (parser com offset -03:00). Date.UTC garante independência de timezone do servidor.
-    const targetDate = parsePedagogicalDateInput(dto.date);
     const dateParts = dto.date.split('-').map(Number);
     const dayStart = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 0, 0, 0, 0));
     const dayEnd   = new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2], 23, 59, 59, 999));
@@ -218,7 +238,14 @@ export class PlanningService {
       });
       if (!matrix) throw new NotFoundException('Matriz curricular não encontrada');
       if (!matrix.isActive) throw new BadRequestException('Matriz curricular não está ativa');
+      if (matrix.mantenedoraId !== user.mantenedoraId && !user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
+        throw new ForbiddenException('A matriz curricular não pertence à sua mantenedora');
+      }
     }
+
+    // Validar datas cedo para que a composição etária seja avaliada na data do planejamento.
+    const startDate = parsePedagogicalDateInput(createDto.startDate);
+    const endDate = parsePedagogicalDateInput(createDto.endDate);
 
     // Validar se a turma existe
     const classroom = await this.prisma.classroom.findUnique({
@@ -228,6 +255,19 @@ export class PlanningService {
           select: {
             id: true,
             mantenedoraId: true,
+          },
+        },
+        enrollments: {
+          where: {
+            status: 'ATIVA',
+            enrollmentDate: { lte: startDate },
+            OR: [
+              { withdrawalDate: null },
+              { withdrawalDate: { gte: startDate } },
+            ],
+          },
+          select: {
+            child: { select: { id: true, dateOfBirth: true } },
           },
         },
       },
@@ -240,14 +280,38 @@ export class PlanningService {
     // Validar permissão
     await this.validateCreatePermission(classroom, user);
 
-    // Resolver matriz automaticamente quando não fornecida pelo frontend
-    // Regra fechada: mantenedora + segmento (derivado de ageGroupMin) + isActive + ano desc
-    if (!resolvedMatrixId) {
-      const ageMin = classroom.ageGroupMin ?? 0;
-      let seg: string | null = null;
-      if (ageMin <= 18) seg = 'EI01';
-      else if (ageMin <= 47) seg = 'EI02';
-      else if (ageMin <= 71) seg = 'EI03';
+    // Resolver matriz automaticamente pela composição real da turma quando não fornecida.
+    // A faixa cadastrada na turma só é fallback quando não há matrículas válidas.
+    const curriculumContext = resolveCurriculumContext({
+      referenceDate: startDate,
+      children: (classroom.enrollments ?? []).map((enrollment) => enrollment.child),
+      configuredAgeGroupMin: classroom.ageGroupMin,
+      configuredAgeGroupMax: classroom.ageGroupMax,
+    });
+
+    if (curriculumContext.status === 'MIXED' && !resolvedMatrixId) {
+      throw new BadRequestException(
+        `Turma com composição etária mista (${curriculumContext.candidateSegments.join(', ')}). Selecione uma matriz pedagógica explicitamente ou revise a composição da turma.`,
+      );
+    }
+
+    if (resolvedMatrixId) {
+      const selectedMatrix = await this.prisma.curriculumMatrix.findUnique({
+        where: { id: resolvedMatrixId },
+        select: { id: true, segment: true, mantenedoraId: true, isActive: true },
+      });
+      if (!selectedMatrix) throw new NotFoundException('Matriz curricular não encontrada');
+      if (!selectedMatrix.isActive) throw new BadRequestException('Matriz curricular não está ativa');
+      if (selectedMatrix.mantenedoraId !== classroom.unit.mantenedoraId && !user.roles.some((role) => role.level === RoleLevel.DEVELOPER)) {
+        throw new ForbiddenException('A matriz curricular não pertence à sua mantenedora');
+      }
+      if (curriculumContext.candidateSegments.length > 0 && !curriculumContext.candidateSegments.includes(selectedMatrix.segment as any)) {
+        throw new BadRequestException(
+          `A matriz ${selectedMatrix.segment} não corresponde aos segmentos presentes nas matrículas ativas (${curriculumContext.candidateSegments.join(', ')}).`,
+        );
+      }
+    } else {
+      const seg = curriculumContext.resolvedSegment;
       const matrizAuto = await this.prisma.curriculumMatrix.findFirst({
         where: {
           mantenedoraId: classroom.unit.mantenedoraId,
@@ -261,9 +325,6 @@ export class PlanningService {
     }
 
     // Validar datas
-    const startDate = parsePedagogicalDateInput(createDto.startDate);
-    const endDate = parsePedagogicalDateInput(createDto.endDate);
-
     if (startDate > endDate) {
       throw new BadRequestException(
         'A data de início deve ser anterior à data de término',

@@ -13,6 +13,11 @@ import { QueryCurriculumMatrixEntryDto } from './dto/query-curriculum-matrix-ent
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { maskMatrizEntriesForProfessor, maskMatrizEntryForProfessor } from '../common/helpers/masking.helper';
 import { RoleLevel } from '@prisma/client';
+import {
+  CURRICULUM_SEGMENTS,
+  resolveCurriculumContext,
+  type CurriculumSegment,
+} from '../common/utils/curriculum-segment';
 
 @Injectable()
 export class CurriculumMatrixEntryService {
@@ -336,8 +341,11 @@ export class CurriculumMatrixEntryService {
     classroomId: string,
     date: string,
     user: JwtPayload,
+    requestedSegment?: string,
   ): Promise<{
-    segment: string | null;
+    segment: CurriculumSegment | null;
+    candidateSegments?: CurriculumSegment[];
+    matrixId?: string;
     date: string;
     classroomId: string;
     objectives: Array<{
@@ -350,13 +358,34 @@ export class CurriculumMatrixEntryService {
     }>;
     message?: string;
   }> {
-    // 1. Buscar a turma e validar acesso multi-tenant
+    // 1. Normalizar a data e buscar a turma com matrículas ativas na data de referência.
+    const parts = date.split('-').map(Number);
+    const year = parts[0];
+    const month = parts[1] - 1;
+    const day = parts[2];
+    const targetDate = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+    const targetDateStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+    const targetDateEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+
     const classroom = await this.prisma.classroom.findUnique({
       where: { id: classroomId },
       select: {
         id: true,
         ageGroupMin: true,
-        ageGroupMax: true, // necessário para calcular midpoint do segmento
+        ageGroupMax: true,
+        enrollments: {
+          where: {
+            status: 'ATIVA',
+            enrollmentDate: { lte: targetDate },
+            OR: [
+              { withdrawalDate: null },
+              { withdrawalDate: { gte: targetDate } },
+            ],
+          },
+          select: {
+            child: { select: { id: true, dateOfBirth: true } },
+          },
+        },
         unit: {
           select: {
             id: true,
@@ -376,36 +405,62 @@ export class CurriculumMatrixEntryService {
       return { segment: null, date, classroomId, objectives: [], message: 'Acesso negado a esta turma' };
     }
 
-    // 2. Detectar segmento via midpoint(ageGroupMin, ageGroupMax) — consistente com diary-event.service.ts
-    // Usar midpoint evita erro de borda: turmas como MATERNAL I B (ageGroupMin=18, ageGroupMax=24)
-    // resultam em midpoint=21 → EI02 (correto), enquanto usar apenas ageGroupMin=18 → EI01 (errado)
-    // EI01: midpoint 0–18 meses | EI02: midpoint 19–47 meses | EI03: midpoint 48–71 meses
-    const ageMin = classroom.ageGroupMin ?? 0;
-    const ageMax = classroom.ageGroupMax ?? ageMin;
-    const midpoint = (ageMin + ageMax) / 2;
-    let segment: string | null = null;
-    if (midpoint <= 18) segment = 'EI01';
-    else if (midpoint <= 47) segment = 'EI02';
-    else if (midpoint <= 71) segment = 'EI03';
+    const selectedSegment = requestedSegment && CURRICULUM_SEGMENTS.includes(requestedSegment as CurriculumSegment)
+      ? requestedSegment as CurriculumSegment
+      : undefined;
 
-    if (!segment) {
+    if (requestedSegment && !selectedSegment) {
       return {
         segment: null,
+        candidateSegments: [],
         date,
         classroomId,
         objectives: [],
-        message: `Não foi possível detectar o segmento da turma (ageGroupMin=${ageMin}, ageGroupMax=${ageMax}, midpoint=${midpoint}). Verifique a configuração da turma.`,
+        message: `Segmento curricular inválido: ${requestedSegment}. Use EI01, EI02 ou EI03.`,
       };
     }
 
-    // 3. Normalizar a data usando Date.UTC para cobrir tanto T00:00Z quanto T03:00Z
-    // (parser PDF grava com offset -03:00 = T03:00Z; frontend envia YYYY-MM-DD = T00:00Z)
-    const parts = date.split('-').map(Number);
-    const year = parts[0];
-    const month = parts[1] - 1; // 0-indexed
-    const day = parts[2];
-    const targetDateStart = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-    const targetDateEnd = new Date(Date.UTC(year, month, day, 23, 59, 59, 999));
+    // 2. Resolver o segmento pela composição real; a configuração da turma é fallback explícito.
+    const curriculumContext = resolveCurriculumContext({
+      referenceDate: targetDate,
+      children: (classroom.enrollments ?? []).map((enrollment) => enrollment.child),
+      configuredAgeGroupMin: classroom.ageGroupMin,
+      configuredAgeGroupMax: classroom.ageGroupMax,
+    });
+
+    if (curriculumContext.status === 'MIXED' && !selectedSegment) {
+      return {
+        segment: null,
+        candidateSegments: curriculumContext.candidateSegments,
+        date,
+        classroomId,
+        objectives: [],
+        message: `Turma com composição etária mista (${curriculumContext.candidateSegments.join(', ')}). Selecione explicitamente qual segmento curricular será usado no planejamento.`,
+      };
+    }
+
+    if (selectedSegment && curriculumContext.candidateSegments.length > 0 && !curriculumContext.candidateSegments.includes(selectedSegment)) {
+      return {
+        segment: null,
+        candidateSegments: curriculumContext.candidateSegments,
+        date,
+        classroomId,
+        objectives: [],
+        message: `O segmento ${selectedSegment} não está presente na composição etária ativa desta turma (${curriculumContext.candidateSegments.join(', ')}).`,
+      };
+    }
+
+    const segment = selectedSegment ?? curriculumContext.resolvedSegment;
+    if (!segment) {
+      return {
+        segment: null,
+        candidateSegments: curriculumContext.candidateSegments,
+        date,
+        classroomId,
+        objectives: [],
+        message: 'Não foi possível resolver a matriz curricular para esta turma e data. Verifique matrículas, datas de nascimento ou a configuração da turma.',
+      };
+    }
 
     // 4. Buscar a matriz ativa do segmento no escopo da mantenedora
     const matrix = await this.prisma.curriculumMatrix.findFirst({
@@ -421,6 +476,7 @@ export class CurriculumMatrixEntryService {
     if (!matrix) {
       return {
         segment,
+        candidateSegments: curriculumContext.candidateSegments,
         date,
         classroomId,
         objectives: [],
@@ -482,6 +538,8 @@ export class CurriculumMatrixEntryService {
     if (objectives.length === 0) {
       return {
         segment,
+        candidateSegments: curriculumContext.candidateSegments,
+        matrixId: matrix.id,
         date,
         classroomId,
         objectives,
@@ -489,7 +547,14 @@ export class CurriculumMatrixEntryService {
       };
     }
 
-    return { segment, date, classroomId, objectives };
+    return {
+      segment,
+      candidateSegments: curriculumContext.candidateSegments,
+      matrixId: matrix.id,
+      date,
+      classroomId,
+      objectives,
+    };
   }
 
   /**
@@ -574,6 +639,7 @@ export class CurriculumMatrixEntryService {
     startDateStr: string,
     days: number,
     user: JwtPayload,
+    requestedSegment?: string,
   ) {
     // Gerar array de datas
     const dates: string[] = [];
@@ -587,13 +653,15 @@ export class CurriculumMatrixEntryService {
     // Buscar objetivos para cada dia em paralelo
     const results = await Promise.all(
       dates.map(async (date) => {
-        const dayResult = await this.byClassroomDay(classroomId, date, user);
+        const dayResult = await this.byClassroomDay(classroomId, date, user, requestedSegment);
         return {
           date,
           diaSemana: new Date(date + 'T12:00:00-03:00').toLocaleDateString('pt-BR', {
             weekday: 'long', timeZone: 'America/Sao_Paulo',
           }),
           segment: dayResult.segment,
+          candidateSegments: dayResult.candidateSegments ?? [],
+          matrixId: dayResult.matrixId,
           objectives: dayResult.objectives,
           message: dayResult.message,
         };
@@ -604,6 +672,8 @@ export class CurriculumMatrixEntryService {
       classroomId,
       startDate: startDateStr,
       days,
+      candidateSegments: [...new Set(results.flatMap((result) => result.candidateSegments))],
+      matrixId: results.find((result) => result.matrixId)?.matrixId,
       diasLetivos: results,
     };
   }

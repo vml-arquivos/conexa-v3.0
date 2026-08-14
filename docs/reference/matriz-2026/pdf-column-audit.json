@@ -1,0 +1,166 @@
+{
+  "pdf": "/home/ubuntu/work/conexa-v3.0-github/docs/reference/matriz-2026/sequencia-pedagogica-matriz-2026.pdf",
+  "pages": 152,
+  "pages_by_segment": {
+    "EI01": 48,
+    "EI02": 56,
+    "EI03": 47
+  },
+  "entries_total": 297,
+  "entries_by_segment": {
+    "EI01": 110,
+    "EI02": 81,
+    "EI03": 106
+  },
+  "entries_by_field": {
+    "EI01": {
+      "CG": 30,
+      "EF": 28,
+      "ET": 29,
+      "EO": 21,
+      "TS": 2
+    },
+    "EI02": {
+      "EO": 17,
+      "ET": 27,
+      "CG": 19,
+      "TS": 2,
+      "EF": 16
+    },
+    "EI03": {
+      "CG": 16,
+      "EO": 15,
+      "TS": 8,
+      "EF": 33,
+      "ET": 34
+    }
+  },
+  "field_code_mismatch_count": 1,
+  "field_code_mismatches": [
+    {
+      "page": 57,
+      "segment": "EI02",
+      "date": "17/03",
+      "field_text": "Corpo, gestos",
+      "field_code": "ET",
+      "code": "EI02ET01",
+      "objective_bncc": "com crianças e",
+      "objective_curriculo": "a diferença,",
+      "intencionalidade": "percepção",
+      "visible_field_code": "CG"
+    }
+  ],
+  "code_segment_mismatch_count": 0,
+  "code_segment_mismatches": [],
+  "duplicate_segment_date_count": 1,
+  "duplicate_segment_dates": [
+    {
+      "segment": "EI03",
+      "date": "16/10",
+      "count": 2,
+      "pages": [
+        91,
+        142
+      ]
+    }
+  ],
+  "empty_normative_count": 8,
+  "empty_normative_examples": [
+    {
+      "page": 28,
+      "segment": "EI01",
+      "date": "28/07",
+      "field_text": "gestos e",
+      "field_code": "CG",
+      "code": "EI01CG16",
+      "objective_bncc": "",
+      "objective_curriculo": "as habilidades Retomar",
+      "intencionalidade": "e ampliar as habilidades",
+      "visible_field_code": null
+    },
+    {
+      "page": 36,
+      "segment": "EI01",
+      "date": "01/10",
+      "field_text": "fala,",
+      "field_code": "EF",
+      "code": "EI01EF08",
+      "objective_bncc": "",
+      "objective_curriculo": "paulatinamente, as",
+      "intencionalidade": "a internalização de",
+      "visible_field_code": null
+    },
+    {
+      "page": 43,
+      "segment": "EI01",
+      "date": "13/11",
+      "field_text": "tempos,",
+      "field_code": "ET",
+      "code": "EI01ET09",
+      "objective_bncc": "",
+      "objective_curriculo": "colaborativamente das",
+      "intencionalidade": "hábitos de cuidado e",
+      "visible_field_code": null
+    },
+    {
+      "page": 82,
+      "segment": "EI02",
+      "date": "31/08",
+      "field_text": "o outro e o",
+      "field_code": "CG",
+      "code": "EI02CG04",
+      "objective_bncc": "",
+      "objective_curriculo": "hábitos de higiene: pedir",
+      "intencionalidade": "o autocuidado e a",
+      "visible_field_code": null
+    },
+    {
+      "page": 85,
+      "segment": "EI02",
+      "date": "14/09",
+      "field_text": "outro e o nós",
+      "field_code": "CG",
+      "code": "EI02CG05",
+      "objective_bncc": "",
+      "objective_curriculo": "gradativamente, a capacidade",
+      "intencionalidade": "Desenvolver autonomia,",
+      "visible_field_code": null
+    },
+    {
+      "page": 87,
+      "segment": "EI02",
+      "date": "25/09",
+      "field_text": "tempos,",
+      "field_code": "ET",
+      "code": "EI02ET03",
+      "objective_bncc": "",
+      "objective_curriculo": "os seres vivos a partir da",
+      "intencionalidade": "a observação",
+      "visible_field_code": null
+    },
+    {
+      "page": 90,
+      "segment": "EI02",
+      "date": "09/10",
+      "field_text": "tempos,",
+      "field_code": "ET",
+      "code": "EI02ET03",
+      "objective_bncc": "",
+      "objective_curriculo": "atitudes de Regar",
+      "intencionalidade": "as plantas da escola,",
+      "visible_field_code": null
+    },
+    {
+      "page": 91,
+      "segment": "EI02",
+      "date": "15/10",
+      "field_text": "",
+      "field_code": "ET",
+      "code": "EI02ET03",
+      "objective_bncc": "",
+      "objective_curriculo": "situações de cuidado de",
+      "intencionalidade": "atitudes de",
+      "visible_field_code": null
+    }
+  ]
+}

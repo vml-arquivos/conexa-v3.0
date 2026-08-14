@@ -27,11 +27,11 @@ COPY packages/types/package.json ./packages/types/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
 COPY packages/utils/package.json ./packages/utils/package.json
 
-# Instalar TODAS as deps do workspace com cache mount
-# Cache persiste entre builds — evita baixar 1433 pacotes toda vez (~90s → ~5s)
-# Fallback: se o lockfile estiver levemente desatualizado, instala sem frozen
+# Instalar apenas as dependências do workspace web.
+# O frontend não importa packages internos @conexa/*; manter o escopo filtrado
+# reduz o risco de timeout no build sem alterar o lockfile ou o runtime.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile || pnpm install --no-frozen-lockfile
+    pnpm install --filter @conexa/web --frozen-lockfile
 
 # Copiar o código-fonte dos packages internos (dependências do web)
 COPY packages/ ./packages/

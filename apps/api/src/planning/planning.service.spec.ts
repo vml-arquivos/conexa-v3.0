@@ -179,6 +179,25 @@ describe('PlanningService — Fluxo de Revisão e Mascaramento', () => {
       expect(mockAuditService.logCreate).toHaveBeenCalled();
     });
 
+    it('bloqueia seleção automática quando a composição etária da turma é mista', async () => {
+      mockPrismaService.classroom.findUnique.mockResolvedValue({
+        id: 'class-1',
+        unitId: 'unit-1',
+        ageGroupMin: 36,
+        ageGroupMax: 47,
+        unit: { id: 'unit-1', mantenedoraId: 'mant-1' },
+        enrollments: [
+          { child: { id: 'child-ei02', dateOfBirth: '2023-08-20T12:00:00.000Z' } },
+          { child: { id: 'child-ei03', dateOfBirth: '2022-07-20T12:00:00.000Z' } },
+        ],
+      });
+
+      await expect(
+        service.create(createDto as any, makeProfessor('professor-mixed-class')),
+      ).rejects.toThrow('composição etária mista');
+      expect(mockPrismaService.planning.create).not.toHaveBeenCalled();
+    });
+
     it('nega com ForbiddenException quando a professora não está vinculada à turma', async () => {
       mockPrismaService.classroomTeacher.findFirst.mockResolvedValue(null);
 

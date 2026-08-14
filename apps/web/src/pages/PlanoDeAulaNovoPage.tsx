@@ -52,80 +52,6 @@ import { normalizeRoles } from '../app/RoleProtectedRoute';
 import { toPedagogicalISODate } from '../lib/formatDate';
 import { useAutoSave } from '../hooks/useAutoSave';
 import { extractErrorMessage } from '../lib/utils';
-// Fallback local: usado SOMENTE quando o backend retornar objectives vazio
-import { MATRIZ_2026, type EntradaMatriz, type SegmentoKey } from '../data/matrizCompleta2026';
-
-// ─── Fallback local ───────────────────────────────────────────────────────────
-const CAMPO_MAP: Record<string, string> = {
-  'eu-outro-nos':   'O_EU_O_OUTRO_E_O_NOS',
-  'corpo-gestos':   'CORPO_GESTOS_E_MOVIMENTOS',
-  'tracos-sons':    'TRACOS_SONS_CORES_E_FORMAS',
-  'escuta-fala':    'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO',
-  'espacos-tempos': 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES',
-};
-function inferirSegmento(turma: { name?: string; ageGroupMin?: number | null }): SegmentoKey | null {
-  const nome = (turma.name ?? '').toUpperCase();
-  if (/BERÇ|BERCARIO|BEBE|BEBÊ/.test(nome)) return 'EI01';
-  if (/MATERNAL/.test(nome)) return 'EI02';
-  if (/PRÉ|PRE|JARDIM/.test(nome)) return 'EI03';
-  const min = turma.ageGroupMin ?? null;
-  if (min !== null) {
-    if (min <= 6)  return 'EI01';
-    if (min <= 42) return 'EI02';
-    return 'EI03';
-  }
-  return null;
-}
-function entradaParaObjetivo(e: EntradaMatriz): MatrizObjective {
-  const campoRaw = e.campo_experiencia_id ?? e.campo_id;
-  const campoExperiencia = CAMPO_MAP[campoRaw] ?? campoRaw.toUpperCase().replace(/-/g, '_');
-  return {
-    campoExperiencia,
-    codigoBNCC: e.codigo_bncc ?? null,
-    objetivoBNCC: e.objetivo_bncc ?? '',
-    objetivoCurriculoDF: e.objetivo_curriculo_movimento ?? e.objetivo_curriculo ?? '',
-    intencionalidadePedagogica: e.intencionalidade_pedagogica ?? e.intencionalidade ?? null,
-    exemploAtividade: undefined,
-  };
-}
-/**
- * Busca intencionalidade pedagógica no fallback local (MATRIZ_2026) por código BNCC.
- *
- * Regras (Opção A blindada):
- * 1. Só é chamada quando intencionalidadePedagogica da API for null/vazio
- * 2. Match ESTRITO por codigo_bncc (campo canônico)
- * 3. Se houver mais de 1 resultado com o mesmo código, usa o primeiro (não há ambiguidade real)
- * 4. Retorna null se não houver match — nunca inventa conteúdo
- * 5. NÃO é persistida no submit — apenas visual
- */
-function resolverIntencionalidadeFallback(
-  codigoBNCC: string | null,
-  segmento: SegmentoKey | null,
-): string | null {
-  if (!codigoBNCC || !segmento) return null;
-  const entradas = MATRIZ_2026[segmento] ?? [];
-  const match = entradas.find(
-    (e: EntradaMatriz) => e.codigo_bncc === codigoBNCC,
-  );
-  if (!match) return null;
-  // Prefere intencionalidade_pedagogica (campo estendido), depois intencionalidade (canônico)
-  const valor = match.intencionalidade_pedagogica ?? match.intencionalidade ?? null;
-  // Rejeita strings vazias ou só whitespace
-  return valor && valor.trim().length > 0 ? valor.trim() : null;
-}
-
-function buildFallback(dateISO: string, turma: { name?: string; ageGroupMin?: number | null }): { objectives: MatrizObjective[]; message: string } | null {
-  const segmento = inferirSegmento(turma);
-  if (!segmento) return null;
-  const [, m, d] = dateISO.split('-');
-  const ddmm = `${d}/${m}`;
-  const entradas = (MATRIZ_2026[segmento] ?? []).filter((e: EntradaMatriz) => e.data === ddmm);
-  if (entradas.length === 0) return null;
-  return {
-    objectives: entradas.map(entradaParaObjetivo),
-    message: 'Objetivos carregados localmente (fallback) — verifique sincronização do banco.',
-  };
-}
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 interface Turma {
@@ -166,8 +92,18 @@ interface MatrizObjective {
   exemploAtividade?: string | null;
 }
 
+type CurriculumSegment = 'EI01' | 'EI02' | 'EI03';
+
+const CURRICULUM_SEGMENT_LABELS: Record<CurriculumSegment, string> = {
+  EI01: 'EI01 — Bebês (0 a 1 ano e 6 meses)',
+  EI02: 'EI02 — Crianças bem pequenas (1 ano e 7 meses a 3 anos e 11 meses)',
+  EI03: 'EI03 — Crianças pequenas (4 anos a 5 anos e 11 meses)',
+};
+
 interface MatrizByDayResponse {
-  segment: string | null;
+  segment: CurriculumSegment | null;
+  candidateSegments?: CurriculumSegment[];
+  matrixId?: string;
   date: string;
   classroomId: string;
   objectives: MatrizObjective[];
@@ -179,6 +115,8 @@ interface PlanningV2Json {
   version: 2;
   classroomId: string;
   range: { start: string; end: string; days: number };
+  segment?: CurriculumSegment;
+  curriculumMatrixId?: string;
   days: Array<{
     date: string;
     objectives: MatrizObjective[];
@@ -225,12 +163,9 @@ function inferTipo(numDays: number): string {
 function ObjetivoCard({
   objetivo,
   index,
-  segmento,
 }: {
   objetivo: MatrizObjective;
   index: number;
-  /** Segmento inferido da turma — usado SOMENTE para fallback visual de intencionalidade */
-  segmento?: SegmentoKey | null;
 }) {
   // Paleta de cores para o cabeçalho do card (rotaciona por índice)
   const headerPalettes = [
@@ -290,32 +225,15 @@ function ObjetivoCard({
         </div>
 
         {/* ── Campo 3: Intencionalidade Pedagógica ── borda lateral violeta */}
-        {/* FIX P0: quando API retorna null, tenta fallback local por codigoBNCC (apenas visual, não persiste) */}
         <div className="flex bg-violet-50/40">
           <div className="w-1 flex-shrink-0 bg-violet-500" />
           <div className="px-4 py-3 flex-1">
             <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest mb-1">
               🎯 Intencionalidade Pedagógica
             </p>
-            {(() => {
-              const apiVal = objetivo.intencionalidadePedagogica?.trim();
-              if (apiVal) {
-                return <p className="text-sm text-violet-900 leading-relaxed font-medium">{apiVal}</p>;
-              }
-              const fbVal = resolverIntencionalidadeFallback(
-                objetivo.codigoBNCC ?? null,
-                segmento ?? null,
-              );
-              if (fbVal) {
-                return (
-                  <>
-                    <p className="text-sm text-violet-800 leading-relaxed">{fbVal}</p>
-                    <p className="text-[10px] text-violet-400 italic mt-1">💡 Sugestão local — aguardando cadastro pela coordenação</p>
-                  </>
-                );
-              }
-              return <p className="text-xs text-violet-400 italic">Aguardando preenchimento pela coordenação</p>;
-            })()}
+            {objetivo.intencionalidadePedagogica?.trim()
+              ? <p className="text-sm text-violet-900 leading-relaxed font-medium">{objetivo.intencionalidadePedagogica.trim()}</p>
+              : <p className="text-xs text-violet-400 italic">Aguardando preenchimento pela coordenação</p>}
           </div>
         </div>
 
@@ -383,6 +301,9 @@ export default function PlanoDeAulaNovoPage() {
   const [numDays, setNumDays] = useState(1);
   const [title, setTitle] = useState('');
   const [days, setDays] = useState<DayState[]>([]);
+  const [selectedSegment, setSelectedSegment] = useState<CurriculumSegment | ''>('');
+  const [candidateSegments, setCandidateSegments] = useState<CurriculumSegment[]>([]);
+  const [selectedMatrixId, setSelectedMatrixId] = useState<string | undefined>();
 
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -396,7 +317,7 @@ export default function PlanoDeAulaNovoPage() {
 
   // ─── Auto-save no localStorage (apenas para novos planos — planningId nulo) ──
   const autoSaveKey = `plano-aula-rascunho-${user?.id ?? 'anon'}-${classroomId || 'sem-turma'}`;
-  const autoSaveData = { classroomId, startDate, numDays, title, days };
+  const autoSaveData = { classroomId, startDate, numDays, title, days, selectedSegment, selectedMatrixId };
   const { hasDraft, clearDraft, lastSaved } = useAutoSave({
     key: autoSaveKey,
     data: autoSaveData,
@@ -407,12 +328,16 @@ export default function PlanoDeAulaNovoPage() {
       if (saved.startDate)   setStartDate(saved.startDate);
       if (saved.numDays)     setNumDays(saved.numDays);
       if (saved.title)       setTitle(saved.title);
+      if (saved.selectedSegment === 'EI01' || saved.selectedSegment === 'EI02' || saved.selectedSegment === 'EI03') {
+        setSelectedSegment(saved.selectedSegment);
+      }
+      if (typeof saved.selectedMatrixId === 'string' && saved.selectedMatrixId) setSelectedMatrixId(saved.selectedMatrixId);
       if (Array.isArray(saved.days) && saved.days.length > 0) setDays(saved.days);
       toast.info('Rascunho recuperado automaticamente. Revise antes de enviar.');
     },
   });
 
-  // Cache de matriz: chave = "classroomId|YYYY-MM-DD"
+  // Cache de matriz: chave = "classroomId|YYYY-MM-DD|segmento-ou-auto"
   const matrizCache = useRef<Map<string, MatrizByDayResponse>>(new Map());
   // Rastreia a turma anterior para detectar mudança e limpar objetivos
   const prevClassroomIdRef = useRef<string>('');
@@ -482,6 +407,11 @@ export default function PlanoDeAulaNovoPage() {
 
           if (v2?.version === 2 && Array.isArray(v2.days)) {
             setClassroomId(v2.classroomId ?? planning.classroomId ?? '');
+            const restoredSegment = v2.segment ?? (planning as any).curriculumSegment;
+            if (restoredSegment === 'EI01' || restoredSegment === 'EI02' || restoredSegment === 'EI03') {
+              setSelectedSegment(restoredSegment);
+            }
+            setSelectedMatrixId((planning as any).curriculumMatrixId ?? v2.curriculumMatrixId);
             setStartDate(v2.range?.start ?? '');
             setNumDays(v2.range?.days ?? 1);
             // Restaura dados do professor por dia.
@@ -577,9 +507,11 @@ export default function PlanoDeAulaNovoPage() {
   // Dados vêm exclusivamente do backend — sem fallback local
   const fetchMatrizForDay = useCallback(async (date: string, cid: string) => {
     if (!cid || !date) return;
-    const cacheKey = `${cid}|${date}`;
+    const cacheKey = `${cid}|${date}|${selectedSegment || 'auto'}`;
     if (matrizCache.current.has(cacheKey)) {
       const cached = matrizCache.current.get(cacheKey)!;
+      setCandidateSegments(cached.candidateSegments ?? []);
+      if (cached.matrixId) setSelectedMatrixId(cached.matrixId);
       setDays(prev =>
         prev.map(d =>
           d.date === date
@@ -592,16 +524,13 @@ export default function PlanoDeAulaNovoPage() {
     setDays(prev => prev.map(d => d.date === date ? { ...d, matrizLoading: true } : d));
     try {
       const res = await http.get('/curriculum-matrix-entries/by-classroom-day', {
-        params: { classroomId: cid, date },
+        params: { classroomId: cid, date, ...(selectedSegment ? { segment: selectedSegment } : {}) },
       });
       const data = res.data as MatrizByDayResponse;
-      let objectives = data.objectives ?? [];
-      let message = data.message;
-      // Fallback local: quando o banco não tem dados para a data
-      if (objectives.length === 0 && turmaSelecionada) {
-        const fb = buildFallback(date, turmaSelecionada);
-        if (fb) { objectives = fb.objectives; message = fb.message; }
-      }
+      const objectives = data.objectives ?? [];
+      const message = data.message;
+      setCandidateSegments(data.candidateSegments ?? []);
+      if (data.matrixId) setSelectedMatrixId(data.matrixId);
       matrizCache.current.set(cacheKey, { ...data, objectives, message });
       setDays(prev =>
         prev.map(d =>
@@ -620,7 +549,7 @@ export default function PlanoDeAulaNovoPage() {
         )
       );
     }
-  }, [turmaSelecionada]);
+  }, [selectedSegment]);
 
   /** Carrega todos os dias em lote usando by-classroom-date (mais eficiente para numDays > 1) */
   const fetchMatrizLote = useCallback(async (cid: string, start: string, n: number) => {
@@ -628,20 +557,21 @@ export default function PlanoDeAulaNovoPage() {
     setDays(prev => prev.map(d => ({ ...d, matrizLoading: true })));
     try {
       const res = await http.get('/curriculum-matrix-entries/by-classroom-date', {
-        params: { classroomId: cid, date: start, days: n },
+        params: { classroomId: cid, date: start, days: n, ...(selectedSegment ? { segment: selectedSegment } : {}) },
       });
-      const data = res.data as { diasLetivos: Array<{ date: string; objectives: MatrizObjective[]; message?: string }> };
+      const data = res.data as {
+        matrixId?: string;
+        candidateSegments?: CurriculumSegment[];
+        diasLetivos: Array<{ date: string; segment?: CurriculumSegment | null; objectives: MatrizObjective[]; message?: string }>;
+      };
+      setCandidateSegments(data.candidateSegments ?? []);
+      if (data.matrixId) setSelectedMatrixId(data.matrixId);
       const byDate = new Map(data.diasLetivos.map(d => [d.date, d]));
       setDays(prev =>
         prev.map(d => {
           const found = byDate.get(d.date);
-          let objectives = found?.objectives ?? [];
-          let message = found?.message;
-          // Fallback local: quando o banco não tem dados para a data
-          if (objectives.length === 0 && turmaSelecionada) {
-            const fb = buildFallback(d.date, turmaSelecionada);
-            if (fb) { objectives = fb.objectives; message = fb.message; }
-          }
+          const objectives = found?.objectives ?? [];
+          const message = found?.message;
           return { ...d, objectives, matrizLoading: false, matrizMessage: message };
         })
       );
@@ -649,13 +579,16 @@ export default function PlanoDeAulaNovoPage() {
       const msg = extractErrorMessage(err, 'Erro ao carregar Matriz.');
       setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: msg })));
     }
-  }, [turmaSelecionada]);
+  }, [selectedSegment]);
 
   // Quando classroomId muda, limpa cache e objetivos para forçar recarga
   useEffect(() => {
     if (!classroomId) return;
     if (prevClassroomIdRef.current && prevClassroomIdRef.current !== classroomId) {
       matrizCache.current.clear();
+      setSelectedSegment('');
+      setSelectedMatrixId(undefined);
+      setCandidateSegments([]);
       setDays(prev =>
         prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined }))
       );
@@ -679,7 +612,7 @@ export default function PlanoDeAulaNovoPage() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days.length, classroomId, startDate, numDays]);
+  }, [days.length, classroomId, startDate, numDays, selectedSegment]);
 
   // ─── Atualiza campo do professor por dia ─────────────────────────────────
   function updateTeacherField(date: string, field: keyof DayTeacherData, value: string) {
@@ -708,6 +641,8 @@ export default function PlanoDeAulaNovoPage() {
       version: 2,
       classroomId,
       range: { start: startDate, end: endDate, days: numDays },
+      segment: selectedSegment || undefined,
+      curriculumMatrixId: selectedMatrixId,
       days: days.map(d => ({
         date: d.date,
         objectives: d.objectives,
@@ -721,6 +656,7 @@ export default function PlanoDeAulaNovoPage() {
       startDate: startISO,
       endDate: endISO,
       type: inferTipo(numDays),
+      curriculumMatrixId: selectedMatrixId,
       description: safeJsonStringify(v2),
       // objectives: serializa objetivos do primeiro dia para compatibilidade legada
       objectives: days[0]?.objectives?.length
@@ -733,6 +669,10 @@ export default function PlanoDeAulaNovoPage() {
   async function salvarRascunho() {
     if (!classroomId || !startDate) {
       toast.error('Selecione a turma e a data de início');
+      return;
+    }
+    if (candidateSegments.length > 1 && !selectedSegment) {
+      toast.error('Selecione o segmento curricular da turma mista antes de salvar');
       return;
     }
     const hasAnyActivity = days.some(d => d.teacher.atividade.trim());
@@ -766,6 +706,10 @@ export default function PlanoDeAulaNovoPage() {
   async function enviarParaRevisao() {
     if (!classroomId || !startDate) {
       toast.error('Selecione a turma e a data de início');
+      return;
+    }
+    if (candidateSegments.length > 1 && !selectedSegment) {
+      toast.error('Selecione o segmento curricular da turma mista antes de enviar');
       return;
     }
     const hasAnyActivity = days.some(d => d.teacher.atividade.trim());
@@ -1053,11 +997,14 @@ export default function PlanoDeAulaNovoPage() {
               <select
                 className="w-full mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                 value={classroomId}
-                onChange={e => {
+                  onChange={e => {
                   setClassroomId(e.target.value);
-                  // Limpa cache ao trocar turma
+                  // Limpa a escolha e o cache ao trocar turma.
+                  setSelectedSegment('');
+                  setSelectedMatrixId(undefined);
+                  setCandidateSegments([]);
                   matrizCache.current.clear();
-                  setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false })));
+                  setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined })));
                 }}
                 disabled={bloqueado}
               >
@@ -1157,6 +1104,40 @@ export default function PlanoDeAulaNovoPage() {
                 </div>
               </div>
             )}
+
+            {candidateSegments.length > 1 && (
+              <div className="flex items-start gap-3 p-4 bg-indigo-50 border border-indigo-200 rounded-xl text-indigo-900 text-sm">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5 text-indigo-600" />
+                <div className="flex-1 space-y-2">
+                  <div>
+                    <p className="font-semibold">Turma com mais de uma faixa etária</p>
+                    <p className="text-xs mt-0.5 text-indigo-700">
+                      As matrículas ativas indicam {candidateSegments.join(' e ')}. Escolha a matriz que será usada neste planejamento; essa decisão será registrada junto ao rascunho.
+                    </p>
+                  </div>
+                  <select
+                    className="w-full rounded-md border border-indigo-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                    value={selectedSegment}
+                    onChange={e => {
+                      const value = e.target.value as CurriculumSegment | '';
+                      setSelectedSegment(value);
+                      setSelectedMatrixId(undefined);
+                      matrizCache.current.clear();
+                      setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined })));
+                    }}
+                    disabled={bloqueado}
+                  >
+                    <option value="">Selecione o segmento curricular...</option>
+                    {candidateSegments.map(segment => (
+                      <option key={segment} value={segment}>{CURRICULUM_SEGMENT_LABELS[segment]}</option>
+                    ))}
+                  </select>
+                  {!selectedSegment && (
+                    <p className="text-xs font-medium text-indigo-700">A seleção é obrigatória para carregar os objetivos desta turma mista.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1250,7 +1231,6 @@ export default function PlanoDeAulaNovoPage() {
                               key={`${day.date}-${obj.codigoBNCC ?? obj.campoExperiencia}-${i}`}
                               objetivo={obj}
                               index={i}
-                              segmento={turmaSelecionada ? inferirSegmento(turmaSelecionada) : null}
                             />
                           ))}
                         </div>

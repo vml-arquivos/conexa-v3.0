@@ -73,7 +73,7 @@ export class CurriculumMatrixEntryController {
    * GET /curriculum-matrix-entries/by-classroom-day?classroomId=...&date=YYYY-MM-DD
    *
    * Retorna os objetivos da Matriz 2026 para uma turma e data específica.
-   * Detecta o segmento via ageGroupMin do Classroom (sem fallback).
+   * Resolve o segmento pelas matrículas ativas; em turma mista, aceita `segment` explícito.
    * Disponível para todos os roles autenticados (professor, coordenação, etc.).
    * O campo exemploAtividade é retornado apenas para coordenação e acima.
    */
@@ -81,6 +81,7 @@ export class CurriculumMatrixEntryController {
   byClassroomDay(
     @Query('classroomId') classroomId: string,
     @Query('date') date: string,
+    @Query('segment') segment: string | undefined,
     @CurrentUser() user: JwtPayload,
   ) {
     if (!classroomId || !date) {
@@ -90,7 +91,7 @@ export class CurriculumMatrixEntryController {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new BadRequestException('O parâmetro date deve estar no formato YYYY-MM-DD');
     }
-    return this.curriculumMatrixEntryService.byClassroomDay(classroomId, date, user);
+    return this.curriculumMatrixEntryService.byClassroomDay(classroomId, date, user, segment);
   }
 
   /**
@@ -103,6 +104,7 @@ export class CurriculumMatrixEntryController {
     @Query('classroomId') classroomId: string,
     @Query('date') date: string,
     @Query('days') daysStr: string,
+    @Query('segment') segment: string | undefined,
     @CurrentUser() user: JwtPayload,
   ) {
     if (!classroomId || !date) {
@@ -112,7 +114,7 @@ export class CurriculumMatrixEntryController {
       throw new BadRequestException('O parâmetro date deve estar no formato YYYY-MM-DD');
     }
     const days = Math.min(Math.max(parseInt(daysStr ?? '1', 10) || 1, 1), 31);
-    return this.curriculumMatrixEntryService.byClassroomDateRange(classroomId, date, days, user);
+    return this.curriculumMatrixEntryService.byClassroomDateRange(classroomId, date, days, user, segment);
   }
 
   @Get(':id')

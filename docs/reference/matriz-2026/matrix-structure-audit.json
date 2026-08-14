@@ -1,0 +1,863 @@
+{
+  "total_lines": 5504,
+  "segment_markers": [
+    {
+      "line": 113,
+      "segment": "EI01",
+      "label": "Bebês"
+    },
+    {
+      "line": 114,
+      "segment": "EI03",
+      "label": "Crianças Pequenas"
+    },
+    {
+      "line": 218,
+      "segment": "EI01",
+      "label": "Bebês"
+    },
+    {
+      "line": 251,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 274,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 314,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 345,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 384,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 423,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 459,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 490,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 522,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 557,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 582,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 608,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 628,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 664,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 699,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 738,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 771,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 804,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 841,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 877,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 911,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 941,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 974,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1001,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1035,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1070,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1105,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1138,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1172,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1205,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1239,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1266,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1297,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1327,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1346,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1374,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1405,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1447,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1483,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1520,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1553,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1588,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1619,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1649,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1686,
+      "segment": "EI01",
+      "label": "BEBÊS"
+    },
+    {
+      "line": 1749,
+      "segment": "EI02",
+      "label": "Crianças Bem Pequenas"
+    },
+    {
+      "line": 1831,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 1851,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 1891,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 1928,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 1997,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2065,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2114,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2155,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2192,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2233,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2266,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2294,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2319,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2355,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2388,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2462,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2508,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2547,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2584,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2618,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2657,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2693,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2736,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2769,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2805,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2847,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2894,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2946,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 2982,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3057,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3108,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3153,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3195,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3236,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3258,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3293,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3336,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3398,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3435,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3488,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3527,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3602,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3639,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3679,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3708,
+      "segment": "EI02",
+      "label": "CRIANÇAS BEM PEQUENAS"
+    },
+    {
+      "line": 3775,
+      "segment": "EI03",
+      "label": "Crianças Pequenas"
+    },
+    {
+      "line": 3828,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 3849,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 3879,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 3913,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 3950,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 3988,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4030,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4068,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4116,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4152,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4177,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4206,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4226,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4267,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4301,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4340,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4378,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4414,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4452,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4487,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4540,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4580,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4622,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4661,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4706,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4746,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4792,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4826,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4867,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4901,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4947,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 4985,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5026,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5056,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5075,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5107,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5142,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5177,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5213,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5250,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5282,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5319,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5353,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5393,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    },
+    {
+      "line": 5434,
+      "segment": "EI03",
+      "label": "CRIANÇAS PEQUENAS"
+    }
+  ],
+  "segment_counts": {
+    "EI01": 196,
+    "EI02": 215,
+    "EI03": 205
+  },
+  "field_counts": {
+    "EI01": {
+      "EO": 37,
+      "CG": 41,
+      "TS": 38,
+      "EF": 42,
+      "ET": 38
+    },
+    "EI02": {
+      "EO": 42,
+      "CG": 43,
+      "TS": 39,
+      "EF": 43,
+      "ET": 48
+    },
+    "EI03": {
+      "EO": 37,
+      "CG": 43,
+      "TS": 40,
+      "EF": 44,
+      "ET": 41
+    }
+  },
+  "distinct_codes": 139,
+  "total_code_occurrences": 616,
+  "top_codes": [
+    [
+      "EI02TS02",
+      20
+    ],
+    [
+      "EI03TS02",
+      20
+    ],
+    [
+      "EI02CG04",
+      13
+    ],
+    [
+      "EI02ET03",
+      12
+    ],
+    [
+      "EI03CG01",
+      12
+    ],
+    [
+      "EI02EO06",
+      11
+    ],
+    [
+      "EI03CG02",
+      11
+    ],
+    [
+      "EI02EF01",
+      10
+    ],
+    [
+      "EI02ET04",
+      10
+    ],
+    [
+      "EI02TS01",
+      10
+    ],
+    [
+      "EI02EF09",
+      10
+    ],
+    [
+      "EI03TS01",
+      10
+    ],
+    [
+      "EI03TS03",
+      10
+    ],
+    [
+      "EI02TS03",
+      9
+    ],
+    [
+      "EI02EO05",
+      9
+    ],
+    [
+      "EI02CG05",
+      9
+    ],
+    [
+      "EI02CG02",
+      9
+    ],
+    [
+      "EI03EF01",
+      9
+    ],
+    [
+      "EI03CG03",
+      9
+    ],
+    [
+      "EI01CG02",
+      8
+    ],
+    [
+      "EI01EO04",
+      8
+    ],
+    [
+      "EI02CG03",
+      8
+    ],
+    [
+      "EI02ET05",
+      8
+    ],
+    [
+      "EI02EF04",
+      8
+    ],
+    [
+      "EI03EO03",
+      8
+    ]
+  ],
+  "wrong_segment_code_count": 0,
+  "wrong_segment_codes": [],
+  "field_mismatch_count": 3,
+  "field_mismatches": [
+    {
+      "line": 354,
+      "code": "EI01EF01",
+      "declared_field": "O eu, o outro e o nós",
+      "code_field": "Escuta, fala, pensamento e imaginação",
+      "text": "09/03   O eu, o outro e o nós     (EI01EF01) Comunicar-se com          Perceber que existem diferentes    Favorecer o reconhecimento das"
+    },
+    {
+      "line": 2703,
+      "code": "EI02ET04",
+      "declared_field": "O eu, o outro e o nós",
+      "code_field": "Espaços, tempos, quantidades, relações e transformações",
+      "text": "06/07   O eu, o outro e o nós   (EI02ET04) Identificar relações      Identificar diferentes tipos de moradia,   Compreender o espaço vivido,"
+    },
+    {
+      "line": 3066,
+      "code": "EI02CG05",
+      "declared_field": "O eu, o outro e o nós",
+      "code_field": "Corpo, gestos e movimentos",
+      "text": "14/09   O eu, o outro e o nós    (EI02CG05) Desenvolver               Desenvolver, gradativamente, a capacidade       Desenvolver autonomia,"
+    }
+  ]
+}
