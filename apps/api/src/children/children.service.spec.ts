@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ChildrenService } from './children.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EnrollmentStatus } from '@prisma/client';
 
 /**
  * Testes unitários para ChildrenService.getHealthDashboard
@@ -29,7 +30,11 @@ describe('ChildrenService — getHealthDashboard', () => {
     },
     // outros métodos não usados neste teste
     dietaryRestriction: { findMany: jest.fn() },
-    enrollment: { create: jest.fn() },
+    enrollment: {
+      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
   };
 
   // ─── Usuário coordenação (UNIDADE) ──────────────────────────────────────────
@@ -217,6 +222,36 @@ describe('ChildrenService — getHealthDashboard', () => {
 
     const callArgs = mockPrisma.child.findMany.mock.calls[0][0];
     expect(callArgs.where.unitId).toBe('unit-C');
+  });
+
+  // ─── Regressão: movimentação cancela somente matrícula ativa ────────────────
+  it('deve atualizar uma matrícula ativa para CANCELADA sem remover a criança', async () => {
+    jest.spyOn(service, 'findOne').mockResolvedValue({ id: 'child-1' } as any);
+    mockPrisma.enrollment.findFirst.mockResolvedValue({ id: 'enr-1', childId: 'child-1' });
+    mockPrisma.enrollment.update.mockResolvedValue({
+      id: 'enr-1',
+      status: EnrollmentStatus.CANCELADA,
+    });
+
+    const result = await service.updateEnrollmentStatus(
+      'child-1',
+      'enr-1',
+      { status: EnrollmentStatus.CANCELADA },
+      mockUserCoord,
+    );
+
+    expect(mockPrisma.enrollment.findFirst).toHaveBeenCalledWith({
+      where: { id: 'enr-1', childId: 'child-1', status: EnrollmentStatus.ATIVA },
+    });
+    expect(mockPrisma.enrollment.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'enr-1' },
+      data: expect.objectContaining({
+        status: EnrollmentStatus.CANCELADA,
+        updatedBy: 'user-coord-1',
+        withdrawalDate: expect.any(Date),
+      }),
+    }));
+    expect(result).toMatchObject({ id: 'enr-1', status: EnrollmentStatus.CANCELADA });
   });
 
   // ─── Regressão: criação recebe data HTML date-only ─────────────────────────

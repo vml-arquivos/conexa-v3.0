@@ -19,7 +19,7 @@ import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { RequireRoles } from '../common/decorators/roles.decorator';
-import { RoleLevel } from '@prisma/client';
+import { EnrollmentStatus, RoleLevel } from '@prisma/client';
 import { ChildrenService } from './children.service';
 import { CreateChildDto } from './dto/create-child.dto';
 import { UpdateChildDto } from './dto/update-child.dto';
@@ -112,6 +112,21 @@ export class ChildrenController {
     @Request() req,
   ) {
     return this.childrenService.createEnrollment(id, enrollmentData, req.user);
+  }
+
+  /**
+   * Atualizar status da matrícula ativa (cancelamento ou transferência)
+   * PATCH /children/:id/enrollment/:enrollmentId
+   */
+  @Patch(':id/enrollment/:enrollmentId')
+  @RequireRoles(RoleLevel.UNIDADE)
+  async updateEnrollmentStatus(
+    @Param('id') id: string,
+    @Param('enrollmentId') enrollmentId: string,
+    @Body() body: { status?: EnrollmentStatus },
+    @Request() req,
+  ) {
+    return this.childrenService.updateEnrollmentStatus(id, enrollmentId, body, req.user);
   }
 
   /**

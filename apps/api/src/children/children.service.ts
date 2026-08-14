@@ -404,6 +404,49 @@ export class ChildrenService {
   }
 
   /**
+   * Atualizar status de uma matrícula ativa.
+   * Usado por Cancelamentos e Transferências; não remove a criança nem seus dados.
+   */
+  async updateEnrollmentStatus(
+    childId: string,
+    enrollmentId: string,
+    data: { status?: EnrollmentStatus },
+    user: any,
+  ) {
+    await this.findOne(childId, user);
+
+    const allowedStatuses: EnrollmentStatus[] = [
+      EnrollmentStatus.CANCELADA,
+      EnrollmentStatus.TRANSFERIDA,
+    ];
+    if (!data.status || !allowedStatuses.includes(data.status)) {
+      throw new BadRequestException('Status de matrícula inválido para movimentação.');
+    }
+
+    const enrollment = await this.prisma.enrollment.findFirst({
+      where: {
+        id: enrollmentId,
+        childId,
+        status: EnrollmentStatus.ATIVA,
+      },
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Matrícula ativa não encontrada para esta criança.');
+    }
+
+    return this.prisma.enrollment.update({
+      where: { id: enrollmentId },
+      data: {
+        status: data.status,
+        withdrawalDate: new Date(),
+        updatedBy: user.sub,
+      },
+      include: { classroom: true },
+    });
+  }
+
+  /**
    * Atualizar matrícula ativa da criança (trocar turma ou data)
    * Chamado pelo frontend após salvar os dados do aluno em modo edição.
    *
