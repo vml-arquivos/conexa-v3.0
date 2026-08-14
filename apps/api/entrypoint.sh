@@ -39,6 +39,62 @@ if [ "${NODE_ENV:-production}" = "production" ]; then
   echo "✅ Banco consistente: $runtime_db"
 fi
 
+# ── Recuperação explícita de uma migration FAILED conhecida ─────────────────
+# Por padrão, nenhuma migration é resolvida automaticamente. Este bloco só é
+# executado quando o operador define PRISMA_ROLLBACK_MIGRATION explicitamente
+# no Coolify, com o nome exato da migration que foi inspecionada e corrigida.
+# Depois de recuperar, a variável pode permanecer configurada: se não houver
+# mais uma linha FAILED, a operação vira um no-op seguro.
+resolve_explicit_failed_migration() {
+  local migration_name="${PRISMA_ROLLBACK_MIGRATION:-}"
+  local migration_state
+
+  if [ -z "$migration_name" ]; then
+    return 0
+  fi
+
+  case "$migration_name" in
+    20260813010000_add_missing_models_from_zellare)
+      ;;
+    *)
+      echo "❌ ERRO: PRISMA_ROLLBACK_MIGRATION não está autorizada para este deploy: $migration_name"
+      exit 1
+      ;;
+  esac
+
+  echo "⚠️  Recuperação explícita solicitada para migration: $migration_name"
+  migration_state=$(psql "$DATABASE_URL" -t -A -v ON_ERROR_STOP=1 -c "
+    SELECT CASE
+      WHEN EXISTS (
+        SELECT 1 FROM \"_prisma_migrations\"
+        WHERE migration_name = '$migration_name'
+          AND finished_at IS NULL
+          AND rolled_back_at IS NULL
+      ) THEN 'FAILED'
+      WHEN EXISTS (
+        SELECT 1 FROM \"_prisma_migrations\"
+        WHERE migration_name = '$migration_name'
+          AND rolled_back_at IS NOT NULL
+      ) THEN 'ROLLED_BACK'
+      ELSE 'MISSING'
+    END;
+  " | tr -d '[:space:]')
+
+  case "$migration_state" in
+    FAILED)
+      npx prisma migrate resolve --rolled-back "$migration_name" --schema=./prisma/schema.prisma
+      echo "✅ Migration marcada explicitamente como rolled-back para nova tentativa."
+      ;;
+    ROLLED_BACK|MISSING)
+      echo "ℹ️  Nenhuma linha FAILED ativa para $migration_name (estado: $migration_state). Nenhuma alteração feita."
+      ;;
+    *)
+      echo "❌ ERRO: estado inesperado da migration $migration_name: $migration_state"
+      exit 1
+      ;;
+  esac
+}
+
 # ── Função: executar migrations com falha explícita ─────────────────────────
 run_migrate_deploy() {
   echo "Executando prisma migrate deploy..."
@@ -90,6 +146,7 @@ run_operational_access_fix() {
 # ── Passo 1: Não resolver migrations automaticamente ──────────────────────────
 # O estado FAILED deve permanecer visível para diagnóstico e correção explícita.
 echo "🔎 Migrations FAILED serão preservadas para diagnóstico; nenhuma será marcada como aplicada automaticamente."
+resolve_explicit_failed_migration
 
 # ── Passo 2: Aplicar migrations com falha explícita em caso de drift ──────────
 run_migrate_deploy
