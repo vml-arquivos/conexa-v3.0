@@ -33,7 +33,13 @@ export function QuickObservationInput({ planningId, curriculumEntryId, classroom
         childId: selectedStudent,
         classroomId,
         planningId,
-        curriculumEntryId
+        curriculumEntryId,
+        tags: ['OBSERVACAO_RAPIDA', 'PROFESSOR'],
+        aiContext: {
+          source: 'OBSERVACAO_RAPIDA',
+          captureMode: 'TEXT_PLUS_CHILD',
+          requiresHumanReview: true,
+        },
       });
 
       toast.success("Observação Salva", {

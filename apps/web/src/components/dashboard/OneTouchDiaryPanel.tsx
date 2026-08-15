@@ -31,7 +31,14 @@ export function OneTouchDiaryPanel({ planningId, curriculumEntryId, classroomId,
           childId: student.id,
           classroomId,
           planningId,
-          curriculumEntryId
+          curriculumEntryId,
+          tags: ['ONE_TOUCH', type, 'TURMA_COMPLETA'],
+          aiContext: {
+            source: 'ONE_TOUCH_DIARY',
+            captureMode: 'BULK_CLASSROOM',
+            domain: type,
+            requiresHumanReview: true,
+          },
         })
       );
 

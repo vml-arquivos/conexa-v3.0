@@ -28,6 +28,7 @@ import {
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { TriangleAlert } from 'lucide-react';
+import { getPsychologyIntelligenceOverview } from '../api/intelligence-core';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface Rdic {
@@ -66,6 +67,24 @@ interface DashboardGeral {
     totalAlunos: number;
     coberturaChamada: number;
   }>;
+}
+
+interface IntelligencePsicologia {
+  metrics: { units: number; childrenWithSignals: number; observations: number; casesRequiringReview: number };
+  queue: Array<{
+    childId: string;
+    childName: string;
+    unitId: string;
+    classroomName: string | null;
+    lastObservationAt: string;
+    observationCount: number;
+    attentionCount: number;
+    categories: string[];
+    evidence: Array<{ id: string; date: string; category: string; emotionalState: string; psychologicalNotes: string; developmentAlerts: string; recommendations: string; nextSteps: string }>;
+    status: string;
+    requiresHumanReview: boolean;
+  }>;
+  safety?: { clinicalDiagnosis?: boolean; humanReviewRequired?: boolean; note?: string };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -184,6 +203,7 @@ export default function DashboardPsicologoPage() {
   const [filtroCategoria, setFiltroCategoria] = useState<string>('todas');
   const [busca, setBusca] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [inteligenciaPsicologia, setInteligenciaPsicologia] = useState<IntelligencePsicologia | null>(null);
 
   const hoje = getPedagogicalToday();
   const ha30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
@@ -191,13 +211,15 @@ export default function DashboardPsicologoPage() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [rdicRes, obsRes, dashRes] = await Promise.allSettled([
+      const [rdicRes, obsRes, dashRes, psychologyRes] = await Promise.allSettled([
         apiCache.get('/rdic/geral', undefined, () =>
           http.get('/rdic/geral').then(r => r.data)),
         apiCache.get('/development-observations', { startDate: ha30, endDate: hoje } as Record<string, unknown>, () =>
           http.get('/development-observations', { params: { startDate: ha30, endDate: hoje } }).then(r => r.data)),
         apiCache.get('/coordenacao/dashboard/geral', undefined, () =>
           http.get('/coordenacao/dashboard/geral').then(r => r.data)),
+        apiCache.get('/intelligence-core/psychology/overview', { startDate: ha30, endDate: hoje }, () =>
+          getPsychologyIntelligenceOverview({ startDate: ha30, endDate: hoje })),
       ]);
 
       if (rdicRes.status === 'fulfilled') {
@@ -210,6 +232,9 @@ export default function DashboardPsicologoPage() {
       }
       if (dashRes.status === 'fulfilled') {
         setDashboard(dashRes.value as DashboardGeral);
+      }
+      if (psychologyRes.status === 'fulfilled') {
+        setInteligenciaPsicologia(psychologyRes.value as IntelligencePsicologia);
       }
     } catch {
       toast.error('Erro ao carregar dashboard da psicóloga');
@@ -343,6 +368,57 @@ export default function DashboardPsicologoPage() {
                 tone={!ind?.diariosHoje ? 'warning' : 'success'}
                 helper="Registros do dia" />
             </div>
+          )}
+
+          {inteligenciaPsicologia && (
+            <SectionCard title="Fila de revisão da Psicologia" icon={<Brain className="h-4 w-4 text-purple-600" />}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="rounded-xl bg-purple-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-purple-700/70">Crianças com sinais</p>
+                  <p className="text-xl font-bold text-purple-900 mt-1">{fmt(inteligenciaPsicologia.metrics.childrenWithSignals)}</p>
+                  <p className="text-[11px] text-purple-700/70">evidências no período</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-700/70">Revisão humana</p>
+                  <p className="text-xl font-bold text-amber-900 mt-1">{fmt(inteligenciaPsicologia.metrics.casesRequiringReview)}</p>
+                  <p className="text-[11px] text-amber-700/70">casos priorizados</p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-blue-700/70">Observações</p>
+                  <p className="text-xl font-bold text-blue-900 mt-1">{fmt(inteligenciaPsicologia.metrics.observations)}</p>
+                  <p className="text-[11px] text-blue-700/70">registros analisados</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-emerald-700/70">Proteção</p>
+                  <p className="text-xl font-bold text-emerald-900 mt-1">Ativa</p>
+                  <p className="text-[11px] text-emerald-700/70">sem diagnóstico automático</p>
+                </div>
+              </div>
+              {inteligenciaPsicologia.queue.length === 0 ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700 py-3">
+                  <CheckCircle className="h-4 w-4" /> Nenhuma fila de revisão foi gerada no período.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
+                  {inteligenciaPsicologia.queue.slice(0, 8).map((item) => (
+                    <div key={item.childId} className="rounded-xl border border-purple-100 bg-purple-50/40 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">{item.childName}</p>
+                          <p className="text-xs text-gray-500">{item.classroomName ?? 'Turma não informada'} · {item.observationCount} observação(ões)</p>
+                        </div>
+                        <span className="text-[11px] rounded-full bg-amber-100 text-amber-800 px-2 py-1 whitespace-nowrap">Revisar com equipe</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {item.categories.map((category) => <span key={category} className="text-[11px] rounded-full bg-white border border-purple-100 px-2 py-0.5 text-purple-700">{category}</span>)}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">Evidência mais recente: {item.evidence[0]?.emotionalState || item.evidence[0]?.developmentAlerts || 'registro observacional disponível para leitura contextual.'}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-500 mt-3">A fila organiza evidências registradas e exige revisão profissional. Não constitui diagnóstico, prognóstico ou conclusão clínica.</p>
+            </SectionCard>
           )}
 
           {/* Gráficos */}

@@ -11,11 +11,12 @@ import {
 } from 'recharts';
 import {
   AlertTriangle, CheckCircle, Clock, ShoppingCart,
-  BookOpen, RefreshCw, ChevronRight, Package, TriangleAlert,
+  Activity, BookOpen, RefreshCw, ChevronRight, Package, TriangleAlert,
 } from 'lucide-react';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import http from '../api/http';
 import { getErrorMessage } from '../utils/errorMessage';
+import { getUnitIntelligenceOverview } from '../api/intelligence-core';
 import { formatPedagogicalDate } from '../lib/formatDate';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -64,6 +65,26 @@ interface PlanejamentoParado {
   updatedAt: string;
 }
 
+interface IntelligenceUnidade {
+  metrics: {
+    activeChildren: number;
+    attendance: { presenceRate: number | null };
+    records: { coverageRate: number | null; diaryEvents: number; observations: number };
+    attentionChildren: number;
+    nutritionalRevaluationsDue: number;
+    openOperationalAlerts: number;
+  };
+  attentionItems: Array<{
+    id: string;
+    title: string;
+    childName: string;
+    classroomName: string | null;
+    severity: string;
+    description: string;
+  }>;
+  safety?: { humanReviewRequired?: boolean };
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function DashboardUnidadePage() {
@@ -78,6 +99,7 @@ export function DashboardUnidadePage() {
   const [dadosMateriais, setDadosMateriais] = useState<DadosMateriais[]>([]);
   const [turmasSemChamada, setTurmasSemChamada] = useState<TurmaSemChamada[]>([]);
   const [planejamentosParados, setPlanejamentosParados] = useState<PlanejamentoParado[]>([]);
+  const [inteligencia, setInteligencia] = useState<IntelligenceUnidade | null>(null);
   const [indicators, setIndicators] = useState({
     totalAlunos: 0,
     totalTurmas: 0,
@@ -115,6 +137,14 @@ export function DashboardUnidadePage() {
       const alertas = raw.alertas ?? {};
       setTurmasSemChamada(Array.isArray(alertas.turmasSemChamadaHoje) ? alertas.turmasSemChamadaHoje : []);
       setPlanejamentosParados(Array.isArray(alertas.planejamentosParados) ? alertas.planejamentosParados : []);
+
+      // O resumo analítico é complementar: uma falha nele não derruba o painel operacional.
+      try {
+        const intelligence = await getUnitIntelligenceOverview();
+        setInteligencia(intelligence as IntelligenceUnidade);
+      } catch {
+        setInteligencia(null);
+      }
 
       // Agrupa requisições por categoria para o gráfico
       const categorias: Record<string, number> = {};
@@ -197,10 +227,10 @@ export function DashboardUnidadePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Package className="h-6 w-6 text-emerald-600" />
-            Painel da Coordenação Geral
+            Painel da Coordenação da Unidade
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Bem-vindo, {((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Controle operacional — pendências, alertas, materiais e planejamentos.
+            Bem-vindo, {((user?.nome as string) || '').split(' ')[0] || 'Coordenador(a)'}! Visão operacional e pedagógica da unidade — pendências, alertas, registros e planejamentos.
           </p>
         </div>
         <button
@@ -256,6 +286,77 @@ export function DashboardUnidadePage() {
           { label: 'Planos p/ Revisar',    value: indicators.alertasAtivos,      tone: indicators.alertasAtivos > 0 ? 'danger' : 'default' },
         ]}
       />
+
+      {/* Inteligência da Unidade — resumo read-only e revisável */}
+      {inteligencia && (
+        <section className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 to-white p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-indigo-950">
+                <Activity className="h-5 w-5 text-indigo-600" />
+                Inteligência da Unidade
+              </h2>
+              <p className="text-xs text-indigo-800/70 mt-1">
+                Cruzamento de presença, registros pedagógicos, observações e cuidados. São sinais para revisão humana, não diagnósticos.
+              </p>
+            </div>
+            <span className="text-[11px] rounded-full bg-white border border-indigo-100 px-2.5 py-1 text-indigo-700">
+              Últimos 30 dias
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="rounded-lg bg-white border border-indigo-100 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Cobertura de registros</p>
+              <p className="text-2xl font-bold text-indigo-700 mt-1">{inteligencia.metrics.records.coverageRate == null ? '—' : `${inteligencia.metrics.records.coverageRate}%`}</p>
+              <p className="text-[11px] text-gray-500">crianças com diário/observação</p>
+            </div>
+            <div className="rounded-lg bg-white border border-indigo-100 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Frequência</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">{inteligencia.metrics.attendance.presenceRate == null ? '—' : `${inteligencia.metrics.attendance.presenceRate}%`}</p>
+              <p className="text-[11px] text-gray-500">presença no período</p>
+            </div>
+            <div className="rounded-lg bg-white border border-indigo-100 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Para revisar</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">{inteligencia.metrics.attentionChildren}</p>
+              <p className="text-[11px] text-gray-500">crianças com sinais registrados</p>
+            </div>
+            <div className="rounded-lg bg-white border border-indigo-100 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Reavaliações</p>
+              <p className="text-2xl font-bold text-rose-700 mt-1">{inteligencia.metrics.nutritionalRevaluationsDue}</p>
+              <p className="text-[11px] text-gray-500">nutricionais vencidas</p>
+            </div>
+          </div>
+
+          <div className="rounded-lg bg-white border border-indigo-100 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Fila de atenção</h3>
+                <p className="text-xs text-gray-500">Abra o contexto e confirme a evidência antes de tomar providências.</p>
+              </div>
+              <span className="text-xs text-gray-500">{inteligencia.metrics.openOperationalAlerts} alerta(s) operacional(is)</span>
+            </div>
+            {inteligencia.attentionItems.length === 0 ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-700 py-2">
+                <CheckCircle className="h-4 w-4" /> Nenhuma pendência analítica encontrada no período.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {inteligencia.attentionItems.slice(0, 4).map((item) => (
+                  <div key={item.id} className="flex items-start gap-3 rounded-md border border-gray-100 bg-gray-50 p-3">
+                    <AlertTriangle className={`h-4 w-4 mt-0.5 flex-shrink-0 ${item.severity === 'ALTA' || item.severity === 'CRITICA' ? 'text-rose-600' : 'text-amber-600'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{item.title}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">{item.childName}{item.classroomName ? ` · ${item.classroomName}` : ''}</p>
+                      <p className="text-xs text-gray-500 mt-1">{item.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Gráfico de requisições por prioridade */}
       {dadosMateriais.length > 0 && (

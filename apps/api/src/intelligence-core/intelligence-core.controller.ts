@@ -13,6 +13,51 @@ export class IntelligenceCoreController {
   constructor(private readonly intelligenceCore: IntelligenceCoreService) {}
 
   /**
+   * GET /intelligence-core/unit/overview
+   * Resumo operacional e pedagógico agregado de uma unidade.
+   */
+  @Get('unit/overview')
+  @RequireRoles(RoleLevel.UNIDADE, RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getUnitOverview(
+    @CurrentUser() user: JwtPayload,
+    @Query('unitId') unitId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.intelligenceCore.getUnitOverview(user, { unitId, startDate, endDate });
+  }
+
+  /**
+   * GET /intelligence-core/network/overview
+   * Visão agregada por unidade para coordenação geral, sem notas psicológicas.
+   */
+  @Get('network/overview')
+  @RequireRoles(RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getNetworkOverview(
+    @CurrentUser() user: JwtPayload,
+    @Query('unitId') unitId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.intelligenceCore.getNetworkOverview(user, { unitId, startDate, endDate });
+  }
+
+  /**
+   * GET /intelligence-core/psychology/overview
+   * Fila sensível para Psicologia Central; o service exige RoleType específico.
+   */
+  @Get('psychology/overview')
+  @RequireRoles(RoleLevel.STAFF_CENTRAL, RoleLevel.MANTENEDORA, RoleLevel.DEVELOPER)
+  getPsychologyOverview(
+    @CurrentUser() user: JwtPayload,
+    @Query('unitId') unitId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.intelligenceCore.getPsychologyOverview(user, { unitId, startDate, endDate });
+  }
+
+  /**
    * GET /intelligence-core/child/:childId/integral-profile
    *
    * Perfil integral da criança, somente leitura.

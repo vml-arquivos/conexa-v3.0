@@ -111,7 +111,12 @@ export default function MobileObservacaoPage() {
         date: hojeISO(),
         behaviorDescription: form.descricao,
         indicadores: { campoExperiencia: form.campo, campoExperienciaLabel: campoLabel, nivel: form.nivel, nivelLabel },
-        tags: [form.campo, form.nivel],
+        tags: [form.campo, form.nivel, 'PWA_OBSERVACAO'],
+        aiContext: {
+          source: 'PWA_OBSERVACAO',
+          captureMode: 'STRUCTURED_PLUS_NOTE',
+          requiresHumanReview: true,
+        },
         motorSkills: detalhes.motorSkills || undefined,
         cognitiveSkills: detalhes.cognitiveSkills || undefined,
         languageSkills: detalhes.languageSkills || undefined,

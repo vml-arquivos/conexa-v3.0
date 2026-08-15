@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { RoleLevel, RoleType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { canAccessUnit } from '../common/utils/can-access-unit';
 
 type PeriodParams = { startDate?: string; endDate?: string };
 type Severity = 'BAIXA' | 'MEDIA' | 'ALTA' | 'CRITICA';
@@ -16,15 +17,31 @@ type AttentionPoint = {
   allowedForFamilyReport: boolean;
 };
 
+type AttentionItem = {
+  id: string;
+  source: string;
+  childId: string | null;
+  childName: string;
+  classroomName: string | null;
+  type: string;
+  severity: string;
+  title: string;
+  description: string;
+  date: Date | string | null;
+  recommendation: string;
+};
+
 // FIX: usar 'as const' + cast para evitar erro TS2345 com arrays de enum literal
 const CENTRAL_LEVELS = [RoleLevel.DEVELOPER, RoleLevel.MANTENEDORA, RoleLevel.STAFF_CENTRAL] as RoleLevel[];
 const CARE_RESTRICTED_ROLES = [
   RoleType.UNIDADE_DIRETOR,
-  RoleType.UNIDADE_COORDENADOR_PEDAGOGICO,
   RoleType.UNIDADE_NUTRICIONISTA,
   RoleType.STAFF_CENTRAL_PSICOLOGIA,
-  RoleType.STAFF_CENTRAL_PEDAGOGICO,
   RoleType.MANTENEDORA_ADMIN,
+  RoleType.DEVELOPER,
+] as RoleType[];
+const PSYCHOLOGY_ROLES = [
+  RoleType.STAFF_CENTRAL_PSICOLOGIA,
   RoleType.DEVELOPER,
 ] as RoleType[];
 
@@ -34,6 +51,10 @@ function hasCentralAccess(user: JwtPayload): boolean {
 
 function hasRoleLevel(user: JwtPayload, level: RoleLevel): boolean {
   return user.roles?.some((role) => role.level === level) ?? false;
+}
+
+function hasRoleType(user: JwtPayload, ...types: RoleType[]): boolean {
+  return user.roles?.some((role) => types.includes(role.type as RoleType)) ?? false;
 }
 
 function hasCareRestrictedAccess(user: JwtPayload): boolean {
@@ -170,10 +191,237 @@ export class IntelligenceCoreService {
     throw new ForbiddenException('Perfil sem acesso ao núcleo de inteligência');
   }
 
+  private async getAccessibleUnits(user: JwtPayload, unitIdParam?: string) {
+    if (!user?.mantenedoraId) throw new ForbiddenException('Escopo inválido');
+
+    const where: any = { mantenedoraId: user.mantenedoraId, isActive: true };
+    if (unitIdParam) {
+      const allowed = await canAccessUnit(user, unitIdParam);
+      if (!allowed) throw new ForbiddenException('Sem acesso à unidade informada');
+      where.id = unitIdParam;
+    } else if (!hasCentralAccess(user)) {
+      if (!user.unitId) throw new ForbiddenException('unitId é obrigatório para este perfil');
+      where.id = user.unitId;
+    } else {
+      const roleUnitScopes = user.roles?.flatMap((role) => role.unitScopes ?? []) ?? [];
+      if (roleUnitScopes.length > 0) where.id = { in: Array.from(new Set(roleUnitScopes)) };
+    }
+
+    return this.prisma.unit.findMany({
+      where,
+      select: { id: true, name: true, mantenedoraId: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private async buildUnitOverview(unitId: string, unitName: string, user: JwtPayload, params: PeriodParams) {
+    const { start, end } = parsePeriod(params, 30);
+    const [enrollments, attendance, diaryEvents, observations, nutritionalCases, operationalAlerts] = await Promise.all([
+      this.prisma.enrollment.findMany({
+        where: { status: 'ATIVA', classroom: { unitId, isActive: true } },
+        select: {
+          childId: true,
+          classroomId: true,
+          child: { select: { id: true, firstName: true, lastName: true } },
+          classroom: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.attendance.findMany({
+        where: { unitId, mantenedoraId: user.mantenedoraId, date: { gte: start, lte: end } },
+        select: { childId: true, status: true, date: true },
+      }),
+      this.prisma.diaryEvent.findMany({
+        where: { unitId, mantenedoraId: user.mantenedoraId, eventDate: { gte: start, lte: end } },
+        select: { childId: true, eventDate: true, type: true, status: true },
+      }),
+      this.prisma.developmentObservation.findMany({
+        where: { date: { gte: start, lte: end }, child: { unitId } },
+        select: { childId: true, date: true, category: true, developmentAlerts: true, healthNotes: true, dietaryNotes: true, psychologicalNotes: true },
+      }),
+      this.prisma.acompanhamentoNutricional.findMany({
+        where: { unitId, ativo: true },
+        select: { childId: true, statusCaso: true, proximaReavaliacao: true, atualizadoEm: true },
+      }),
+      this.prisma.alertaOperacional.findMany({
+        where: { unitId, mantenedoraId: user.mantenedoraId, resolvido: false },
+        orderBy: [{ severidade: 'desc' }, { criadoEm: 'desc' }],
+        take: 50,
+        select: { id: true, childId: true, tipo: true, severidade: true, titulo: true, descricao: true, criadoEm: true },
+      }),
+    ]);
+
+    const childContext = new Map(enrollments.map((e) => [e.childId, {
+      name: `${e.child.firstName} ${e.child.lastName}`.trim(),
+      classroomId: e.classroomId,
+      classroomName: e.classroom.name,
+    }]));
+    const activeChildIds = Array.from(childContext.keys());
+    const recordedChildIds = new Set([...diaryEvents.map((e) => e.childId), ...observations.map((o) => o.childId)]);
+    const present = attendance.filter((a) => String(a.status) === 'PRESENTE').length;
+    const attentionChildren = new Set(observations.filter((o) => Boolean(o.developmentAlerts || o.healthNotes || o.dietaryNotes)).map((o) => o.childId));
+    const revaluationsDue = nutritionalCases.filter((c) => c.proximaReavaliacao && new Date(c.proximaReavaliacao) <= end);
+    const severityCounts = operationalAlerts.reduce((acc: Record<string, number>, alert) => {
+      const key = String(alert.severidade);
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const attentionItems: AttentionItem[] = operationalAlerts.slice(0, 20).map((alert) => {
+      const context = alert.childId ? childContext.get(alert.childId) : undefined;
+      return {
+        id: alert.id,
+        source: 'AlertaOperacional',
+        childId: alert.childId,
+        childName: context?.name ?? 'Criança não identificada',
+        classroomName: context?.classroomName ?? null,
+        type: alert.tipo,
+        severity: String(alert.severidade),
+        title: alert.titulo,
+        description: safeText(alert.descricao, 220),
+        date: alert.criadoEm,
+        recommendation: 'Revisar a evidência, registrar providência e manter o fato histórico preservado.',
+      };
+    });
+
+    for (const childId of activeChildIds.filter((id) => !recordedChildIds.has(id)).slice(0, 20)) {
+      const context = childContext.get(childId)!;
+      attentionItems.push({
+        id: `coverage-${childId}`,
+        source: 'CoberturaDeRegistro',
+        childId,
+        childName: context.name,
+        classroomName: context.classroomName,
+        type: 'SEM_REGISTRO_NO_PERIODO',
+        severity: 'MEDIA',
+        title: 'Sem registro pedagógico no período',
+        description: 'Não foi encontrado diário ou observação no intervalo selecionado.',
+        date: null,
+        recommendation: 'Confirmar se houve aula, ausência ou falha de registro antes de interpretar o dado.',
+      });
+    }
+
+    return {
+      module: 'COCRIS Intelligence Core',
+      readonly: true,
+      scope: { unitId, unitName, mantenedoraId: user.mantenedoraId },
+      period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) },
+      metrics: {
+        activeChildren: activeChildIds.length,
+        attendance: { total: attendance.length, present, absent: attendance.filter((a) => String(a.status) === 'AUSENTE').length, presenceRate: percent(present, attendance.length) },
+        records: { diaryEvents: diaryEvents.length, observations: observations.length, childrenWithRecord: recordedChildIds.size, coverageRate: percent(recordedChildIds.size, activeChildIds.length) },
+        attentionChildren: attentionChildren.size,
+        activeNutritionalCases: nutritionalCases.length,
+        nutritionalRevaluationsDue: revaluationsDue.length,
+        openOperationalAlerts: operationalAlerts.length,
+      },
+      alertSummary: severityCounts,
+      attentionItems,
+      classrooms: Array.from(new Map(enrollments.map((e) => [e.classroomId, e.classroom.name])).entries()).map(([classroomId, name]) => ({ classroomId, name, activeChildren: enrollments.filter((e) => e.classroomId === classroomId).length, childrenWithRecord: enrollments.filter((e) => recordedChildIds.has(e.childId) && e.classroomId === classroomId).length })),
+      safety: { clinicalDiagnosis: false, humanReviewRequired: true, automaticFamilyCommunicationAllowed: false, psychologyNotesIncluded: false },
+    };
+  }
+
+  async getUnitOverview(user: JwtPayload, params: PeriodParams & { unitId?: string }) {
+    if (hasCentralAccess(user) && !params.unitId) {
+      throw new ForbiddenException('Selecione uma unidade para ver o resumo da unidade');
+    }
+    const units = await this.getAccessibleUnits(user, params.unitId);
+    if (units.length === 0) throw new NotFoundException('Unidade não encontrada no escopo permitido');
+    return this.buildUnitOverview(units[0].id, units[0].name, user, params);
+  }
+
+  async getNetworkOverview(user: JwtPayload, params: PeriodParams & { unitId?: string }) {
+    const units = await this.getAccessibleUnits(user, params.unitId);
+    const unidadeData = await Promise.all(units.map((unit) => this.buildUnitOverview(unit.id, unit.name, user, params)));
+    const totalChildren = unidadeData.reduce((sum, item) => sum + item.metrics.activeChildren, 0);
+    const totalRecordedChildren = unidadeData.reduce((sum, item) => sum + item.metrics.records.childrenWithRecord, 0);
+    return {
+      module: 'COCRIS Intelligence Core',
+      readonly: true,
+      scope: { mantenedoraId: user.mantenedoraId, unitIds: units.map((unit) => unit.id) },
+      period: unidadeData[0]?.period ?? parsePeriod(params, 30),
+      metrics: {
+        units: unidadeData.length,
+        activeChildren: totalChildren,
+        childrenWithRecord: totalRecordedChildren,
+        coverageRate: percent(totalRecordedChildren, totalChildren),
+        diaryEvents: unidadeData.reduce((sum, item) => sum + item.metrics.records.diaryEvents, 0),
+        observations: unidadeData.reduce((sum, item) => sum + item.metrics.records.observations, 0),
+        openOperationalAlerts: unidadeData.reduce((sum, item) => sum + item.metrics.openOperationalAlerts, 0),
+        nutritionalRevaluationsDue: unidadeData.reduce((sum, item) => sum + item.metrics.nutritionalRevaluationsDue, 0),
+      },
+      units: unidadeData.map((item) => ({
+        unitId: item.scope.unitId,
+        unitName: item.scope.unitName,
+        metrics: item.metrics,
+        alertSummary: item.alertSummary,
+      })),
+      safety: { clinicalDiagnosis: false, humanReviewRequired: true, childNamesIncluded: false, psychologyNotesIncluded: false },
+    };
+  }
+
+  async getPsychologyOverview(user: JwtPayload, params: PeriodParams & { unitId?: string }) {
+    if (!hasRoleType(user, ...PSYCHOLOGY_ROLES)) throw new ForbiddenException('Acesso restrito à Psicologia Central');
+    const units = await this.getAccessibleUnits(user, params.unitId);
+    const { start, end } = parsePeriod(params, 90);
+    const unitIds = units.map((unit) => unit.id);
+    if (unitIds.length === 0) return { module: 'COCRIS Intelligence Core', readonly: true, period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }, metrics: { childrenWithSignals: 0, observations: 0 }, queue: [], safety: { clinicalDiagnosis: false, humanReviewRequired: true } };
+
+    const observations = await this.prisma.developmentObservation.findMany({
+      where: {
+        date: { gte: start, lte: end },
+        child: { unitId: { in: unitIds }, isActive: true },
+        OR: [{ psychologicalNotes: { not: null } }, { developmentAlerts: { not: null } }, { emotionalState: { not: null } }],
+      },
+      orderBy: { date: 'desc' },
+      take: 500,
+      select: {
+        id: true, childId: true, classroomId: true, date: true, category: true, emotionalState: true, psychologicalNotes: true, developmentAlerts: true, recommendations: true, nextSteps: true,
+        child: { select: { id: true, firstName: true, lastName: true, unitId: true, enrollments: { where: { status: 'ATIVA' }, take: 1, select: { classroom: { select: { name: true } } } } } },
+      },
+    });
+
+    const byChild = new Map<string, { child: any; observations: any[] }>();
+    for (const observation of observations) {
+      const current = byChild.get(observation.childId) ?? { child: observation.child, observations: [] };
+      current.observations.push(observation);
+      byChild.set(observation.childId, current);
+    }
+
+    const queue = Array.from(byChild.values()).map(({ child, observations: childObservations }) => {
+      const latest = childObservations[0];
+      const attentionCount = childObservations.filter((item) => Boolean(item.developmentAlerts || item.psychologicalNotes)).length;
+      return {
+        childId: child.id,
+        childName: `${child.firstName} ${child.lastName}`.trim(),
+        unitId: child.unitId,
+        classroomName: child.enrollments?.[0]?.classroom?.name ?? null,
+        lastObservationAt: latest.date,
+        observationCount: childObservations.length,
+        attentionCount,
+        categories: Array.from(new Set(childObservations.map((item) => item.category).filter(Boolean))),
+        evidence: childObservations.slice(0, 6).map((item) => ({ id: item.id, date: item.date, category: item.category, emotionalState: safeText(item.emotionalState), psychologicalNotes: safeText(item.psychologicalNotes), developmentAlerts: safeText(item.developmentAlerts), recommendations: safeText(item.recommendations), nextSteps: safeText(item.nextSteps) })),
+        status: attentionCount > 0 ? 'REVISAR_COM_EQUIPE' : 'ACOMPANHAR',
+        requiresHumanReview: true,
+      };
+    }).sort((a, b) => b.attentionCount - a.attentionCount || new Date(String(b.lastObservationAt)).getTime() - new Date(String(a.lastObservationAt)).getTime());
+
+    return {
+      module: 'COCRIS Intelligence Core',
+      readonly: true,
+      scope: { mantenedoraId: user.mantenedoraId, unitIds },
+      period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) },
+      metrics: { units: units.length, childrenWithSignals: queue.length, observations: observations.length, casesRequiringReview: queue.filter((item) => item.status === 'REVISAR_COM_EQUIPE').length },
+      queue,
+      safety: { clinicalDiagnosis: false, humanReviewRequired: true, automaticFamilyCommunicationAllowed: false, note: 'Fila baseada em evidências registradas. Não representa diagnóstico ou prognóstico.' },
+    };
+  }
+
   async getIntegralChildProfile(childId: string, user: JwtPayload, params: PeriodParams) {
     const { child, classroomId, classroomName } = await this.assertChildAccess(childId, user);
     const { start, end } = parsePeriod(params, 180);
-    const canSeeRestrictedCare = hasCareRestrictedAccess(user) || hasCentralAccess(user);
+    const canSeeRestrictedCare = hasCareRestrictedAccess(user);
+    const canSeePsychology = hasRoleType(user, ...PSYCHOLOGY_ROLES);
 
     const [attendance, diaryEvents, observations, rdics, dietaryRestrictions, familyMeetings, nutritionalFollowUp, openAlerts, plannings] = await Promise.all([
       this.prisma.attendance.findMany({
@@ -379,7 +627,7 @@ export class IntelligenceCoreService {
       : null;
 
     return {
-      module: 'Zelare Intelligence Core',
+      module: 'COCRIS Intelligence Core',
       readonly: true,
       period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) },
       child: {
@@ -410,7 +658,7 @@ export class IntelligenceCoreService {
           status: d.status,
           evidence: safeText(d.developmentNotes || d.behaviorNotes || d.observations || d.description, 240),
         })),
-        observations: observations.slice(0, 20).map((o) => this.normalizeObservation(o, canSeeRestrictedCare)),
+        observations: observations.slice(0, 20).map((o) => this.normalizeObservation(o, canSeeRestrictedCare, canSeePsychology)),
         rdic: rdics.slice(0, 10),
         dietaryRestrictions: canSeeRestrictedCare ? dietaryRestrictions : dietaryRestrictions.map((r) => ({ id: r.id, type: r.type, name: r.name, severity: r.severity, forbiddenFoods: r.forbiddenFoods })),
         nutritionalFollowUp: safeNutritionalFollowUp,
@@ -487,7 +735,7 @@ export class IntelligenceCoreService {
     ];
 
     return {
-      module: 'Zelare Intelligence Core',
+      module: 'COCRIS Intelligence Core',
       readonly: true,
       child: profile.child,
       period: profile.period,
@@ -583,7 +831,7 @@ export class IntelligenceCoreService {
     const totalPresent = attendance.filter((a) => String(a.status) === 'PRESENTE').length;
 
     return {
-      module: 'Zelare Intelligence Core',
+      module: 'COCRIS Intelligence Core',
       readonly: true,
       classroom: { id: classroomCtx.id, name: classroomCtx.name, unitId: classroomCtx.unitId },
       period: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) },
@@ -614,7 +862,7 @@ export class IntelligenceCoreService {
     };
   }
 
-  private normalizeObservation(o: any, canSeeRestrictedCare: boolean) {
+  private normalizeObservation(o: any, canSeeRestrictedCare: boolean, canSeePsychology: boolean) {
     const base: any = {
       id: o.id,
       date: o.date,
@@ -639,6 +887,8 @@ export class IntelligenceCoreService {
       base.healthNotes = safeText(o.healthNotes);
       base.dietaryNotes = safeText(o.dietaryNotes);
       base.sleepPattern = safeText(o.sleepPattern);
+    }
+    if (canSeePsychology) {
       base.psychologicalNotes = safeText(o.psychologicalNotes);
     }
     return base;

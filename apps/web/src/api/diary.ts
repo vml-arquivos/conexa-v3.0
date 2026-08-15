@@ -26,6 +26,11 @@ export interface CreateDiaryEventDto {
   // FIX C3.5: opcionais — backend aceita eventos sem vínculo de planejamento
   planningId?: string;
   curriculumEntryId?: string;
+  tags?: string[];
+  aiContext?: Record<string, unknown>;
+  medicaoAlimentar?: Record<string, unknown>;
+  sonoMinutos?: number;
+  trocaFraldaStatus?: string;
 }
 
 export async function getDiaryEvents(): Promise<DiaryEvent[]> {

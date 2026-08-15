@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { OcorrenciasPanel } from '../components/dashboard/OcorrenciasPanel';
 import { getPedagogicalToday } from '@/utils/pedagogicalDate';
+import { getNetworkIntelligenceOverview } from '../api/intelligence-core';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface UnidadeConsolidado {
@@ -66,6 +67,25 @@ interface DashboardGeralAPI {
 
 interface GovernanceFunnel {
   funnel: { created: number; submitted: number; approved: number; executed: number };
+}
+
+interface IntelligenceRede {
+  metrics: {
+    units: number;
+    activeChildren: number;
+    childrenWithRecord: number;
+    coverageRate: number | null;
+    diaryEvents: number;
+    observations: number;
+    openOperationalAlerts: number;
+    nutritionalRevaluationsDue: number;
+  };
+  units: Array<{
+    unitId: string;
+    unitName: string;
+    metrics: { records: { coverageRate: number | null }; openOperationalAlerts: number; attentionChildren: number };
+    alertSummary: Record<string, number>;
+  }>;
 }
 
 interface Requisicao {
@@ -213,6 +233,7 @@ export default function DashboardCoordenacaoGeralPage() {
     pct: number;
   }>>([]);
   const [loadingRdic, setLoadingRdic] = useState(false);
+  const [inteligenciaRede, setInteligenciaRede] = useState<IntelligenceRede | null>(null);
 
   const hoje = getPedagogicalToday();
   const ha30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
@@ -220,7 +241,7 @@ export default function DashboardCoordenacaoGeralPage() {
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashRes, funilRes, covRes, reqRes] = await Promise.allSettled([
+      const [dashRes, funilRes, covRes, reqRes, intelligenceRes] = await Promise.allSettled([
         apiCache.get('/coordenacao/dashboard/geral', {}, () =>
           http.get('/coordenacao/dashboard/geral').then(r => r.data)),
         apiCache.get('/insights/governance/funnel', { startDate: ha30, endDate: hoje }, () =>
@@ -229,6 +250,8 @@ export default function DashboardCoordenacaoGeralPage() {
           http.get('/insights/governance/coverage', { params: { startDate: ha30, endDate: hoje } }).then(r => r.data)),
         apiCache.get('/coordenacao/requisicoes', { status: 'SOLICITADO' }, () =>
           http.get('/coordenacao/requisicoes', { params: { status: 'SOLICITADO' } }).then(r => r.data)),
+        apiCache.get('/intelligence-core/network/overview', { startDate: ha30, endDate: hoje }, () =>
+          getNetworkIntelligenceOverview({ startDate: ha30, endDate: hoje })),
       ]);
       if (dashRes.status === 'fulfilled') setDashboard(dashRes.value as DashboardGeralAPI);
       if (funilRes.status === 'fulfilled') setFunil(funilRes.value as GovernanceFunnel);
@@ -240,6 +263,7 @@ export default function DashboardCoordenacaoGeralPage() {
         const raw = reqRes.value as any;
         setRequisicoes(Array.isArray(raw) ? raw : (raw?.requisicoes ?? raw?.data ?? []));
       }
+      if (intelligenceRes.status === 'fulfilled') setInteligenciaRede(intelligenceRes.value as IntelligenceRede);
     } catch {
       toast.error('Erro ao carregar dashboard');
     } finally {
@@ -476,6 +500,61 @@ export default function DashboardCoordenacaoGeralPage() {
                 helper={alertasCriticos === 0 ? 'Tudo OK' : 'Requerem atenção'}
                 onClick={() => setAbaAtiva('unidades')} />
             </div>
+          )}
+
+          {inteligenciaRede && (
+            <SectionCard title="Inteligência pedagógica da rede" icon={<Network className="h-4 w-4 text-indigo-600" />}>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                <div className="rounded-xl bg-indigo-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-indigo-700/70">Cobertura</p>
+                  <p className="text-xl font-bold text-indigo-900 mt-1">{inteligenciaRede.metrics.coverageRate == null ? '—' : `${inteligenciaRede.metrics.coverageRate}%`}</p>
+                  <p className="text-[11px] text-indigo-700/70">crianças com registro</p>
+                </div>
+                <div className="rounded-xl bg-blue-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-blue-700/70">Diários</p>
+                  <p className="text-xl font-bold text-blue-900 mt-1">{fmt(inteligenciaRede.metrics.diaryEvents)}</p>
+                  <p className="text-[11px] text-blue-700/70">no período</p>
+                </div>
+                <div className="rounded-xl bg-purple-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-purple-700/70">Observações</p>
+                  <p className="text-xl font-bold text-purple-900 mt-1">{fmt(inteligenciaRede.metrics.observations)}</p>
+                  <p className="text-[11px] text-purple-700/70">evidências coletadas</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-700/70">Alertas</p>
+                  <p className="text-xl font-bold text-amber-900 mt-1">{fmt(inteligenciaRede.metrics.openOperationalAlerts)}</p>
+                  <p className="text-[11px] text-amber-700/70">revisão operacional</p>
+                </div>
+                <div className="rounded-xl bg-rose-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-rose-700/70">Nutrição</p>
+                  <p className="text-xl font-bold text-rose-900 mt-1">{fmt(inteligenciaRede.metrics.nutritionalRevaluationsDue)}</p>
+                  <p className="text-[11px] text-rose-700/70">reavaliações vencidas</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                      <th className="py-2 pr-3 font-medium">Unidade</th>
+                      <th className="py-2 px-3 font-medium">Cobertura</th>
+                      <th className="py-2 px-3 font-medium">Crianças para revisão</th>
+                      <th className="py-2 pl-3 font-medium">Alertas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inteligenciaRede.units.map((unit) => (
+                      <tr key={unit.unitId} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2 pr-3 font-medium text-gray-800">{unit.unitName}</td>
+                        <td className="py-2 px-3 text-gray-600">{unit.metrics.records.coverageRate == null ? '—' : `${unit.metrics.records.coverageRate}%`}</td>
+                        <td className="py-2 px-3 text-gray-600">{unit.metrics.attentionChildren}</td>
+                        <td className="py-2 pl-3 text-gray-600">{unit.metrics.openOperationalAlerts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-gray-500 mt-3">Visão agregada por unidade. Dados psicológicos individuais permanecem restritos ao painel específico de Psicologia.</p>
+            </SectionCard>
           )}
 
           {/* Gráficos */}

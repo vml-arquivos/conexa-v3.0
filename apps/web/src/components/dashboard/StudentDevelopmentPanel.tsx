@@ -101,6 +101,13 @@ export function StudentDevelopmentPanel({ planningId, curriculumEntryId, classro
         classroomId,
         planningId,
         curriculumEntryId,
+        tags: ['MICROGESTO', gesto.group.toUpperCase(), gesto.type, gesto.title],
+        aiContext: {
+          source: 'MICROGESTO_PROFESSOR',
+          captureMode: 'ONE_TAP',
+          domain: gesto.group,
+          requiresHumanReview: true,
+        },
       });
       toast({
         title: `Microgesto registrado!`,

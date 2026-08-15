@@ -422,6 +422,9 @@ export class DevelopmentObservationsService {
       if (dto[field] !== undefined) data[field] = nullableText(dto[field]);
     }
 
+    if (dto.tags !== undefined) data.tags = dto.tags;
+    if (dto.indicadores !== undefined) data.indicadores = dto.indicadores;
+
     return data;
   }
 }
