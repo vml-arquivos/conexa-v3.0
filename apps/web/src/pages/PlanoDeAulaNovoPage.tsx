@@ -755,7 +755,10 @@ export default function PlanoDeAulaNovoPage() {
   const statusInfo = statusConfig[status] ?? statusConfig.RASCUNHO;
   // Bloqueado: não pode editar quando em revisão, aprovado, em execução ou concluído
   // Coordenação também é sempre bloqueada para edição — acessa apenas para revisão
-  const bloqueado = isCoordRole || ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
+  // Coordenação entra nesta rota para revisar, nunca para criar ou editar.
+  const modoRevisao = isCoordRole && Boolean(planningId);
+  const bloqueado = ['EM_REVISAO', 'APROVADO', 'EM_EXECUCAO', 'CONCLUIDO', 'PUBLICADO', 'CANCELADO'].includes(status);
+  const somenteLeitura = bloqueado || modoRevisao;
 
   // ─── Objeto Planning para impressão/PDF — reaproveita PrintablePlan.tsx ─────
   // Monta a partir do estado já carregado em tela, sem nova chamada à API.
@@ -785,6 +788,20 @@ export default function PlanoDeAulaNovoPage() {
       <PageShell title={isCoordRole ? 'Planejamento' : isEditing ? 'Editar Planejamento' : 'Novo Planejamento'}>
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      </PageShell>
+    );
+  }
+
+  // Coordenação nunca entra no formulário de criação sem um plano carregado.
+  if (isCoordRole && !planningId) {
+    return (
+      <PageShell title="Revisão de Planejamento" subtitle="Selecione um plano existente para analisar">
+        <div className="max-w-2xl mx-auto rounded-xl border border-gray-200 bg-gray-50 p-6 text-center space-y-4">
+          <p className="text-sm text-gray-600">A coordenação não cria planos de aula nesta área.</p>
+          <Button variant="outline" onClick={() => navigate('/app/planejamentos')}>
+            <ArrowLeft className="h-4 w-4 mr-2" /> Voltar para Planejamentos
+          </Button>
         </div>
       </PageShell>
     );
@@ -842,7 +859,7 @@ export default function PlanoDeAulaNovoPage() {
         </div>
 
         {/* Banner de auto-save */}
-        {hasDraft && !planningId && (
+        {!modoRevisao && hasDraft && !planningId && (
           <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-sm">
             <Save className="h-4 w-4 flex-shrink-0 text-blue-500" />
             <span className="flex-1">
@@ -989,6 +1006,32 @@ export default function PlanoDeAulaNovoPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {modoRevisao ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Dados do planejamento</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Turma</Label>
+                    <p className="mt-1 text-sm font-medium text-gray-800">{turmaSelecionada?.name || 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <Label>Período</Label>
+                    <p className="mt-1 text-sm font-medium text-gray-800">
+                      {formatDateBR(startDate)}{days.length > 1 ? ` — ${formatDateBR(days[days.length - 1]?.date ?? startDate)}` : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Quantidade de dias</Label>
+                    <p className="mt-1 text-sm text-gray-700">{numDays}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>Título</Label>
+                    <p className="mt-1 text-sm text-gray-800">{title || 'Não informado'}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Turma */}
             <div>
               <Label>
@@ -1006,7 +1049,7 @@ export default function PlanoDeAulaNovoPage() {
                   matrizCache.current.clear();
                   setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined })));
                 }}
-                disabled={bloqueado}
+                disabled={somenteLeitura}
               >
                 <option value="">Selecione a turma...</option>
                 {turmas.map(t => (
@@ -1030,7 +1073,7 @@ export default function PlanoDeAulaNovoPage() {
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  disabled={bloqueado}
+                  disabled={somenteLeitura}
                   className={occupiedDates.length > 0 ? 'border-amber-400' : ''}
                 />
                 {startDate && (
@@ -1065,7 +1108,7 @@ export default function PlanoDeAulaNovoPage() {
                     const v = parseInt(e.target.value, 10);
                     setNumDays(isNaN(v) || v < 1 ? 1 : Math.min(31, v));
                   }}
-                  disabled={bloqueado}
+                  disabled={somenteLeitura}
                 />
                 <p className="text-xs text-gray-400 mt-1">Máximo 31 dias</p>
               </div>
@@ -1078,7 +1121,7 @@ export default function PlanoDeAulaNovoPage() {
                 placeholder="Gerado automaticamente ao selecionar turma e data"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                disabled={bloqueado}
+                disabled={somenteLeitura}
               />
               <p className="text-xs text-gray-400 mt-1">
                 Você pode personalizar o título se desejar.
@@ -1125,7 +1168,7 @@ export default function PlanoDeAulaNovoPage() {
                       matrizCache.current.clear();
                       setDays(prev => prev.map(d => ({ ...d, objectives: [], matrizLoading: false, matrizMessage: undefined })));
                     }}
-                    disabled={bloqueado}
+                    disabled={somenteLeitura}
                   >
                     <option value="">Selecione o segmento curricular...</option>
                     {candidateSegments.map(segment => (
@@ -1137,6 +1180,8 @@ export default function PlanoDeAulaNovoPage() {
                   )}
                 </div>
               </div>
+            )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -1261,7 +1306,7 @@ export default function PlanoDeAulaNovoPage() {
                       </div>
 
                       {/* Tarefa 3.1 — Sugestão de atividade via IA (opcional e editável) */}
-                      {!bloqueado && day.objectives.length > 0 && (() => {
+                      {!modoRevisao && day.objectives.length > 0 && (() => {
                         const obj = day.objectives[0];
                         return (
                           <GeradorAtividadeIA
@@ -1282,6 +1327,24 @@ export default function PlanoDeAulaNovoPage() {
                         );
                       })()}
 
+                      {modoRevisao ? (
+                        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Conteúdo enviado pela professora</p>
+                          <div>
+                            <Label>Desenvolvimento da Atividade</Label>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-800">{day.teacher.atividade || 'Não informado.'}</p>
+                          </div>
+                          <div>
+                            <Label>Recursos e materiais</Label>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">{day.teacher.recursos || 'Não informado.'}</p>
+                          </div>
+                          <div>
+                            <Label>Observações / Adaptações</Label>
+                            <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-gray-700">{day.teacher.observacoes || 'Não informado.'}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
                       <div>
                         <Label>
                           Desenvolvimento da Atividade <span className="text-red-500">*</span>
@@ -1291,7 +1354,7 @@ export default function PlanoDeAulaNovoPage() {
                           rows={4}
                           value={day.teacher.atividade}
                           onChange={e => updateTeacherField(day.date, 'atividade', e.target.value)}
-                          disabled={bloqueado}
+                          disabled={somenteLeitura}
                         />
                       </div>
                       <div>
@@ -1301,7 +1364,7 @@ export default function PlanoDeAulaNovoPage() {
                           rows={2}
                           value={day.teacher.recursos}
                           onChange={e => updateTeacherField(day.date, 'recursos', e.target.value)}
-                          disabled={bloqueado}
+                          disabled={somenteLeitura}
                         />
                       </div>
                       <div>
@@ -1311,9 +1374,11 @@ export default function PlanoDeAulaNovoPage() {
                           rows={2}
                           value={day.teacher.observacoes}
                           onChange={e => updateTeacherField(day.date, 'observacoes', e.target.value)}
-                          disabled={bloqueado}
+                          disabled={somenteLeitura}
                         />
                       </div>
+                        </>
+                      )}
                     </div>
                   </CardContent>
                 )}
