@@ -1305,8 +1305,10 @@ export default function PlanoDeAulaNovoPage() {
                         </p>
                       </div>
 
-                      {/* Tarefa 3.1 — Sugestão de atividade via IA (opcional e editável) */}
-                      {!modoRevisao && day.objectives.length > 0 && (() => {
+                      {/* Tarefa 3.1 — Sugestão de atividade via IA: autoria exclusiva do professor.
+                          A coordenação apenas revisa o conteúdo enviado e não gera atividades
+                          dentro do plano docente. A autoria institucional fica em fluxo separado. */}
+                      {!isCoordRole && !modoRevisao && day.objectives.length > 0 && (() => {
                         const obj = day.objectives[0];
                         return (
                           <GeradorAtividadeIA

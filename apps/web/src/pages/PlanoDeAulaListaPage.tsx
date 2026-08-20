@@ -172,6 +172,7 @@ export default function PlanoDeAulaListaPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isDeveloper = normalizeRoles(user).includes('DEVELOPER');
+  const isCoordRole = !isProfessor(user);
   const today = new Date();
 
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -513,9 +514,9 @@ export default function PlanoDeAulaListaPage() {
 
         {/* ─── Botão flutuante ─── */}
         <button
-          onClick={() => navigate('/app/planejamento/novo')}
+          onClick={() => navigate(isCoordRole ? '/app/planejamentos-legado?modo=autoria' : '/app/planejamento/novo')}
           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 z-40"
-          title="Novo Planejamento"
+          title={isCoordRole ? 'Criar plano ou projeto institucional' : 'Novo Planejamento'}
         >
           <Plus className="h-6 w-6" />
         </button>

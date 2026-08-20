@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/AuthProvider';
 import { isProfessor, isUnidade, isCentral } from '../api/auth';
 import { UnitScopeSelector } from '../components/select/UnitScopeSelector';
@@ -112,9 +112,11 @@ export default function PlanejamentosPage() {
   const ehProfessor = isProfessor(user);
   const ehCoordenador = isUnidade(user);
   const ehCentral = isCentral(user);
+  const [searchParams] = useSearchParams();
+  const modoAutoriaCoord = searchParams.get('modo') === 'autoria' && (ehCoordenador || ehCentral);
   // Contexto global de escopo de unidade (para STAFF_CENTRAL)
   const { selectedUnitId: ctxUnitId } = useUnitScope();
-  const [aba, setAba] = useState<'meus' | 'novo' | 'matriz' | 'templates'>('meus');
+  const [aba, setAba] = useState<'meus' | 'novo' | 'matriz' | 'templates'>(modoAutoriaCoord ? 'templates' : 'meus');
   const [revisaoModal, setRevisaoModal] = useState<{ planningId: string; tipo: 'devolver' } | null>(null);
   const [comentarioRevisao, setComentarioRevisao] = useState('');
   const [plannings, setPlannings] = useState<Planning[]>([]);
@@ -341,19 +343,29 @@ export default function PlanejamentosPage() {
   });
 
   return (
-    <PageShell title="Planejamentos Pedagógicos" subtitle="Organize seus planejamentos com base na Matriz Curricular COCRIS 2026">
+    <PageShell
+      title={modoAutoriaCoord ? 'Autoria da Coordenação' : 'Planejamentos Pedagógicos'}
+      subtitle={modoAutoriaCoord ? 'Crie planos e projetos institucionais para os professores' : 'Organize seus planejamentos com base na Matriz Curricular COCRIS 2026'}
+    >
       {/* Seletor de unidade — apenas para STAFF_CENTRAL/MANTENEDORA */}
       {ehCentral && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-4">
           <UnitScopeSelector showNetworkOption placeholder="Toda a rede" />
         </div>
       )}
+      {modoAutoriaCoord && (
+        <div className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900">
+          <p className="font-semibold">Espaço de autoria institucional</p>
+          <p className="mt-1 text-indigo-800">Crie planos e projetos para orientar os professores. Os planos enviados pelas professoras continuam em uma área separada de revisão e aprovação.</p>
+        </div>
+      )}
+
       {/* Abas */}
       <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-6 overflow-x-auto">
         {[
           { id: 'meus', label: 'Planos de Aula', icon: <BookOpen className="h-4 w-4" /> },
-          // Aba 'Novo' oculta para coordenação/direção
-          ...(!ehCoordenador && !ehCentral ? [{ id: 'novo', label: 'Novo Plano de Aula', icon: <Plus className="h-4 w-4" /> }] : []),
+          // A coordenação só vê autoria quando abre o espaço institucional explícito.
+          ...((!ehCoordenador && !ehCentral) || modoAutoriaCoord ? [{ id: 'novo', label: 'Novo Plano / Projeto', icon: <Plus className="h-4 w-4" /> }] : []),
           { id: 'matriz', label: 'Matriz Curricular 2026', icon: <Layers className="h-4 w-4" /> },
           { id: 'templates', label: 'Templates', icon: <BookMarked className="h-4 w-4" /> },
         ].map(tab => (
@@ -803,7 +815,7 @@ export default function PlanejamentosPage() {
       {/* ─── TEMPLATES ─── */}
       {aba === 'templates' && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">Templates pré-configurados para facilitar seu planejamento</p>
+          <p className="text-sm text-gray-600">{modoAutoriaCoord ? 'Escolha um modelo para criar um plano ou projeto da coordenação.' : 'Templates pré-configurados para facilitar seu planejamento'}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {(templates.length > 0 ? templates.map(t => ({ nome: t.name, tipo: t.type, desc: t.description || '', campos: [], cor: 'border-blue-200 bg-blue-50' })) : [
               { nome: 'Planejamento Semanal — EI01 Bebês', tipo: 'SEMANAL', desc: 'Template para bebês (0-18 meses) com foco em rotinas de cuidado, exploração sensorial e vínculos afetivos.', campos: ['eu-outro-nos', 'corpo-gestos'], cor: 'border-pink-200 bg-pink-50' },
