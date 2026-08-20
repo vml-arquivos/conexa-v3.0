@@ -132,23 +132,23 @@ export default function TeacherDashboardPremium() {
   const nomeProfessora = ((user?.nome as string) || (user as any)?.firstName || 'Professora').split(' ')[0];
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-[#FAFAFA] p-6">
+    <div className="min-h-screen bg-[var(--surface-page)] text-[var(--text-primary)] p-4 sm:p-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-[#3B82F6] to-[#A855F7] bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl font-normal bg-gradient-to-r from-brand-300 to-brand-500 bg-clip-text text-transparent">
               Olá, {nomeProfessora}! 👋
             </h1>
-            <p className="text-[#A1A1AA] mt-2">
+            <p className="text-[var(--text-secondary)] mt-2">
               {classroomName ? `Turma: ${classroomName}` : loading ? 'Carregando turma...' : 'Nenhuma turma atribuída'}
             </p>
           </div>
           <div className="text-right flex flex-col items-end gap-2">
-            <div className="text-3xl font-bold text-[#3B82F6]">
+            <div className="text-2xl sm:text-3xl font-normal text-brand-400">
               {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </div>
-            <div className="text-[#A1A1AA] text-sm">
+            <div className="text-[var(--text-secondary)] text-sm">
               {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </div>
             <div className="flex items-center gap-2">
@@ -161,7 +161,7 @@ export default function TeacherDashboardPremium() {
                   <WifiOff className="h-3 w-3" /> Offline — registros em fila
                 </Badge>
               )}
-              <Button size="sm" variant="ghost" onClick={loadDashboardData} className="text-[#A1A1AA] hover:text-white" disabled={loading}>
+              <Button size="sm" variant="ghost" onClick={loadDashboardData} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]" disabled={loading}>
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
             </div>
@@ -172,18 +172,18 @@ export default function TeacherDashboardPremium() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Total de Alunos', value: stats.totalAlunos, icon: <Users className="h-6 w-6" />, color: '#3B82F6' },
-          { label: 'Presentes Hoje', value: stats.presentesToday, icon: <CheckCircle2 className="h-6 w-6" />, color: '#22C55E' },
-          { label: 'Atividades Pendentes', value: stats.atividadesPendentes, icon: <Clock className="h-6 w-6" />, color: '#F59E0B' },
-          { label: 'Planejamentos', value: stats.planejamentosConcluidos, icon: <TrendingUp className="h-6 w-6" />, color: '#A855F7' },
+          { label: 'Total de Alunos', value: stats.totalAlunos, icon: <Users className="h-6 w-6" />, color: 'var(--brand-400)' },
+          { label: 'Presentes Hoje', value: stats.presentesToday, icon: <CheckCircle2 className="h-6 w-6" />, color: 'var(--success)' },
+          { label: 'Atividades Pendentes', value: stats.atividadesPendentes, icon: <Clock className="h-6 w-6" />, color: 'var(--warning)' },
+          { label: 'Planejamentos', value: stats.planejamentosConcluidos, icon: <TrendingUp className="h-6 w-6" />, color: 'var(--brand-500)' },
         ].map((stat) => (
-          <Card key={stat.label} className="bg-[#111113] border-[#27272A]">
+          <Card key={stat.label} className="bg-[var(--surface-card)] border-[var(--border-default)]">
             <CardContent className="p-4">
               <div style={{ color: stat.color }} className="mb-2">{stat.icon}</div>
-              <div className="text-3xl font-bold" style={{ color: stat.color }}>
+              <div className="text-3xl font-normal" style={{ color: stat.color }}>
                 {loading ? '—' : stat.value}
               </div>
-              <div className="text-[#A1A1AA] text-sm mt-1">{stat.label}</div>
+              <div className="text-[var(--text-secondary)] text-sm mt-1">{stat.label}</div>
             </CardContent>
           </Card>
         ))}
@@ -192,28 +192,28 @@ export default function TeacherDashboardPremium() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Ações Rápidas + Lista de Alunos */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-[#111113] border-[#27272A]">
+          <Card className="bg-[var(--surface-card)] border-[var(--border-default)]">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-[#FAFAFA] flex items-center">
-                <Activity className="h-5 w-5 mr-2 text-[#3B82F6]" />
+              <CardTitle className="text-lg font-normal text-[var(--text-primary)] flex items-center">
+                <Activity className="h-5 w-5 mr-2 text-brand-400" />
                 Ações Rápidas
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
-                <Button onClick={() => navigate('/app/diario-de-bordo')} className="bg-gradient-to-r from-[#3B82F6] to-[#2563EB] hover:from-[#2563EB] hover:to-[#1D4ED8] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                <Button onClick={() => navigate('/app/diario-de-bordo')} className="bg-brand-600 hover:bg-brand-700 text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-ds-brand">
                   <BookOpen className="h-6 w-6" />
                   <span className="text-sm">Diário de Bordo</span>
                 </Button>
-                <Button onClick={() => navigate('/app/rdic-crianca')} className="bg-gradient-to-r from-[#22C55E] to-[#16A34A] hover:from-[#16A34A] hover:to-[#15803D] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                <Button onClick={() => navigate('/app/rdic-crianca')} className="bg-brand-600 hover:bg-brand-700 text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-ds-brand">
                   <Users className="h-6 w-6" />
                   <span className="text-sm">RDIC por Criança</span>
                 </Button>
-                <Button onClick={() => navigate('/app/plano-de-aula')} className="bg-gradient-to-r from-[#F59E0B] to-[#D97706] hover:from-[#D97706] hover:to-[#B45309] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                <Button onClick={() => navigate('/app/plano-de-aula')} className="bg-brand-600 hover:bg-brand-700 text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-ds-brand">
                   <Calendar className="h-6 w-6" />
                   <span className="text-sm">Plano de Aula</span>
                 </Button>
-                <Button onClick={() => navigate('/app/rdic-ria')} className="bg-gradient-to-r from-[#A855F7] to-[#9333EA] hover:from-[#9333EA] hover:to-[#7E22CE] text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-[0_0_20px_rgba(168,85,247,0.3)]">
+                <Button onClick={() => navigate('/app/rdic-ria')} className="bg-brand-600 hover:bg-brand-700 text-white h-24 flex flex-col items-center justify-center space-y-2 shadow-ds-brand">
                   <Star className="h-6 w-6" />
                   <span className="text-sm">RDIC / RIA</span>
                 </Button>
@@ -222,9 +222,9 @@ export default function TeacherDashboardPremium() {
           </Card>
 
           {/* Lista de Alunos */}
-          <Card className="bg-[#111113] border-[#27272A]">
+          <Card className="bg-[var(--surface-card)] border-[var(--border-default)]">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-[#FAFAFA] flex items-center">
+              <CardTitle className="text-lg font-normal text-[var(--text-primary)] flex items-center">
                 <Users className="h-5 w-5 mr-2 text-[#22C55E]" />
                 Alunos da Turma ({stats.totalAlunos})
               </CardTitle>
@@ -232,24 +232,24 @@ export default function TeacherDashboardPremium() {
             <CardContent>
               {loading ? (
                 <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-6 w-6 animate-spin text-[#3B82F6]" />
+                  <RefreshCw className="h-6 w-6 animate-spin text-brand-400" />
                 </div>
               ) : children.length ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-64 overflow-y-auto">
                   {children.map((child) => (
-                    <button key={child.id} onClick={() => navigate('/app/rdic-crianca')} className="flex items-center gap-2 p-2 bg-[#1A1A1D] rounded-lg hover:bg-[#27272A] transition-colors text-left">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3B82F6] to-[#A855F7] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+                    <button key={child.id} onClick={() => navigate('/app/rdic-crianca')} className="flex items-center gap-2 p-2 bg-[var(--surface-inset)] rounded-lg hover:bg-[var(--surface-muted)] transition-colors text-left">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
                         {child.firstName[0]}{child.lastName[0]}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-[#FAFAFA] truncate">{child.firstName} {child.lastName}</p>
+                        <p className="text-sm font-normal text-[var(--text-primary)] truncate">{child.firstName} {child.lastName}</p>
                         {child.dietaryRestrictions?.length ? <p className="text-xs text-yellow-400">⚠ Restrição alimentar</p> : null}
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-[#A1A1AA] text-center py-4">Nenhum aluno encontrado</p>
+                <p className="text-[var(--text-secondary)] text-center py-4">Nenhum aluno encontrado</p>
               )}
             </CardContent>
           </Card>
@@ -257,28 +257,28 @@ export default function TeacherDashboardPremium() {
 
         {/* Sidebar — Alertas + Cuidados */}
         <div className="space-y-6">
-          <Card className="bg-[#111113] border-[#27272A]">
+          <Card className="bg-[var(--surface-card)] border-[var(--border-default)]">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-[#FAFAFA] flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2 text-[#EF4444]" />
+              <CardTitle className="text-lg font-normal text-[var(--text-primary)] flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2 text-[var(--error)]" />
                 Alertas de Saúde
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {alertasAlergias.length === 0 ? (
-                <div className="flex items-center gap-2 p-3 bg-green-600/10 rounded-lg border-l-4 border-green-500">
-                  <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <p className="text-sm text-green-400">Nenhum alerta ativo</p>
+                <div className="flex items-center gap-2 p-3 bg-[var(--success-bg)] rounded-lg border-l-4 border-[var(--success)]">
+                  <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
+                  <p className="text-sm text-[var(--success)]">Nenhum alerta ativo</p>
                 </div>
               ) : (
                 alertasAlergias.map((alert) => (
-                  <div key={alert.id} className={`p-3 rounded-lg border-l-4 ${alert.priority === 'high' ? 'bg-[#EF4444]/10 border-[#EF4444]' : 'bg-[#F59E0B]/10 border-[#F59E0B]'}`}>
+                  <div key={alert.id} className={`p-3 rounded-lg border-l-4 ${alert.priority === 'high' ? 'bg-[var(--error-bg)] border-[var(--error)]' : 'bg-[var(--warning-bg)] border-[var(--warning)]'}`}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-[#FAFAFA]">{alert.message}</p>
-                        <p className="text-xs text-[#71717A] mt-1">{alert.time}</p>
+                        <p className="text-sm font-normal text-[var(--text-primary)]">{alert.message}</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1">{alert.time}</p>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => navigate('/app/painel-alergias')} className="text-[#3B82F6] hover:text-[#2563EB]">
+                      <Button size="sm" variant="ghost" onClick={() => navigate('/app/painel-alergias')} className="text-brand-400 hover:text-brand-300">
                         <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -288,10 +288,10 @@ export default function TeacherDashboardPremium() {
             </CardContent>
           </Card>
 
-          <Card className="bg-[#111113] border-[#27272A]">
+          <Card className="bg-[var(--surface-card)] border-[var(--border-default)]">
             <CardHeader>
-              <CardTitle className="text-xl font-bold text-[#FAFAFA] flex items-center">
-                <Heart className="h-5 w-5 mr-2 text-[#EF4444]" />
+              <CardTitle className="text-lg font-normal text-[var(--text-primary)] flex items-center">
+                <Heart className="h-5 w-5 mr-2 text-[var(--error)]" />
                 Cuidados do Dia
               </CardTitle>
             </CardHeader>
@@ -302,12 +302,12 @@ export default function TeacherDashboardPremium() {
                 { label: 'Hora do Sono', time: '12:30', icon: <Clock className="h-4 w-4" /> },
                 { label: 'Lanche da Tarde', time: '15:00', icon: <Utensils className="h-4 w-4" /> },
               ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between p-3 bg-[#1A1A1D] rounded-lg">
+                <div key={item.label} className="flex items-center justify-between p-3 bg-[var(--surface-inset)] rounded-lg">
                   <div className="flex items-center gap-2">
-                    <span className="text-[#A1A1AA]">{item.icon}</span>
-                    <p className="text-sm font-medium text-[#FAFAFA]">{item.label}</p>
+                    <span className="text-[var(--text-secondary)]">{item.icon}</span>
+                    <p className="text-sm font-normal text-[var(--text-primary)]">{item.label}</p>
                   </div>
-                  <Badge className="bg-[#27272A] text-[#A1A1AA] border-[#3F3F46]">{item.time}</Badge>
+                  <Badge className="bg-[var(--surface-muted)] text-[var(--text-secondary)] border-[var(--border-strong)]">{item.time}</Badge>
                 </div>
               ))}
             </CardContent>

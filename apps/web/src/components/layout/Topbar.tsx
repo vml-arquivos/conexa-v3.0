@@ -5,7 +5,8 @@ import { getPedagogicalToday } from '../../utils/pedagogicalDate';
 import http from '../../api/http';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Calendar, LogOut, User, Users, Building2, Menu } from 'lucide-react';
+import { Calendar, LogOut, User, Users, Building2, Menu, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface TopbarProps {
   onMenuToggle?: () => void;
@@ -33,6 +34,7 @@ const COORD_ROLES = [
 
 export function Topbar({ onMenuToggle }: TopbarProps) {
   const { user, logout } = useAuth() as any;
+  const { theme, toggleTheme } = useTheme();
   const [resolvedClassroom, setResolvedClassroom] = useState<AccessibleClassroom | null>(null);
 
   // FIX p0.1: usar normalizeRoles + getPrimaryRole para seleção determinística do role exibido
@@ -96,14 +98,14 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   }, [directClassroom?.id, isCoordRole]);
 
   return (
-    <header className="bg-slate-950 border-b border-slate-800/50 px-3 sm:px-4 sticky top-0 z-50 h-[48px] flex items-center">
+    <header className="bg-[var(--surface-topbar)] border-b border-[var(--border-sidebar)] px-3 sm:px-4 sticky top-0 z-50 h-[52px] flex items-center">
       <div className="flex items-center justify-between w-full gap-2">
 
         {/* ── Esquerda: hamburguer + info pedagógica ── */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {/* Botão hamburguer — apenas mobile */}
           <button
-            className="md:hidden flex-shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center"
+            className="md:hidden flex-shrink-0 p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-white hover:bg-[var(--surface-sidebar-hover)] transition-colors touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center"
             onClick={onMenuToggle}
             aria-label="Abrir menu"
           >
@@ -112,30 +114,30 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
           {/* Data pedagógica — oculta em mobile pequeno */}
           <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
-            <Calendar className="h-3.5 w-3.5 text-slate-600" />
-            <span className="font-mono text-[11px] font-normal text-slate-400 bg-slate-800/60 px-2 py-0.5 rounded-md tabular-nums">
+            <Calendar className="h-3.5 w-3.5 text-[var(--sidebar-text-muted)]" />
+            <span className="font-mono text-[11px] font-normal text-[var(--sidebar-text-muted)] bg-[var(--surface-sidebar-hover)] px-2 py-0.5 rounded-md tabular-nums">
               {today}
             </span>
           </div>
 
           {/* Separador — apenas sm+ */}
-          <span className="hidden sm:block w-px h-4 bg-slate-800 flex-shrink-0" />
+          <span className="hidden sm:block w-px h-4 bg-[var(--border-sidebar)] flex-shrink-0" />
 
           {/* Contexto: Turma ou Unidade */}
           {isCoordRole ? (
             <div className="flex items-center gap-1.5 min-w-0">
-              <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-slate-600" />
-              <span className="text-[11px] font-normal text-slate-500 hidden sm:inline whitespace-nowrap">Unidade</span>
-              <span className="text-[11px] font-medium text-slate-300 truncate max-w-[100px] sm:max-w-[180px]">
+              <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-[var(--sidebar-text-muted)]" />
+              <span className="text-[11px] font-normal text-[var(--sidebar-text-muted)] hidden sm:inline whitespace-nowrap">Unidade</span>
+              <span className="text-[11px] font-medium text-white truncate max-w-[100px] sm:max-w-[180px]">
                 {unitName ?? 'Unidade'}
               </span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 min-w-0">
-              <Users className="h-3.5 w-3.5 flex-shrink-0 text-slate-600" />
-              <span className="text-[11px] font-normal text-slate-500 hidden sm:inline whitespace-nowrap">Turma</span>
+              <Users className="h-3.5 w-3.5 flex-shrink-0 text-[var(--sidebar-text-muted)]" />
+              <span className="text-[11px] font-normal text-[var(--sidebar-text-muted)] hidden sm:inline whitespace-nowrap">Turma</span>
               <span className={`text-[11px] font-medium truncate max-w-[90px] sm:max-w-[160px] ${
-                hasClassroom ? 'text-slate-300' : 'text-red-400'
+                hasClassroom ? 'text-white' : 'text-red-300'
               }`}>
                 {classroomName}
               </span>
@@ -147,23 +149,33 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {/* Nome e role — apenas sm+ */}
           <div className="hidden sm:flex flex-col items-end">
-            <span className="text-[12px] font-medium text-slate-200 truncate max-w-[130px] leading-tight">
+            <span className="text-[12px] font-medium text-white truncate max-w-[130px] leading-tight">
               {user?.nome || user?.user?.name || user?.email}
             </span>
-            <span className="text-[9px] font-normal text-slate-500 tracking-wide">
+            <span className="text-[9px] font-normal text-[var(--sidebar-text-muted)] tracking-wide">
               {primaryRole}
             </span>
           </div>
 
           {/* Avatar compacto */}
-          <div className="h-7 w-7 rounded-full bg-brand-800/40 flex items-center justify-center border border-brand-700/30 flex-shrink-0">
-            <User className="h-3.5 w-3.5 text-brand-400" />
+          <div className="h-7 w-7 rounded-full bg-brand-900/80 flex items-center justify-center border border-brand-700/60 flex-shrink-0">
+            <User className="h-3.5 w-3.5 text-brand-300" />
           </div>
+
+          {/* Tema — touch-friendly */}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+            aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+            className="p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-brand-300 hover:bg-[var(--surface-sidebar-hover)] transition-colors touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
 
           {/* Logout — touch-friendly */}
           <button
             onClick={logout}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-slate-800/70 transition-colors touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
+            className="p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-red-300 hover:bg-[var(--surface-sidebar-hover)] transition-colors touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center"
             title="Sair"
           >
             <LogOut className="h-4 w-4" />

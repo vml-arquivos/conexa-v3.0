@@ -190,13 +190,13 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
       onClick={onClick}
       className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-100 ${
         active
-          ? 'bg-brand-600 text-white shadow-ds-sm'
-          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          ? 'bg-brand-600 text-[var(--text-inverse)] shadow-ds-sm'
+          : 'text-[var(--sidebar-text-muted)] hover:bg-[var(--surface-sidebar-hover)] hover:text-white'
       }`}
     >
       <span className="flex items-center gap-2">
         <span className={`flex-shrink-0 transition-colors ${
-          active ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'
+          active ? 'text-[var(--text-inverse)]' : 'text-[var(--sidebar-text-muted)] group-hover:text-brand-300'
         }`}>
           {item.icon}
         </span>
@@ -206,7 +206,7 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
         <span className={`ml-1 flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
           active
             ? 'bg-white/20 text-white'
-            : 'bg-brand-900/60 text-brand-300'
+            : 'bg-brand-900/80 text-brand-300'
         }`}>
           {item.badge}
         </span>
@@ -220,7 +220,7 @@ function NavSection({
 }: { titulo: string; items: MenuItem[]; location: ReturnType<typeof useLocation>; onItemClick?: () => void }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.07em] px-2.5 mb-1.5">
+      <p className="text-[10px] font-medium text-[var(--sidebar-text-muted)] uppercase tracking-[0.09em] px-2.5 mb-1.5">
         {titulo}
       </p>
       <div className="space-y-0.5">
@@ -292,9 +292,9 @@ export function Sidebar({ onClose }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-slate-950 text-white h-full min-h-screen flex flex-col">
+    <aside className="w-64 bg-[var(--surface-sidebar)] text-white h-full min-h-screen flex flex-col border-r border-[var(--border-sidebar)]">
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-slate-800/60">
+      <div className="px-4 py-4 border-b border-[var(--border-sidebar)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
               {/* Logo institucional COCRIS */}
@@ -310,12 +310,12 @@ export function Sidebar({ onClose }: SidebarProps) {
               />
               {/* Fallback: ícone + texto */}
               <div className="hidden items-center gap-2" aria-hidden="true">
-                <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-ds-sm">
                   <span className="text-white font-bold text-xs">C</span>
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-sm font-bold leading-tight text-white truncate">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Sistema Pedagógico</p>
+                  <p className="text-[10px] text-[var(--sidebar-text-muted)] mt-0.5">Sistema Pedagógico</p>
                 </div>
               </div>
             </div>
@@ -323,7 +323,7 @@ export function Sidebar({ onClose }: SidebarProps) {
             {onClose && (
               <button
                 onClick={onClose}
-                className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex-shrink-0"
+                className="md:hidden p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-white hover:bg-[var(--surface-sidebar-hover)] transition-colors flex-shrink-0"
                 aria-label="Fechar menu"
               >
                 <X className="h-4 w-4" />
@@ -331,12 +331,12 @@ export function Sidebar({ onClose }: SidebarProps) {
             )}
           </div>
           {user && (
-            <div className="mt-3 px-2.5 py-2 bg-slate-900 rounded-lg border border-slate-800/60">
-              <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wide">Perfil ativo</p>
-              <p className="text-sm font-medium text-slate-100 truncate mt-0.5">
+            <div className="mt-3 px-2.5 py-2 bg-[var(--surface-sidebar-elevated)] rounded-lg border border-[var(--border-sidebar)]">
+              <p className="text-[10px] font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wide">Perfil ativo</p>
+              <p className="text-sm font-normal text-white truncate mt-0.5">
                 {(user.nome as string) || user.email}
               </p>
-              <span className="inline-block mt-1.5 text-[10px] font-semibold bg-brand-900/70 text-brand-300 px-2 py-0.5 rounded-full tracking-wide">
+              <span className="inline-block mt-1.5 text-[10px] font-medium bg-brand-900/80 text-brand-300 px-2 py-0.5 rounded-full tracking-wide">
                 {perfilLabel}
               </span>
             </div>
@@ -420,7 +420,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       </nav>
 
       {/* Rodapé */}
-      <div className="px-3 py-3 border-t border-slate-800/60 space-y-2">
+      <div className="px-3 py-3 border-t border-[var(--border-sidebar)] space-y-2">
         {!isAdministrativo && (isUnidade || isCentral || isMantenedora || isDeveloper) && adminItems.length > 0 && (
           <NavSection titulo="Administração" items={adminItems} location={location} onItemClick={onClose} />
         )}
@@ -429,20 +429,20 @@ export function Sidebar({ onClose }: SidebarProps) {
           <button
             type="button"
             onClick={() => setConfigOpen(o => !o)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-normal text-[var(--sidebar-text-muted)] hover:text-white hover:bg-[var(--surface-sidebar-hover)] transition-colors"
           >
-            <Settings className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <Settings className="h-4 w-4 flex-shrink-0 text-[var(--sidebar-text-muted)]" />
             <span className="flex-1 text-left">Configurações</span>
             <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${configOpen ? 'rotate-180' : ''}`} />
           </button>
           {configOpen && (
-            <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/60 space-y-0.5">
+            <div className="mt-0.5 ml-3 pl-3 border-l border-[var(--border-sidebar)] space-y-0.5">
               <NavItem item={perfilItem} active={isActiveForItem(location, '/app/meu-perfil')} onClick={onClose} />
               <NavItem item={configItem} active={isActiveForItem(location, '/app/configuracoes')} onClick={onClose} />
             </div>
           )}
         </div>
-        <p className="text-[10px] text-slate-700 text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
+        <p className="text-[10px] text-[var(--sidebar-text-muted)] text-center pt-1 opacity-70">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>
   );

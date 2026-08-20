@@ -10,23 +10,25 @@
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
   ClipboardList, BookOpen, Eye, HeartPulse, Users,
-  Wifi, WifiOff, RefreshCw, LogOut, Monitor,
+  Wifi, WifiOff, RefreshCw, LogOut, Monitor, Moon, Sun,
 } from 'lucide-react';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useAuth } from '../../app/AuthProvider';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const NAV = [
-  { path: '/app/mobile/chamada',    label: 'Chamada',    Icon: ClipboardList, cor: '#4f46e5' },
-  { path: '/app/mobile/diario',     label: 'Diário',     Icon: BookOpen,      cor: '#0284c7' },
-  { path: '/app/mobile/observacao', label: 'Observação', Icon: Eye,           cor: '#7c3aed' },
-  { path: '/app/mobile/ocorrencia', label: 'Ocorrência', Icon: HeartPulse,    cor: '#dc2626' },
-  { path: '/app/mobile/alunos',     label: 'Alunos',     Icon: Users,         cor: '#059669' },
+  { path: '/app/mobile/chamada',    label: 'Chamada',    Icon: ClipboardList, cor: 'var(--brand-500)' },
+  { path: '/app/mobile/diario',     label: 'Diário',     Icon: BookOpen,      cor: 'var(--brand-500)' },
+  { path: '/app/mobile/observacao', label: 'Observação', Icon: Eye,           cor: 'var(--brand-500)' },
+  { path: '/app/mobile/ocorrencia', label: 'Ocorrência', Icon: HeartPulse,    cor: 'var(--brand-500)' },
+  { path: '/app/mobile/alunos',     label: 'Alunos',     Icon: Users,         cor: 'var(--brand-500)' },
 ];
 
 export default function MobileShell() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { isOnline, queueCount, isSyncing, syncNow } = useOfflineSync();
 
   const nomeUsuario = (user as any)?.nome?.split(' ')[0]
@@ -35,13 +37,13 @@ export default function MobileShell() {
     ?? 'Professor(a)';
 
   const ativaIdx = NAV.findIndex(n => n.path === location.pathname);
-  const corAtiva = ativaIdx >= 0 ? NAV[ativaIdx].cor : '#4f46e5';
+  const corAtiva = ativaIdx >= 0 ? NAV[ativaIdx].cor : 'var(--brand-500)';
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
-      height: '100dvh', background: '#f8fafc',
-      fontFamily: '"Inter","system-ui",sans-serif',
+      height: '100dvh', background: 'var(--surface-page)',
+      fontFamily: 'var(--font-body)',
     }}>
 
       {/* ── Header compacto ─────────────────────────────────────── */}
@@ -49,26 +51,26 @@ export default function MobileShell() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '10px 16px',
         paddingTop: 'max(10px, env(safe-area-inset-top))',
-        background: '#fff',
-        borderBottom: '0.5px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        background: 'var(--surface-card)',
+        borderBottom: '0.5px solid var(--border-default)',
+        boxShadow: 'var(--shadow-sm)',
         flexShrink: 0,
       }}>
         {/* Logo + nome */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{
             width: 32, height: 32, borderRadius: 10,
-            background: '#4f46e5',
+            background: 'var(--brand-600)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>C</span>
+            <span style={{ color: 'var(--text-inverse)', fontSize: 14, fontWeight: 700 }}>C</span>
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>
               Olá, {nomeUsuario}
             </p>
-            <p style={{ margin: 0, fontSize: 11, color: '#94a3b8', lineHeight: 1.2 }}>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)', lineHeight: 1.2 }}>
               COCRIS Pedagógico
             </p>
           </div>
@@ -81,13 +83,28 @@ export default function MobileShell() {
             onClick={() => navigate('/app/teacher-dashboard')}
             title="Versão desktop"
             style={{
-              width: 34, height: 34, borderRadius: 10, border: '0.5px solid #e2e8f0',
-              background: '#f8fafc', cursor: 'pointer',
+              width: 34, height: 34, borderRadius: 10, border: '0.5px solid var(--border-default)',
+              background: 'var(--surface-subtle)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#94a3b8',
+              color: 'var(--text-tertiary)',
             }}
           >
             <Monitor size={16} />
+          </button>
+
+          {/* Tema */}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+            aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+            style={{
+              width: 34, height: 34, borderRadius: 10, border: '0.5px solid var(--border-default)',
+              background: 'var(--surface-subtle)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-brand)',
+            }}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {/* Logout */}
@@ -95,10 +112,10 @@ export default function MobileShell() {
             onClick={() => { logout?.(); navigate('/login'); }}
             title="Sair"
             style={{
-              width: 34, height: 34, borderRadius: 10, border: '0.5px solid #fecaca',
-              background: '#fef2f2', cursor: 'pointer',
+              width: 34, height: 34, borderRadius: 10, border: '0.5px solid var(--error-border)',
+              background: 'var(--error-bg)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#dc2626',
+              color: 'var(--error)',
             }}
           >
             <LogOut size={16} />
@@ -111,14 +128,14 @@ export default function MobileShell() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '7px 16px', flexShrink: 0,
-          background: isOnline ? '#fffbeb' : '#fef2f2',
-          borderBottom: `0.5px solid ${isOnline ? '#fde68a' : '#fecaca'}`,
+          background: isOnline ? 'var(--info-bg)' : 'var(--error-bg)',
+          borderBottom: `0.5px solid ${isOnline ? 'var(--info-border)' : 'var(--error-border)'}`,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {isOnline
-              ? <Wifi size={13} color="#d97706" />
-              : <WifiOff size={13} color="#dc2626" />}
-            <span style={{ fontSize: 12, color: isOnline ? '#92400e' : '#991b1b' }}>
+              ? <Wifi size={13} color="var(--info)" />
+              : <WifiOff size={13} color="var(--error)" />}
+            <span style={{ fontSize: 12, color: isOnline ? 'var(--info)' : 'var(--error)' }}>
               {isOnline
                 ? `${queueCount} ${queueCount === 1 ? 'ação aguardando envio' : 'ações aguardando envio'}`
                 : `Sem conexão · ${queueCount} ${queueCount === 1 ? 'ação salva localmente' : 'ações salvas localmente'}`}
@@ -128,7 +145,7 @@ export default function MobileShell() {
             <button onClick={syncNow} disabled={isSyncing} style={{
               background: 'none', border: 'none', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 4,
-              color: '#d97706', fontSize: 12, fontWeight: 500,
+              color: 'var(--info)', fontSize: 12, fontWeight: 500,
               opacity: isSyncing ? 0.6 : 1,
             }}>
               <RefreshCw size={12} style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />
@@ -146,10 +163,10 @@ export default function MobileShell() {
       {/* ── Bottom navigation ────────────────────────────────────── */}
       <nav style={{
         display: 'flex',
-        background: '#fff',
+        background: 'var(--surface-card)',
         borderTop: '0.5px solid #e2e8f0',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        boxShadow: '0 -1px 8px rgba(0,0,0,0.06)',
+        boxShadow: 'var(--shadow-sm)',
         flexShrink: 0,
       }}>
         {NAV.map(({ path, label, Icon, cor }) => {

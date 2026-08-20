@@ -54,7 +54,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Registre o diário de bordo do dia letivo.',
     icon: <ClipboardList className="h-5 w-5" />,
     path: '/app/diario-calendario',
-    accent: 'bg-emerald-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 2,
   },
@@ -64,7 +64,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Crie e gerencie seus planejamentos pedagógicos.',
     icon: <BookOpen className="h-5 w-5" />,
     path: '/app/planejamentos',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 3,
   },
@@ -74,7 +74,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Relatório de Desenvolvimento Individual da Criança.',
     icon: <Brain className="h-5 w-5" />,
     path: '/app/rdic-crianca',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     badge: 'Novo',
     priority: 4,
   },
@@ -84,7 +84,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Registre momentos fotográficos da turma.',
     icon: <Camera className="h-5 w-5" />,
     path: '/app/rdx',
-    accent: 'bg-pink-600',
+    accent: 'bg-brand-600',
     priority: 5,
   },
   {
@@ -93,7 +93,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Registre e consulte atendimentos com responsáveis.',
     icon: <MessageCircle className="h-5 w-5" />,
     path: '/app/atendimentos-pais',
-    accent: 'bg-teal-600',
+    accent: 'bg-brand-600',
     priority: 6,
   },
   {
@@ -112,7 +112,7 @@ const W_PROFESSOR: Widget[] = [
     description: 'Solicite materiais pedagógicos para a turma.',
     icon: <ShoppingCart className="h-5 w-5" />,
     path: '/app/material-requests',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 8,
   },
 ];
@@ -133,7 +133,7 @@ const W_COORD_PEDAGOGICO: Widget[] = [
     description: 'Acompanhe os diários dos professores.',
     icon: <ClipboardList className="h-5 w-5" />,
     path: '/app/diario-calendario',
-    accent: 'bg-emerald-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 2,
   },
@@ -143,7 +143,7 @@ const W_COORD_PEDAGOGICO: Widget[] = [
     description: 'Revise e aprove os RDICs dos professores.',
     icon: <Brain className="h-5 w-5" />,
     path: '/app/rdic-coord',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     badge: 'Coord',
     priority: 3,
   },
@@ -153,7 +153,7 @@ const W_COORD_PEDAGOGICO: Widget[] = [
     description: 'Gerencie turmas e reuniões pedagógicas.',
     icon: <Users className="h-5 w-5" />,
     path: '/app/coordenacao',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     priority: 4,
   },
   {
@@ -162,7 +162,7 @@ const W_COORD_PEDAGOGICO: Widget[] = [
     description: 'Análises e insights pedagógicos da unidade.',
     icon: <Sparkles className="h-5 w-5" />,
     path: '/app/inteligencia',
-    accent: 'bg-indigo-600',
+    accent: 'bg-brand-600',
     priority: 5,
   },
   {
@@ -171,7 +171,7 @@ const W_COORD_PEDAGOGICO: Widget[] = [
     description: 'Relatórios pedagógicos e de desempenho.',
     icon: <BarChart2 className="h-5 w-5" />,
     path: '/app/reports',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 6,
   },
 ];
@@ -192,7 +192,7 @@ const W_DIRETOR: Widget[] = [
     description: 'Pedidos de compra aguardando aprovação.',
     icon: <ShoppingBag className="h-5 w-5" />,
     path: '/app/pedidos-compra',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     badge: 'Aprovação',
     priority: 2,
   },
@@ -202,7 +202,7 @@ const W_DIRETOR: Widget[] = [
     description: 'Gerencie turmas e equipe pedagógica.',
     icon: <Users className="h-5 w-5" />,
     path: '/app/coordenacao',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     priority: 3,
   },
   {
@@ -211,7 +211,7 @@ const W_DIRETOR: Widget[] = [
     description: 'Relatórios executivos da unidade.',
     icon: <BarChart2 className="h-5 w-5" />,
     path: '/app/reports',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 4,
   },
 ];
@@ -223,7 +223,7 @@ const W_NUTRICIONISTA: Widget[] = [
     description: 'Visão geral do módulo de nutrição.',
     icon: <Utensils className="h-5 w-5" />,
     path: '/app/nutricionista',
-    accent: 'bg-emerald-600',
+    accent: 'bg-brand-600',
     priority: 1,
   },
   {
@@ -251,7 +251,7 @@ const W_NUTRICIONISTA: Widget[] = [
     description: 'Visualize crianças por turma.',
     icon: <Users className="h-5 w-5" />,
     path: '/app/nutricionista?s=turmas',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     priority: 4,
   },
 ];
@@ -272,7 +272,7 @@ const W_CENTRAL: Widget[] = [
     description: 'Acompanhe todas as unidades da rede.',
     icon: <Network className="h-5 w-5" />,
     path: '/app/coordenacao-geral',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     priority: 2,
   },
   {
@@ -281,7 +281,7 @@ const W_CENTRAL: Widget[] = [
     description: 'Relatórios de desenvolvimento publicados.',
     icon: <Brain className="h-5 w-5" />,
     path: '/app/rdic-geral',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     badge: 'Novo',
     priority: 3,
   },
@@ -291,7 +291,7 @@ const W_CENTRAL: Widget[] = [
     description: 'Análises avançadas e insights da rede.',
     icon: <Sparkles className="h-5 w-5" />,
     path: '/app/inteligencia',
-    accent: 'bg-indigo-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 4,
   },
@@ -301,7 +301,7 @@ const W_CENTRAL: Widget[] = [
     description: 'Relatórios centrais e comparativos.',
     icon: <BarChart2 className="h-5 w-5" />,
     path: '/app/reports',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 5,
   },
 ];
@@ -322,7 +322,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Registre novas matrículas e gerencie alunos ativos.',
     icon: <UserPlus className="h-5 w-5" />,
     path: '/app/secretaria/matriculas',
-    accent: 'bg-emerald-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 2,
   },
@@ -332,7 +332,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Gerencie movimentações, transferências e histórico.',
     icon: <ClipboardCheck className="h-5 w-5" />,
     path: '/app/secretaria/movimentacoes',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     priority: 3,
   },
   {
@@ -341,7 +341,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Histórico de contatos, ligações e encaminhamentos.',
     icon: <MessageCircle className="h-5 w-5" />,
     path: '/app/atendimentos-pais',
-    accent: 'bg-teal-600',
+    accent: 'bg-brand-600',
     priority: 4,
   },
   {
@@ -350,7 +350,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Recados, avisos e comunicados institucionais.',
     icon: <Bell className="h-5 w-5" />,
     path: '/app/secretaria/comunicacao',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     badge: 'Novo',
     priority: 5,
   },
@@ -378,7 +378,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Cadastro, status, vínculo e permissões da equipe.',
     icon: <UserCog className="h-5 w-5" />,
     path: '/app/secretaria/funcionarios',
-    accent: 'bg-indigo-600',
+    accent: 'bg-brand-600',
     priority: 8,
   },
   {
@@ -387,7 +387,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Limpeza, manutenção, suprimentos e apoio operacional.',
     icon: <Inbox className="h-5 w-5" />,
     path: '/app/secretaria/pedidos',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 9,
   },
   {
@@ -396,7 +396,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Visualize e gerencie turmas e alunos matriculados.',
     icon: <Users className="h-5 w-5" />,
     path: '/app/coordenacao',
-    accent: 'bg-pink-600',
+    accent: 'bg-brand-600',
     priority: 10,
   },
   {
@@ -405,7 +405,7 @@ const W_ADMINISTRATIVO: Widget[] = [
     description: 'Relatórios operacionais da secretaria.',
     icon: <BarChart2 className="h-5 w-5" />,
     path: '/app/reports',
-    accent: 'bg-slate-500',
+    accent: 'bg-brand-600',
     priority: 11,
   },
 ];
@@ -426,7 +426,7 @@ const W_MANTENEDORA: Widget[] = [
     description: 'Acompanhe todas as unidades da rede.',
     icon: <Network className="h-5 w-5" />,
     path: '/app/coordenacao-geral',
-    accent: 'bg-violet-600',
+    accent: 'bg-brand-600',
     priority: 2,
   },
   {
@@ -435,7 +435,7 @@ const W_MANTENEDORA: Widget[] = [
     description: 'Indicadores consolidados da rede.',
     icon: <TrendingUp className="h-5 w-5" />,
     path: '/app/central',
-    accent: 'bg-emerald-600',
+    accent: 'bg-brand-600',
     priority: 3,
   },
   {
@@ -444,7 +444,7 @@ const W_MANTENEDORA: Widget[] = [
     description: 'Matriz pedagógica da rede.',
     icon: <Layers className="h-5 w-5" />,
     path: '/app/matriz-pedagogica',
-    accent: 'bg-amber-600',
+    accent: 'bg-brand-700',
     priority: 4,
   },
   {
@@ -453,7 +453,7 @@ const W_MANTENEDORA: Widget[] = [
     description: 'Relatórios executivos e comparativos.',
     icon: <BarChart2 className="h-5 w-5" />,
     path: '/app/reports',
-    accent: 'bg-slate-600',
+    accent: 'bg-brand-600',
     priority: 5,
   },
 ];
@@ -466,7 +466,7 @@ function WidgetCard({ widget }: { widget: Widget }) {
   return (
     <button
       onClick={() => navigate(widget.path)}
-      className="group relative w-full text-left bg-white border border-slate-100 rounded-2xl p-4 hover:border-brand-200 hover:shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+      className="group relative w-full text-left bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-default)] rounded-2xl p-4 hover:border-brand-300 hover:shadow-ds-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
     >
       {/* Accent bar */}
       <div className={`absolute top-0 left-0 w-1 h-full ${widget.accent} rounded-l-xl opacity-80 group-hover:opacity-100 transition-opacity`} />
@@ -480,22 +480,22 @@ function WidgetCard({ widget }: { widget: Widget }) {
             </span>
           </div>
           {widget.badge && (
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-100 flex-shrink-0">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[var(--surface-brand)] text-[var(--text-brand)] border border-[var(--border-brand)] flex-shrink-0">
               {widget.badge}
             </span>
           )}
         </div>
 
         {/* Content */}
-        <h3 className="text-[13px] font-medium text-slate-700 group-hover:text-brand-700 transition-colors leading-snug">
+        <h3 className="text-[13px] font-normal text-[var(--text-primary)] group-hover:text-[var(--text-brand)] transition-colors leading-snug">
           {widget.title}
         </h3>
-        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2 font-normal">
+        <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed line-clamp-2 font-normal">
           {widget.description}
         </p>
 
         {/* Footer */}
-        <div className="flex items-center gap-1 mt-3 text-[11px] font-medium text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 mt-3 text-[11px] font-medium text-[var(--text-brand)] opacity-0 group-hover:opacity-100 transition-opacity">
           <span>Acessar</span>
           <ArrowRight className="h-3 w-3" />
         </div>
@@ -519,8 +519,8 @@ function WidgetRenderer({ widgets, title, subtitle }: WidgetRendererProps) {
     <div>
       {/* Section header */}
       <div className="mb-4">
-        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-        {subtitle && <p className="text-[11px] text-slate-400 mt-0.5 font-normal">{subtitle}</p>}
+        <h2 className="text-sm font-normal text-[var(--text-primary)]">{title}</h2>
+        {subtitle && <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 font-normal">{subtitle}</p>}
       </div>
 
       {/* Grid responsivo — 1 col mobile, 2 tablet, 3-4 desktop */}
@@ -640,12 +640,12 @@ export function UnifiedDashboard() {
         />
 
         {/* ── Atalhos rápidos ─────────────────────────────────────────────── */}
-        <div className="mt-6 pt-5 border-t border-slate-100 flex flex-wrap gap-2">
+        <div className="mt-6 pt-5 border-t border-[var(--border-subtle)] flex flex-wrap gap-2">
           {quickLinks.map((link) => (
             <button
               key={link.path}
               onClick={() => navigate(link.path)}
-              className="flex items-center gap-1.5 text-[11px] font-normal text-slate-400 hover:text-brand-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-brand-50"
+              className="flex items-center gap-1.5 text-[11px] font-normal text-[var(--text-secondary)] hover:text-[var(--text-brand)] transition-colors px-3 py-1.5 rounded-lg hover:bg-[var(--surface-brand)]"
             >
               {link.icon}
               {link.label}
