@@ -228,14 +228,14 @@ export function buildPrintableHTML(plan: Planning): string {
 
     /* ── Cabeçalho ── */
     .header {
-      border-bottom: 3px solid #4f46e5;
+      border-bottom: 3px solid var(--brand-600);
       padding-bottom: 16px;
       margin-bottom: 20px;
     }
 
     .header-logo {
       font-size: 10pt;
-      color: #6366f1;
+      color: var(--brand-600);
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -245,7 +245,7 @@ export function buildPrintableHTML(plan: Planning): string {
     .header-title {
       font-size: 18pt;
       font-weight: 800;
-      color: #1e1b4b;
+      color: var(--surface-sidebar);
       line-height: 1.2;
       margin-bottom: 4px;
     }
@@ -260,8 +260,8 @@ export function buildPrintableHTML(plan: Planning): string {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px 24px;
-      background: #f8f9ff;
-      border: 1px solid #e0e7ff;
+      background: var(--surface-page);
+      border: 1px solid var(--surface-brand);
       border-radius: 8px;
       padding: 14px 18px;
       margin-bottom: 20px;
@@ -276,7 +276,7 @@ export function buildPrintableHTML(plan: Planning): string {
     .meta-label {
       font-size: 8pt;
       font-weight: 700;
-      color: #6366f1;
+      color: var(--brand-600);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -293,7 +293,7 @@ export function buildPrintableHTML(plan: Planning): string {
       border-radius: 999px;
       font-size: 9pt;
       font-weight: 700;
-      background: #e0e7ff;
+      background: var(--surface-brand);
       color: #3730a3;
     }
 
@@ -307,7 +307,7 @@ export function buildPrintableHTML(plan: Planning): string {
     }
 
     .day-header {
-      background: #4f46e5;
+      background: var(--brand-600);
       color: #fff;
       font-size: 10pt;
       font-weight: 700;
@@ -328,7 +328,7 @@ export function buildPrintableHTML(plan: Planning): string {
     .section-title {
       font-size: 8.5pt;
       font-weight: 700;
-      color: #6366f1;
+      color: var(--brand-600);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 6px;
@@ -342,10 +342,10 @@ export function buildPrintableHTML(plan: Planning): string {
 
     /* ── Objetivos ── */
     .objective-card {
-      border-left: 3px solid #818cf8;
+      border-left: 3px solid var(--brand-400);
       padding: 6px 10px;
       margin-bottom: 8px;
-      background: #f5f3ff;
+      background: var(--surface-brand);
       border-radius: 0 6px 6px 0;
     }
 
@@ -356,7 +356,7 @@ export function buildPrintableHTML(plan: Planning): string {
     .obj-campo {
       font-size: 9pt;
       font-weight: 700;
-      color: #4338ca;
+      color: var(--brand-700);
       text-transform: uppercase;
       margin-bottom: 3px;
     }
@@ -392,7 +392,7 @@ export function buildPrintableHTML(plan: Planning): string {
       top: 0;
       left: 0;
       right: 0;
-      background: #4f46e5;
+      background: var(--brand-600);
       color: #fff;
       padding: 10px 24px;
       display: flex;
@@ -425,7 +425,7 @@ export function buildPrintableHTML(plan: Planning): string {
 
     .btn-print {
       background: #fff;
-      color: #4f46e5;
+      color: var(--brand-600);
     }
 
     .btn-close {
@@ -611,14 +611,14 @@ export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
     }
 
     .header {
-      border-bottom: 3px solid #4f46e5;
+      border-bottom: 3px solid var(--brand-600);
       padding-bottom: 14px;
       margin-bottom: 18px;
     }
 
     .header-logo {
       font-size: 10pt;
-      color: #6366f1;
+      color: var(--brand-600);
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -628,7 +628,7 @@ export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
     .header-title {
       font-size: 17pt;
       font-weight: 800;
-      color: #1e1b4b;
+      color: var(--surface-sidebar);
       line-height: 1.2;
       margin-bottom: 4px;
     }
@@ -640,7 +640,7 @@ export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
 
     .day-pill {
       display: inline-block;
-      background: #4f46e5;
+      background: var(--brand-600);
       color: #fff;
       font-size: 11pt;
       font-weight: 700;
@@ -654,25 +654,25 @@ export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 24px;
-      background: #f8f9ff;
-      border: 1px solid #e0e7ff;
+      background: var(--surface-page);
+      border: 1px solid var(--surface-brand);
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 16px;
     }
 
     .meta-item { display: flex; flex-direction: column; gap: 2px; }
-    .meta-label { font-size: 8pt; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .meta-label { font-size: 8pt; font-weight: 700; color: var(--brand-600); text-transform: uppercase; letter-spacing: 0.5px; }
     .meta-value { font-size: 10.5pt; color: #111827; font-weight: 500; }
 
     .section { padding: 9px 0; border-bottom: 1px solid #f3f4f6; }
     .section:last-child { border-bottom: none; }
-    .section-title { font-size: 8.5pt; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .section-title { font-size: 8.5pt; font-weight: 700; color: var(--brand-600); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
     .field-value { font-size: 10.5pt; color: #374151; line-height: 1.5; }
 
-    .objective-card { border-left: 3px solid #818cf8; padding: 6px 10px; margin-bottom: 7px; background: #f5f3ff; border-radius: 0 6px 6px 0; }
+    .objective-card { border-left: 3px solid var(--brand-400); padding: 6px 10px; margin-bottom: 7px; background: var(--surface-brand); border-radius: 0 6px 6px 0; }
     .objective-card:last-child { margin-bottom: 0; }
-    .obj-campo { font-size: 9pt; font-weight: 700; color: #4338ca; text-transform: uppercase; margin-bottom: 3px; }
+    .obj-campo { font-size: 9pt; font-weight: 700; color: var(--brand-700); text-transform: uppercase; margin-bottom: 3px; }
     .obj-codigo { font-size: 8pt; color: #6b7280; font-family: monospace; margin-bottom: 3px; }
     .obj-text { font-size: 9.5pt; color: #374151; line-height: 1.45; margin-bottom: 2px; }
 
@@ -688,14 +688,14 @@ export function buildPrintableDayHTML(plan: Planning, dayDate: string): string {
 
     .action-bar {
       position: fixed; top: 0; left: 0; right: 0;
-      background: #4f46e5; color: #fff;
+      background: var(--brand-600); color: #fff;
       padding: 10px 24px; display: flex; align-items: center; gap: 12px;
       z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
     .action-bar span { flex: 1; font-size: 11pt; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .btn { padding: 7px 18px; border-radius: 6px; font-size: 10pt; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
     .btn:hover { opacity: 0.85; }
-    .btn-print { background: #fff; color: #4f46e5; }
+    .btn-print { background: #fff; color: var(--brand-600); }
     .btn-close { background: rgba(255,255,255,0.15); color: #fff; }
 
     /* Garante que o conteúdo de UM dia caiba sempre em uma única página */

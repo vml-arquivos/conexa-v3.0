@@ -1338,7 +1338,7 @@ export default function RdicCriancaPage() {
                   const dimHtml = (rdic.rascunhoJson?.dimensoes ?? []).map(d => {
                     const def = DIMENSOES_BNCC.find(x => x.id === d.dimensao);
                     const indsHtml = d.indicadores.map(ind =>
-                      `<tr><td style="padding:4px 8px;font-size:12px;color:#555">${ind.codigo}</td><td style="padding:4px 8px;font-size:12px">${ind.descricao}</td><td style="padding:4px 8px;font-size:12px;text-align:center;font-weight:600;color:${ind.nivel==='CONSOLIDADO'?'#16a34a':ind.nivel==='AMPLIADO'?'#2563eb':ind.nivel==='EM_DESENVOLVIMENTO'?'#d97706':'#9ca3af'}">${ind.nivel.replace('_',' ')}</td></tr>`
+                      `<tr><td style="padding:4px 8px;font-size:12px;color:#555">${ind.codigo}</td><td style="padding:4px 8px;font-size:12px">${ind.descricao}</td><td style="padding:4px 8px;font-size:12px;text-align:center;font-weight:600;color:${ind.nivel==='CONSOLIDADO'?'#16a34a':ind.nivel==='AMPLIADO'?'var(--brand-600)':ind.nivel==='EM_DESENVOLVIMENTO'?'#d97706':'#9ca3af'}">${ind.nivel.replace('_',' ')}</td></tr>`
                     ).join('');
                     return `<div style="margin-bottom:16px"><h4 style="font-size:13px;font-weight:700;color:#374151;margin:0 0 6px">${def?.label ?? d.dimensao}</h4><table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb"><thead><tr style="background:#f9fafb"><th style="padding:4px 8px;font-size:11px;text-align:left">Código</th><th style="padding:4px 8px;font-size:11px;text-align:left">Indicador</th><th style="padding:4px 8px;font-size:11px;text-align:center">Nível</th></tr></thead><tbody>${indsHtml}</tbody></table></div>`;
                   }).join('');

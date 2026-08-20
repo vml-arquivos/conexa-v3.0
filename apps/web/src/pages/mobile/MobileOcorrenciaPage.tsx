@@ -22,8 +22,8 @@ const TIPOS = [
   { id: 'ALERGIA',        label: 'Alergia',            Icon: ShieldAlert,  cor: '#dc2626',       urgente: true  },
   { id: 'VOMITO',         label: 'Vômito',             Icon: Wind,         cor: M.color.warning, urgente: false },
   { id: 'FEBRE',          label: 'Febre',              Icon: Thermometer,  cor: M.color.error,   urgente: true  },
-  { id: 'CHORO',          label: 'Choro excessivo',    Icon: Heart,        cor: '#3b82f6',       urgente: false },
-  { id: 'MEDICACAO',      label: 'Medicação',          Icon: Pill,         cor: '#8b5cf6',       urgente: false },
+  { id: 'CHORO',          label: 'Choro excessivo',    Icon: Heart,        cor: 'var(--brand-500)',       urgente: false },
+  { id: 'MEDICACAO',      label: 'Medicação',          Icon: Pill,         cor: 'var(--brand-500)',       urgente: false },
   { id: 'OUTRO',          label: 'Outro',              Icon: ClipboardList,cor: M.color.textMuted,urgente: false },
 ];
 

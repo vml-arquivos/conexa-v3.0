@@ -44,7 +44,7 @@ import {
 const URGENCIA_CONFIG: Record<string, { label: string; cor: string; dot: string }> = {
   ALTA: { label: 'Urgente', cor: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
   MEDIA: { label: 'Normal', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500' },
-  BAIXA: { label: 'Sem pressa', cor: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500' },
+  BAIXA: { label: 'Sem pressa', cor: 'bg-brand-100 text-brand-700 border-brand-300', dot: 'bg-brand-500' },
 };
 
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -119,7 +119,7 @@ function PedagogicoSubNav({
         ].map(s => (
           <button key={s.id} onClick={() => setSubAba(s.id as any)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              subAba === s.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              subAba === s.id ? 'bg-white text-brand-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}>
             {s.label}
           </button>
@@ -160,15 +160,15 @@ function PedagogicoSubNav({
                 : ctx.climaEmocional === 'AGITADO' ? '😬 Agitado'
                 : ctx.climaEmocional === 'DIFICIL' ? '😔 Difícil' : null;
               return (
-                <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-emerald-100' : 'border-amber-100'}}`}>
+                <div key={diario.id} className={`rounded-2xl border p-4 bg-white ${statusPubl ? 'border-brand-100' : 'border-amber-100'}}`}>
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}}`}>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${statusPubl ? 'bg-brand-50 text-brand-700 border-brand-200' : 'bg-amber-50 text-amber-700 border-amber-200'}}`}>
                           {statusPubl ? 'Publicado' : 'Rascunho'}
                         </span>
                         {execLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-700">{execLabel}</span>}
-                        {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-sky-50 text-sky-700 border border-sky-200">{climaLabel}</span>}
+                        {climaLabel && <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-brand-50 text-brand-700 border border-brand-200">{climaLabel}</span>}
                       </div>
                       <p className="text-sm font-semibold text-gray-800 truncate">
                         {turma}
@@ -195,7 +195,7 @@ function PedagogicoSubNav({
                             diario.classroomId ?? diario.classroom?.id ?? ''
                           }`
                         )}
-                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 px-2 py-0.5 rounded-lg hover:bg-blue-50 transition-colors whitespace-nowrap"
+                        className="text-[11px] font-semibold text-brand-600 hover:text-brand-800 px-2 py-0.5 rounded-lg hover:bg-brand-50 transition-colors whitespace-nowrap"
                       >
                         Ver →
                       </button>
@@ -212,13 +212,13 @@ function PedagogicoSubNav({
       {subAba === 'turmas' && (
         <div className="grid grid-cols-1 gap-3">
           {turmasLista.map((turma: any) => (
-            <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-blue-200 transition-all">
+            <div key={turma.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 hover:border-brand-200 transition-all">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="font-semibold text-gray-800">{turma.nome}</p>
                   <p className="text-xs text-gray-400">{turma.totalAlunos} alunos · {turma.professor || 'Sem professor'}</p>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${turma.chamadaFeita ? 'bg-brand-100 text-brand-700' : 'bg-amber-100 text-amber-700'}`}>
                   {turma.chamadaFeita ? '✅ Chamada' : '⏳ Pendente'}
                 </span>
               </div>
@@ -247,18 +247,18 @@ function PedagogicoSubNav({
             <p className="text-sm font-semibold text-gray-700">Cobertura de Registros — Hoje</p>
             <button
               onClick={() => { setCobertura(null); setPendencias(null); carregarCobertura(); }}
-              className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              className="text-xs text-brand-600 hover:underline flex items-center gap-1">
               Atualizar
             </button>
           </div>
           {loadingCobertura ? (
             <div className="flex items-center justify-center py-10 gap-2">
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-gray-500">Carregando...</p>
             </div>
           ) : !cobertura ? (
             <button onClick={carregarCobertura}
-              className="w-full py-8 rounded-2xl border-2 border-dashed border-blue-200 text-sm text-blue-600 hover:bg-blue-50 transition-all">
+              className="w-full py-8 rounded-2xl border-2 border-dashed border-brand-200 text-sm text-brand-600 hover:bg-brand-50 transition-all">
               Carregar dados de cobertura
             </button>
           ) : (
@@ -267,12 +267,12 @@ function PedagogicoSubNav({
                 <div key={cls.classroomId} className="bg-white rounded-2xl border border-gray-100 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-semibold text-gray-800">{cls.classroomName}</p>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-100 text-emerald-700' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-brand-100 text-brand-700' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'}`}>
                       {cls.coveragePct ?? 0}%
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div className={`h-full rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-emerald-500' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                    <div className={`h-full rounded-full ${(cls.coveragePct ?? 0) >= 80 ? 'bg-brand-500' : (cls.coveragePct ?? 0) >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
                       style={{ width: `${Math.max(cls.coveragePct ?? 0, 2)}%` }} />
                   </div>
                 </div>
@@ -576,21 +576,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       label: 'Planejamentos',
       desc: `${dashboard?.planejamentosParaRevisar ?? 0} aguardando revisão`,
       icon: <BookOpen className="h-5 w-5" />,
-      className: 'from-amber-500 via-orange-500 to-rose-500',
+      className: 'from-brand-700 via-brand-600 to-brand-500',
       action: () => setAbaAtiva('planejamentos'),
     },
     {
       label: 'Diários da Turma',
       desc: `${diariosPublicados} publicados · ${diariosRascunho} rascunho(s)`,
       icon: <ClipboardList className="h-5 w-5" />,
-      className: 'from-sky-600 via-blue-600 to-indigo-700',
+      className: 'from-brand-700 via-brand-600 to-brand-500',
       action: () => navigate('/app/diario-calendario'),
     },
     {
       label: 'Relatórios',
       desc: 'Indicadores e análises da unidade',
       icon: <FileText className="h-5 w-5" />,
-      className: 'from-emerald-600 via-teal-600 to-cyan-700',
+      className: 'from-brand-700 via-brand-600 to-brand-500',
       action: () => setAbaAtiva('relatorios'),
     },
   ] as const;
@@ -601,7 +601,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       label: 'Atendimentos Pais',
       desc: 'Registrar reuniões e gerar PDF',
       icon: <MessageCircle className="h-5 w-5" />,
-      className: 'from-teal-500 via-emerald-500 to-green-600',
+      className: 'from-brand-700 via-brand-600 to-brand-500',
       action: () => navigate('/app/atendimentos-pais'),
     },
   ] as const;
@@ -612,14 +612,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       label: 'Pedidos de Material',
       desc: canApprove ? `${dashboard?.requisicoesParaAnalisar ?? 0} aguardando aprovação` : 'Acompanhar pedidos',
       icon: <ShoppingCart className="h-5 w-5" />,
-      className: 'from-rose-500 via-red-500 to-pink-600',
+      className: 'from-brand-800 via-brand-700 to-brand-600',
       action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
     },
     {
       label: 'Ocorrências',
       desc: 'Registrar e analisar ocorrências',
       icon: <TriangleAlert className="h-5 w-5" />,
-      className: 'from-red-600 via-orange-600 to-yellow-600',
+      className: 'from-brand-800 via-brand-700 to-brand-600',
       action: () => setAbaAtiva('ocorrencias'),
     },
   ] as const;
@@ -701,11 +701,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
       {/* Banner modo leitura para Coordenação Geral */}
       {isCentralUser && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-center gap-3">
-          <Eye className="h-5 w-5 text-blue-500 flex-shrink-0" />
+        <div className="mb-4 p-3 bg-brand-50 border border-brand-200 rounded-2xl flex items-center gap-3">
+          <Eye className="h-5 w-5 text-brand-500 flex-shrink-0" />
           <div>
-            <p className="text-sm font-semibold text-blue-800">Modo Análise — Coordenação Geral</p>
-            <p className="text-xs text-blue-600">Você está visualizando dados desta unidade. Aprovações são responsabilidade da Coordenação da Unidade.</p>
+            <p className="text-sm font-semibold text-brand-800">Modo Análise — Coordenação Geral</p>
+            <p className="text-xs text-brand-600">Você está visualizando dados desta unidade. Aprovações são responsabilidade da Coordenação da Unidade.</p>
           </div>
         </div>
       )}
@@ -722,7 +722,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               setAbaAtiva(aba.id as any);
             }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-              abaAtiva === aba.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              abaAtiva === aba.id ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
             {aba.icon}{aba.label}
             {(aba as any).badge > 0 && (
               <span className="bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
@@ -746,9 +746,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 title: 'Requisições Pendentes',
                 count: dashboard?.requisicoesParaAnalisar ?? 0,
                 subtitle: 'Aguardando análise',
-                color: 'bg-pink-600',
-                bgColor: 'bg-pink-50',
-                icon: <ShoppingCart className="h-5 w-5 text-pink-600" />,
+                color: 'bg-brand-600',
+                bgColor: 'bg-brand-50',
+                icon: <ShoppingCart className="h-5 w-5 text-brand-600" />,
                 action: () => navigate(unitIdParam ? `/app/material-requests?unitId=${unitIdParam}` : '/app/material-requests'),
                 actionLabel: 'Analisar',
               },
@@ -758,9 +758,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 title: 'Planejamentos',
                 count: dashboard?.planejamentosParaRevisar ?? 0,
                 subtitle: 'Aguardando revisão',
-                color: 'bg-blue-600',
-                bgColor: 'bg-blue-50',
-                icon: <ClipboardList className="h-5 w-5 text-blue-600" />,
+                color: 'bg-brand-600',
+                bgColor: 'bg-brand-50',
+                icon: <ClipboardList className="h-5 w-5 text-brand-600" />,
                 action: () => setAbaAtiva('planejamentos'),
                 actionLabel: 'Revisar',
               },
@@ -770,9 +770,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 title: 'Atendimentos',
                 count: 0,
                 subtitle: 'Agendados para hoje',
-                color: 'bg-green-600',
-                bgColor: 'bg-green-50',
-                icon: <Users className="h-5 w-5 text-green-600" />,
+                color: 'bg-brand-600',
+                bgColor: 'bg-brand-50',
+                icon: <Users className="h-5 w-5 text-brand-600" />,
                 action: () => {},
                 actionLabel: 'Ver agenda',
               },
@@ -800,8 +800,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 value: diariosPublicados,
                 unit: `de ${Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho)}`,
                 trend: { value: 8, direction: 'up', label: 'vs ontem' },
-                color: 'text-blue-600',
-                icon: <BookOpen className="h-5 w-5 text-blue-600" />,
+                color: 'text-brand-600',
+                icon: <BookOpen className="h-5 w-5 text-brand-600" />,
                 onClick: () => navigate('/app/diario-calendario'),
               },
               {
@@ -809,16 +809,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 label: 'Planejamentos Aprovados',
                 value: `${Math.round(((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1) * 100)}%`,
                 trend: { value: 10, direction: 'up', label: 'vs semana' },
-                color: 'text-emerald-600',
-                icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,
+                color: 'text-brand-600',
+                icon: <CheckCircle className="h-5 w-5 text-brand-600" />,
               },
               {
                 id: 'frequencia',
                 label: 'Frequência Média',
                 value: '92%',
                 trend: { value: 4, direction: 'up', label: 'vs semana' },
-                color: 'text-purple-600',
-                icon: <BarChart2 className="h-5 w-5 text-purple-600" />,
+                color: 'text-brand-600',
+                icon: <BarChart2 className="h-5 w-5 text-brand-600" />,
               },
               {
                 id: 'alertas',
@@ -835,15 +835,15 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           <PedagogicalSupervisionBlock
             planningMetrics={[
               { label: 'Aguardando Revisão', value: dashboard?.planejamentosParaRevisar ?? 0, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round(((dashboard?.planejamentosParaRevisar ?? 0) / (dashboard?.turmas ?? 1)) * 100) },
-              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0), color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Aprovados', value: (dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0), color: 'text-brand-600', bgColor: 'bg-brand-50', percentage: Math.round((((dashboard?.turmas ?? 0) - (dashboard?.planejamentosParaRevisar ?? 0)) / (dashboard?.turmas ?? 1)) * 100) },
               { label: 'Devolvidos', value: 0, color: 'text-red-600', bgColor: 'bg-red-50' },
               { label: 'Rascunho', value: 0, color: 'text-gray-600', bgColor: 'bg-gray-50' },
             ]}
             diaryMetrics={[
-              { label: 'Publicados', value: diariosPublicados, color: 'text-emerald-600', bgColor: 'bg-emerald-50', percentage: Math.round((diariosPublicados / (dashboard?.turmas ?? 1)) * 100) },
+              { label: 'Publicados', value: diariosPublicados, color: 'text-brand-600', bgColor: 'bg-brand-50', percentage: Math.round((diariosPublicados / (dashboard?.turmas ?? 1)) * 100) },
               { label: 'Rascunho', value: diariosRascunho, color: 'text-amber-600', bgColor: 'bg-amber-50', percentage: Math.round((diariosRascunho / (dashboard?.turmas ?? 1)) * 100) },
               { label: 'Sem Registro', value: Math.max(0, (dashboard?.turmas ?? 0) - diariosPublicados - diariosRascunho), color: 'text-red-600', bgColor: 'bg-red-50' },
-              { label: 'Total', value: Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho), color: 'text-blue-600', bgColor: 'bg-blue-50' },
+              { label: 'Total', value: Math.max(dashboard?.turmas ?? 0, diariosPublicados + diariosRascunho), color: 'text-brand-600', bgColor: 'bg-brand-50' },
             ]}
             classrooms={[
               ...((dashboard?.turmasLista ?? []).map((turma: any) => ({
@@ -942,22 +942,22 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {
                   label: 'Diários esta semana',
                   val: dashboard.diariosEstaSemana ?? (dashboard as any).indicadores?.diariosHoje ?? 0,
-                  icon: <ClipboardList className="h-4 w-4 text-blue-600" />,
-                  bg: 'bg-blue-50',
+                  icon: <ClipboardList className="h-4 w-4 text-brand-600" />,
+                  bg: 'bg-brand-50',
                   onClick: () => setAbaAtiva('diarios' as any),
                 },
                 {
                   label: 'Turmas com chamada',
                   val: `${(dashboard as any).indicadores?.turmasComChamadaHoje ?? 0}/${(dashboard as any).indicadores?.totalTurmas ?? dashboard.turmas ?? 0}`,
-                  icon: <CheckCircle className="h-4 w-4 text-emerald-600" />,
-                  bg: 'bg-emerald-50',
+                  icon: <CheckCircle className="h-4 w-4 text-brand-600" />,
+                  bg: 'bg-brand-50',
                   onClick: undefined as (() => void) | undefined,
                 },
                 {
                   label: 'Cobertura hoje',
                   val: (dashboard as any).indicadores?.diariosHoje > 0 ? `${(dashboard as any).indicadores.diariosHoje} reg.` : '—',
-                  icon: <BarChart2 className="h-4 w-4 text-purple-600" />,
-                  bg: 'bg-purple-50',
+                  icon: <BarChart2 className="h-4 w-4 text-brand-600" />,
+                  bg: 'bg-brand-50',
                   onClick: () => { setCobertura(null); setPendencias(null); carregarCobertura(); },
                 },
               ].map(c => (
@@ -979,12 +979,12 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           <div className="space-y-2">
             {(dashboard?.turmasLista ?? []).map(turma => (
               <div key={turma.id}
-                className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-blue-200 transition-colors">
+                className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:border-brand-200 transition-colors">
                 {/* Cabeçalho da turma */}
                 <div className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Users className="h-4 w-4 text-blue-600" />
+                    <div className="w-9 h-9 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Users className="h-4 w-4 text-brand-600" />
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-gray-800 truncate">{turma.nome}</p>
@@ -996,7 +996,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
                       turma.chamadaFeita
-                        ? 'bg-emerald-100 text-emerald-700'
+                        ? 'bg-brand-100 text-brand-700'
                         : 'bg-amber-100 text-amber-700'
                     }`}>
                       {turma.chamadaFeita ? '✓ Chamada' : '⏳ Pendente'}
@@ -1008,16 +1008,16 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   {[
                     {
                       label: 'Diários',
-                      color: 'text-blue-600',
-                      bg: 'hover:bg-blue-50',
+                      color: 'text-brand-600',
+                      bg: 'hover:bg-brand-50',
                       onClick: () => navigate(
                         `/app/diario-calendario?classroomId=${turma.id}`
                       ),
                     },
                     { label: 'Planos', path: `/app/planejamentos?classroomId=${turma.id}`, color: 'text-amber-600', bg: 'hover:bg-amber-50' },
-                    { label: 'RDIC', path: `/app/rdic-coord?classroomId=${turma.id}`, color: 'text-violet-600', bg: 'hover:bg-violet-50' },
-                    { label: 'Painel', path: `/app/turma/${turma.id}/painel`, color: 'text-teal-600', bg: 'hover:bg-teal-50' },
-                    { label: 'Obs.', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-pink-600', bg: 'hover:bg-pink-50' },
+                    { label: 'RDIC', path: `/app/rdic-coord?classroomId=${turma.id}`, color: 'text-brand-600', bg: 'hover:bg-brand-50' },
+                    { label: 'Painel', path: `/app/turma/${turma.id}/painel`, color: 'text-brand-600', bg: 'hover:bg-brand-50' },
+                    { label: 'Obs.', path: `/app/coordenacao/observacoes?classroomId=${turma.id}`, color: 'text-brand-600', bg: 'hover:bg-brand-50' },
                   ].map(item => (
                     <button
                       key={item.label}
@@ -1059,13 +1059,13 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   return (
                     <div key={diario.id}
                       className={`rounded-xl border px-4 py-2.5 bg-white flex items-center justify-between gap-3 ${
-                        publicado ? 'border-emerald-100' : 'border-amber-100'
+                        publicado ? 'border-brand-100' : 'border-amber-100'
                       }`}>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 truncate">{turmaNm}</p>
                         <p className="text-xs text-gray-400">
                           {professorNm}
-                          {ctx.presencas != null && <span className="ml-2 text-emerald-600">· {ctx.presencas} pres.</span>}
+                          {ctx.presencas != null && <span className="ml-2 text-brand-600">· {ctx.presencas} pres.</span>}
                           {ctx.climaEmocional && <span className="ml-1">· {ctx.climaEmocional}</span>}
                         </p>
                       </div>
@@ -1076,7 +1076,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {diarios.length > 6 && (
                   <button
                     onClick={() => setAbaAtiva('diarios' as any)}
-                    className="w-full py-2 text-xs text-blue-600 hover:underline font-medium"
+                    className="w-full py-2 text-xs text-brand-600 hover:underline font-medium"
                   >
                     Ver todos os {diarios.length} diários →
                   </button>
@@ -1097,7 +1097,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     <div className="w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden flex-shrink-0">
                       <div
                         className={`h-full rounded-full ${
-                          (cls.percentual ?? 0) >= 80 ? 'bg-emerald-500'
+                          (cls.percentual ?? 0) >= 80 ? 'bg-brand-500'
                           : (cls.percentual ?? 0) >= 40 ? 'bg-amber-400'
                           : 'bg-red-400'
                         }`}
@@ -1105,7 +1105,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       />
                     </div>
                     <span className={`text-xs font-bold flex-shrink-0 ${
-                      (cls.percentual ?? 0) >= 80 ? 'text-emerald-600'
+                      (cls.percentual ?? 0) >= 80 ? 'text-brand-600'
                       : (cls.percentual ?? 0) >= 40 ? 'text-amber-600'
                       : 'text-red-500'
                     }`}>{cls.percentual ?? 0}%</span>
@@ -1122,10 +1122,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         const STATUS_CFG: Record<string, { label: string; cor: string; dot: string }> = {
           RASCUNHO:   { label: 'Rascunho',   cor: 'bg-gray-100 text-gray-600 border-gray-300',      dot: 'bg-gray-400'   },
           EM_REVISAO: { label: 'Em Revisão', cor: 'bg-yellow-100 text-yellow-700 border-yellow-300', dot: 'bg-yellow-500' },
-          APROVADO:   { label: 'Aprovado',   cor: 'bg-green-100 text-green-700 border-green-300',   dot: 'bg-green-500'  },
+          APROVADO:   { label: 'Aprovado',   cor: 'bg-brand-100 text-brand-700 border-brand-300',   dot: 'bg-brand-500'  },
           DEVOLVIDO:  { label: 'Devolvido',  cor: 'bg-orange-100 text-orange-700 border-orange-300', dot: 'bg-orange-500' },
-          PUBLICADO:  { label: 'Publicado',  cor: 'bg-blue-100 text-blue-700 border-blue-300',      dot: 'bg-blue-500'   },
-          CONCLUIDO:  { label: 'Concluído',  cor: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500' },
+          PUBLICADO:  { label: 'Publicado',  cor: 'bg-brand-100 text-brand-700 border-brand-300',      dot: 'bg-brand-500'   },
+          CONCLUIDO:  { label: 'Concluído',  cor: 'bg-brand-100 text-brand-700 border-brand-300', dot: 'bg-brand-500' },
         };
 
         // ─── Filtros de status — visão clara do que precisa de ação ────────────
@@ -1134,7 +1134,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           { id: 'ANALISE',   label: 'Aguardando análise', statuses: ['EM_REVISAO'],            cor: 'bg-yellow-500' },
           { id: 'RASCUNHO',  label: 'Rascunhos',          statuses: ['RASCUNHO'],               cor: 'bg-gray-400' },
           { id: 'DEVOLVIDO', label: 'Devolvidos',         statuses: ['DEVOLVIDO'],              cor: 'bg-orange-500' },
-          { id: 'APROVADO',  label: 'Aprovados',          statuses: ['APROVADO', 'PUBLICADO', 'CONCLUIDO'], cor: 'bg-green-500' },
+          { id: 'APROVADO',  label: 'Aprovados',          statuses: ['APROVADO', 'PUBLICADO', 'CONCLUIDO'], cor: 'bg-brand-500' },
         ];
 
         const contagemPorFiltro = (statuses: string[]) =>
@@ -1215,7 +1215,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {filtroAtivo.id !== 'TODOS' && (
                   <button
                     onClick={() => setFiltroStatusPlanejamento('TODOS')}
-                    className="text-xs text-indigo-600 hover:underline font-medium"
+                    className="text-xs text-brand-600 hover:underline font-medium"
                   >
                     Ver todos os planejamentos
                   </button>
@@ -1245,8 +1245,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-left"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <Users className="h-4 w-4 text-blue-600" />
+                          <div className="w-8 h-8 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Users className="h-4 w-4 text-brand-600" />
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-bold text-gray-800 truncate">{grupo.turmaNome}</p>
@@ -1270,7 +1270,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             </span>
                           )}
                           {countAprovado > 0 && (
-                            <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded-full border border-green-200">
+                            <span className="text-[10px] bg-brand-100 text-brand-700 font-bold px-1.5 py-0.5 rounded-full border border-brand-200">
                               {countAprovado} aprovado{countAprovado !== 1 ? 's' : ''}
                             </span>
                           )}
@@ -1327,7 +1327,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                         <button
                                           onClick={() => aprovarPlanejamento(plan.id)}
                                           disabled={processando === plan.id}
-                                          className="text-[11px] bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                                          className="text-[11px] bg-brand-500 hover:bg-brand-600 text-white px-2.5 py-1 rounded-lg font-semibold transition-colors disabled:opacity-50"
                                         >
                                           Aprovar
                                         </button>
@@ -1348,14 +1348,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                     <button
                                       onClick={() => gerarPDF(plan as any)}
                                       title="Gerar PDF do plano completo"
-                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                      className="flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 rounded-lg border border-brand-200 hover:bg-brand-50 transition-colors"
                                     >
                                       <Download className="h-3 w-3" /> PDF
                                     </button>
                                     <button
                                       onClick={() => imprimirPlanejamento(plan as any)}
                                       title="Imprimir o plano completo"
-                                      className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                                      className="flex items-center gap-1 text-[11px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 rounded-lg border border-brand-200 hover:bg-brand-50 transition-colors"
                                     >
                                       <Printer className="h-3 w-3" /> Imprimir
                                     </button>
@@ -1372,7 +1372,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                     {/* Texto contextual: planos já aprovados não precisam de "revisão" novamente */}
                                     <button
                                       onClick={() => navigate(`/app/planejamento/${plan.id}/editar`)}
-                                      className="text-[11px] text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                                      className="text-[11px] text-brand-600 hover:text-brand-800 font-medium hover:underline"
                                     >
                                       {['APROVADO', 'PUBLICADO', 'CONCLUIDO'].includes(statusPlano)
                                         ? 'Visualizar →'
@@ -1396,14 +1396,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                                           <button
                                             onClick={() => gerarPDFDia(plan as any, day.date)}
                                             title="Gerar PDF deste dia"
-                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-brand-600 hover:text-brand-800 bg-white border border-brand-200 rounded-md px-2 py-0.5 hover:bg-brand-50 transition-colors"
                                           >
                                             <Download className="h-2.5 w-2.5" /> PDF
                                           </button>
                                           <button
                                             onClick={() => imprimirPlanejamentoDia(plan as any, day.date)}
                                             title="Imprimir apenas este dia"
-                                            className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-50 transition-colors"
+                                            className="flex items-center gap-1 text-[10px] font-semibold text-brand-600 hover:text-brand-800 bg-white border border-brand-200 rounded-md px-2 py-0.5 hover:bg-brand-50 transition-colors"
                                           >
                                             <Printer className="h-2.5 w-2.5" /> Imprimir
                                           </button>
@@ -1433,7 +1433,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                     value={motivoRejeicao}
                     onChange={e => setMotivoRejeicao(e.target.value)}
                     placeholder="Descreva o que precisa ser ajustado..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
                   />
                   <div className="flex gap-2 mt-4">
                     <button
@@ -1488,7 +1488,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               statusCount[s] = (statusCount[s] ?? 0) + 1;
             }
             const CORES_STATUS: Record<string, string> = {
-              PUBLICADO: '#10b981', REVISADO: '#6366f1', ARQUIVADO: '#94a3b8',
+              PUBLICADO: '#10b981', REVISADO: 'var(--brand-600)', ARQUIVADO: '#94a3b8',
               RASCUNHO: '#f59e0b', DEVOLVIDO: '#ef4444',
             };
             const dadosPizza = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
@@ -1511,8 +1511,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               planStatus[s] = (planStatus[s] ?? 0) + 1;
             }
             const CORES_PLAN: Record<string, string> = {
-              APROVADO: '#10b981', EM_REVISAO: '#6366f1', RASCUNHO: '#f59e0b',
-              DEVOLVIDO: '#ef4444', EM_EXECUCAO: '#3b82f6', CONCLUIDO: '#8b5cf6',
+              APROVADO: '#10b981', EM_REVISAO: 'var(--brand-600)', RASCUNHO: '#f59e0b',
+              DEVOLVIDO: '#ef4444', EM_EXECUCAO: 'var(--brand-500)', CONCLUIDO: 'var(--brand-500)',
             };
             const dadosPlanPizza = Object.entries(planStatus).map(([name, value]) => ({ name, value }));
 
@@ -1531,7 +1531,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                           <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                           <Tooltip formatter={(v: any) => [v, 'Diários']} />
-                          <Bar dataKey="total" fill="#6366f1" radius={[4,4,0,0]} />
+                          <Bar dataKey="total" fill="var(--brand-600)" radius={[4,4,0,0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -1597,21 +1597,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               }, 0);
               return (
                 <>
-                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-emerald-700">{publicados}</p>
-                    <p className="text-xs text-emerald-600 mt-0.5 font-medium">Publicados</p>
+                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-brand-700">{publicados}</p>
+                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Publicados</p>
                   </div>
                   <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
                     <p className="text-2xl font-bold text-amber-700">{rascunhos}</p>
                     <p className="text-xs text-amber-600 mt-0.5 font-medium">Rascunhos</p>
                   </div>
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-blue-700">{comExecucao}</p>
-                    <p className="text-xs text-blue-600 mt-0.5 font-medium">Plano cumprido</p>
+                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-brand-700">{comExecucao}</p>
+                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Plano cumprido</p>
                   </div>
-                  <div className="rounded-2xl border border-violet-100 bg-violet-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-violet-700">{presencaMedia > 0 ? `${Math.round(presencaMedia)}%` : '—'}</p>
-                    <p className="text-xs text-violet-600 mt-0.5 font-medium">Presença média</p>
+                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
+                    <p className="text-2xl font-bold text-brand-700">{presencaMedia > 0 ? `${Math.round(presencaMedia)}%` : '—'}</p>
+                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Presença média</p>
                   </div>
                 </>
               );
@@ -1629,7 +1629,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   placeholder="Buscar turma..."
                   value={filtroDiarioTurma}
                   onChange={e => setFiltroDiarioTurma(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <div>
@@ -1637,7 +1637,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 <select
                   value={filtroDiarioStatus}
                   onChange={e => setFiltroDiarioStatus(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white"
                 >
                   <option value="TODOS">Todos</option>
                   <option value="PUBLICADO">Publicado</option>
@@ -1652,7 +1652,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   type="date"
                   value={filtroDiarioDataInicio}
                   onChange={e => setFiltroDiarioDataInicio(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <div>
@@ -1661,7 +1661,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   type="date"
                   value={filtroDiarioDataFim}
                   onChange={e => setFiltroDiarioDataFim(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
             </div>
@@ -1673,7 +1673,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   placeholder="Buscar professor..."
                   value={filtroDiarioProfessor}
                   onChange={e => setFiltroDiarioProfessor(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <button
@@ -1742,8 +1742,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 const execStatus = ctx.statusExecucaoPlano || conferencia?.status || null;
 
                 const EXEC_CFG: Record<string, { label: string; bg: string; text: string }> = {
-                  CUMPRIDO: { label: 'Cumprido', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-                  FEITO: { label: 'Feito', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+                  CUMPRIDO: { label: 'Cumprido', bg: 'bg-brand-50', text: 'text-brand-700' },
+                  FEITO: { label: 'Feito', bg: 'bg-brand-50', text: 'text-brand-700' },
                   PARCIAL: { label: 'Parcial', bg: 'bg-amber-50', text: 'text-amber-700' },
                   NAO_REALIZADO: { label: 'Não realizado', bg: 'bg-red-50', text: 'text-red-700' },
                 };
@@ -1759,7 +1759,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                   <div
                     key={diario.id}
                     className={`rounded-2xl border bg-white overflow-hidden ${
-                      publicado ? 'border-emerald-200' : 'border-amber-200'
+                      publicado ? 'border-brand-200' : 'border-amber-200'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/70">
@@ -1767,7 +1767,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
                             publicado
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              ? 'bg-brand-50 text-brand-700 border-brand-200'
                               : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}>
                             {publicado ? 'Publicado' : 'Rascunho'}
@@ -1778,7 +1778,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             </span>
                           )}
                           {diario.curriculumEntryId && (
-                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-brand-50 text-brand-700 border border-brand-200">
                               BNCC vinculada
                             </span>
                           )}
@@ -1787,7 +1787,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                         <p className="text-xs text-gray-500 mt-0.5">
                           Prof. {professor}
                           {diario.presencas != null && (
-                            <span className="ml-2 text-emerald-600 font-medium">· {diario.presencas} presentes</span>
+                            <span className="ml-2 text-brand-600 font-medium">· {diario.presencas} presentes</span>
                           )}
                           {diario.ausencias != null && (
                             <span className="ml-2 text-rose-500 font-medium">· {diario.ausencias} ausências</span>
@@ -1808,10 +1808,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       )}
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">BNCC / Currículo</p>
+                        <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-500">BNCC / Currículo</p>
                           {entrada ? (
-                            <div className="mt-2 space-y-1.5 text-sm text-indigo-900">
+                            <div className="mt-2 space-y-1.5 text-sm text-brand-900">
                               {campo && <p><span className="font-semibold">Campo:</span> {campo}</p>}
                               {codigoBNCC && <p><span className="font-semibold">Código:</span> {codigoBNCC}</p>}
                               {bncc && <p><span className="font-semibold">Objetivo BNCC:</span> {bncc}</p>}
@@ -1819,21 +1819,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                               {intenc && <p><span className="font-semibold">Intencionalidade:</span> {intenc}</p>}
                             </div>
                           ) : (
-                            <p className="mt-2 text-sm text-indigo-700">Sem vínculo de BNCC neste diário.</p>
+                            <p className="mt-2 text-sm text-brand-700">Sem vínculo de BNCC neste diário.</p>
                           )}
                         </div>
 
-                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Conferência de execução</p>
+                        <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Conferência de execução</p>
                           {plano ? (
-                            <div className="mt-2 space-y-1.5 text-sm text-emerald-900">
+                            <div className="mt-2 space-y-1.5 text-sm text-brand-900">
                               <p><span className="font-semibold">Plano:</span> {plano.title}</p>
                               <p><span className="font-semibold">Status do plano:</span> {plano.status}</p>
                               {execCfg && <p><span className="font-semibold">Execução:</span> {execCfg.label}</p>}
                               {conferencia?.observacao && <p><span className="font-semibold">Observação:</span> {conferencia.observacao}</p>}
                             </div>
                           ) : (
-                            <p className="mt-2 text-sm text-emerald-700">Diário sem planejamento vinculado.</p>
+                            <p className="mt-2 text-sm text-brand-700">Diário sem planejamento vinculado.</p>
                           )}
                         </div>
                       </div>
@@ -1862,7 +1862,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             e.stopPropagation();
                             navigate(`/app/diario-calendario?classroomId=${diario.classroomId ?? diario.classroom?.id ?? ''}`);
                           }}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl transition-colors"
                         >
                           <BookOpen className="h-3.5 w-3.5" />
                           Ver diário completo
@@ -1876,7 +1876,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               {diariosFiltrados.length > paginaDiarios * ITENS_POR_PAGINA && (
                 <button
                   onClick={() => setPaginaDiarios(p => p + 1)}
-                  className="w-full py-3 text-sm text-blue-600 hover:bg-blue-50 rounded-2xl border border-blue-100 font-medium transition-colors mt-2"
+                  className="w-full py-3 text-sm text-brand-600 hover:bg-brand-50 rounded-2xl border border-brand-100 font-medium transition-colors mt-2"
                 >
                   Carregar mais ({diariosFiltrados.length - paginaDiarios * ITENS_POR_PAGINA} restantes)
                 </button>
@@ -1890,8 +1890,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ABA: OBSERVAÇÕES INDIVIDUAIS */}
       {abaAtiva === 'observacoes' && (
         <div className="space-y-4">
-          <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-            <p className="text-sm text-teal-700">
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4">
+            <p className="text-sm text-brand-700">
               Visualize as observações individuais registradas pelos professores para cada aluno.
               Você pode filtrar por turma, aluno ou categoria.
             </p>
@@ -1900,10 +1900,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             {dashboard?.turmasLista?.map(turma => (
               <button key={turma.id}
                 onClick={() => navigate(`/app/coordenacao/observacoes?classroomId=${turma.id}`)}
-                className="p-4 bg-white border-2 border-teal-100 rounded-2xl text-left hover:border-teal-300 hover:shadow-sm transition-all">
+                className="p-4 bg-white border-2 border-brand-100 rounded-2xl text-left hover:border-brand-300 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <Brain className="h-5 w-5 text-teal-600" />
+                  <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+                    <Brain className="h-5 w-5 text-brand-600" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm text-gray-800">{turma.nome}</p>
@@ -1919,8 +1919,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* ABA: SALA DE AULA VIRTUAL */}
       {abaAtiva === 'sala' && (
         <div className="space-y-4">
-          <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
-            <p className="text-sm text-indigo-700">
+          <div className="bg-brand-50 border border-brand-200 rounded-2xl p-4">
+            <p className="text-sm text-brand-700">
               Acompanhe as atividades e tarefas publicadas pelos professores na Sala de Aula Virtual.
               Visualize o desempenho individual de cada aluno por atividade.
             </p>
@@ -1929,10 +1929,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
             {dashboard?.turmasLista?.map(turma => (
               <button key={turma.id}
                 onClick={() => navigate(`/app/sala-de-aula-virtual?classroomId=${turma.id}`)}
-                className="p-4 bg-white border-2 border-indigo-100 rounded-2xl text-left hover:border-indigo-300 hover:shadow-sm transition-all">
+                className="p-4 bg-white border-2 border-brand-100 rounded-2xl text-left hover:border-brand-300 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                    <GraduationCap className="h-5 w-5 text-indigo-600" />
+                  <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+                    <GraduationCap className="h-5 w-5 text-brand-600" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm text-gray-800">{turma.nome}</p>
@@ -1952,11 +1952,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           <p className="text-xs text-gray-400 px-1">Acesso direto aos relatórios da unidade</p>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { label: 'Diários por turma',     path: unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports',                         icon: <ClipboardList className="h-5 w-5 text-blue-600" />,   bg: 'bg-blue-50',   border: 'border-blue-100'   },
+              { label: 'Diários por turma',     path: unitIdParam ? `/app/reports?unitId=${unitIdParam}` : '/app/reports',                         icon: <ClipboardList className="h-5 w-5 text-brand-600" />,   bg: 'bg-brand-50',   border: 'border-brand-100'   },
               { label: 'Consumo de materiais',  path: unitIdParam ? `/app/relatorio-consumo-materiais?unitId=${unitIdParam}` : '/app/relatorio-consumo-materiais', icon: <ShoppingCart className="h-5 w-5 text-orange-600" />, bg: 'bg-orange-50', border: 'border-orange-100' },
-              { label: 'Desenvolvimento',       path: unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil', icon: <Brain className="h-5 w-5 text-purple-600" />,        bg: 'bg-purple-50', border: 'border-purple-100' },
-              { label: 'RDICs publicados',      path: '/app/rdic-geral',                                                                           icon: <FileText className="h-5 w-5 text-teal-600" />,        bg: 'bg-teal-50',   border: 'border-teal-100'   },
-              { label: 'Requisições aprovadas', path: '/app/material-requests',                                                                    icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,  bg: 'bg-emerald-50',border: 'border-emerald-100' },
+              { label: 'Desenvolvimento',       path: unitIdParam ? `/app/desenvolvimento-infantil?unitId=${unitIdParam}` : '/app/desenvolvimento-infantil', icon: <Brain className="h-5 w-5 text-brand-600" />,        bg: 'bg-brand-50', border: 'border-brand-100' },
+              { label: 'RDICs publicados',      path: '/app/rdic-geral',                                                                           icon: <FileText className="h-5 w-5 text-brand-600" />,        bg: 'bg-brand-50',   border: 'border-brand-100'   },
+              { label: 'Requisições aprovadas', path: '/app/material-requests',                                                                    icon: <CheckCircle className="h-5 w-5 text-brand-600" />,  bg: 'bg-brand-50',border: 'border-brand-100' },
               { label: 'Ocorrências',           path: '/app/ocorrencias',                                                                          icon: <TriangleAlert className="h-5 w-5 text-red-500" />,    bg: 'bg-red-50',    border: 'border-red-100'    },
             ].map(item => (
               <button key={item.label} onClick={() => navigate(item.path)}

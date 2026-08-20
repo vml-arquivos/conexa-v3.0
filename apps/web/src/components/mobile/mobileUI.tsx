@@ -19,9 +19,9 @@ export const M = {
   space:   { xs: 6, sm: 10, md: 14, lg: 18, xl: 24 },
   font:    { xs: 11, sm: 12, md: 13, base: 15, lg: 17, xl: 20 },
   color: {
-    brand:      '#4f46e5',
-    brandLight: '#eef2ff',
-    brandText:  '#4338ca',
+    brand:      'var(--brand-600)',
+    brandLight: 'var(--surface-brand)',
+    brandText:  'var(--brand-700)',
     surface:    '#ffffff',
     page:       '#f8fafc',
     border:     '#e2e8f0',

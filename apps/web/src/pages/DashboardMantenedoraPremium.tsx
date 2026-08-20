@@ -30,13 +30,13 @@ import {
 
 // Cores vibrantes para gráficos
 const COLORS = {
-  primary: '#3B82F6',
+  primary: 'var(--brand-500)',
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
-  purple: '#8B5CF6',
+  purple: 'var(--brand-500)',
   pink: '#EC4899',
-  cyan: '#06B6D4',
+  cyan: 'var(--brand-500)',
   orange: '#F97316',
 };
 

@@ -25,7 +25,7 @@ const CAMPOS = [
 // Níveis — ícones Lucide por nível
 const NIVEIS = [
   { id: 'EMERGINDO',        label: 'Emergindo',     desc: 'Primeiros sinais',  Icon: TrendingUp,   color: M.color.warning  },
-  { id: 'EM_DESENVOLVIMENTO',label: 'Desenvolvendo', desc: 'Com apoio',         Icon: Minus,        color: '#3b82f6'        },
+  { id: 'EM_DESENVOLVIMENTO',label: 'Desenvolvendo', desc: 'Com apoio',         Icon: Minus,        color: 'var(--brand-500)'        },
   { id: 'CONSOLIDADO',      label: 'Consolidado',   desc: 'Com autonomia',     Icon: TrendingDown, color: M.color.success  },
 ];
 
@@ -34,10 +34,10 @@ function Avatar({ child, size = 44 }: { child: CachedChild; size?: number }) {
   const foto = resolveChildPhotoUrl(child as any);
   const ini  = `${child.firstName?.[0] ?? ''}${child.lastName?.[0] ?? ''}`.toUpperCase();
   return (
-    <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: '#ede9fe', border: '1.5px solid #ddd6fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', background: 'var(--surface-brand)', border: '1.5px solid var(--border-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {foto
         ? <img src={foto} alt={ini} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-        : <span style={{ fontSize: size * 0.35, fontWeight: 700, color: '#7c3aed' }}>{ini}</span>}
+        : <span style={{ fontSize: size * 0.35, fontWeight: 700, color: 'var(--brand-600)' }}>{ini}</span>}
     </div>
   );
 }
@@ -147,7 +147,7 @@ export default function MobileObservacaoPage() {
     <div style={{ padding: '16px 16px 90px', minHeight: '100%', background: M.color.page }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Eye size={18} color="#7c3aed" strokeWidth={2} />
+        <Eye size={18} color="var(--brand-600)" strokeWidth={2} />
         <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: M.color.text }}>Observação Individual</h1>
       </div>
       <p style={{ fontSize: 12, color: M.color.textMuted, margin: '0 0 16px' }}>Desenvolvimento individual · Campos de experiência BNCC</p>
@@ -174,7 +174,7 @@ export default function MobileObservacaoPage() {
                 <Avatar child={c} size={40} />
                 <div>
                   <p style={{ fontSize: M.font.base, fontWeight: 500, margin: 0, color: M.color.text }}>{c.firstName} {c.lastName}</p>
-                  {c.laudado && <p style={{ fontSize: 11, color: '#7c3aed', margin: 0, display: 'flex', alignItems: 'center', gap: 3 }}><Star size={10} /> Laudado</p>}
+                  {c.laudado && <p style={{ fontSize: 11, color: 'var(--brand-600)', margin: 0, display: 'flex', alignItems: 'center', gap: 3 }}><Star size={10} /> Laudado</p>}
                 </div>
               </button>
             ))}
@@ -185,33 +185,33 @@ export default function MobileObservacaoPage() {
       {/* Criança selecionada */}
       {crianca && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: M.radius.lg, background: '#ede9fe', border: '0.5px solid #ddd6fe', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: M.radius.lg, background: 'var(--surface-brand)', border: '0.5px solid var(--border-brand)', marginBottom: 20 }}>
             <Avatar child={crianca} size={38} />
-            <p style={{ flex: 1, margin: 0, fontSize: M.font.base, fontWeight: 600, color: '#4c1d95' }}>{crianca.firstName} {crianca.lastName}</p>
-            <button onClick={() => setCrianca(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7c3aed', display: 'flex', alignItems: 'center' }}>
+            <p style={{ flex: 1, margin: 0, fontSize: M.font.base, fontWeight: 600, color: 'var(--brand-700)' }}>{crianca.firstName} {crianca.lastName}</p>
+            <button onClick={() => setCrianca(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brand-600)', display: 'flex', alignItems: 'center' }}>
               <X size={16} />
             </button>
           </div>
 
           {/* Campos BNCC */}
           <div style={{ marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid #ddd6fe' }}>
-              <div style={{ width: 24, height: 24, borderRadius: 6, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Star size={13} color="#7c3aed" strokeWidth={2} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: '1px solid var(--border-brand)' }}>
+              <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--surface-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Star size={13} color="var(--brand-600)" strokeWidth={2} />
               </div>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', margin: 0, letterSpacing: 0.6, textTransform: 'uppercase' }}>Campo de Experiência (BNCC)</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-600)', margin: 0, letterSpacing: 0.6, textTransform: 'uppercase' }}>Campo de Experiência (BNCC)</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {CAMPOS.map(c => {
                 const active = form.campo === c.id;
                 return (
                   <button key={c.id} onClick={() => setForm(f => ({ ...f, campo: c.id === f.campo ? '' : c.id }))}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: M.radius.lg, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: `0.5px solid ${active ? '#7c3aed' : M.color.border}`, background: active ? '#ede9fe' : M.color.surface, transition: 'all 0.12s' }}>
-                    <div style={{ width: 32, height: 32, borderRadius: 8, background: active ? '#7c3aed' : M.color.page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.12s' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: M.radius.lg, cursor: 'pointer', WebkitTapHighlightColor: 'transparent', border: `0.5px solid ${active ? 'var(--brand-600)' : M.color.border}`, background: active ? 'var(--surface-brand)' : M.color.surface, transition: 'all 0.12s' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: active ? 'var(--brand-600)' : M.color.page, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.12s' }}>
                       <c.Icon size={16} color={active ? '#fff' : M.color.textMuted} strokeWidth={1.8} />
                     </div>
-                    <span style={{ fontSize: 13, color: active ? '#4c1d95' : M.color.text, fontWeight: active ? 600 : 400, lineHeight: 1.3 }}>{c.label}</span>
-                    {active && <Check size={14} color="#7c3aed" strokeWidth={2.5} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                    <span style={{ fontSize: 13, color: active ? 'var(--brand-700)' : M.color.text, fontWeight: active ? 600 : 400, lineHeight: 1.3 }}>{c.label}</span>
+                    {active && <Check size={14} color="var(--brand-600)" strokeWidth={2.5} style={{ marginLeft: 'auto', flexShrink: 0 }} />}
                   </button>
                 );
               })}
@@ -260,7 +260,7 @@ export default function MobileObservacaoPage() {
             <div style={{ marginBottom: 20 }}>
               <button onClick={() => setMostrarDetalhes(v => !v)} style={{
                 background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                color: '#7c3aed', fontSize: 13, fontWeight: 600, WebkitTapHighlightColor: 'transparent',
+                color: 'var(--brand-600)', fontSize: 13, fontWeight: 600, WebkitTapHighlightColor: 'transparent',
               }}>
                 {mostrarDetalhes ? '− Ocultar' : '+ Adicionar'} detalhamento por área
               </button>
@@ -317,7 +317,7 @@ export default function MobileObservacaoPage() {
           </MobileField>
 
           <MobileSaveBar label="Salvar observação" labelDone="Observação salva" onClick={salvar}
-            disabled={!podeEnviar} saving={saving} saved={saved} isOnline={isOnline} color="#7c3aed" />
+            disabled={!podeEnviar} saving={saving} saved={saved} isOnline={isOnline} color="var(--brand-600)" />
         </>
       )}
 

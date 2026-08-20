@@ -38,7 +38,7 @@ const PRIORITY_CONFIG: Record<MissionPriority, {
 }> = {
   CRITICAL: { label: 'Crítico', bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', dot: '#dc2626' },
   HIGH:     { label: 'Alto',    bg: '#fffbeb', border: '#fde68a', text: '#92400e', dot: '#f59e0b' },
-  MEDIUM:   { label: 'Médio',   bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', dot: '#3b82f6' },
+  MEDIUM:   { label: 'Médio',   bg: 'var(--surface-brand)', border: 'var(--brand-200)', text: 'var(--brand-700)', dot: 'var(--brand-500)' },
   LOW:      { label: 'Baixo',   bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', dot: '#22c55e' },
 };
 
@@ -185,7 +185,7 @@ export function MissionPanel({
         {missions.length > maxItems && (
           <button
             onClick={() => navigate('/app/inteligencia/missoes')}
-            style={{ fontSize: 12, color: '#4f46e5', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+            style={{ fontSize: 12, color: 'var(--brand-600)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
           >
             Ver todas →
           </button>

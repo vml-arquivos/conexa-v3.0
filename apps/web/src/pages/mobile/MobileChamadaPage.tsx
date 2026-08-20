@@ -28,7 +28,7 @@ interface AlunoComportamento {
 
 const COMPORTAMENTOS = [
   { id: 'OTIMO',   label: '😊 Ótimo',      cor: M.color.success },
-  { id: 'BOM',     label: '🙂 Bom',         cor: '#3b82f6' },
+  { id: 'BOM',     label: '🙂 Bom',         cor: 'var(--brand-500)' },
   { id: 'REGULAR', label: '😐 Regular',     cor: M.color.warning },
   { id: 'ATENCAO', label: '😟 Atenção',     cor: M.color.error },
 ];
@@ -39,8 +39,8 @@ function hojeISO() { return new Date().toISOString().slice(0, 10); }
 function AvatarAluno({ child, status, size = 44 }: { child: CachedChild; status: Status; size?: number }) {
   const foto = resolveChildPhotoUrl(child as any);
   const iniciais = `${child.firstName?.[0] ?? ''}${child.lastName?.[0] ?? ''}`.toUpperCase();
-  const cor = status === 'P' ? M.color.success : status === 'F' ? M.color.error : '#6366f1';
-  const bg  = status === 'P' ? '#d1fae5' : status === 'F' ? '#fee2e2' : '#eef2ff';
+  const cor = status === 'P' ? M.color.success : status === 'F' ? M.color.error : 'var(--brand-600)';
+  const bg  = status === 'P' ? '#d1fae5' : status === 'F' ? '#fee2e2' : 'var(--surface-brand)';
 
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, position: 'relative', overflow: 'hidden',
@@ -295,10 +295,10 @@ export default function MobileChamadaPage() {
                         <span style={{ fontSize: 10, color: M.color.warning }}>⚠ Alergia</span>
                       )}
                       {child.laudado && (
-                        <span style={{ fontSize: 10, color: '#7c3aed' }}>★ Laudado</span>
+                        <span style={{ fontSize: 10, color: 'var(--brand-600)' }}>★ Laudado</span>
                       )}
                       {hasComp && (
-                        <span style={{ fontSize: 10, color: '#0284c7' }}>
+                        <span style={{ fontSize: 10, color: 'var(--brand-600)' }}>
                           <MessageSquare size={9} style={{ display: 'inline', marginRight: 2 }} />
                           {COMPORTAMENTOS.find(b => b.id === d.comportamento)?.label.split(' ')[1] ?? d.comportamento}
                         </span>
@@ -340,7 +340,7 @@ export default function MobileChamadaPage() {
             disabled={saving || pendente === children.length}
             style={{
               width: '100%', padding: 15, borderRadius: M.radius.lg, border: 'none',
-              background: saved ? M.color.success : saving ? '#818cf8' : M.color.brand,
+              background: saved ? M.color.success : saving ? 'var(--brand-400)' : M.color.brand,
               color: '#fff', fontSize: M.font.base, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               opacity: (saving || pendente === children.length) ? 0.6 : 1,

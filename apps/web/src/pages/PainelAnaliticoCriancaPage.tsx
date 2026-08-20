@@ -16,18 +16,18 @@ import { ChildQuickActions } from '../components/children/ChildQuickActions';
 import { getIntegralChildProfile } from '../api/intelligence-core';
 
 const DIMENSOES = [
-  { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: '#ec4899' },
+  { id: 'eu-outro-nos',   short: 'Eu e o Nós',  cor: 'var(--brand-500)' },
   { id: 'corpo-gestos',   short: 'Corpo',        cor: '#f97316' },
-  { id: 'tracos-sons',    short: 'Arte',         cor: '#a855f7' },
-  { id: 'escuta-fala',    short: 'Linguagem',    cor: '#3b82f6' },
+  { id: 'tracos-sons',    short: 'Arte',         cor: 'var(--brand-500)' },
+  { id: 'escuta-fala',    short: 'Linguagem',    cor: 'var(--brand-500)' },
   { id: 'espacos-tempos', short: 'Matemática',   cor: '#22c55e' },
 ] as const;
 
 const NIVEL_COR: Record<string, string> = {
-  NAO_OBSERVADO: '#e5e7eb', EM_DESENVOLVIMENTO: '#fde68a', CONSOLIDADO: '#86efac', AMPLIADO: '#93c5fd',
+  NAO_OBSERVADO: '#e5e7eb', EM_DESENVOLVIMENTO: '#fde68a', CONSOLIDADO: '#86efac', AMPLIADO: 'var(--brand-300)',
 };
 
-const DIARY_CORES = ['#6366f1','#22c55e','#f59e0b','#ef4444','#f97316','#06b6d4','#8b5cf6','#ec4899','#6b7280','#3b82f6','#9ca3af'];
+const DIARY_CORES = ['var(--brand-600)','#22c55e','#f59e0b','#ef4444','#f97316','var(--brand-500)','var(--brand-500)','var(--brand-500)','#6b7280','var(--brand-500)','#9ca3af'];
 const DIARY_LABELS: Record<string, string> = {
   ATIVIDADE_PEDAGOGICA:'Pedagógica', DESENVOLVIMENTO:'Desenvolvimento', COMPORTAMENTO:'Comportamento',
   SAUDE:'Saúde', REFEICAO:'Refeição', HIGIENE:'Higiene', SONO:'Sono',
@@ -257,7 +257,7 @@ export default function PainelAnaliticoCriancaPage() {
                         <RadarChart data={radarData} margin={{top:10,right:20,bottom:10,left:20}}>
                           <PolarGrid stroke="#e5e7eb"/>
                           <PolarAngleAxis dataKey="campo" tick={{fontSize:10,fill:'#6b7280'}}/>
-                          <Radar name="Consolidado" dataKey="pct" stroke="#6366f1" fill="#6366f1" fillOpacity={0.25} strokeWidth={2}/>
+                          <Radar name="Consolidado" dataKey="pct" stroke="var(--brand-600)" fill="var(--brand-600)" fillOpacity={0.25} strokeWidth={2}/>
                           <Radar name="Em Desenvolvimento" dataKey="pctED" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} strokeWidth={1.5} strokeDasharray="4 2"/>
                           <Tooltip formatter={(v:number)=>[`${v}%`]} contentStyle={{fontSize:11}}/>
                           <Legend wrapperStyle={{fontSize:10}}/>
@@ -355,7 +355,7 @@ export default function PainelAnaliticoCriancaPage() {
                         <YAxis tick={{fontSize:10}} allowDecimals={false}/>
                         <Tooltip contentStyle={{fontSize:11}}/>
                         <Legend wrapperStyle={{fontSize:10}}/>
-                        <Line type="monotone" dataKey="Total" stroke="#6366f1" strokeWidth={2} dot={{r:3}}/>
+                        <Line type="monotone" dataKey="Total" stroke="var(--brand-600)" strokeWidth={2} dot={{r:3}}/>
                         <Line type="monotone" dataKey="Pedagógico" stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 2" dot={{r:2}}/>
                         <Line type="monotone" dataKey="Ocorrências" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 2" dot={{r:2}}/>
                       </LineChart>

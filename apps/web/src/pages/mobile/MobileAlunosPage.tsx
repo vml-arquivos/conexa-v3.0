@@ -30,7 +30,7 @@ interface AlunoLista {
   classroomName?: string;
 }
 
-const ACCENT = '#4f46e5';
+const ACCENT = 'var(--brand-600)';
 
 export default function MobileAlunosPage() {
   const navigate = useNavigate();
@@ -192,7 +192,7 @@ export default function MobileAlunosPage() {
               ) : (
                 <div style={{
                   width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg,#e0e7ff,#ede9fe)',
+                  background: 'linear-gradient(135deg,var(--surface-brand),var(--surface-brand))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 15, fontWeight: 600, color: ACCENT,
                 }}>
@@ -211,7 +211,7 @@ export default function MobileAlunosPage() {
                       <AlertTriangle size={11} /> Alergia
                     </span>
                   )}
-                  {a.laudado && <span style={{ fontSize: 11, color: '#7c3aed' }}>Laudado</span>}
+                  {a.laudado && <span style={{ fontSize: 11, color: 'var(--brand-600)' }}>Laudado</span>}
                 </div>
               </div>
 

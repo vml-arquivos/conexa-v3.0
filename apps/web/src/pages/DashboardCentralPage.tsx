@@ -83,7 +83,7 @@ interface RdicCentral {
 
 // ─── Cores ───────────────────────────────────────────────────────────────────
 
-const CORES_GRAFICOS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+const CORES_GRAFICOS = ['var(--brand-500)', '#10B981', '#F59E0B', '#EF4444', 'var(--brand-500)', 'var(--brand-500)'];
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
@@ -188,8 +188,8 @@ export function DashboardCentralPage() {
     setDadosAlertas([
       { tipo: 'Comportamental', quantidade: 3, cor: '#EF4444' },
       { tipo: 'Desenvolvimento', quantidade: 2, cor: '#F59E0B' },
-      { tipo: 'Saúde', quantidade: 1, cor: '#8B5CF6' },
-      { tipo: 'Alimentação', quantidade: 1, cor: '#06B6D4' },
+      { tipo: 'Saúde', quantidade: 1, cor: 'var(--brand-500)' },
+      { tipo: 'Alimentação', quantidade: 1, cor: 'var(--brand-500)' },
     ]);
   };
 
@@ -348,7 +348,7 @@ export function DashboardCentralPage() {
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="registros" name="Registros" stroke="#3B82F6" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="registros" name="Registros" stroke="var(--brand-500)" strokeWidth={2} dot={{ r: 4 }} />
               <Line type="monotone" dataKey="presencas" name="Presenças" stroke="#10B981" strokeWidth={2} dot={{ r: 4 }} />
               <Line type="monotone" dataKey="alertas" name="Alertas" stroke="#EF4444" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
@@ -407,7 +407,7 @@ export function DashboardCentralPage() {
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="alunos" name="Alunos" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="alunos" name="Alunos" fill="var(--brand-500)" radius={[4, 4, 0, 0]} />
               <Bar dataKey="professores" name="Professores" fill="#10B981" radius={[4, 4, 0, 0]} />
               <Bar dataKey="alertas" name="Alertas" fill="#EF4444" radius={[4, 4, 0, 0]} />
             </BarChart>

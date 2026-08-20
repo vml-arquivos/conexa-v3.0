@@ -34,13 +34,13 @@ interface Ocorrencia {
 const CATEGORIAS: Record<string, { label: string; cor: string }> = {
   chegada_saida:              { label: 'Chegada / Saída',              cor: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
   saude_lesao:                { label: 'Saúde / Lesão',                cor: 'bg-red-100 text-red-700 border-red-200' },
-  material_pertences:         { label: 'Material / Pertences',         cor: 'bg-blue-100 text-blue-700 border-blue-200' },
+  material_pertences:         { label: 'Material / Pertences',         cor: 'bg-brand-100 text-brand-700 border-brand-200' },
   comportamento:              { label: 'Comportamento',                cor: 'bg-orange-100 text-orange-700 border-orange-200' },
-  comunicacao_responsaveis:   { label: 'Comunicação c/ responsáveis',  cor: 'bg-teal-100 text-teal-700 border-teal-200' },
+  comunicacao_responsaveis:   { label: 'Comunicação c/ responsáveis',  cor: 'bg-brand-100 text-brand-700 border-brand-200' },
   saude:                      { label: 'Saúde',                        cor: 'bg-red-100 text-red-700 border-red-200' },
-  familia:                    { label: 'Família',                      cor: 'bg-purple-100 text-purple-700 border-purple-200' },
-  material:                   { label: 'Material',                     cor: 'bg-blue-100 text-blue-700 border-blue-200' },
-  comunicacao:                { label: 'Comunicação',                  cor: 'bg-teal-100 text-teal-700 border-teal-200' },
+  familia:                    { label: 'Família',                      cor: 'bg-brand-100 text-brand-700 border-brand-200' },
+  material:                   { label: 'Material',                     cor: 'bg-brand-100 text-brand-700 border-brand-200' },
+  comunicacao:                { label: 'Comunicação',                  cor: 'bg-brand-100 text-brand-700 border-brand-200' },
   observacao:                 { label: 'Observação',                   cor: 'bg-gray-100 text-gray-700 border-gray-200' },
   outro:                      { label: 'Outro',                        cor: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
@@ -368,7 +368,7 @@ export function OcorrenciasPanel({
                           {catConfig.label}
                         </span>
                         {ocorr.mediaUrls && ocorr.mediaUrls.length > 0 && (
-                          <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="text-xs bg-brand-50 text-brand-600 border border-brand-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Camera className="h-3 w-3" />
                             {ocorr.mediaUrls.length} foto{ocorr.mediaUrls.length > 1 ? 's' : ''}
                           </span>

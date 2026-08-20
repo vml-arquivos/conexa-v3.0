@@ -98,10 +98,10 @@ const RDIC_STATUS: Record<string, { label: string; bg: string; text: string }> =
 };
 
 const OBS_CATEGORY: Record<string, { label: string; color: string }> = {
-  COGNITIVO:      { label: 'Cognitivo',      color: '#3b82f6' },
+  COGNITIVO:      { label: 'Cognitivo',      color: 'var(--brand-500)' },
   SOCIOAFETIVO:   { label: 'Socioafetivo',   color: '#10b981' },
   MOTOR:          { label: 'Motor',          color: '#f59e0b' },
-  LINGUAGEM:      { label: 'Linguagem',      color: '#8b5cf6' },
+  LINGUAGEM:      { label: 'Linguagem',      color: 'var(--brand-500)' },
   COMPORTAMENTAL: { label: 'Comportamental', color: '#ef4444' },
   OUTRO:          { label: 'Outro',          color: '#6b7280' },
 };
@@ -462,7 +462,7 @@ export default function DashboardPsicologoPage() {
                       <XAxis dataKey="nome" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                      <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="RDICs" />
+                      <Bar dataKey="count" fill="var(--brand-500)" radius={[4, 4, 0, 0]} name="RDICs" />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

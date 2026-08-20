@@ -22,10 +22,10 @@ import { MobileTextarea, PhotoCapture, type CapturedPhoto, M } from '../../compo
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const T = {
-  purple: { text: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+  purple: { text: 'var(--brand-600)', bg: 'var(--surface-brand)', border: 'var(--border-brand)' },
   red:    { text: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
   amber:  { text: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-  blue:   { text: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  blue:   { text: 'var(--brand-600)', bg: 'var(--surface-brand)', border: 'var(--brand-200)' },
   green:  { text: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
   slate:  { text: '#475569', bg: '#f8fafc', border: '#e2e8f0' },
 };
@@ -34,7 +34,7 @@ const T = {
 const CLIMAS = [
   { id: 'MUITO_BOM', label: 'Muito Bom', Icon: Sun,      cor: '#ca8a04', bg: '#fefce8', border: '#fde047' },
   { id: 'BOM',       label: 'Bom',       Icon: CloudSun, cor: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
-  { id: 'REGULAR',   label: 'Regular',   Icon: Cloud,    cor: '#2563eb', bg: '#eff6ff', border: '#93c5fd' },
+  { id: 'REGULAR',   label: 'Regular',   Icon: Cloud,    cor: 'var(--brand-600)', bg: 'var(--surface-brand)', border: 'var(--brand-300)' },
   { id: 'AGITADO',   label: 'Agitado',   Icon: Zap,      cor: '#ea580c', bg: '#fff7ed', border: '#fdba74' },
   { id: 'DIFICIL',   label: 'Difícil',   Icon: CloudRain,cor: '#4b5563', bg: '#f9fafb', border: '#d1d5db' },
 ];
@@ -325,7 +325,7 @@ export default function MobileDiarioPage() {
       {/* Header */}
       <div style={{ padding: '16px 16px 0' }}>
         <h1 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 2px', color: M.color.text, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BookOpen size={18} color="#0284c7" strokeWidth={2} /> Diário do Dia
+          <BookOpen size={18} color="var(--brand-600)" strokeWidth={2} /> Diário do Dia
         </h1>
         <p style={{ fontSize: 12, color: M.color.textMuted, margin: '0 0 12px' }}>{hojeLabel()} · {isOnline ? 'online' : 'offline'}</p>
 
@@ -349,7 +349,7 @@ export default function MobileDiarioPage() {
               { id: 'individual' as Aba, label: `Individuais${obsComDados > 0 ? ` (${obsComDados})` : ''}`, Icon: Users },
             ]).map(a => (
               <button key={a.id} onClick={() => { setAba(a.id); setCriancaAtiva(null); }}
-                style={{ flex: 1, padding: '9px 8px', borderRadius: M.radius.lg, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: aba === a.id ? 600 : 400, background: aba === a.id ? '#0284c7' : 'transparent', color: aba === a.id ? '#fff' : M.color.textSoft, transition: 'all 0.15s', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                style={{ flex: 1, padding: '9px 8px', borderRadius: M.radius.lg, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: aba === a.id ? 600 : 400, background: aba === a.id ? 'var(--brand-600)' : 'transparent', color: aba === a.id ? '#fff' : M.color.textSoft, transition: 'all 0.15s', WebkitTapHighlightColor: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                 <a.Icon size={14} strokeWidth={aba === a.id ? 2.5 : 1.8} />{a.label}
               </button>
             ))}
@@ -438,7 +438,7 @@ export default function MobileDiarioPage() {
           {/* Botão salvar diário */}
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 16px', paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))', background: M.color.surface, borderTop: `0.5px solid ${M.color.borderSoft}`, boxShadow: '0 -4px 16px rgba(0,0,0,0.06)', zIndex: 10 }}>
             <button onClick={salvarDiario} disabled={savingDiario || !descricao.trim()}
-              style={{ width: '100%', padding: 15, borderRadius: M.radius.lg, border: 'none', background: savedDiario ? T.green.text : '#0284c7', color: '#fff', fontSize: M.font.base, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: (!descricao.trim() || savingDiario) ? 0.6 : 1, WebkitTapHighlightColor: 'transparent', transition: 'background 0.2s', fontFamily: 'inherit' }}>
+              style={{ width: '100%', padding: 15, borderRadius: M.radius.lg, border: 'none', background: savedDiario ? T.green.text : 'var(--brand-600)', color: '#fff', fontSize: M.font.base, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: (!descricao.trim() || savingDiario) ? 0.6 : 1, WebkitTapHighlightColor: 'transparent', transition: 'background 0.2s', fontFamily: 'inherit' }}>
               {savingDiario ? <Loader2 size={18} style={{ animation: 'spin 0.8s linear infinite' }} /> : savedDiario ? <Check size={18} /> : <Send size={16} />}
               {savedDiario ? 'Diário publicado!' : isOnline ? 'Publicar diário' : 'Salvar offline'}
             </button>

@@ -166,14 +166,14 @@ const COR_CATEGORIA: Record<string, string> = {
 };
 
 const CHART_COLORS = [
-  '#6366f1',
+  'var(--brand-600)',
   '#10b981',
   '#f59e0b',
   '#ef4444',
-  '#8b5cf6',
-  '#06b6d4',
-  '#ec4899',
-  '#14b8a6',
+  'var(--brand-500)',
+  'var(--brand-500)',
+  'var(--brand-500)',
+  'var(--brand-500)',
   '#f97316',
   '#84cc16',
 ];
@@ -405,7 +405,7 @@ function ModalResumoAluno({
                       <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                       <YAxis tick={{ fontSize: 10 }} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="value" fill="var(--brand-500)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

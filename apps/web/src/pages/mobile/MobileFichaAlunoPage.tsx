@@ -58,7 +58,7 @@ interface Ficha {
   restricoesAlimentares?: RestricaoAlimentar[];
 }
 
-const ACCENT = '#4f46e5';
+const ACCENT = 'var(--brand-600)';
 
 function fmtData(iso?: string | null): string {
   if (!iso) return '—';
@@ -236,12 +236,12 @@ export default function MobileFichaAlunoPage() {
                 <img
                   src={fotoUrl}
                   alt={nome}
-                  style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid #eef2ff' }}
+                  style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--surface-brand)' }}
                 />
               ) : (
                 <div style={{
                   width: 96, height: 96, borderRadius: '50%',
-                  background: 'linear-gradient(135deg,#e0e7ff,#ede9fe)',
+                  background: 'linear-gradient(135deg,var(--surface-brand),var(--surface-brand))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 30, fontWeight: 600, color: ACCENT,
                 }}>
@@ -327,14 +327,14 @@ export default function MobileFichaAlunoPage() {
           </Secao>
 
           {/* ── Matrícula / Turma ───────────────────────────────────── */}
-          <Secao titulo="Matrícula" Icon={GraduationCap} cor="#0284c7">
+          <Secao titulo="Matrícula" Icon={GraduationCap} cor="var(--brand-600)">
             <Campo label="Turma" valor={ficha.turma?.name} />
             <Campo label="Unidade" valor={ficha.unidade?.name} />
             <Campo label="Matrícula (ID)" valor={ficha.id} mono />
           </Secao>
 
           {/* ── Contatos operacionais ───────────────────────────────── */}
-          <Secao titulo="Contatos operacionais" Icon={Users} cor="#7c3aed">
+          <Secao titulo="Contatos operacionais" Icon={Users} cor="var(--brand-600)">
             {!ficha.nomeMae && !ficha.nomePai && !ficha.emergencyContactName
               && !ficha.emergencyContactPhone && !ficha.celPai && (
               <p style={{ fontSize: 13, color: '#94a3b8', margin: '4px 0' }}>Nenhum contato cadastrado.</p>
@@ -369,9 +369,9 @@ function Chip({ children, tone }: { children: ReactNode; tone?: 'warn' }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20,
-      background: warn ? '#fffbeb' : '#eef2ff',
-      color: warn ? '#92400e' : '#4338ca',
-      border: `0.5px solid ${warn ? '#fde68a' : '#e0e7ff'}`,
+      background: warn ? '#fffbeb' : 'var(--surface-brand)',
+      color: warn ? '#92400e' : 'var(--brand-700)',
+      border: `0.5px solid ${warn ? '#fde68a' : 'var(--surface-brand)'}`,
     }}>
       {children}
     </span>

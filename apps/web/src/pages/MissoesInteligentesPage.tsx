@@ -84,7 +84,7 @@ export default function MissoesInteligentesPage() {
           {[
             { label: 'Crítico', value: summary.CRITICAL ?? 0, color: '#dc2626', bg: '#fef2f2' },
             { label: 'Alto',    value: summary.HIGH    ?? 0, color: '#f59e0b', bg: '#fffbeb' },
-            { label: 'Médio',   value: summary.MEDIUM  ?? 0, color: '#3b82f6', bg: '#eff6ff' },
+            { label: 'Médio',   value: summary.MEDIUM  ?? 0, color: 'var(--brand-500)', bg: 'var(--surface-brand)' },
             { label: 'Baixo',   value: summary.LOW     ?? 0, color: '#22c55e', bg: '#f0fdf4' },
           ].map((k) => (
             <div key={k.label} style={{ background: k.bg, border: `0.5px solid ${k.color}30`, borderRadius: 16, padding: '14px 16px' }}>

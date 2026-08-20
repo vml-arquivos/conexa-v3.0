@@ -77,8 +77,8 @@ function getPlanningMatrixFields(obj: DashboardPlanningObjective) {
     {
       label: 'Campo de Experiência',
       value: getPlanningFieldDisplay(obj.campoExperiencia),
-      tone: 'border-sky-100 bg-sky-50/80 text-sky-950',
-      labelTone: 'text-sky-700',
+      tone: 'border-[var(--border-brand)] bg-brand-600/80 text-[var(--text-brand)]',
+      labelTone: 'text-[var(--text-brand)]',
     },
     {
       label: 'Objetivo BNCC',
@@ -89,14 +89,14 @@ function getPlanningMatrixFields(obj: DashboardPlanningObjective) {
     {
       label: 'Objetivo do Currículo',
       value: getPlanningFieldDisplay(obj.objetivoCurriculo),
-      tone: 'border-emerald-100 bg-emerald-50/80 text-emerald-950',
-      labelTone: 'text-emerald-700',
+      tone: 'border-brand-100 bg-brand-50/80 text-brand-950',
+      labelTone: 'text-brand-700',
     },
     {
       label: 'Intencionalidade Pedagógica',
       value: getPlanningFieldDisplay(obj.intencionalidade),
-      tone: 'border-indigo-100 bg-indigo-50 text-indigo-950',
-      labelTone: 'text-indigo-700',
+      tone: 'border-brand-100 bg-brand-50 text-brand-950',
+      labelTone: 'text-brand-700',
     },
   ];
 }
@@ -146,14 +146,14 @@ function normalizeDashboardPlanning(activePlanning: any, fallbackObjectives: any
 
 // ─── Ações Rápidas ────────────────────────────────────────────────────────────
 const ACOES_RAPIDAS = [
-  { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-green-500', rota: '/app/chamada' },
-  { id: 'diario', label: 'Diário da Turma', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-blue-500', rota: '/app/diario-calendario' },
-  { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-purple-500', rota: '/app/planejamentos' },
-  { id: 'sala', label: 'Sala de Aula Virtual', desc: 'Tarefas e desempenho', icon: <GraduationCap className="h-6 w-6" />, cor: 'bg-violet-500', rota: '/app/sala-de-aula-virtual' },
-  { id: 'rdic', label: 'Relatório da Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-indigo-500', rota: '/app/rdic-crianca' },
+  { id: 'chamada', label: 'Chamada', desc: 'Marcar presença', icon: <CheckCircle className="h-6 w-6" />, cor: 'bg-brand-500', rota: '/app/chamada' },
+  { id: 'diario', label: 'Diário da Turma', desc: 'Registrar o dia', icon: <BookOpen className="h-6 w-6" />, cor: 'bg-brand-600', rota: '/app/diario-calendario' },
+  { id: 'planejamento', label: 'Planejamentos', desc: 'Planejar semana', icon: <Calendar className="h-6 w-6" />, cor: 'bg-brand-600', rota: '/app/planejamentos' },
+  { id: 'sala', label: 'Sala de Aula Virtual', desc: 'Tarefas e desempenho', icon: <GraduationCap className="h-6 w-6" />, cor: 'bg-brand-600', rota: '/app/sala-de-aula-virtual' },
+  { id: 'rdic', label: 'Relatório da Criança', desc: 'Desenvolvimento individual', icon: <Brain className="h-6 w-6" />, cor: 'bg-brand-500', rota: '/app/rdic-crianca' },
   { id: 'materiais', label: 'Materiais', desc: 'Solicitar recursos', icon: <ShoppingCart className="h-6 w-6" />, cor: 'bg-orange-500', rota: '/app/material-requests' },
-  { id: 'fotos', label: 'Fotos da Turma', desc: 'Galeria e RDX', icon: <Camera className="h-6 w-6" />, cor: 'bg-pink-500', rota: '/app/rdx' },
-  { id: 'relatorio', label: 'Relatórios', desc: 'Ver evolução', icon: <TrendingUp className="h-6 w-6" />, cor: 'bg-teal-500', rota: '/app/reports' },
+  { id: 'fotos', label: 'Fotos da Turma', desc: 'Galeria e RDX', icon: <Camera className="h-6 w-6" />, cor: 'bg-brand-600', rota: '/app/rdx' },
+  { id: 'relatorio', label: 'Relatórios', desc: 'Ver evolução', icon: <TrendingUp className="h-6 w-6" />, cor: 'bg-brand-500', rota: '/app/reports' },
   { id: 'matriz', label: 'Matriz 2026', desc: 'Objetivos BNCC', icon: <FileText className="h-6 w-6" />, cor: 'bg-gray-600', rota: '/app/planejamentos' },
 ];
 
@@ -205,9 +205,9 @@ function FotoUpload({ crianca, onUpload }: { crianca: any; onUpload: (id: string
       <button
         onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
         disabled={uploading}
-        className="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-blue-50 z-10"
+        className="absolute bottom-0 right-0 w-5 h-5 bg-white rounded-full shadow border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-brand-600 z-10"
         title="Adicionar foto">
-        {uploading ? <RefreshCw className="h-2.5 w-2.5 text-blue-500 animate-spin" /> : <Camera className="h-2.5 w-2.5 text-gray-500" />}
+        {uploading ? <RefreshCw className="h-2.5 w-2.5 text-[var(--text-brand)] animate-spin" /> : <Camera className="h-2.5 w-2.5 text-gray-500" />}
       </button>
     </>
   );
@@ -465,11 +465,11 @@ export default function TeacherDashboardPage() {
   const objetivosHoje = getObjetivosDia(ddmmHoje, segmentoTurma);
   const segmentosHoje = getSegmentosNaData(ddmmHoje);
   const CAMPO_CORES: Record<string, string> = {
-    'eu-outro-nos': 'bg-pink-50 border-pink-200 text-pink-800',
-    'corpo-gestos': 'bg-orange-50 border-orange-200 text-orange-800',
-    'tracos-sons': 'bg-purple-50 border-purple-200 text-purple-800',
-    'escuta-fala': 'bg-blue-50 border-blue-200 text-blue-800',
-    'espacos-tempos': 'bg-green-50 border-green-200 text-green-800',
+    'eu-outro-nos': 'bg-[var(--surface-brand)] border-[var(--border-brand)] text-[var(--text-brand)]',
+    'corpo-gestos': 'bg-[var(--surface-brand)] border-[var(--border-brand)] text-[var(--text-brand)]',
+    'tracos-sons': 'bg-[var(--surface-brand)] border-[var(--border-brand)] text-[var(--text-brand)]',
+    'escuta-fala': 'bg-[var(--surface-brand)] border-[var(--border-brand)] text-[var(--text-brand)]',
+    'espacos-tempos': 'bg-[var(--surface-brand)] border-[var(--border-brand)] text-[var(--text-brand)]',
   };
   const totalAlunos = ind?.totalAlunos ?? alunos.length;
   const presentesHoje = insightsHoje?.presenca?.presentes ?? 0;
@@ -489,20 +489,20 @@ export default function TeacherDashboardPage() {
       value: registrosHoje,
       helper: totalAlunos > 0 ? `${registrosHojePct}% da turma acompanhada hoje` : 'Sem turma vinculada',
       icon: <Sparkles className="h-5 w-5" />,
-      accent: 'text-sky-700',
-      iconShell: 'bg-sky-600',
+      accent: 'text-[var(--text-brand)]',
+      iconShell: 'bg-brand-600',
       progress: registrosHojePct,
-      progressClass: 'bg-sky-500',
+      progressClass: 'bg-brand-500',
     },
     {
       label: 'Planejamentos no período',
       value: planejamentosSemana,
       helper: 'Acompanhamento da semana',
       icon: <Calendar className="h-5 w-5" />,
-      accent: 'text-violet-700',
-      iconShell: 'bg-violet-600',
+      accent: 'text-[var(--text-brand)]',
+      iconShell: 'bg-brand-600',
       progress: planejamentosPct,
-      progressClass: 'bg-violet-500',
+      progressClass: 'bg-brand-500',
     },
   ];
   const destaquesResumoTurma = [
@@ -533,11 +533,11 @@ export default function TeacherDashboardPage() {
       {data?.hasClassroom && (
         <div className="space-y-6 overflow-x-hidden">
           <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr] max-w-full">
-            <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 p-5 text-white shadow-xl shadow-slate-200/70">
+            <div className="rounded-[28px] border border-[var(--border-sidebar)] bg-[var(--surface-sidebar)] p-5 text-[var(--text-inverse)] shadow-ds-md">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-4">
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
-                    <Star className="h-3.5 w-3.5 text-amber-300" />
+                    <Star className="h-3.5 w-3.5 text-brand-300" />
                     Cockpit da turma
                   </div>
                   <div>
@@ -565,12 +565,12 @@ export default function TeacherDashboardPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Resumo do dia</p>
                       <p className="mt-1 text-3xl font-semibold">{presentesHoje}<span className="text-base font-medium text-slate-300">/{totalAlunos || '?'} presentes</span></p>
                     </div>
-                    <div className="rounded-2xl bg-emerald-400/15 p-3 text-emerald-200">
+                    <div className="rounded-2xl bg-brand-400/15 p-3 text-brand-200">
                       <CheckCircle className="h-6 w-6" />
                     </div>
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${presencaPct}%` }} />
+                    <div className="h-full rounded-full bg-brand-400 transition-all" style={{ width: `${presencaPct}%` }} />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
                     <div className="rounded-2xl bg-black/10 p-3">
@@ -588,7 +588,7 @@ export default function TeacherDashboardPage() {
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
               {cardsResumoTurma.map((card) => (
-                <div key={card.label} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60">
+                <div key={card.label} className="rounded-3xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 shadow-ds-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
@@ -599,7 +599,7 @@ export default function TeacherDashboardPage() {
                       {card.icon}
                     </div>
                   </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                     <div className={`h-full rounded-full ${card.progressClass} transition-all`} style={{ width: `${card.progress}%` }} />
                   </div>
                 </div>
@@ -609,10 +609,10 @@ export default function TeacherDashboardPage() {
 
           {/* Widget: Hoje — dados reais da API com fallback para lookup local */}
           {(insightsHoje || objetivosHoje.length > 0) && (
-            <div className="rounded-[28px] border border-amber-200 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 p-5 shadow-sm shadow-amber-100/70">
+            <div className="rounded-[28px] border border-[var(--border-brand)] bg-[var(--surface-brand)] p-5 shadow-ds-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400 text-white shadow-sm shadow-amber-200">
+                  <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-ds-brand">
                     <Star className="h-5 w-5" />
                   </div>
                   <div>
@@ -630,7 +630,7 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
                 <button onClick={() => navigate('/app/planejamentos')}
-                  className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white/80 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-white">
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-brand)] bg-[var(--surface-card)] px-3 py-2 text-xs font-medium text-[var(--text-brand)] transition hover:bg-[var(--surface-brand)]">
                   Ver planejamentos <ArrowRight className="h-3 w-3" />
                 </button>
               </div>
@@ -646,41 +646,41 @@ export default function TeacherDashboardPage() {
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-emerald-200 bg-white/80 p-4">
+                  <div className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Presença recente</p>
-                        <p className="mt-1 text-2xl font-semibold text-emerald-900">{presentesHoje}<span className="text-sm font-medium text-emerald-700">/{totalAlunos || '?'} presentes</span></p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">Presença recente</p>
+                        <p className="mt-1 text-2xl font-semibold text-brand-900">{presentesHoje}<span className="text-sm font-medium text-brand-700">/{totalAlunos || '?'} presentes</span></p>
                       </div>
-                      <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700">
+                      <div className="rounded-2xl bg-brand-100 p-3 text-brand-700">
                         <CheckCircle className="h-5 w-5" />
                       </div>
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
-                      <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${presencaPct}%` }} />
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-brand-100">
+                      <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${presencaPct}%` }} />
                     </div>
-                    <p className="mt-2 text-xs text-emerald-700">{ausentesHoje} ausência(s) registradas no dia.</p>
+                    <p className="mt-2 text-xs text-brand-700">{ausentesHoje} ausência(s) registradas no dia.</p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                  <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Leitura rápida da turma</p>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-inset)] px-3 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Diários da semana</p>
                         <p className="mt-1 text-lg font-semibold text-slate-900">{diariosSemana}/5</p>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-amber-500" style={{ width: `${diariosPct}%` }} /></div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-500" style={{ width: `${diariosPct}%` }} /></div>
                       </div>
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-3">
+                      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-inset)] px-3 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Cobertura pedagógica</p>
                         <p className="mt-1 text-lg font-semibold text-slate-900">{registrosHoje}/{totalAlunos || '?'}</p>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-sky-500" style={{ width: `${registrosHojePct}%` }} /></div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-500" style={{ width: `${registrosHojePct}%` }} /></div>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="min-w-0">
-                  <div className="rounded-[24px] border border-amber-200/80 bg-white/90 p-4 shadow-sm shadow-amber-100/60 sm:p-5">
+                  <div className="rounded-[24px] border border-[var(--border-brand)] bg-[var(--surface-card)] p-4 shadow-ds-sm sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Planejamento do dia</p>
@@ -689,7 +689,7 @@ export default function TeacherDashboardPage() {
                         </h3>
                       </div>
                       <button onClick={() => navigate('/app/planejamentos')}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-100">
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border-brand)] bg-[var(--surface-brand)] px-3 py-1.5 text-[11px] font-medium text-[var(--text-brand)] transition hover:bg-[var(--surface-card-hover)]">
                         Ver plano <ArrowRight className="h-3 w-3" />
                       </button>
                     </div>
@@ -697,19 +697,19 @@ export default function TeacherDashboardPage() {
                     {(planejamentoResumoHoje.atividade || planejamentoResumoHoje.recursos || planejamentoResumoHoje.objectives.length > 0) ? (
                       <div className="mt-4 space-y-3">
                         {planejamentoResumoHoje.atividade && (
-                          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
+                          <div className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-brand)] px-4 py-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Desenvolvimento da Atividade</p>
                             <p className="mt-1.5 text-sm leading-relaxed text-amber-950 whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
                           </div>
                         )}
                         {planejamentoResumoHoje.recursos && (
-                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] px-4 py-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Recursos e Materiais</p>
                             <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">{planejamentoResumoHoje.recursos}</p>
                           </div>
                         )}
                         {!planejamentoResumoHoje.atividade && !planejamentoResumoHoje.recursos && planejamentoResumoHoje.objectives.length > 0 && (
-                          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-inset)] px-4 py-3">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Campos de Experiência</p>
                             <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
                               {[...new Set(planejamentoResumoHoje.objectives.map(o => o.campoExperiencia).filter(Boolean))].join(' · ') || 'Não informado'}
@@ -718,7 +718,7 @@ export default function TeacherDashboardPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="mt-4 text-center rounded-2xl border border-dashed border-amber-300 bg-white/70 py-8 px-4">
+                      <div className="mt-4 text-center rounded-2xl border border-dashed border-[var(--border-brand)] bg-[var(--surface-inset)] py-8 px-4">
                         <p className="text-sm text-amber-700">Nenhum planejamento ativo para hoje.</p>
                         <button onClick={() => navigate('/app/planejamento/novo')}
                           className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
@@ -731,7 +731,7 @@ export default function TeacherDashboardPage() {
                       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                         <button
                           onClick={() => navigate(`/app/diario-de-bordo?classroomId=${encodeURIComponent(insightsHoje.planejamentoAtivo.classroomId)}`)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors"
                         >
                           <ClipboardList className="h-4 w-4" />
                           Registrar Diário do Dia
@@ -748,7 +748,7 @@ export default function TeacherDashboardPage() {
                             };
                             input.click();
                           }}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors"
                           title="Registrar evidência fotográfica do dia"
                         >
                           <Camera className="h-4 w-4" />
@@ -812,7 +812,7 @@ export default function TeacherDashboardPage() {
           )}
 
           {/* Abas */}
-          <div className="flex gap-1 overflow-x-auto rounded-xl bg-gray-100 p-1">
+          <div className="flex gap-1 overflow-x-auto rounded-xl bg-[var(--surface-muted)] p-1">
             {[
               { id: 'turma', label: 'Minha Turma', icon: <Users className="h-4 w-4" /> },
               { id: 'rdic', label: 'Relatório da Criança', icon: <Brain className="h-4 w-4" /> },
@@ -821,7 +821,7 @@ export default function TeacherDashboardPage() {
               { id: 'indicadores', label: 'Progresso', icon: <TrendingUp className="h-4 w-4" /> },
             ].map(tab => (
               <button key={tab.id} onClick={() => setAbaAtiva(tab.id as any)}
-                className={`flex min-w-[132px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${abaAtiva === tab.id ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}>
+                className={`flex min-w-[132px] shrink-0 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${abaAtiva === tab.id ? 'bg-[var(--surface-card)] text-[var(--text-brand)] shadow-ds-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                 {tab.icon} <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
@@ -830,7 +830,7 @@ export default function TeacherDashboardPage() {
           {/* ─── MINHA TURMA ─── */}
           {abaAtiva === 'turma' && (
             <div className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-3 rounded-[28px] border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-ds-sm lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Minhas Crianças</h2>
                   <p className="mt-1 text-sm text-slate-500">
@@ -839,9 +839,9 @@ export default function TeacherDashboardPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span className="rounded-full bg-slate-100 px-3 py-1">{alunos.length} crianças</span>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">{registrosHoje} com registro hoje</span>
+                  <span className="rounded-full bg-brand-50 px-3 py-1 text-brand-700">{registrosHoje} com registro hoje</span>
                   <button onClick={() => navigate('/app/chamada')}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 font-medium text-white transition hover:bg-blue-700">
+                    className="inline-flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1.5 font-medium text-white transition hover:bg-brand-700">
                     Fazer chamada <ChevronRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -861,7 +861,7 @@ export default function TeacherDashboardPage() {
 
                     return (
                       <div key={aluno.id}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-100 transition-all duration-200 p-4 flex flex-col items-center gap-3">
+                        className="bg-[var(--surface-card)] rounded-2xl border border-[var(--border-default)] shadow-ds-sm hover:shadow-ds-md hover:border-[var(--border-brand)] transition-all duration-200 p-4 flex flex-col items-center gap-3">
 
                         {/* Avatar + câmera */}
                         <div className="relative w-14 h-14 flex-shrink-0 cursor-pointer"
@@ -870,10 +870,10 @@ export default function TeacherDashboardPage() {
                             <img
                               src={resolveChildPhotoUrl(aluno)!}
                               alt={`${aluno.firstName} ${aluno.lastName}`}
-                              className="w-14 h-14 rounded-full object-cover ring-2 ring-offset-1 ring-blue-100"
+                              className="w-14 h-14 rounded-full object-cover ring-2 ring-offset-1 ring-[var(--border-brand)]"
                             />
                           ) : (
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-base ring-2 ring-offset-1 ring-blue-100">
+                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-white font-medium text-base ring-2 ring-offset-1 ring-[var(--border-brand)]">
                               {aluno.firstName?.[0]}{aluno.lastName?.[0]}
                             </div>
                           )}
@@ -881,19 +881,19 @@ export default function TeacherDashboardPage() {
                         </div>
 
                         {/* Nome */}
-                        <p className="text-sm font-bold text-gray-800 text-center leading-tight w-full truncate">
+                        <p className="text-sm font-normal text-[var(--text-primary)] text-center leading-tight w-full truncate">
                           {aluno.firstName} {aluno.lastName}
                         </p>
 
                         {/* Subtítulo */}
-                        <p className="text-xs text-gray-400 text-center">
+                        <p className="text-xs text-[var(--text-tertiary)] text-center">
                           {aluno.idade} meses · {generoLabel}
                         </p>
 
                         {/* Badge de registro */}
                         <span className={registradoHoje
-                          ? 'text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full'
-                          : 'text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full'}>
+                          ? 'text-xs bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'
+                          : 'text-xs bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'}>
                           {registradoHoje ? 'Registrado hoje' : 'Sem registro'}
                         </span>
 
@@ -902,11 +902,11 @@ export default function TeacherDashboardPage() {
                           <button
                             onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
                             title="Registrar microgesto"
-                            className="flex-1 text-xs font-medium bg-blue-600 text-white rounded-xl py-2 hover:bg-blue-700 transition">
+                            className="flex-1 text-xs font-medium bg-brand-600 text-white rounded-xl py-2 hover:bg-brand-700 transition">
                             Registrar
                           </button>
                           <button onClick={() => navigate('/app/rdx')} title="Fotos"
-                            className="flex-1 text-xs font-medium border border-pink-200 text-pink-600 rounded-xl py-2 hover:bg-pink-50 transition">
+                            className="flex-1 text-xs font-medium border border-[var(--border-brand)] text-[var(--text-brand)] rounded-xl py-2 hover:bg-[var(--surface-brand)] transition">
                             Fotos
                           </button>
                         </div>
@@ -942,7 +942,7 @@ export default function TeacherDashboardPage() {
                   <Button
                     size="sm"
                     onClick={() => navigate('/app/rdic-crianca')}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+                    className="bg-brand-600 hover:bg-brand-700 text-white text-xs"
                   >
                     <Plus className="h-3 w-3 mr-1" /> Novo relatório
                   </Button>
@@ -989,20 +989,20 @@ export default function TeacherDashboardPage() {
 
               {/* Barra de cobertura geral */}
               {alunos.length > 0 && (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                <div className="bg-brand-50 border border-brand-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-indigo-800">Cobertura da turma</span>
-                    <span className="text-sm font-bold text-indigo-700">
+                    <span className="text-sm font-medium text-brand-800">Cobertura da turma</span>
+                    <span className="text-sm font-bold text-brand-700">
                       {loadingRdics ? '...' : `${Object.values(rdicsMap).filter(r => r.count > 0).length} / ${alunos.length} crianças`}
                     </span>
                   </div>
-                  <div className="w-full bg-indigo-200 rounded-full h-2.5">
+                  <div className="w-full bg-brand-200 rounded-full h-2.5">
                     <div
-                      className="h-2.5 rounded-full bg-indigo-600 transition-all duration-500"
+                      className="h-2.5 rounded-full bg-brand-600 transition-all duration-500"
                       style={{ width: loadingRdics ? '0%' : `${alunos.length > 0 ? Math.round((Object.values(rdicsMap).filter(r => r.count > 0).length / alunos.length) * 100) : 0}%` }}
                     />
                   </div>
-                  <p className="text-xs text-indigo-500 mt-1">
+                  <p className="text-xs text-brand-500 mt-1">
                     {loadingRdics ? 'Carregando...' : `${alunos.length > 0 ? Math.round((Object.values(rdicsMap).filter(r => r.count > 0).length / alunos.length) * 100) : 0}% das crianças com pelo menos 1 relatório registrado`}
                   </p>
                 </div>
@@ -1017,11 +1017,11 @@ export default function TeacherDashboardPage() {
                     const info = rdicsMap[aluno.id] ?? { count: 0, ultimoStatus: '', ultimoPeriodo: '' };
                     const temRdic = info.count > 0;
                     const statusColor = info.ultimoStatus === 'PUBLICADO'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-brand-100 text-brand-700'
                       : info.ultimoStatus === 'REVISAO'
                       ? 'bg-yellow-100 text-yellow-700'
                       : info.ultimoStatus === 'RASCUNHO'
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-brand-600 text-[var(--text-brand)]'
                       : 'bg-gray-100 text-gray-500';
                     const statusLabel = info.ultimoStatus === 'PUBLICADO' ? 'Publicado'
                       : info.ultimoStatus === 'REVISAO' ? 'Em Revisão'
@@ -1031,17 +1031,17 @@ export default function TeacherDashboardPage() {
                       <button
                         key={aluno.id}
                         onClick={() => navigate(`/app/rdic-crianca?childId=${aluno.id}`)}
-                        className="w-full flex items-center gap-3 p-3 bg-white border-2 border-gray-100 rounded-xl hover:border-indigo-200 hover:shadow-sm transition-all text-left"
+                        className="w-full flex items-center gap-3 p-3 bg-white border-2 border-gray-100 rounded-xl hover:border-brand-200 hover:shadow-sm transition-all text-left"
                       >
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
-                          temRdic ? 'bg-indigo-500' : 'bg-gray-300'
+                          temRdic ? 'bg-brand-500' : 'bg-gray-300'
                         }`}>
                           <ChildAvatar
                             child={aluno}
                             alt={aluno.firstName}
                             sizeClassName="w-10 h-10"
                             imageClassName="rounded-full object-cover"
-                            fallbackClassName={`w-10 h-10 rounded-full flex items-center justify-center ${temRdic ? 'bg-indigo-500 text-white' : 'bg-gray-300 text-white'}`}
+                            fallbackClassName={`w-10 h-10 rounded-full flex items-center justify-center ${temRdic ? 'bg-brand-500 text-white' : 'bg-gray-300 text-white'}`}
                             initialsClassName="text-sm font-bold"
                             showInitials
                           />
@@ -1072,7 +1072,7 @@ export default function TeacherDashboardPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {ACOES_RAPIDAS.map(acao => (
                   <button key={acao.id} onClick={() => navigate(acao.rota)}
-                    className="p-4 bg-white border-2 border-gray-100 rounded-2xl text-left hover:border-blue-200 hover:shadow-md transition-all active:scale-95">
+                    className="p-4 bg-white border-2 border-gray-100 rounded-2xl text-left hover:border-[var(--border-brand)] hover:shadow-md transition-all active:scale-95">
                     <div className={`w-12 h-12 ${acao.cor} rounded-2xl flex items-center justify-center text-white mb-3`}>
                       {acao.icon}
                     </div>
@@ -1087,9 +1087,9 @@ export default function TeacherDashboardPage() {
           {/* ─── IA PEDAGÓGICA ─── */}
           {abaAtiva === 'ia' && (
             <div className="space-y-5">
-              <div className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border-2 border-purple-100">
+              <div className="p-5 bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl border-2 border-[var(--border-brand)]">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 rounded-xl flex items-center justify-center">
                     <Brain className="h-6 w-6 text-white" />
                   </div>
                   <div>
@@ -1098,7 +1098,7 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
                 <textarea
-                  className="w-full border-2 border-purple-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-purple-400 bg-white"
+                  className="w-full border-2 border-[var(--border-brand)] rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-[var(--border-brand)] bg-white"
                   rows={5}
                   placeholder="Descreva como foi o dia da turma: atividades realizadas, comportamentos observados, interações entre crianças, aprendizagens percebidas, situações relevantes...\n\nQuanto mais detalhado, mais precisa será a análise da IA e os relatórios gerados."
                   value={entradaDiarioIA}
@@ -1127,7 +1127,7 @@ export default function TeacherDashboardPage() {
                       } finally { setAnalisandoIA(false); }
                     }}
                     disabled={analisandoIA || !entradaDiarioIA.trim()}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    className="bg-gradient-to-r from-brand-700 to-brand-600 hover:from-brand-700 hover:to-brand-700"
                   >
                     {analisandoIA ? <><RefreshCw className="h-4 w-4 animate-spin mr-2" /> Analisando...</> : <><Sparkles className="h-4 w-4 mr-2" /> Analisar com IA</>}
                   </Button>
@@ -1136,26 +1136,26 @@ export default function TeacherDashboardPage() {
 
               {relatorioIA && (
                 <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl border border-blue-100">
+                  <div className="p-4 bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl border border-[var(--border-brand)]">
                     <div className="flex items-center gap-2 mb-3">
-                      <FileText className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-bold text-blue-800">Relatório de Desenvolvimento</p>
-                      <span className="ml-auto px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium flex items-center gap-1">
+                      <FileText className="h-4 w-4 text-[var(--text-brand)]" />
+                      <p className="text-sm font-bold text-[var(--text-brand)]">Relatório de Desenvolvimento</p>
+                      <span className="ml-auto px-2 py-0.5 bg-brand-600 text-[var(--text-brand)] text-xs rounded-full font-medium flex items-center gap-1">
                         <Sparkles className="h-3 w-3" /> IA
                       </span>
                     </div>
                     <p className="text-sm text-gray-700 leading-relaxed">{relatorioIA.relatorio}</p>
                   </div>
 
-                  <div className="p-4 bg-green-50 rounded-2xl border border-green-100">
+                  <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100">
                     <div className="flex items-center gap-2 mb-3">
-                      <Star className="h-4 w-4 text-green-600" />
-                      <p className="text-sm font-bold text-green-800">Pontos Fortes Observados</p>
+                      <Star className="h-4 w-4 text-brand-600" />
+                      <p className="text-sm font-bold text-brand-800">Pontos Fortes Observados</p>
                     </div>
                     {relatorioIA.pontosFortess?.map((p, i) => (
                       <div key={i} className="flex items-start gap-2 mb-1.5">
-                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-green-700">{p}</p>
+                        <CheckCircle className="h-4 w-4 text-brand-500 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-brand-700">{p}</p>
                       </div>
                     ))}
                   </div>
@@ -1191,11 +1191,11 @@ export default function TeacherDashboardPage() {
             <div className="space-y-4">
               <h2 className="text-base font-bold text-gray-700">Meu Progresso Pedagógico</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="border-2 border-blue-100">
+                <Card className="border-2 border-[var(--border-brand)]">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
+                        <BookOpen className="h-5 w-5 text-[var(--text-brand)]" />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">Diário de Bordo</p>
@@ -1203,23 +1203,23 @@ export default function TeacherDashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-end gap-2">
-                      <span className="text-3xl font-bold text-blue-600">{ind?.diariosEstaSemana ?? 0}</span>
+                      <span className="text-3xl font-bold text-[var(--text-brand)]">{ind?.diariosEstaSemana ?? 0}</span>
                       <span className="text-sm text-gray-400 mb-1">/ 5 dias</span>
                     </div>
                     <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(100, ((ind?.diariosEstaSemana ?? 0) / 5) * 100)}%` }} />
+                      <div className="h-full bg-brand-600 rounded-full transition-all" style={{ width: `${Math.min(100, ((ind?.diariosEstaSemana ?? 0) / 5) * 100)}%` }} />
                     </div>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-blue-600 border-blue-200" onClick={() => navigate('/app/diario-calendario')}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-[var(--text-brand)] border-[var(--border-brand)]" onClick={() => navigate('/app/diario-calendario')}>
                       <Plus className="h-3 w-3 mr-1" /> Abrir Diário
                     </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-purple-100">
+                <Card className="border-2 border-[var(--border-brand)]">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                        <Calendar className="h-5 w-5 text-purple-600" />
+                      <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center">
+                        <Calendar className="h-5 w-5 text-[var(--text-brand)]" />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">Planejamentos</p>
@@ -1227,20 +1227,20 @@ export default function TeacherDashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-end gap-2">
-                      <span className="text-3xl font-bold text-purple-600">{ind?.planejamentosEstaSemana ?? 0}</span>
+                      <span className="text-3xl font-bold text-[var(--text-brand)]">{ind?.planejamentosEstaSemana ?? 0}</span>
                       <span className="text-sm text-gray-400 mb-1">registrados</span>
                     </div>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-purple-600 border-purple-200" onClick={() => navigate('/app/planejamentos')}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-[var(--text-brand)] border-[var(--border-brand)]" onClick={() => navigate('/app/planejamentos')}>
                       <Plus className="h-3 w-3 mr-1" /> Criar Planejamento
                     </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-indigo-100">
+                <Card className="border-2 border-brand-100">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                        <Brain className="h-5 w-5 text-indigo-600" />
+                      <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+                        <Brain className="h-5 w-5 text-brand-600" />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">Relatório da Criança</p>
@@ -1248,20 +1248,20 @@ export default function TeacherDashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-end gap-2">
-                      <span className="text-3xl font-bold text-indigo-600">{ind?.rdicsRegistrados ?? 0}</span>
+                      <span className="text-3xl font-bold text-brand-600">{ind?.rdicsRegistrados ?? 0}</span>
                       <span className="text-sm text-gray-400 mb-1">registros</span>
                     </div>
-                    <Button size="sm" variant="outline" className="mt-3 w-full text-indigo-600 border-indigo-200" onClick={() => navigate('/app/rdic-crianca')}>
+                    <Button size="sm" variant="outline" className="mt-3 w-full text-brand-600 border-brand-200" onClick={() => navigate('/app/rdic-crianca')}>
                       <Plus className="h-3 w-3 mr-1" /> Novo Registro
                     </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-green-100">
+                <Card className="border-2 border-brand-100">
                   <CardContent className="pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                        <Award className="h-5 w-5 text-green-600" />
+                      <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+                        <Award className="h-5 w-5 text-brand-600" />
                       </div>
                       <div>
                         <p className="font-semibold text-gray-800">{turma?.name}</p>
@@ -1269,18 +1269,18 @@ export default function TeacherDashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-end gap-2">
-                      <span className="text-3xl font-bold text-green-600">{alunos.length}</span>
+                      <span className="text-3xl font-bold text-brand-600">{alunos.length}</span>
                       <span className="text-sm text-gray-400 mb-1">/ {turma?.capacity ?? '?'} vagas</span>
                     </div>
                     <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${turma?.capacity ? Math.min(100, (alunos.length / turma.capacity) * 100) : 0}%` }} />
+                      <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${turma?.capacity ? Math.min(100, (alunos.length / turma.capacity) * 100) : 0}%` }} />
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Dica pedagógica */}
-              <Card className="border-2 border-yellow-100 bg-gradient-to-r from-yellow-50 to-orange-50">
+              <Card className="border-2 border-yellow-100 bg-gradient-to-r from-brand-50 to-brand-100">
                 <CardContent className="pt-4">
                   <div className="flex items-start gap-3">
                     <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -1335,8 +1335,8 @@ export default function TeacherDashboardPage() {
                   onClick={() => setMicrogestoRapido(opt.kind)}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
                     microgestoRapido === opt.kind
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      ? 'border-[var(--border-brand)] bg-brand-600'
+                      : 'border-gray-200 hover:border-[var(--border-brand)]'
                   }`}
                 >
                   <span className="text-xl">{opt.emoji}</span>
@@ -1352,7 +1352,7 @@ export default function TeacherDashboardPage() {
                 placeholder="Detalhe adicional..."
                 value={microgestoTexto}
                 onChange={e => setMicrogestoTexto(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+                className="w-full border-2 border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--border-brand)]"
               />
             </div>
 

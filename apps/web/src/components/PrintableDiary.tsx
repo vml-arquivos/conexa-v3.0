@@ -132,10 +132,10 @@ const ROTINA_LABELS: Record<string, string> = {
 };
 
 const TIPO_OBS_LABELS: Record<string, { label: string; cor: string }> = {
-  DESCRITIVA:  { label: 'Descritiva',  cor: '#4f46e5' },
+  DESCRITIVA:  { label: 'Descritiva',  cor: 'var(--brand-600)' },
   MICROGESTO:  { label: 'Microgesto', cor: '#0891b2' },
   ALERTA:      { label: 'Alerta',     cor: '#dc2626' },
-  NARRATIVA:   { label: 'Narrativa',  cor: '#7c3aed' },
+  NARRATIVA:   { label: 'Narrativa',  cor: 'var(--brand-600)' },
 };
 
 const GRUPO_LABELS: Record<string, string> = {
@@ -426,13 +426,13 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
 
     /* ── Cabeçalho ── */
     .header {
-      border-bottom: 3px solid #4f46e5;
+      border-bottom: 3px solid var(--brand-600);
       padding-bottom: 16px;
       margin-bottom: 20px;
     }
     .header-logo {
       font-size: 9pt;
-      color: #6366f1;
+      color: var(--brand-600);
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -441,7 +441,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
     .header-title {
       font-size: 17pt;
       font-weight: 800;
-      color: #1e1b4b;
+      color: var(--surface-sidebar);
       line-height: 1.2;
       margin-bottom: 4px;
     }
@@ -455,14 +455,14 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 8px 20px;
-      background: #f8f9ff;
-      border: 1px solid #e0e7ff;
+      background: var(--surface-page);
+      border: 1px solid var(--surface-brand);
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 20px;
     }
     .meta-item { display: flex; flex-direction: column; gap: 2px; }
-    .meta-label { font-size: 7.5pt; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .meta-label { font-size: 7.5pt; font-weight: 700; color: var(--brand-600); text-transform: uppercase; letter-spacing: 0.5px; }
     .meta-value { font-size: 10pt; color: #111827; font-weight: 500; }
 
     /* ── Blocos ── */
@@ -479,9 +479,9 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
       padding: 8px 14px;
       letter-spacing: 0.2px;
     }
-    .indigo-header  { background: #4f46e5; color: #fff; }
+    .indigo-header  { background: var(--brand-600); color: #fff; }
     .emerald-header { background: #059669; color: #fff; }
-    .purple-header  { background: #7c3aed; color: #fff; }
+    .purple-header  { background: var(--brand-600); color: #fff; }
     .green-header   { background: #16a34a; color: #fff; }
     .amber-header   { background: #d97706; color: #fff; }
 
@@ -494,25 +494,25 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
     .section-title {
       font-size: 8pt;
       font-weight: 700;
-      color: #6366f1;
+      color: var(--brand-600);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 6px;
     }
-    .highlight-section { background: #faf5ff; }
+    .highlight-section { background: var(--surface-brand); }
     .field-value { font-size: 10.5pt; color: #374151; line-height: 1.55; }
     .mt-8 { margin-top: 8px; }
 
     /* ── Objetivos ── */
     .objective-card {
-      border-left: 3px solid #818cf8;
+      border-left: 3px solid var(--brand-400);
       padding: 6px 10px;
       margin-bottom: 8px;
-      background: #f5f3ff;
+      background: var(--surface-brand);
       border-radius: 0 6px 6px 0;
     }
     .objective-card:last-child { margin-bottom: 0; }
-    .obj-campo { font-size: 8.5pt; font-weight: 700; color: #4338ca; text-transform: uppercase; margin-bottom: 3px; }
+    .obj-campo { font-size: 8.5pt; font-weight: 700; color: var(--brand-700); text-transform: uppercase; margin-bottom: 3px; }
     .obj-codigo { font-size: 7.5pt; color: #6b7280; font-family: monospace; margin-bottom: 3px; }
     .obj-text { font-size: 10pt; color: #374151; line-height: 1.5; margin-bottom: 2px; }
 
@@ -545,7 +545,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
     }
     .presenca-ok    { background: #d1fae5; border: 1px solid #6ee7b7; }
     .presenca-aus   { background: #fee2e2; border: 1px solid #fca5a5; }
-    .presenca-total { background: #e0e7ff; border: 1px solid #a5b4fc; }
+    .presenca-total { background: var(--surface-brand); border: 1px solid #a5b4fc; }
     .presenca-clima { background: #fef3c7; border: 1px solid #fcd34d; }
     .presenca-num   { font-size: 18pt; font-weight: 800; color: #111827; }
     .presenca-label { font-size: 7.5pt; font-weight: 600; color: #6b7280; text-transform: uppercase; margin-top: 2px; }
@@ -638,7 +638,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
     .action-bar {
       position: fixed;
       top: 0; left: 0; right: 0;
-      background: #4f46e5;
+      background: var(--brand-600);
       color: #fff;
       padding: 10px 24px;
       display: flex;
@@ -658,7 +658,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
       transition: opacity 0.15s;
     }
     .btn:hover { opacity: 0.85; }
-    .btn-print  { background: #fff; color: #4f46e5; }
+    .btn-print  { background: #fff; color: var(--brand-600); }
     .btn-pdf    { background: #10b981; color: #fff; }
     .btn-close  { background: rgba(255,255,255,0.15); color: #fff; }
 
@@ -690,7 +690,7 @@ export function buildDiaryPrintableHTML(d: DiaryPrintData): string {
   <!-- Barra de ação -->
   <div class="action-bar">
     <span>📋 Diário da Turma — ${esc(d.turmaNome)} — ${d.data.split('-').reverse().join('/')}</span>
-    <button class="btn btn-pdf" onclick="(function(){ var p=document.createElement('p'); p.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);background:#1e1b4b;color:#fff;padding:8px 20px;border-radius:8px;font-size:10pt;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);'; p.textContent='Na janela de impressão, escolha Destino → Salvar como PDF'; document.body.appendChild(p); setTimeout(function(){ document.body.removeChild(p); window.print(); },1200); })();">📄 Gerar PDF</button>
+    <button class="btn btn-pdf" onclick="(function(){ var p=document.createElement('p'); p.style.cssText='position:fixed;top:56px;left:50%;transform:translateX(-50%);background:var(--surface-sidebar);color:#fff;padding:8px 20px;border-radius:8px;font-size:10pt;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);'; p.textContent='Na janela de impressão, escolha Destino → Salvar como PDF'; document.body.appendChild(p); setTimeout(function(){ document.body.removeChild(p); window.print(); },1200); })();">📄 Gerar PDF</button>
     <button class="btn btn-print" onclick="window.print()">🖨️ Imprimir</button>
     <button class="btn btn-close" onclick="window.close()">✕ Fechar</button>
   </div>

@@ -368,7 +368,7 @@ export function DashboardUnidadePage() {
               <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
               <YAxis dataKey="categoria" type="category" tick={{ fontSize: 12 }} width={100} />
               <Tooltip />
-              <Bar dataKey="quantidade" name="Requisições" fill="#3B82F6" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="quantidade" name="Requisições" fill="var(--brand-500)" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

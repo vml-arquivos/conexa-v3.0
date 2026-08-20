@@ -48,7 +48,7 @@ const CATS = [
 
 const PRIOS = [
   { id: 'LOW',    label: 'Baixa',   color: M.color.textMuted },
-  { id: 'MEDIUM', label: 'Normal',  color: '#3b82f6'         },
+  { id: 'MEDIUM', label: 'Normal',  color: 'var(--brand-500)'         },
   { id: 'HIGH',   label: 'Urgente', color: M.color.warning   },
 ];
 

@@ -11,7 +11,7 @@ import { Brain, Users, AlertTriangle, CheckCircle, ArrowLeft, RefreshCw, Activit
 
 const ANO = 2026;
 const TRIMESTRES = [
-  { id:1, label:'1º Trimestre', short:'1T', cor:'#6366f1' },
+  { id:1, label:'1º Trimestre', short:'1T', cor:'var(--brand-600)' },
   { id:2, label:'2º Trimestre', short:'2T', cor:'#22c55e' },
   { id:3, label:'3º Trimestre', short:'3T', cor:'#f59e0b' },
 ] as const;
@@ -22,7 +22,7 @@ const S_CFG: Record<string,{label:string,cor:string,bg:string}> = {
   DEVOLVIDO: {label:'Devolvido',  cor:'#f97316',bg:'bg-orange-100 text-orange-700'},
   EM_REVISAO:{label:'Em Revisão', cor:'#eab308',bg:'bg-yellow-100 text-yellow-700'},
   APROVADO:  {label:'Aprovado',   cor:'#22c55e',bg:'bg-emerald-100 text-emerald-700'},
-  FINALIZADO:{label:'Finalizado', cor:'#3b82f6',bg:'bg-blue-100 text-blue-700'},
+  FINALIZADO:{label:'Finalizado', cor:'var(--brand-500)',bg:'bg-blue-100 text-blue-700'},
   PUBLICADO: {label:'Publicado',  cor:'#16a34a',bg:'bg-green-100 text-green-700'},
 };
 function Dot({status}: {status:string}) {
@@ -201,8 +201,8 @@ export default function PainelTurmaPage() {
                   {[
                     {icon:<AlertTriangle className="h-4 w-4 text-red-500"/>,label:'Com alergias',val:health.stats?.comAlergia??0,cor:'#ef4444'},
                     {icon:<Activity className="h-4 w-4 text-orange-500"/>,label:'Com dieta restritiva',val:health.stats?.comDieta??0,cor:'#f97316'},
-                    {icon:<Heart className="h-4 w-4 text-blue-500"/>,label:'Com condição médica',val:health.stats?.comCondicaoMedica??0,cor:'#3b82f6'},
-                    {icon:<Stethoscope className="h-4 w-4 text-purple-500"/>,label:'Com medicação',val:health.stats?.comMedicamento??0,cor:'#a855f7'},
+                    {icon:<Heart className="h-4 w-4 text-blue-500"/>,label:'Com condição médica',val:health.stats?.comCondicaoMedica??0,cor:'var(--brand-500)'},
+                    {icon:<Stethoscope className="h-4 w-4 text-purple-500"/>,label:'Com medicação',val:health.stats?.comMedicamento??0,cor:'var(--brand-500)'},
                   ].map((item,i)=>(
                     <div key={i} className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">{item.icon}</div>
@@ -229,7 +229,7 @@ export default function PainelTurmaPage() {
                     <XAxis dataKey="semana" tick={{fontSize:9}}/>
                     <YAxis tick={{fontSize:10}} allowDecimals={false}/>
                     <Tooltip contentStyle={{fontSize:11}}/>
-                    <Bar dataKey="Observações" fill="#6366f1" radius={[3,3,0,0]} maxBarSize={24}/>
+                    <Bar dataKey="Observações" fill="var(--brand-600)" radius={[3,3,0,0]} maxBarSize={24}/>
                   </BarChart>
                 </ResponsiveContainer>
               )}

@@ -62,16 +62,16 @@ const TIPO_LABEL: Record<string, string> = {
   PERMANENTE: 'Permanente', OUTRO: 'Outros', OUTROS: 'Outros',
 };
 const STATUS_LABEL: Record<string, { label: string; cor: string; hex: string }> = {
-  SOLICITADO: { label: 'Solicitado', cor: 'bg-blue-100 text-blue-700', hex: '#3b82f6' },
+  SOLICITADO: { label: 'Solicitado', cor: 'bg-blue-100 text-blue-700', hex: 'var(--brand-500)' },
   EM_ANALISE: { label: 'Em Análise', cor: 'bg-yellow-100 text-yellow-700', hex: '#f59e0b' },
   APROVADO:   { label: 'Aprovado',   cor: 'bg-green-100 text-green-700',  hex: '#22c55e' },
   REJEITADO:  { label: 'Rejeitado',  cor: 'bg-red-100 text-red-700',      hex: '#ef4444' },
-  ENTREGUE:   { label: 'Entregue',   cor: 'bg-purple-100 text-purple-700',hex: '#a855f7' },
+  ENTREGUE:   { label: 'Entregue',   cor: 'bg-purple-100 text-purple-700',hex: 'var(--brand-500)' },
   RASCUNHO:   { label: 'Rascunho',   cor: 'bg-gray-100 text-gray-600',    hex: '#9ca3af' },
 };
 const CATEGORIA_CORES: Record<string, string> = {
-  PEDAGOGICO: '#6366f1', HIGIENE: '#06b6d4', LIMPEZA: '#10b981',
-  ALIMENTACAO: '#f59e0b', CONSUMIVEL: '#f97316', PERMANENTE: '#8b5cf6', OUTRO: '#9ca3af',
+  PEDAGOGICO: 'var(--brand-600)', HIGIENE: 'var(--brand-500)', LIMPEZA: '#10b981',
+  ALIMENTACAO: '#f59e0b', CONSUMIVEL: '#f97316', PERMANENTE: 'var(--brand-500)', OUTRO: '#9ca3af',
 };
 const PRIORITY_LABEL: Record<string, { label: string; cor: string }> = {
   baixa: { label: 'Baixa', cor: 'text-gray-400' },
@@ -540,8 +540,8 @@ export default function RelatorioConsumoMateriaisPage() {
                       <AreaChart data={serieMensalFmt} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                         <defs>
                           <linearGradient id="gradReq" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                            <stop offset="5%" stopColor="var(--brand-600)" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="var(--brand-600)" stopOpacity={0} />
                           </linearGradient>
                           <linearGradient id="gradAprov" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -553,9 +553,9 @@ export default function RelatorioConsumoMateriaisPage() {
                         <YAxis tick={{ fontSize: 11 }} />
                         <Tooltip formatter={(v: number, name: string) => [fmt(v), name]} />
                         <Legend />
-                        <Area type="monotone" dataKey="requisicoes" name="Requisições" stroke="#6366f1" fill="url(#gradReq)" strokeWidth={2} dot={{ r: 3 }} />
+                        <Area type="monotone" dataKey="requisicoes" name="Requisições" stroke="var(--brand-600)" fill="url(#gradReq)" strokeWidth={2} dot={{ r: 3 }} />
                         <Area type="monotone" dataKey="aprovadas" name="Aprovadas" stroke="#22c55e" fill="url(#gradAprov)" strokeWidth={2} dot={{ r: 3 }} />
-                        <Area type="monotone" dataKey="entregues" name="Entregues" stroke="#a855f7" fill="none" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
+                        <Area type="monotone" dataKey="entregues" name="Entregues" stroke="var(--brand-500)" fill="none" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -580,7 +580,7 @@ export default function RelatorioConsumoMateriaisPage() {
                           <Tooltip formatter={(v: number, name: string) => [name === 'custo' ? fmtBRL(v) : fmt(v), name === 'custo' ? 'Custo' : 'Requisições']} />
                           <Bar dataKey="total" name="Requisições" radius={[0, 4, 4, 0]}>
                             {topCategorias.map((_, i) => (
-                              <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
+                              <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? 'var(--brand-600)'} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -588,7 +588,7 @@ export default function RelatorioConsumoMateriaisPage() {
                       <div className="mt-3 space-y-1">
                         {topCategorias.map((c, i) => (
                           <div key={i} className="flex items-center gap-2 text-xs">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1' }} />
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? 'var(--brand-600)' }} />
                             <span className="text-gray-600 flex-1">{c.name}</span>
                             <span className="text-gray-400">{pct(c.total, relatorio.total)}%</span>
                             {c.custo > 0 && <span className="text-gray-500 font-medium">{fmtBRL(c.custo)}</span>}
@@ -702,7 +702,7 @@ export default function RelatorioConsumoMateriaisPage() {
                           <YAxis type="category" dataKey="nome" tick={{ fontSize: 11 }} width={100} />
                           <Tooltip />
                           <Legend />
-                          <Bar dataKey="total" name="Total" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="total" name="Total" fill="var(--brand-600)" radius={[0, 4, 4, 0]} />
                           <Bar dataKey="aprovados" name="Aprovadas" fill="#22c55e" radius={[0, 4, 4, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -855,7 +855,7 @@ export default function RelatorioConsumoMateriaisPage() {
                           <Tooltip formatter={(v: number) => [fmt(v), 'Itens solicitados']} />
                           <Bar dataKey="total" name="Itens" radius={[0, 4, 4, 0]}>
                             {topProd.map((p, i) => (
-                              <Cell key={i} fill={p.higiene ? '#06b6d4' : CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
+                              <Cell key={i} fill={p.higiene ? 'var(--brand-500)' : CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? 'var(--brand-600)'} />
                             ))}
                           </Bar>
                         </BarChart>
@@ -889,11 +889,11 @@ export default function RelatorioConsumoMateriaisPage() {
                     <CardContent>
                       <ResponsiveContainer width="100%" height={Math.max(120, fraldaData.length * 40)}>
                         <BarChart data={fraldaData} layout="vertical" margin={{ top: 0, right: 20, left: 120, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e0f2fe" horizontal={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-brand)" horizontal={false} />
                           <XAxis type="number" tick={{ fontSize: 11 }} />
                           <YAxis type="category" dataKey="turma" tick={{ fontSize: 11 }} width={120} />
                           <Tooltip formatter={(v: number) => [fmt(v), 'Itens de higiene']} />
-                          <Bar dataKey="total" name="Itens de Higiene" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+                          <Bar dataKey="total" name="Itens de Higiene" fill="var(--brand-500)" radius={[0, 4, 4, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                       <p className="text-xs text-cyan-600 mt-3 bg-cyan-100 rounded-lg px-3 py-2">
@@ -962,7 +962,7 @@ export default function RelatorioConsumoMateriaisPage() {
                         <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} tickFormatter={v => fmtBRL(v)} />
                         <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo Estimado']} />
-                        <Bar dataKey="custoEstimado" name="Custo Estimado" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="custoEstimado" name="Custo Estimado" fill="var(--brand-600)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -1004,7 +1004,7 @@ export default function RelatorioConsumoMateriaisPage() {
                         <Tooltip formatter={(v: number) => [fmtBRL(v), 'Custo']} />
                         <Bar dataKey="custo" name="Custo" radius={[0, 4, 4, 0]}>
                           {topCategorias.filter(c => c.custo > 0).map((_, i) => (
-                            <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? '#6366f1'} />
+                            <Cell key={i} fill={CATEGORIA_CORES[Object.keys(CATEGORIA_CORES)[i % Object.keys(CATEGORIA_CORES).length]] ?? 'var(--brand-600)'} />
                           ))}
                         </Bar>
                       </BarChart>

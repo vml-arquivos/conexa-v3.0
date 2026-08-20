@@ -29,12 +29,12 @@ interface RelatorioConsumo {
 }
 
 const PALETTE = {
-  indigo: '#6366f1', green: '#10b981', amber: '#f59e0b', red: '#ef4444',
-  purple: '#8b5cf6', cyan: '#06b6d4', teal: '#14b8a6',
+  indigo: 'var(--brand-600)', green: '#10b981', amber: '#f59e0b', red: '#ef4444',
+  purple: 'var(--brand-500)', cyan: 'var(--brand-500)', teal: 'var(--brand-500)',
 };
 const STATUS_COLORS: Record<string, string> = {
-  APROVADO: '#10b981', SOLICITADO: '#6366f1', RASCUNHO: '#f59e0b',
-  REJEITADO: '#ef4444', ENTREGUE: '#06b6d4', CANCELADO: '#94a3b8',
+  APROVADO: '#10b981', SOLICITADO: 'var(--brand-600)', RASCUNHO: '#f59e0b',
+  REJEITADO: '#ef4444', ENTREGUE: 'var(--brand-500)', CANCELADO: '#94a3b8',
 };
 const STATUS_LABEL: Record<string, string> = {
   APROVADO: 'Aprovado', SOLICITADO: 'Solicitado', RASCUNHO: 'Rascunho',
@@ -44,7 +44,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
   PEDAGOGICO: 'Pedagógico', HIGIENE_PESSOAL: 'Higiene', OUTROS: 'Outros',
   CONSUMIVEL: 'Consumível', PERMANENTE: 'Permanente', LIMPEZA: 'Limpeza', ALIMENTACAO: 'Alimentação',
 };
-const CAT_COLORS = ['#6366f1', '#06b6d4', '#8b5cf6', '#14b8a6', '#ec4899', '#f97316', '#84cc16'];
+const CAT_COLORS = ['var(--brand-600)', 'var(--brand-500)', 'var(--brand-500)', 'var(--brand-500)', 'var(--brand-500)', '#f97316', '#84cc16'];
 
 const TooltipPremium = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;

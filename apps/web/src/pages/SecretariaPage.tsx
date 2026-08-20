@@ -51,7 +51,7 @@ const MODULOS_SECRETARIA = [
   { label: 'Funcionários da Unidade', desc: 'Profissionais, contatos, documentação e apoio administrativo da unidade.', path: '/app/secretaria/funcionarios', icon: <UserCog className="h-5 w-5" />, accent: 'border-l-indigo-500' },
 ];
 
-const CORES = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16'];
+const CORES = ['var(--brand-600)','#0ea5e9','#10b981','#f59e0b','#ef4444','var(--brand-500)','var(--brand-500)','#84cc16'];
 
 function hojeISO() { return new Date().toISOString().slice(0, 10); }
 

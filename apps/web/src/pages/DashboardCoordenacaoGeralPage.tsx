@@ -106,7 +106,7 @@ function calcStatus(u: UnidadeConsolidado): 'otimo' | 'atencao' | 'critico' {
 }
 
 const STATUS_CFG = {
-  otimo:   { label: 'Ótimo',   bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200',  dot: 'bg-green-500',  bar: 'bg-green-500' },
+  otimo:   { label: 'Ótimo',   bg: 'bg-brand-50',  text: 'text-brand-700',  border: 'border-brand-200',  dot: 'bg-brand-500',  bar: 'bg-brand-500' },
   atencao: { label: 'Atenção', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-500', bar: 'bg-yellow-400' },
   critico: { label: 'Crítico', bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-200',    dot: 'bg-red-500',    bar: 'bg-red-500' },
 };
@@ -137,10 +137,10 @@ function KpiCard({
 }) {
   const tones: Record<string, string> = {
     default: 'bg-white border-gray-200 text-gray-800',
-    success: 'bg-green-50 border-green-200 text-green-800',
+    success: 'bg-brand-50 border-brand-200 text-brand-800',
     warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     danger:  'bg-red-50 border-red-200 text-red-800',
-    info:    'bg-blue-50 border-blue-200 text-blue-800',
+    info:    'bg-brand-50 border-brand-200 text-brand-800',
   };
   return (
     <div
@@ -169,7 +169,7 @@ function SectionCard({ title, icon, children, action }: {
           {icon}{title}
         </div>
         {action && (
-          <button onClick={action.onClick} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+          <button onClick={action.onClick} className="text-xs text-brand-600 hover:text-brand-800 flex items-center gap-1">
             {action.label} <ArrowRight className="h-3 w-3" />
           </button>
         )}
@@ -391,8 +391,8 @@ export default function DashboardCoordenacaoGeralPage() {
 
   // Funil pedagógico
   const funilDados = funil ? [
-    { etapa: 'Criados',    valor: funil.funnel.created,   cor: '#3b82f6' },
-    { etapa: 'Enviados',   valor: funil.funnel.submitted, cor: '#8b5cf6' },
+    { etapa: 'Criados',    valor: funil.funnel.created,   cor: 'var(--brand-500)' },
+    { etapa: 'Enviados',   valor: funil.funnel.submitted, cor: 'var(--brand-500)' },
     { etapa: 'Aprovados',  valor: funil.funnel.approved,  cor: '#10b981' },
     { etapa: 'Executados', valor: funil.funnel.executed,  cor: '#f59e0b' },
   ] : [];
@@ -436,7 +436,7 @@ export default function DashboardCoordenacaoGeralPage() {
             </span>
           )}
           {reqPendentes > 0 && (
-            <span className="inline-flex items-center gap-1 border rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 border-blue-300">
+            <span className="inline-flex items-center gap-1 border rounded-full px-2.5 py-0.5 text-xs font-semibold bg-brand-100 text-brand-800 border-brand-300">
               <Bell className="h-3 w-3" />{reqPendentes} requisição(ões) pendente(s)
             </span>
           )}
@@ -447,7 +447,7 @@ export default function DashboardCoordenacaoGeralPage() {
       )}
 
       {/* ── Seletor de Unidade ── */}
-      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4">
+      <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 mb-4">
         <UnitScopeSelector showNetworkOption placeholder="Toda a rede" compact />
       </div>
       {/* ── Tabs ──────────────────────────────────────────────────────── */}
@@ -503,22 +503,22 @@ export default function DashboardCoordenacaoGeralPage() {
           )}
 
           {inteligenciaRede && (
-            <SectionCard title="Inteligência pedagógica da rede" icon={<Network className="h-4 w-4 text-indigo-600" />}>
+            <SectionCard title="Inteligência pedagógica da rede" icon={<Network className="h-4 w-4 text-brand-600" />}>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-                <div className="rounded-xl bg-indigo-50 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-indigo-700/70">Cobertura</p>
-                  <p className="text-xl font-bold text-indigo-900 mt-1">{inteligenciaRede.metrics.coverageRate == null ? '—' : `${inteligenciaRede.metrics.coverageRate}%`}</p>
-                  <p className="text-[11px] text-indigo-700/70">crianças com registro</p>
+                <div className="rounded-xl bg-brand-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-brand-700/70">Cobertura</p>
+                  <p className="text-xl font-bold text-brand-900 mt-1">{inteligenciaRede.metrics.coverageRate == null ? '—' : `${inteligenciaRede.metrics.coverageRate}%`}</p>
+                  <p className="text-[11px] text-brand-700/70">crianças com registro</p>
                 </div>
-                <div className="rounded-xl bg-blue-50 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-blue-700/70">Diários</p>
-                  <p className="text-xl font-bold text-blue-900 mt-1">{fmt(inteligenciaRede.metrics.diaryEvents)}</p>
-                  <p className="text-[11px] text-blue-700/70">no período</p>
+                <div className="rounded-xl bg-brand-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-brand-700/70">Diários</p>
+                  <p className="text-xl font-bold text-brand-900 mt-1">{fmt(inteligenciaRede.metrics.diaryEvents)}</p>
+                  <p className="text-[11px] text-brand-700/70">no período</p>
                 </div>
-                <div className="rounded-xl bg-purple-50 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-purple-700/70">Observações</p>
-                  <p className="text-xl font-bold text-purple-900 mt-1">{fmt(inteligenciaRede.metrics.observations)}</p>
-                  <p className="text-[11px] text-purple-700/70">evidências coletadas</p>
+                <div className="rounded-xl bg-brand-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-brand-700/70">Observações</p>
+                  <p className="text-xl font-bold text-brand-900 mt-1">{fmt(inteligenciaRede.metrics.observations)}</p>
+                  <p className="text-[11px] text-brand-700/70">evidências coletadas</p>
                 </div>
                 <div className="rounded-xl bg-amber-50 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-amber-700/70">Alertas</p>
@@ -560,7 +560,7 @@ export default function DashboardCoordenacaoGeralPage() {
           {/* Gráficos */}
           {!loading && unidades.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <SectionCard title="Presença por Unidade" icon={<TrendingUp className="h-4 w-4 text-blue-500" />}>
+              <SectionCard title="Presença por Unidade" icon={<TrendingUp className="h-4 w-4 text-brand-500" />}>
                 {dadosPresenca.length > 0 ? (
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={dadosPresenca} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -578,7 +578,7 @@ export default function DashboardCoordenacaoGeralPage() {
                 ) : <p className="text-xs text-gray-400 text-center py-8">Sem dados de presença</p>}
               </SectionCard>
 
-              <SectionCard title="Status das Unidades" icon={<Target className="h-4 w-4 text-purple-500" />}>
+              <SectionCard title="Status das Unidades" icon={<Target className="h-4 w-4 text-brand-500" />}>
                 {dadosPizza.length > 0 ? (
                   <div className="flex items-center gap-4">
                     <ResponsiveContainer width="55%" height={200}>
@@ -608,25 +608,25 @@ export default function DashboardCoordenacaoGeralPage() {
 
           {/* Acesso rápido — Desenvolvimento Infantil */}
           {!loading && (
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-brand-50 to-brand-50 border border-brand-200 rounded-2xl p-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
+                <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="h-5 w-5 text-brand-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-purple-800">Desenvolvimento Infantil</p>
-                  <p className="text-xs text-purple-600">Acompanhe as observações de desenvolvimento por unidade, turma e criança</p>
+                  <p className="text-sm font-semibold text-brand-800">Desenvolvimento Infantil</p>
+                  <p className="text-xs text-brand-600">Acompanhe as observações de desenvolvimento por unidade, turma e criança</p>
                 </div>
               </div>
               <button onClick={() => navigate('/app/desenvolvimento-infantil')}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-xl hover:bg-purple-700 transition-all flex-shrink-0">
+                className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-all flex-shrink-0">
                 Acessar <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           )}
           {/* Próximas reuniões */}
           {!loading && (dashboard?.proximasReunioes?.length ?? 0) > 0 && (
-            <SectionCard title="Próximas Reuniões" icon={<Calendar className="h-4 w-4 text-indigo-500" />}
+            <SectionCard title="Próximas Reuniões" icon={<Calendar className="h-4 w-4 text-brand-500" />}
               action={{ label: 'Ver todas', onClick: () => setAbaAtiva('reunioes') }}>
               <div className="space-y-2">
                 {dashboard!.proximasReunioes.map(r => (
@@ -636,7 +636,7 @@ export default function DashboardCoordenacaoGeralPage() {
                       {r.localOuLink && <p className="text-xs text-gray-400">{r.localOuLink}</p>}
                     </div>
                     <div className="text-right">
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
+                      <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
@@ -656,7 +656,7 @@ export default function DashboardCoordenacaoGeralPage() {
             {(['todas', 'otimo', 'atencao', 'critico'] as const).map(s => (
               <button key={s} onClick={() => setFiltroStatus(s)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  filtroStatus === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'
+                  filtroStatus === s ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300'
                 }`}>
                 {s === 'todas' ? 'Todas' : STATUS_CFG[s].label}
                 {s !== 'todas' && <span className="ml-1.5 opacity-70">({unidades.filter(u => u._status === s).length})</span>}
@@ -714,12 +714,12 @@ export default function DashboardCoordenacaoGeralPage() {
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={() => navigate(`/app/coordenacao-pedagogica?unitId=${u.id}`)}
-                        className="flex-1 text-xs py-2 px-3 bg-white border border-blue-200 text-blue-600 rounded-xl hover:bg-blue-50 transition-all font-medium">
+                        className="flex-1 text-xs py-2 px-3 bg-white border border-brand-200 text-brand-600 rounded-xl hover:bg-brand-50 transition-all font-medium">
                         Coord. Pedagógica
                       </button>
                       <button
                         onClick={() => navigate(`/app/desenvolvimento-infantil?unitId=${u.id}`)}
-                        className="flex-1 text-xs py-2 px-3 bg-white border border-purple-200 text-purple-600 rounded-xl hover:bg-purple-50 transition-all font-medium">
+                        className="flex-1 text-xs py-2 px-3 bg-white border border-brand-200 text-brand-600 rounded-xl hover:bg-brand-50 transition-all font-medium">
                         Desenvolvimento
                       </button>
                     </div>
@@ -737,7 +737,7 @@ export default function DashboardCoordenacaoGeralPage() {
       {abaAtiva === 'pedagogico' && (
         <div className="space-y-5">
           {/* ── RDIC por Unidade — 1º Trimestre ── */}
-          <SectionCard title="RDIC por Unidade — 1º Trimestre 2026" icon={<Brain className="h-4 w-4 text-indigo-500" />}>
+          <SectionCard title="RDIC por Unidade — 1º Trimestre 2026" icon={<Brain className="h-4 w-4 text-brand-500" />}>
             {loadingRdic ? (
               <div className="h-24 animate-pulse bg-gray-100 rounded-xl" />
             ) : rdicRede.length === 0 ? (
@@ -750,19 +750,19 @@ export default function DashboardCoordenacaoGeralPage() {
                       <span className="text-xs font-medium text-gray-700 truncate max-w-[60%]">{u.unidadeNome}</span>
                       <div className="flex items-center gap-3 text-xs">
                         <span className="text-gray-400">{u.iniciados}/{u.total} iniciados</span>
-                        <span className={`font-bold ${u.pct >= 70 ? 'text-emerald-600' : u.pct >= 30 ? 'text-amber-600' : 'text-red-500'}`}>
+                        <span className={`font-bold ${u.pct >= 70 ? 'text-brand-600' : u.pct >= 30 ? 'text-amber-600' : 'text-red-500'}`}>
                           {u.pct}%
                         </span>
                       </div>
                     </div>
                     <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 70 ? 'bg-emerald-500' : u.pct >= 30 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 70 ? 'bg-brand-500' : u.pct >= 30 ? 'bg-amber-400' : 'bg-red-400'}`}
                         style={{ width: `${u.pct}%` }}
                       />
                     </div>
                     {u.aprovados > 0 && (
-                      <p className="text-[10px] text-emerald-600 mt-0.5">{u.aprovados} aprovado(s)</p>
+                      <p className="text-[10px] text-brand-600 mt-0.5">{u.aprovados} aprovado(s)</p>
                     )}
                   </div>
                 ))}
@@ -772,14 +772,14 @@ export default function DashboardCoordenacaoGeralPage() {
 
           {/* ── Cobertura de Diários Hoje por Unidade ── */}
           {diariosCobertura.length > 0 && (
-            <SectionCard title="Cobertura de Diários Hoje" icon={<BookOpen className="h-4 w-4 text-blue-500" />}>
+            <SectionCard title="Cobertura de Diários Hoje" icon={<BookOpen className="h-4 w-4 text-brand-500" />}>
               <div className="space-y-2">
                 {diariosCobertura.map((u, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <span className="text-xs text-gray-600 w-36 truncate flex-shrink-0">{u.unidadeNome}</span>
                     <div className="flex-1 h-5 rounded-full bg-gray-100 overflow-hidden relative">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 80 ? 'bg-emerald-400' : u.pct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${u.pct >= 80 ? 'bg-brand-400' : u.pct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
                         style={{ width: `${Math.max(u.pct, 3)}%` }}
                       />
                       <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-white mix-blend-multiply">
@@ -795,7 +795,7 @@ export default function DashboardCoordenacaoGeralPage() {
             </SectionCard>
           )}
 
-          <SectionCard title="Funil de Planejamentos (últimos 30 dias)" icon={<TrendingUp className="h-4 w-4 text-purple-500" />}>
+          <SectionCard title="Funil de Planejamentos (últimos 30 dias)" icon={<TrendingUp className="h-4 w-4 text-brand-500" />}>
             {loading ? (
               <div className="h-40 animate-pulse bg-gray-100 rounded-xl" />
             ) : funilDados.length > 0 ? (
@@ -835,7 +835,7 @@ export default function DashboardCoordenacaoGeralPage() {
                 <RadarChart data={radarDados}>
                   <PolarGrid stroke="#e5e7eb" />
                   <PolarAngleAxis dataKey="campo" tick={{ fontSize: 10 }} />
-                  <Radar name="Cobertura" dataKey="cobertura" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.25} />
+                  <Radar name="Cobertura" dataKey="cobertura" stroke="var(--brand-500)" fill="var(--brand-500)" fillOpacity={0.25} />
                   <Tooltip formatter={(v: number) => [`${v}%`, 'Cobertura']} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 </RadarChart>
               </ResponsiveContainer>
@@ -854,9 +854,9 @@ export default function DashboardCoordenacaoGeralPage() {
               { label: 'Coord. Pedagógica',     icon: <Network className="h-5 w-5" />,   path: '/app/coordenacao-pedagogica',     badge: '' },
             ].map((item, i) => (
               <button key={i} onClick={() => navigate(item.path)}
-                className="relative flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-2xl hover:border-blue-300 hover:shadow-sm transition-all text-gray-600 hover:text-blue-700">
+                className="relative flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-2xl hover:border-brand-300 hover:shadow-sm transition-all text-gray-600 hover:text-brand-700">
                 {item.badge && (
-                  <span className="absolute top-2 right-2 text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full leading-none">
+                  <span className="absolute top-2 right-2 text-xs bg-brand-500 text-white px-1.5 py-0.5 rounded-full leading-none">
                     {item.badge}
                   </span>
                 )}
@@ -878,7 +878,7 @@ export default function DashboardCoordenacaoGeralPage() {
               {reqPendentes > 0 ? `${reqPendentes} requisição(ões) pendente(s) de materiais` : 'Nenhuma requisição pendente'}
             </p>
             <button onClick={() => navigate('/app/coordenacao-geral')}
-              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+              className="text-xs text-brand-600 hover:text-brand-800 flex items-center gap-1">
               Ver detalhes <ArrowRight className="h-3 w-3" />
             </button>
           </div>
@@ -886,15 +886,15 @@ export default function DashboardCoordenacaoGeralPage() {
           {loading ? (
             <div className="space-y-2">{[0,1,2].map(i => <div key={i} className="h-16 animate-pulse bg-gray-100 rounded-xl" />)}</div>
           ) : requisicoes.length === 0 ? (
-            <div className="text-center py-12 bg-green-50 border border-green-200 rounded-2xl">
-              <CheckCircle className="h-10 w-10 text-green-400 mx-auto mb-2" />
-              <p className="text-sm text-green-700 font-medium">Tudo em dia!</p>
-              <p className="text-xs text-green-500">Nenhuma requisição pendente</p>
+            <div className="text-center py-12 bg-brand-50 border border-brand-200 rounded-2xl">
+              <CheckCircle className="h-10 w-10 text-brand-400 mx-auto mb-2" />
+              <p className="text-sm text-brand-700 font-medium">Tudo em dia!</p>
+              <p className="text-xs text-brand-500">Nenhuma requisição pendente</p>
             </div>
           ) : (
             <div className="space-y-2">
               {requisicoes.slice(0, 20).map(r => (
-                <div key={r.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-blue-200 transition-all">
+                <div key={r.id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl hover:border-brand-200 transition-all">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">
                       {r.createdByUser ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}` : 'Professor'}
@@ -904,7 +904,7 @@ export default function DashboardCoordenacaoGeralPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 ml-3">
-                    {r.category && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{r.category}</span>}
+                    {r.category && <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">{r.category}</span>}
                     <span className="text-xs text-gray-400">{relDate(r.createdAt)}</span>
                     <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">Pendente</span>
                   </div>
@@ -925,13 +925,13 @@ export default function DashboardCoordenacaoGeralPage() {
               {dashboard?.proximasReunioes?.length ?? 0} próxima(s) reunião(ões) agendada(s)
             </p>
             <button onClick={() => navigate('/app/coordenacao')}
-              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+              className="text-xs text-brand-600 hover:text-brand-800 flex items-center gap-1">
               Gerenciar <ArrowRight className="h-3 w-3" />
             </button>
           </div>
 
           {(dashboard?.proximasReunioes?.length ?? 0) > 0 && (
-            <SectionCard title="Próximas" icon={<Clock className="h-4 w-4 text-blue-500" />}>
+            <SectionCard title="Próximas" icon={<Clock className="h-4 w-4 text-brand-500" />}>
               <div className="space-y-3">
                 {dashboard!.proximasReunioes.map(r => (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
@@ -940,7 +940,7 @@ export default function DashboardCoordenacaoGeralPage() {
                       {r.localOuLink && <p className="text-xs text-gray-400">{r.localOuLink}</p>}
                     </div>
                     <div className="text-right">
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
+                      <span className="text-xs bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">{relDate(r.dataRealizacao)}</span>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
@@ -950,14 +950,14 @@ export default function DashboardCoordenacaoGeralPage() {
           )}
 
           {(dashboard?.ultimasReunioes?.length ?? 0) > 0 && (
-            <SectionCard title="Últimas realizadas" icon={<CheckCircle className="h-4 w-4 text-green-500" />}>
+            <SectionCard title="Últimas realizadas" icon={<CheckCircle className="h-4 w-4 text-brand-500" />}>
               <div className="space-y-3">
                 {dashboard!.ultimasReunioes.map(r => (
                   <div key={r.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                     <p className="text-sm text-gray-700">{r.titulo}</p>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        r.status === 'REALIZADA' ? 'bg-green-100 text-green-700' :
+                        r.status === 'REALIZADA' ? 'bg-brand-100 text-brand-700' :
                         r.status === 'CANCELADA' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
                       }`}>{r.status}</span>
                       <span className="text-xs text-gray-400">{new Date(r.dataRealizacao).toLocaleDateString('pt-BR')}</span>
@@ -972,7 +972,7 @@ export default function DashboardCoordenacaoGeralPage() {
             <div className="text-center py-12 bg-gray-50 rounded-2xl">
               <Calendar className="h-10 w-10 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-400">Nenhuma reunião registrada</p>
-              <button onClick={() => navigate('/app/coordenacao')} className="mt-3 text-xs text-blue-600 underline">
+              <button onClick={() => navigate('/app/coordenacao')} className="mt-3 text-xs text-brand-600 underline">
                 Agendar reunião
               </button>
             </div>
@@ -995,14 +995,14 @@ export default function DashboardCoordenacaoGeralPage() {
       {abaAtiva === 'desenvolvimento' && (
         <div className="space-y-5">
           {/* Cabeçalho explicativo */}
-          <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4">
+          <div className="bg-brand-50 border border-brand-100 rounded-2xl p-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-purple-100 rounded-xl flex-shrink-0">
-                <Sparkles className="h-4 w-4 text-purple-600" />
+              <div className="p-2 bg-brand-100 rounded-xl flex-shrink-0">
+                <Sparkles className="h-4 w-4 text-brand-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-purple-800">Desenvolvimento infantil e psicossocial</p>
-                <p className="text-xs text-purple-600 mt-0.5">
+                <p className="text-sm font-semibold text-brand-800">Desenvolvimento infantil e psicossocial</p>
+                <p className="text-xs text-brand-600 mt-0.5">
                   Observações registradas pelos professores agrupadas pelos 5 campos de experiência da BNCC.
                   Dados construídos dia a dia na sala de aula.
                 </p>
@@ -1025,10 +1025,10 @@ export default function DashboardCoordenacaoGeralPage() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
-                    { id: 'O_EU_O_OUTRO_E_NOS', label: 'O eu, o outro e o nós', emoji: '🤝', color: 'bg-violet-50 border-violet-100', bar: 'bg-violet-400' },
-                    { id: 'CORPO_GESTOS_E_MOVIMENTOS', label: 'Corpo, gestos e movimentos', emoji: '🏃', color: 'bg-blue-50 border-blue-100', bar: 'bg-blue-400' },
+                    { id: 'O_EU_O_OUTRO_E_NOS', label: 'O eu, o outro e o nós', emoji: '🤝', color: 'bg-brand-50 border-brand-100', bar: 'bg-brand-400' },
+                    { id: 'CORPO_GESTOS_E_MOVIMENTOS', label: 'Corpo, gestos e movimentos', emoji: '🏃', color: 'bg-brand-50 border-brand-100', bar: 'bg-brand-400' },
                     { id: 'TRACOS_SONS_CORES_E_FORMAS', label: 'Traços, sons, cores e formas', emoji: '🎨', color: 'bg-rose-50 border-rose-100', bar: 'bg-rose-400' },
-                    { id: 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO', label: 'Escuta, fala, pensamento e imaginação', emoji: '💬', color: 'bg-emerald-50 border-emerald-100', bar: 'bg-emerald-400' },
+                    { id: 'ESCUTA_FALA_PENSAMENTO_E_IMAGINACAO', label: 'Escuta, fala, pensamento e imaginação', emoji: '💬', color: 'bg-brand-50 border-brand-100', bar: 'bg-brand-400' },
                     { id: 'ESPACOS_TEMPOS_QUANTIDADES_RELACOES_E_TRANSFORMACOES', label: 'Espaços, tempos, quantidades e transformações', emoji: '🔢', color: 'bg-amber-50 border-amber-100', bar: 'bg-amber-400' },
                   ].map((campo) => {
                     const totalObs = devObservacoes.reduce((s, u) => s + u.totalObs, 0);
@@ -1066,14 +1066,14 @@ export default function DashboardCoordenacaoGeralPage() {
                   <div className="divide-y divide-slate-50">
                     {devObservacoes.map((u, i) => (
                       <div key={i} className="px-4 py-3 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-purple-700">{u.unidadeNome.slice(0, 2).toUpperCase()}</span>
+                        <div className="w-8 h-8 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-brand-700">{u.unidadeNome.slice(0, 2).toUpperCase()}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">{u.unidadeNome}</p>
                           <p className="text-xs text-slate-400">{u.totalObs} observações registradas</p>
                         </div>
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${u.totalObs >= 20 ? 'bg-emerald-100 text-emerald-700' : u.totalObs >= 5 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-lg ${u.totalObs >= 20 ? 'bg-brand-100 text-brand-700' : u.totalObs >= 5 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
                           {u.totalObs >= 20 ? 'Ativo' : u.totalObs >= 5 ? 'Moderado' : 'Baixo'}
                         </span>
                       </div>
@@ -1082,24 +1082,24 @@ export default function DashboardCoordenacaoGeralPage() {
                 </div>
               ) : (
                 <div className="bg-white border border-slate-100 rounded-2xl p-8 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center mx-auto mb-3">
-                    <Sparkles className="h-6 w-6 text-purple-400" />
+                  <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles className="h-6 w-6 text-brand-400" />
                   </div>
                   <p className="text-sm font-medium text-slate-600 mb-1">Sem observações de desenvolvimento registradas</p>
                   <p className="text-xs text-slate-400">Os professores registram observações individuais pelo painel da turma</p>
                   <button onClick={() => navigate('/app/desenvolvimento-infantil')}
-                    className="mt-4 text-xs text-blue-600 underline">
+                    className="mt-4 text-xs text-brand-600 underline">
                     Ver painel de desenvolvimento
                   </button>
                 </div>
               )}
 
               {/* Navegação rápida para criança */}
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl p-4">
-                <p className="text-sm font-semibold text-purple-800 mb-1">Análise individual</p>
-                <p className="text-xs text-purple-600 mb-3">Acesse o painel analítico de cada criança para ver evolução detalhada por campo de experiência, linha do tempo e observações.</p>
+              <div className="bg-gradient-to-br from-brand-50 to-brand-50 border border-brand-100 rounded-2xl p-4">
+                <p className="text-sm font-semibold text-brand-800 mb-1">Análise individual</p>
+                <p className="text-xs text-brand-600 mb-3">Acesse o painel analítico de cada criança para ver evolução detalhada por campo de experiência, linha do tempo e observações.</p>
                 <button onClick={() => navigate('/app/secretaria/matriculas')}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-purple-200 rounded-xl text-xs font-medium text-purple-700 hover:bg-purple-50 transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white border border-brand-200 rounded-xl text-xs font-medium text-brand-700 hover:bg-brand-50 transition-colors">
                   <Eye className="h-3.5 w-3.5" /> Buscar criança
                 </button>
               </div>
@@ -1133,23 +1133,23 @@ export default function DashboardCoordenacaoGeralPage() {
               </p>
               <p className="text-xs text-amber-500 mt-1 font-medium">Atenção moderada</p>
             </div>
-            <div className="bg-blue-50 rounded-2xl p-4">
+            <div className="bg-brand-50 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="p-1.5 bg-white/60 rounded-lg"><Users className="h-4 w-4 text-blue-500" /></div>
+                <div className="p-1.5 bg-white/60 rounded-lg"><Users className="h-4 w-4 text-brand-500" /></div>
               </div>
-              <p className="text-2xl font-semibold text-blue-700 tabular-nums">
+              <p className="text-2xl font-semibold text-brand-700 tabular-nums">
                 {unidades.reduce((s, u) => s + (u.totalAlunos || 0), 0)}
               </p>
-              <p className="text-xs text-blue-500 mt-1 font-medium">Alunos monitorados</p>
+              <p className="text-xs text-brand-500 mt-1 font-medium">Alunos monitorados</p>
             </div>
-            <div className="bg-emerald-50 rounded-2xl p-4">
+            <div className="bg-brand-50 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="p-1.5 bg-white/60 rounded-lg"><CheckCircle className="h-4 w-4 text-emerald-500" /></div>
+                <div className="p-1.5 bg-white/60 rounded-lg"><CheckCircle className="h-4 w-4 text-brand-500" /></div>
               </div>
-              <p className="text-2xl font-semibold text-emerald-700 tabular-nums">
+              <p className="text-2xl font-semibold text-brand-700 tabular-nums">
                 {saudeAlertas.length === 0 ? '100' : Math.max(0, 100 - saudeAlertas.filter((a) => a.severidade === 'ALTA' || a.severidade === 'CRITICA').length * 5)}%
               </p>
-              <p className="text-xs text-emerald-500 mt-1 font-medium">Score de saúde</p>
+              <p className="text-xs text-brand-500 mt-1 font-medium">Score de saúde</p>
             </div>
           </div>
 
@@ -1166,7 +1166,7 @@ export default function DashboardCoordenacaoGeralPage() {
                   <p className="text-xs text-slate-400">{saudeAlertas.length} alertas no total</p>
                 </div>
                 <button onClick={() => navigate('/app/secretaria/ocorrencias')}
-                  className="text-xs text-blue-600 font-medium hover:underline">
+                  className="text-xs text-brand-600 font-medium hover:underline">
                   Ver todos <ChevronRight className="inline h-3 w-3" />
                 </button>
               </div>
@@ -1175,12 +1175,12 @@ export default function DashboardCoordenacaoGeralPage() {
                   const isCritico = alerta.severidade === 'ALTA' || alerta.severidade === 'CRITICA';
                   return (
                     <div key={alerta.id} className="px-4 py-3 flex items-start gap-3">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isCritico ? 'bg-red-500' : alerta.severidade === 'MEDIA' ? 'bg-amber-500' : 'bg-blue-400'}`} />
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${isCritico ? 'bg-red-500' : alerta.severidade === 'MEDIA' ? 'bg-amber-500' : 'bg-brand-400'}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-700 truncate">{alerta.titulo}</p>
                         <p className="text-xs text-slate-400">{alerta.unidadeNome || 'Rede geral'} · {alerta.tipo}</p>
                       </div>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${isCritico ? 'bg-red-100 text-red-700' : alerta.severidade === 'MEDIA' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${isCritico ? 'bg-red-100 text-red-700' : alerta.severidade === 'MEDIA' ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'}`}>
                         {alerta.severidade}
                       </span>
                     </div>
@@ -1190,8 +1190,8 @@ export default function DashboardCoordenacaoGeralPage() {
             </div>
           ) : (
             <div className="bg-white border border-slate-100 rounded-2xl p-8 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle className="h-6 w-6 text-emerald-400" />
+              <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle className="h-6 w-6 text-brand-400" />
               </div>
               <p className="text-sm font-medium text-slate-600 mb-1">Nenhum alerta de saúde ativo</p>
               <p className="text-xs text-slate-400">Todas as unidades estão sem ocorrências pendentes</p>

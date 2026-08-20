@@ -3241,7 +3241,7 @@ function AbaTurmasNutricional({
   );
 }
 // ─── Constantes de cores para gráficos ──────────────────────────────────────
-const CORES_RELATORIO = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'];
+const CORES_RELATORIO = ['#f97316', 'var(--brand-500)', '#10b981', '#f59e0b', 'var(--brand-500)', '#ef4444', 'var(--brand-500)', '#84cc16'];
 
 // ─── AbaRelatorioConsolidado ─────────────────────────────────────────────────────────────────────────────────
 function AbaRelatorioConsolidado({ unitId }: { unitId: string }) {

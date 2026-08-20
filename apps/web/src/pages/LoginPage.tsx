@@ -4,7 +4,23 @@ import { useAuth } from '../app/AuthProvider';
 import { getRedirectPathByRoles } from '../hooks/useRedirectByRole';
 import { getErrorMessage } from '../utils/errorMessage';
 import { getAccessToken } from '../api/tokenStorage';
-import { Eye, EyeOff, BookOpen, Sparkles, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, Sparkles, Smartphone, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+      title={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+      className="absolute right-5 top-5 z-20 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] text-[var(--text-brand)] shadow-ds-sm transition hover:border-brand-400 hover:bg-[var(--surface-brand)]"
+    >
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
 
 // Detecta se o app está rodando como PWA instalado
 function isPWAMode(): boolean {
@@ -60,23 +76,24 @@ export function LoginPage() {
   // ── Login PWA: tela limpa para celular ─────────────────────────────────
   if (isPWAMode()) {
     return (
-      <div style={{
+      <div className="relative" style={{
         minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-        background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
-        fontFamily: '"Inter","system-ui",sans-serif',
+        background: 'var(--surface-page)', color: 'var(--text-primary)',
+        fontFamily: 'var(--font-body)',
         padding: '0 24px',
         paddingTop: 'max(48px, env(safe-area-inset-top))',
         paddingBottom: 'max(32px, env(safe-area-inset-bottom))',
         justifyContent: 'space-between',
       }}>
+        <ThemeToggle />
 
         {/* Topo: logo e título */}
-        <div style={{ textAlign: 'center', color: '#fff' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-primary)' }}>
           <div style={{
-            width: 72, height: 72, borderRadius: 22, background: 'rgba(255,255,255,0.15)',
+            width: 72, height: 72, borderRadius: 22, background: 'var(--surface-brand)',
             backdropFilter: 'blur(8px)', margin: '0 auto 16px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid rgba(255,255,255,0.2)',
+            border: '1px solid var(--border-brand)',
           }}>
             <img
               src="/branding/cocris/logo-cocris.png"
@@ -87,30 +104,30 @@ export function LoginPage() {
                 (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
               }}
             />
-            <span style={{ display: 'none', fontSize: 28, fontWeight: 800, color: '#fff' }}>C</span>
+            <span style={{ display: 'none', fontSize: 28, fontWeight: 800, color: 'var(--text-brand)' }}>C</span>
           </div>
-          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>
+          <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 500, letterSpacing: -0.5 }}>
             COCRIS Pedagógico
           </h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
             Gestão de educação infantil
           </p>
         </div>
 
         {/* Formulário */}
         <div style={{
-          background: '#fff', borderRadius: 24, padding: 24,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          background: 'var(--surface-card)', borderRadius: 24, padding: 24,
+          border: '1px solid var(--border-default)', boxShadow: 'var(--shadow-lg)',
         }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600, color: '#0f172a' }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>
             Entrar
           </h2>
 
           {error && (
             <div style={{
               padding: '10px 14px', borderRadius: 12, marginBottom: 16,
-              background: '#fef2f2', border: '0.5px solid #fecaca',
-              fontSize: 13, color: '#dc2626',
+              background: 'var(--error-bg)', border: '0.5px solid var(--error-border)',
+              fontSize: 13, color: 'var(--error)',
             }}>
               {error}
             </div>
@@ -118,7 +135,7 @@ export function LoginPage() {
 
           {/* Email */}
           <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               E-mail
             </label>
             <input
@@ -130,15 +147,15 @@ export function LoginPage() {
               autoCorrect="off"
               style={{
                 width: '100%', padding: '13px 14px', borderRadius: 12, boxSizing: 'border-box',
-                border: '0.5px solid #e2e8f0', background: '#f8fafc',
-                fontSize: 16, color: '#0f172a', outline: 'none',
+                border: '0.5px solid var(--border-default)', background: 'var(--surface-inset)',
+                fontSize: 16, color: 'var(--text-primary)', outline: 'none',
               }}
             />
           </div>
 
           {/* Senha */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#475569', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Senha
             </label>
             <div style={{ position: 'relative' }}>
@@ -150,8 +167,8 @@ export function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e as any)}
                 style={{
                   width: '100%', padding: '13px 44px 13px 14px', borderRadius: 12, boxSizing: 'border-box',
-                  border: '0.5px solid #e2e8f0', background: '#f8fafc',
-                  fontSize: 16, color: '#0f172a', outline: 'none',
+                  border: '0.5px solid var(--border-default)', background: 'var(--surface-inset)',
+                  fontSize: 16, color: 'var(--text-primary)', outline: 'none',
                 }}
               />
               <button
@@ -159,7 +176,7 @@ export function LoginPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 style={{
                   position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4,
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 4,
                 }}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -173,8 +190,8 @@ export function LoginPage() {
             disabled={loading || !email || !password}
             style={{
               width: '100%', padding: '14px', borderRadius: 14, border: 'none',
-              background: loading ? '#818cf8' : '#4f46e5',
-              color: '#fff', fontSize: 16, fontWeight: 600, cursor: 'pointer',
+              background: loading ? 'var(--brand-400)' : 'var(--brand-600)',
+              color: 'var(--text-inverse)', fontSize: 16, fontWeight: 500, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               opacity: (!email || !password) ? 0.6 : 1,
               transition: 'all 0.15s',
@@ -182,7 +199,7 @@ export function LoginPage() {
           >
             {loading ? (
               <>
-                <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ width: 18, height: 18, border: '2px solid color-mix(in srgb, var(--text-inverse) 30%, transparent)', borderTopColor: 'var(--text-inverse)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                 Entrando...
               </>
             ) : 'Entrar'}
@@ -191,7 +208,7 @@ export function LoginPage() {
 
         {/* Rodapé */}
         <div style={{ textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
             <Smartphone size={12} /> App instalado
           </p>
         </div>
@@ -202,12 +219,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 50%, #1d4ed8 100%)' }}>
+    <div className="relative min-h-screen flex bg-[var(--surface-page)] text-[var(--text-primary)]">
+      <ThemeToggle />
       {/* Painel esquerdo — identidade visual */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-12 text-white relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center border-r border-[var(--border-default)] bg-[var(--surface-card)] p-12 text-[var(--text-primary)] relative overflow-hidden">
         {/* Círculos decorativos */}
-        <div className="absolute top-0 left-0 w-96 h-96 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #60a5fa, transparent)', transform: 'translate(-30%, -30%)' }} />
-        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #93c5fd, transparent)', transform: 'translate(30%, 30%)' }} />
+        <div className="absolute top-0 left-0 w-96 h-96 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, var(--brand-400), transparent)', transform: 'translate(-30%, -30%)' }} />
+        <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, var(--brand-300), transparent)', transform: 'translate(30%, 30%)' }} />
 
         <div className="relative z-10 max-w-md text-center">
           {/* Logo desktop — COCRIS institucional */}
@@ -224,21 +242,21 @@ export function LoginPage() {
             />
             {/* Fallback texto (oculto por padrão) */}
             <div className="hidden items-center gap-3" aria-hidden="true">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-2xl">
-                <span className="text-blue-700 font-black text-3xl">C</span>
+              <div className="w-16 h-16 bg-[var(--surface-brand)] border border-[var(--border-brand)] rounded-2xl flex items-center justify-center shadow-ds-sm">
+                <span className="text-brand-700 font-medium text-3xl">C</span>
               </div>
               <div className="text-left">
                 <h1 className="text-4xl font-black tracking-tight">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
-                <p className="text-blue-200 text-sm font-medium tracking-widest uppercase">Sistema Pedagógico</p>
+                <p className="text-[var(--text-brand)] text-sm font-medium tracking-widest uppercase">Sistema Pedagógico</p>
               </div>
             </div>
           </div>
 
           <h2 className="text-3xl font-bold mb-4 leading-tight">
             Educação mais<br />
-            <span className="text-blue-300">inteligente</span> e cuidadosa
+            <span className="text-brand-600 dark:text-brand-300">inteligente</span> e cuidadosa
           </h2>
-          <p className="text-blue-100 text-lg leading-relaxed mb-8">
+          <p className="text-[var(--text-secondary)] text-lg leading-relaxed mb-8">
             Planejamentos, chamadas, relatórios e acompanhamento do desenvolvimento das crianças — tudo em um só lugar.
           </p>
 
@@ -250,9 +268,9 @@ export function LoginPage() {
               { icon: '📊', text: 'Relatórios e análises automáticas' },
               { icon: '🤖', text: 'Assistente de IA para educadores' },
             ].map((f, i) => (
-              <div key={i} className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3 backdrop-blur-sm">
+              <div key={i} className="flex items-center gap-3 bg-[var(--surface-brand)] border border-[var(--border-brand)] rounded-xl px-4 py-3">
                 <span className="text-xl">{f.icon}</span>
-                <span className="text-sm font-medium text-blue-50">{f.text}</span>
+                <span className="text-sm font-normal text-[var(--text-primary)]">{f.text}</span>
               </div>
             ))}
           </div>
@@ -276,30 +294,30 @@ export function LoginPage() {
             />
             {/* Fallback texto mobile (oculto por padrão) */}
             <div className="hidden items-center gap-3" aria-hidden="true">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-blue-700 font-black text-2xl">C</span>
+              <div className="w-12 h-12 bg-[var(--surface-brand)] border border-[var(--border-brand)] rounded-xl flex items-center justify-center shadow-ds-sm">
+                <span className="text-brand-700 font-medium text-2xl">C</span>
               </div>
               <div>
-                <h1 className="text-2xl font-black text-white">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
-                <p className="text-blue-200 text-xs">Sistema Pedagógico</p>
+                <h1 className="text-2xl font-normal text-[var(--text-primary)]">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
+                <p className="text-[var(--text-brand)] text-xs">Sistema Pedagógico</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-2xl p-8 lg:p-10">
+          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-3xl shadow-ds-md p-8 lg:p-10">
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-5 w-5 text-blue-600" />
-                <span className="text-sm font-semibold text-blue-600 uppercase tracking-wide">Bem-vindo de volta</span>
+                <Sparkles className="h-5 w-5 text-brand-500" />
+                <span className="text-sm font-medium text-[var(--text-brand)] uppercase tracking-wide">Bem-vindo de volta</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Acesse sua conta</h2>
-              <p className="text-gray-500 text-sm mt-1">Entre com seu e-mail e senha cadastrados</p>
+              <h2 className="text-2xl font-normal text-[var(--text-primary)]">Acesse sua conta</h2>
+              <p className="text-[var(--text-secondary)] text-sm mt-1">Entre com seu e-mail e senha cadastrados</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* E-mail */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                   E-mail
                 </label>
                 <input
@@ -309,13 +327,13 @@ export function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="seu@email.com"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-gray-900 placeholder-gray-400"
+                  className="w-full px-4 py-3 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-xl focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition-all text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                 />
               </div>
 
               {/* Senha */}
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                   Senha
                 </label>
                 <div className="relative">
@@ -326,12 +344,12 @@ export function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="••••••••"
-                    className="w-full px-4 py-3 pr-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-gray-900 placeholder-gray-400"
+                    className="w-full px-4 py-3 pr-12 border border-[var(--border-default)] bg-[var(--surface-inset)] rounded-xl focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100 transition-all text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-brand)] transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -350,7 +368,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
+                className="w-full py-3.5 px-6 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-medium rounded-xl transition-all shadow-ds-brand disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base"
               >
                 {loading ? (
                   <>
@@ -366,8 +384,8 @@ export function LoginPage() {
               </button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-              <p className="text-xs text-gray-400">
+            <div className="mt-8 pt-6 border-t border-[var(--border-subtle)] text-center">
+              <p className="text-xs text-[var(--text-tertiary)]">
                 {import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026 — Sistema Pedagógico Inteligente
               </p>
             </div>
