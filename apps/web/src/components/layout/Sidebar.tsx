@@ -190,8 +190,8 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
       onClick={onClick}
       className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-100 ${
         active
-          ? 'bg-brand-600 text-[var(--text-inverse)] shadow-ds-sm'
-          : 'text-[var(--sidebar-text-muted)] hover:bg-[var(--surface-sidebar-hover)] hover:text-white'
+          ? 'bg-white/15 text-white shadow-ds-sm ring-1 ring-inset ring-white/20'
+          : 'text-[var(--sidebar-text-muted)] hover:bg-white/10 hover:text-white'
       }`}
     >
       <span className="flex items-center gap-2">
@@ -206,7 +206,7 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
         <span className={`ml-1 flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
           active
             ? 'bg-white/20 text-white'
-            : 'bg-brand-900/80 text-brand-300'
+            : 'bg-white/15 text-brand-100'
         }`}>
           {item.badge}
         </span>
@@ -429,7 +429,7 @@ export function Sidebar({ onClose }: SidebarProps) {
           <button
             type="button"
             onClick={() => setConfigOpen(o => !o)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-normal text-[var(--sidebar-text-muted)] hover:text-white hover:bg-[var(--surface-sidebar-hover)] transition-colors"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-normal text-[var(--sidebar-text-muted)] hover:text-white hover:bg-white/10 transition-colors"
           >
             <Settings className="h-4 w-4 flex-shrink-0 text-[var(--sidebar-text-muted)]" />
             <span className="flex-1 text-left">Configurações</span>

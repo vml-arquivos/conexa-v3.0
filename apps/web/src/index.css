@@ -30,10 +30,10 @@
     --surface-subtle:    #eef4f0;
     --surface-muted:     #e1ebe5;
     --surface-floating:  #ffffff;
-    --surface-sidebar:   #07100d;
-    --surface-topbar:    #07100d;
-    --surface-sidebar-hover: #10241b;
-    --surface-sidebar-elevated: #0c1b15;
+    --surface-sidebar:   #0f6844;
+    --surface-topbar:    #ffffff;
+    --surface-sidebar-hover: #158354;
+    --surface-sidebar-elevated: #0b4e35;
     --surface-overlay:   rgba(4,15,10,0.58);
     --surface-brand:     #e7f8ee;
     --surface-card:      #ffffff;
@@ -47,7 +47,7 @@
     --border-strong:  #b8cebf;
     --border-brand:   #1fa967;
     --border-focus:   #158354;
-    --border-sidebar: rgba(180,220,198,0.15);
+    --border-sidebar: rgba(255,255,255,0.22);
 
     /* ── Texto ───────────────────────────────────────────────────── */
     --text-primary:    #15231d;
@@ -57,7 +57,7 @@
     --text-inverse:    #ffffff;
     --text-brand:      #0f6844;
     --text-brand-soft: #158354;
-    --sidebar-text-muted: #98b1a3;
+    --sidebar-text-muted: #d8f5e4;
 
     /* ── Status semânticos: só aparecem em estados reais ─────────── */
     --success:        #168957;
@@ -413,6 +413,14 @@
   .dark [class~="text-gray-700"], .dark [class~="text-gray-600"], .dark [class~="text-slate-700"], .dark [class~="text-slate-600"] { color: var(--text-secondary) !important; }
   .dark [class~="text-gray-500"], .dark [class~="text-gray-400"], .dark [class~="text-slate-500"], .dark [class~="text-slate-400"] { color: var(--text-tertiary) !important; }
   .dark [class~="border-gray-100"], .dark [class~="border-gray-200"], .dark [class~="border-gray-300"], .dark [class~="border-slate-100"], .dark [class~="border-slate-200"] { border-color: var(--border-default) !important; }
+
+  /* Status críticos e avisos preservam a semântica, mas não viram cartões brancos no escuro. */
+  .dark [class*="bg-red-50"], .dark [class*="bg-red-100"] { background-color: var(--error-bg) !important; }
+  .dark [class*="bg-amber-50"], .dark [class*="bg-amber-100"], .dark [class*="bg-yellow-50"], .dark [class*="bg-yellow-100"] { background-color: var(--warning-bg) !important; }
+  .dark [class*="text-red-"] { color: var(--error) !important; }
+  .dark [class*="text-amber-"], .dark [class*="text-yellow-"] { color: var(--warning) !important; }
+  .dark [class*="border-red-"] { border-color: var(--error-border) !important; }
+  .dark [class*="border-amber-"], .dark [class*="border-yellow-"] { border-color: var(--warning-border) !important; }
 }
 
 /* Intensidades sólidas legadas precisam manter contraste com texto inverso. */

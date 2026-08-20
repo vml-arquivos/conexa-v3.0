@@ -643,9 +643,9 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       {/* Modal motivo rejeição */}
       {itemParaRejeitar && canApprove && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <div className="bg-[var(--surface-modal)] border border-[var(--border-default)] rounded-2xl p-5 max-w-sm w-full shadow-2xl">
             <h3 className="font-bold text-lg mb-2">Devolver com orientação</h3>
-            <p className="text-sm text-gray-500 mb-4">Escreva uma orientação para o professor:</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">Escreva uma orientação para o professor:</p>
             <textarea className="w-full border-2 rounded-xl p-3 text-sm resize-none mb-4" rows={4}
               placeholder="Ex: Por favor, detalhe melhor os objetivos..."
               value={motivoRejeicao} onChange={e => setMotivoRejeicao(e.target.value)} />
@@ -663,24 +663,24 @@ export default function DashboardCoordenacaoPedagogicaPage() {
       )}
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4 flex-wrap">
+      <nav className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)] mb-3 flex-wrap">
         <button
           onClick={() => navigate('/app/teacher-dashboard')}
-          className="hover:text-gray-700 transition-colors"
+          className="hover:text-[var(--text-brand)] transition-colors"
         >
           Início
         </button>
         <ChevronRight className="h-3 w-3 flex-shrink-0" />
         <button
           onClick={() => setAbaAtiva('inicio')}
-          className="hover:text-gray-700 transition-colors"
+          className="hover:text-[var(--text-brand)] transition-colors"
         >
           Coordenação Pedagógica
         </button>
         {abaAtiva !== 'inicio' && (
           <>
             <ChevronRight className="h-3 w-3 flex-shrink-0" />
-            <span className="text-gray-600 font-medium capitalize">
+            <span className="text-[var(--text-primary)] font-medium capitalize">
               {abaAtiva === 'turmas' ? 'Turmas' :
                abaAtiva === 'planejamentos' ? 'Planejamentos' :
                abaAtiva === 'relatorios' ? 'Relatórios' :
@@ -710,7 +710,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
         </div>
       )}
       {/* Abas */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-2xl overflow-x-auto">
+      <div className="flex gap-1 mb-5 bg-[var(--surface-muted)] p-1 rounded-xl overflow-x-auto">
         {abas.map(aba => (
           <button
             key={aba.id}
@@ -722,10 +722,10 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               setAbaAtiva(aba.id as any);
             }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-              abaAtiva === aba.id ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              abaAtiva === aba.id ? 'bg-[var(--surface-card)] text-[var(--text-brand)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             {aba.icon}{aba.label}
             {(aba as any).badge > 0 && (
-              <span className="bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+              <span className="bg-[var(--surface-brand)] text-[var(--text-brand)] border border-[var(--border-brand)] text-xs w-5 h-5 rounded-full flex items-center justify-center font-semibold">
                 {(aba as any).badge}
               </span>
             )}
@@ -735,7 +735,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
 
       {/* ABA: HOJE */}
       {abaAtiva === 'inicio' && (
-        <div className="space-y-8">
+        <div className="space-y-5">
 
           {/* BLOCO 1: AÇÃO EXIGIDA */}
           <ActionRequiredBlock
@@ -1488,8 +1488,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               statusCount[s] = (statusCount[s] ?? 0) + 1;
             }
             const CORES_STATUS: Record<string, string> = {
-              PUBLICADO: '#10b981', REVISADO: 'var(--brand-600)', ARQUIVADO: '#94a3b8',
-              RASCUNHO: '#f59e0b', DEVOLVIDO: '#ef4444',
+              PUBLICADO: 'var(--brand-500)', REVISADO: 'var(--brand-600)', ARQUIVADO: 'var(--text-tertiary)',
+              RASCUNHO: 'var(--warning)', DEVOLVIDO: 'var(--error)',
             };
             const dadosPizza = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
 
@@ -1511,8 +1511,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               planStatus[s] = (planStatus[s] ?? 0) + 1;
             }
             const CORES_PLAN: Record<string, string> = {
-              APROVADO: '#10b981', EM_REVISAO: 'var(--brand-600)', RASCUNHO: '#f59e0b',
-              DEVOLVIDO: '#ef4444', EM_EXECUCAO: 'var(--brand-500)', CONCLUIDO: 'var(--brand-500)',
+              APROVADO: 'var(--brand-500)', EM_REVISAO: 'var(--brand-600)', RASCUNHO: 'var(--warning)',
+              DEVOLVIDO: 'var(--error)', EM_EXECUCAO: 'var(--brand-500)', CONCLUIDO: 'var(--brand-500)',
             };
             const dadosPlanPizza = Object.entries(planStatus).map(([name, value]) => ({ name, value }));
 
@@ -1522,14 +1522,14 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {dadosBarras.length > 0 && (
                   <Card className="lg:col-span-2">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold text-gray-700">Diários por turma</CardTitle>
+                      <CardTitle className="text-sm font-semibold text-[var(--text-primary)]">Diários por turma</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={dadosBarras} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                          <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} />
+                          <YAxis tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} allowDecimals={false} />
                           <Tooltip formatter={(v: any) => [v, 'Diários']} />
                           <Bar dataKey="total" fill="var(--brand-600)" radius={[4,4,0,0]} />
                         </BarChart>
@@ -1542,7 +1542,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {dadosPizza.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos diários</CardTitle>
+                      <CardTitle className="text-sm font-semibold text-[var(--text-primary)]">Status dos diários</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <ResponsiveContainer width="100%" height={180}>
@@ -1564,7 +1564,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 {dadosPlanPizza.length > 0 && (
                   <Card className="lg:col-span-1">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold text-gray-700">Status dos planejamentos</CardTitle>
+                      <CardTitle className="text-sm font-semibold text-[var(--text-primary)]">Status dos planejamentos</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
                       <ResponsiveContainer width="100%" height={180}>
@@ -1597,21 +1597,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               }, 0);
               return (
                 <>
-                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-brand-700">{publicados}</p>
-                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Publicados</p>
+                  <div className="rounded-xl border border-[var(--border-brand)] bg-[var(--surface-brand)] p-3 text-center">
+                    <p className="text-2xl font-semibold text-[var(--text-brand)]">{publicados}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Publicados</p>
                   </div>
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-amber-700">{rascunhos}</p>
-                    <p className="text-xs text-amber-600 mt-0.5 font-medium">Rascunhos</p>
+                  <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-bg)] p-3 text-center">
+                    <p className="text-2xl font-semibold text-[var(--warning)]">{rascunhos}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Rascunhos</p>
                   </div>
-                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-brand-700">{comExecucao}</p>
-                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Plano cumprido</p>
+                  <div className="rounded-xl border border-[var(--border-brand)] bg-[var(--surface-brand)] p-3 text-center">
+                    <p className="text-2xl font-semibold text-[var(--text-brand)]">{comExecucao}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Plano cumprido</p>
                   </div>
-                  <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3 text-center">
-                    <p className="text-2xl font-bold text-brand-700">{presencaMedia > 0 ? `${Math.round(presencaMedia)}%` : '—'}</p>
-                    <p className="text-xs text-brand-600 mt-0.5 font-medium">Presença média</p>
+                  <div className="rounded-xl border border-[var(--border-brand)] bg-[var(--surface-brand)] p-3 text-center">
+                    <p className="text-2xl font-semibold text-[var(--text-brand)]">{presencaMedia > 0 ? `${Math.round(presencaMedia)}%` : '—'}</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Presença média</p>
                   </div>
                 </>
               );
@@ -1619,25 +1619,25 @@ export default function DashboardCoordenacaoPedagogicaPage() {
           </div>
 
           {/* FIX P4-3: Filtros operacionais por turma, status, data e professor */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtrar diários</p>
+          <div className="bg-[var(--surface-card)] border border-[var(--border-default)] rounded-2xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Filtrar diários</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Turma</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Turma</label>
                 <input
                   type="text"
                   placeholder="Buscar turma..."
                   value={filtroDiarioTurma}
                   onChange={e => setFiltroDiarioTurma(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
+                  className="w-full px-3 py-1.5 text-sm text-[var(--text-primary)] bg-[var(--surface-inset)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Status</label>
                 <select
                   value={filtroDiarioStatus}
                   onChange={e => setFiltroDiarioStatus(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white"
+                  className="w-full px-3 py-1.5 text-sm text-[var(--text-primary)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-[var(--surface-inset)]"
                 >
                   <option value="TODOS">Todos</option>
                   <option value="PUBLICADO">Publicado</option>
@@ -1647,38 +1647,38 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data início</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Data início</label>
                 <input
                   type="date"
                   value={filtroDiarioDataInicio}
                   onChange={e => setFiltroDiarioDataInicio(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
+                  className="w-full px-3 py-1.5 text-sm text-[var(--text-primary)] bg-[var(--surface-inset)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data fim</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Data fim</label>
                 <input
                   type="date"
                   value={filtroDiarioDataFim}
                   onChange={e => setFiltroDiarioDataFim(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
+                  className="w-full px-3 py-1.5 text-sm text-[var(--text-primary)] bg-[var(--surface-inset)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Professor</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Professor</label>
                 <input
                   type="text"
                   placeholder="Buscar professor..."
                   value={filtroDiarioProfessor}
                   onChange={e => setFiltroDiarioProfessor(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
+                  className="w-full px-3 py-1.5 text-sm text-[var(--text-primary)] bg-[var(--surface-inset)] border border-[var(--border-default)] rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300"
                 />
               </div>
               <button
                 onClick={() => { setFiltroDiarioTurma(''); setFiltroDiarioStatus('TODOS'); setFiltroDiarioDataInicio(''); setFiltroDiarioDataFim(''); setFiltroDiarioProfessor(''); }}
-                className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="mt-4 px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] bg-[var(--surface-muted)] hover:bg-[var(--surface-subtle)] rounded-lg transition-colors"
               >
                 Limpar filtros
               </button>
@@ -1708,7 +1708,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
               return true;
             });
             return diariosFiltrados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 bg-white rounded-2xl border border-gray-100 gap-2">
+            <div className="flex flex-col items-center justify-center py-12 bg-[var(--surface-card)] rounded-2xl border border-[var(--border-default)] gap-2">
               <ClipboardList className="h-10 w-10 text-gray-200" />
               <p className="text-sm text-gray-400">{diarios.length === 0 ? 'Nenhum diário registrado neste período.' : 'Nenhum diário encontrado com os filtros aplicados.'}</p>
             </div>
@@ -1758,11 +1758,11 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                 return (
                   <div
                     key={diario.id}
-                    className={`rounded-2xl border bg-white overflow-hidden ${
-                      publicado ? 'border-brand-200' : 'border-amber-200'
+                    className={`rounded-2xl border bg-[var(--surface-card)] overflow-hidden ${
+                      publicado ? 'border-[var(--border-brand)]' : 'border-[var(--warning-border)]'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/70">
+                    <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-[var(--border-default)] bg-[var(--surface-subtle)]">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold border ${
@@ -1783,8 +1783,8 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm font-bold text-gray-900 truncate">{turma}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{turma}</p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                           Prof. {professor}
                           {diario.presencas != null && (
                             <span className="ml-2 text-brand-600 font-medium">· {diario.presencas} presentes</span>
@@ -1794,7 +1794,7 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                           )}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold text-gray-400 flex-shrink-0 mt-0.5">{dataFmt}</span>
+                      <span className="text-xs font-semibold text-[var(--text-tertiary)] flex-shrink-0 mt-0.5">{dataFmt}</span>
                     </div>
 
                     <div className="p-4 space-y-3">
@@ -1839,21 +1839,21 @@ export default function DashboardCoordenacaoPedagogicaPage() {
                       </div>
 
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Clima</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{CLIMA[diario.climaEmocional || ctx.climaEmocional] ?? '—'}</p>
+                        <div className="rounded-xl bg-[var(--surface-inset)] border border-[var(--border-default)] p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-semibold">Clima</p>
+                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{CLIMA[diario.climaEmocional || ctx.climaEmocional] ?? '—'}</p>
                         </div>
-                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Métrica turma</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.publicados}/${metricasTurma.total} publicados` : '—'}</p>
+                        <div className="rounded-xl bg-[var(--surface-inset)] border border-[var(--border-default)] p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-semibold">Métrica turma</p>
+                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{metricasTurma ? `${metricasTurma.publicados}/${metricasTurma.total} publicados` : '—'}</p>
                         </div>
-                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com BNCC</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comMatriz}/${metricasTurma.total}` : '—'}</p>
+                        <div className="rounded-xl bg-[var(--surface-inset)] border border-[var(--border-default)] p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-semibold">Com BNCC</p>
+                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{metricasTurma ? `${metricasTurma.comMatriz}/${metricasTurma.total}` : '—'}</p>
                         </div>
-                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Com plano</p>
-                          <p className="mt-1 text-sm font-semibold text-slate-700">{metricasTurma ? `${metricasTurma.comPlano}/${metricasTurma.total}` : '—'}</p>
+                        <div className="rounded-xl bg-[var(--surface-inset)] border border-[var(--border-default)] p-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--text-tertiary)] font-semibold">Com plano</p>
+                          <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{metricasTurma ? `${metricasTurma.comPlano}/${metricasTurma.total}` : '—'}</p>
                         </div>
                       </div>
                       <div className="flex justify-end pt-2">

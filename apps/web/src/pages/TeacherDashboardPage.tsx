@@ -508,11 +508,7 @@ export default function TeacherDashboardPage() {
   const destaquesResumoTurma = [
     `${totalAlunos} criança(s) na turma`,
     `${presentesHoje} presente(s) hoje`,
-    `${registrosHoje} registro(s) pedagógico(s) no dia`,
   ];
-  if (planejamentoResumoHoje.objectives.length > 0) {
-    destaquesResumoTurma.push(`${planejamentoResumoHoje.objectives.length} objetivo(s) ativos`);
-  };
 
   return (
     <PageShell
@@ -531,27 +527,23 @@ export default function TeacherDashboardPage() {
       )}
 
       {data?.hasClassroom && (
-        <div className="space-y-6 overflow-x-hidden">
+        <div className="space-y-4 overflow-x-hidden">
           <div className="grid gap-4 xl:grid-cols-[1.3fr_0.9fr] max-w-full">
-            <div className="rounded-[28px] border border-[var(--border-sidebar)] bg-[var(--surface-sidebar)] p-5 text-[var(--text-inverse)] shadow-ds-md">
+            <div className="rounded-2xl border border-[var(--border-sidebar)] bg-[var(--surface-sidebar)] p-4 text-[var(--text-inverse)] shadow-ds-md">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-medium text-white/80">
                     <Star className="h-3.5 w-3.5 text-brand-300" />
                     Cockpit da turma
                   </div>
                   <div>
-                    <h2 className="text-2xl font-semibold tracking-tight">Sua visão rápida da turma de hoje</h2>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-200">
+                    <h2 className="text-xl font-semibold tracking-tight">Visão da turma</h2>
+                    <p className="mt-1 max-w-2xl text-sm text-white/70">
                       {turma ? `${turma.name} · ${turma.unit?.name}` : 'Painel da professora'}
-                      {turma?.segmento ? ` · segmento ${turma.segmento}` : ''}
                     </p>
                   </div>
-                  <div className="space-y-2 text-sm text-slate-100/90">
-                    <p className="max-w-2xl text-sm leading-relaxed text-slate-200">
-                      Painel simplificado para leitura rápida, com foco em presença, registros do dia e planejamento pedagógico ativo.
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs text-slate-100/90">
+                  <div className="text-sm text-white/80">
+                    <div className="flex flex-wrap gap-2 text-xs text-white/80">
                       {destaquesResumoTurma.map((item) => (
                         <span key={item} className="rounded-full border border-white/15 bg-white/10 px-3 py-1">{item}</span>
                       ))}
@@ -559,26 +551,26 @@ export default function TeacherDashboardPage() {
                   </div>
                 </div>
 
-                <div className="min-w-[240px] rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
+                <div className="min-w-[220px] rounded-2xl border border-white/10 bg-white/10 p-3.5 backdrop-blur-sm">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Resumo do dia</p>
-                      <p className="mt-1 text-3xl font-semibold">{presentesHoje}<span className="text-base font-medium text-slate-300">/{totalAlunos || '?'} presentes</span></p>
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-white/60">Resumo do dia</p>
+                      <p className="mt-1 text-2xl font-semibold">{presentesHoje}<span className="text-sm font-medium text-white/60">/{totalAlunos || '?'} presentes</span></p>
                     </div>
                     <div className="rounded-2xl bg-brand-400/15 p-3 text-brand-200">
                       <CheckCircle className="h-6 w-6" />
                     </div>
                   </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
                     <div className="h-full rounded-full bg-brand-400 transition-all" style={{ width: `${presencaPct}%` }} />
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-200">
-                    <div className="rounded-2xl bg-black/10 p-3">
-                      <p className="text-slate-300">Ausências</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-white/75">
+                    <div className="rounded-xl bg-black/10 p-2.5">
+                      <p className="text-white/60">Ausências</p>
                       <p className="mt-1 text-lg font-semibold text-white">{ausentesHoje}</p>
                     </div>
-                    <div className="rounded-2xl bg-black/10 p-3">
-                      <p className="text-slate-300">Registros hoje</p>
+                    <div className="rounded-xl bg-black/10 p-2.5">
+                      <p className="text-white/60">Registros hoje</p>
                       <p className="mt-1 text-lg font-semibold text-white">{registrosHoje}</p>
                     </div>
                   </div>
@@ -609,23 +601,23 @@ export default function TeacherDashboardPage() {
 
           {/* Widget: Hoje — dados reais da API com fallback para lookup local */}
           {(insightsHoje || objetivosHoje.length > 0) && (
-            <div className="rounded-[28px] border border-[var(--border-brand)] bg-[var(--surface-brand)] p-5 shadow-ds-sm">
+            <div className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-brand)] p-4 shadow-ds-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-ds-brand">
                     <Star className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">Resumo pedagógico de hoje</p>
-                    <p className="mt-1 text-lg font-semibold text-amber-950">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-brand)]">Resumo pedagógico</p>
+                    <p className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
                       {insightsHoje?.diaSemana ? insightsHoje.diaSemana.charAt(0).toUpperCase() + insightsHoje.diaSemana.slice(1) : ddmmHoje + '/2026'}
                     </p>
                     {insightsHoje?.planejamentoAtivo ? (
-                      <p className="mt-1 text-sm text-amber-800">
-                        Planejamento ativo: <span className="font-semibold">{insightsHoje.planejamentoAtivo.title}</span>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                        Planejamento ativo: <span className="font-medium text-[var(--text-primary)]">{insightsHoje.planejamentoAtivo.title}</span>
                       </p>
                     ) : (
-                      <p className="mt-1 text-sm text-amber-800">Sem planejamento ativo identificado para hoje.</p>
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">Sem planejamento ativo para hoje.</p>
                     )}
                   </div>
                 </div>
@@ -649,8 +641,8 @@ export default function TeacherDashboardPage() {
                   <div className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-card)] p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">Presença recente</p>
-                        <p className="mt-1 text-2xl font-semibold text-brand-900">{presentesHoje}<span className="text-sm font-medium text-brand-700">/{totalAlunos || '?'} presentes</span></p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-brand)]">Presença recente</p>
+                        <p className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{presentesHoje}<span className="text-sm font-medium text-[var(--text-brand)]">/{totalAlunos || '?'} presentes</span></p>
                       </div>
                       <div className="rounded-2xl bg-brand-100 p-3 text-brand-700">
                         <CheckCircle className="h-5 w-5" />
@@ -659,7 +651,7 @@ export default function TeacherDashboardPage() {
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-brand-100">
                       <div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${presencaPct}%` }} />
                     </div>
-                    <p className="mt-2 text-xs text-brand-700">{ausentesHoje} ausência(s) registradas no dia.</p>
+                    <p className="mt-2 text-xs text-[var(--text-secondary)]">{ausentesHoje} ausência(s) no dia.</p>
                   </div>
 
                   <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4">
@@ -683,8 +675,8 @@ export default function TeacherDashboardPage() {
                   <div className="rounded-[24px] border border-[var(--border-brand)] bg-[var(--surface-card)] p-4 shadow-ds-sm sm:p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Planejamento do dia</p>
-                        <h3 className="mt-1 text-base font-semibold leading-tight text-slate-900 break-words">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-brand)]">Planejamento do dia</p>
+                        <h3 className="mt-1 text-base font-semibold leading-tight text-[var(--text-primary)] break-words">
                           {planejamentoResumoHoje.title || 'Síntese pedagógica organizada para execução em sala'}
                         </h3>
                       </div>
@@ -698,8 +690,8 @@ export default function TeacherDashboardPage() {
                       <div className="mt-4 space-y-3">
                         {planejamentoResumoHoje.atividade && (
                           <div className="rounded-2xl border border-[var(--border-brand)] bg-[var(--surface-brand)] px-4 py-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Desenvolvimento da Atividade</p>
-                            <p className="mt-1.5 text-sm leading-relaxed text-amber-950 whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-brand)]">Desenvolvimento da Atividade</p>
+                            <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap break-words">{planejamentoResumoHoje.atividade}</p>
                           </div>
                         )}
                         {planejamentoResumoHoje.recursos && (
@@ -719,9 +711,9 @@ export default function TeacherDashboardPage() {
                       </div>
                     ) : (
                       <div className="mt-4 text-center rounded-2xl border border-dashed border-[var(--border-brand)] bg-[var(--surface-inset)] py-8 px-4">
-                        <p className="text-sm text-amber-700">Nenhum planejamento ativo para hoje.</p>
+                        <p className="text-sm text-[var(--text-secondary)]">Nenhum planejamento ativo para hoje.</p>
                         <button onClick={() => navigate('/app/planejamento/novo')}
-                          className="mt-2 text-xs font-semibold text-amber-800 underline underline-offset-2">
+                          className="mt-2 text-xs font-semibold text-[var(--text-brand)] underline underline-offset-2">
                           Criar planejamento →
                         </button>
                       </div>
@@ -830,15 +822,12 @@ export default function TeacherDashboardPage() {
           {/* ─── MINHA TURMA ─── */}
           {abaAtiva === 'turma' && (
             <div className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-[28px] border border-[var(--border-default)] bg-[var(--surface-card)] p-5 shadow-ds-sm lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 shadow-ds-sm lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Minhas Crianças</h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Acesso rápido às crianças da turma, com leitura objetiva do status do dia e ações essenciais.
-                  </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-3 py-1">{alunos.length} crianças</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
+                  <span className="rounded-full bg-[var(--surface-subtle)] px-2.5 py-1">{alunos.length} crianças</span>
                   <span className="rounded-full bg-brand-50 px-3 py-1 text-brand-700">{registrosHoje} com registro hoje</span>
                   <button onClick={() => navigate('/app/chamada')}
                     className="inline-flex items-center gap-1 rounded-full bg-brand-600 px-3 py-1.5 font-medium text-white transition hover:bg-brand-700">
@@ -853,7 +842,7 @@ export default function TeacherDashboardPage() {
                   <p className="text-gray-400">Nenhuma criança matriculada ainda</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
                   {alunos.map(aluno => {
                     const temFoto = hasChildPhoto(aluno);
                     const generoLabel = aluno.gender === 'MASCULINO' ? 'Menino' : aluno.gender === 'FEMININO' ? 'Menina' : 'Não informado';
@@ -861,19 +850,19 @@ export default function TeacherDashboardPage() {
 
                     return (
                       <div key={aluno.id}
-                        className="bg-[var(--surface-card)] rounded-2xl border border-[var(--border-default)] shadow-ds-sm hover:shadow-ds-md hover:border-[var(--border-brand)] transition-all duration-200 p-4 flex flex-col items-center gap-3">
+                        className="bg-[var(--surface-card)] rounded-xl border border-[var(--border-default)] shadow-ds-sm hover:shadow-ds-md hover:border-[var(--border-brand)] transition-all duration-200 p-3 flex flex-col items-center gap-2">
 
                         {/* Avatar + câmera */}
-                        <div className="relative w-14 h-14 flex-shrink-0 cursor-pointer"
+                        <div className="relative w-12 h-12 flex-shrink-0 cursor-pointer"
                           onClick={() => setModalCriancaInfo(aluno.id)}>
                           {temFoto ? (
                             <img
                               src={resolveChildPhotoUrl(aluno)!}
                               alt={`${aluno.firstName} ${aluno.lastName}`}
-                              className="w-14 h-14 rounded-full object-cover ring-2 ring-offset-1 ring-[var(--border-brand)]"
+                              className="w-12 h-12 rounded-full object-cover ring-2 ring-offset-1 ring-[var(--border-brand)]"
                             />
                           ) : (
-                            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-white font-medium text-base ring-2 ring-offset-1 ring-[var(--border-brand)]">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-brand-300 to-brand-600 flex items-center justify-center text-white font-medium text-sm ring-2 ring-offset-1 ring-[var(--border-brand)]">
                               {aluno.firstName?.[0]}{aluno.lastName?.[0]}
                             </div>
                           )}
@@ -881,19 +870,19 @@ export default function TeacherDashboardPage() {
                         </div>
 
                         {/* Nome */}
-                        <p className="text-sm font-normal text-[var(--text-primary)] text-center leading-tight w-full truncate">
+                        <p className="text-xs font-medium text-[var(--text-primary)] text-center leading-tight w-full truncate">
                           {aluno.firstName} {aluno.lastName}
                         </p>
 
                         {/* Subtítulo */}
-                        <p className="text-xs text-[var(--text-tertiary)] text-center">
+                        <p className="text-[11px] text-[var(--text-tertiary)] text-center">
                           {aluno.idade} meses · {generoLabel}
                         </p>
 
                         {/* Badge de registro */}
                         <span className={registradoHoje
-                          ? 'text-xs bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'
-                          : 'text-xs bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'}>
+                          ? 'text-[11px] bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'
+                          : 'text-[11px] bg-[var(--surface-brand)] text-[var(--text-brand)] px-2 py-0.5 rounded-full'}>
                           {registradoHoje ? 'Registrado hoje' : 'Sem registro'}
                         </span>
 
@@ -902,11 +891,11 @@ export default function TeacherDashboardPage() {
                           <button
                             onClick={() => { setModalCrianca({ id: aluno.id, nome: aluno.nome }); }}
                             title="Registrar microgesto"
-                            className="flex-1 text-xs font-medium bg-brand-600 text-white rounded-xl py-2 hover:bg-brand-700 transition">
+                            className="flex-1 text-[11px] font-medium bg-brand-600 text-white rounded-lg py-1.5 hover:bg-brand-700 transition">
                             Registrar
                           </button>
                           <button onClick={() => navigate('/app/rdx')} title="Fotos"
-                            className="flex-1 text-xs font-medium border border-[var(--border-brand)] text-[var(--text-brand)] rounded-xl py-2 hover:bg-[var(--surface-brand)] transition">
+                            className="flex-1 text-[11px] font-medium border border-[var(--border-brand)] text-[var(--text-brand)] rounded-lg py-1.5 hover:bg-[var(--surface-brand)] transition">
                             Fotos
                           </button>
                         </div>
@@ -934,7 +923,7 @@ export default function TeacherDashboardPage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setRdicsMap({}); carregarRdicsDaTurma(); }}
-                    className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1 rounded"
                     title="Atualizar"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -1021,7 +1010,7 @@ export default function TeacherDashboardPage() {
                       : info.ultimoStatus === 'REVISAO'
                       ? 'bg-yellow-100 text-yellow-700'
                       : info.ultimoStatus === 'RASCUNHO'
-                      ? 'bg-brand-600 text-[var(--text-brand)]'
+                      ? 'bg-[var(--surface-brand)] text-[var(--text-brand)]'
                       : 'bg-gray-100 text-gray-500';
                     const statusLabel = info.ultimoStatus === 'PUBLICADO' ? 'Publicado'
                       : info.ultimoStatus === 'REVISAO' ? 'Em Revisão'
@@ -1031,7 +1020,7 @@ export default function TeacherDashboardPage() {
                       <button
                         key={aluno.id}
                         onClick={() => navigate(`/app/rdic-crianca?childId=${aluno.id}`)}
-                        className="w-full flex items-center gap-3 p-3 bg-white border-2 border-gray-100 rounded-xl hover:border-brand-200 hover:shadow-sm transition-all text-left"
+                        className="w-full flex items-center gap-3 p-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-xl hover:border-[var(--border-brand)] hover:shadow-sm transition-all text-left"
                       >
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
                           temRdic ? 'bg-brand-500' : 'bg-gray-300'
@@ -1047,15 +1036,15 @@ export default function TeacherDashboardPage() {
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-800 truncate">{aluno.firstName} {aluno.lastName}</p>
-                          <p className="text-xs text-gray-400">{info.ultimoPeriodo || 'Nenhum período registrado'}</p>
+                          <p className="font-medium text-sm text-[var(--text-primary)] truncate">{aluno.firstName} {aluno.lastName}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{info.ultimoPeriodo || 'Nenhum período registrado'}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>{statusLabel}</span>
                           {temRdic && (
-                            <span className="text-xs text-gray-400">{info.count} reg.</span>
+                            <span className="text-xs text-[var(--text-tertiary)]">{info.count} reg.</span>
                           )}
-                          <ChevronRight className="h-4 w-4 text-gray-300" />
+                          <ChevronRight className="h-4 w-4 text-[var(--text-tertiary)]" />
                         </div>
                       </button>
                     );
@@ -1068,16 +1057,16 @@ export default function TeacherDashboardPage() {
           {/* ─── AÇÕES RÁPIDAS ─── */}
           {abaAtiva === 'acoes' && (
             <div>
-              <h2 className="text-base font-bold text-gray-700 mb-4">O que você quer fazer?</h2>
+              <h2 className="text-base font-semibold text-[var(--text-primary)] mb-3">O que você quer fazer?</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {ACOES_RAPIDAS.map(acao => (
                   <button key={acao.id} onClick={() => navigate(acao.rota)}
-                    className="p-4 bg-white border-2 border-gray-100 rounded-2xl text-left hover:border-[var(--border-brand)] hover:shadow-md transition-all active:scale-95">
+                    className="p-3 bg-[var(--surface-card)] border border-[var(--border-default)] rounded-xl text-left hover:border-[var(--border-brand)] hover:shadow-md transition-all active:scale-95">
                     <div className={`w-12 h-12 ${acao.cor} rounded-2xl flex items-center justify-center text-white mb-3`}>
                       {acao.icon}
                     </div>
-                    <p className="font-bold text-gray-800 text-sm">{acao.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{acao.desc}</p>
+                    <p className="font-medium text-[var(--text-primary)] text-sm">{acao.label}</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{acao.desc}</p>
                   </button>
                 ))}
               </div>
@@ -1087,25 +1076,25 @@ export default function TeacherDashboardPage() {
           {/* ─── IA PEDAGÓGICA ─── */}
           {abaAtiva === 'ia' && (
             <div className="space-y-5">
-              <div className="p-5 bg-gradient-to-br from-brand-50 to-brand-100 rounded-2xl border-2 border-[var(--border-brand)]">
+              <div className="p-4 bg-[var(--surface-brand)] rounded-2xl border border-[var(--border-brand)]">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 rounded-xl flex items-center justify-center">
                     <Brain className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <p className="font-bold text-gray-900">Análise Pedagógica com IA</p>
-                    <p className="text-xs text-gray-500">Descreva o dia e a IA gera o relatório da criança automaticamente</p>
+                    <p className="font-semibold text-[var(--text-primary)]">Análise Pedagógica com IA</p>
+                    <p className="text-xs text-[var(--text-secondary)]">Descreva o dia e a IA gera o relatório da criança automaticamente</p>
                   </div>
                 </div>
                 <textarea
-                  className="w-full border-2 border-[var(--border-brand)] rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-[var(--border-brand)] bg-white"
+                  className="w-full border border-[var(--border-brand)] rounded-xl p-3 text-sm text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--border-focus)] bg-[var(--surface-card)]"
                   rows={5}
                   placeholder="Descreva como foi o dia da turma: atividades realizadas, comportamentos observados, interações entre crianças, aprendizagens percebidas, situações relevantes...\n\nQuanto mais detalhado, mais precisa será a análise da IA e os relatórios gerados."
                   value={entradaDiarioIA}
                   onChange={e => setEntradaDiarioIA(e.target.value)}
                 />
                 <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-gray-400">{entradaDiarioIA.length} caracteres</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">{entradaDiarioIA.length} caracteres</p>
                   <Button
                     onClick={async () => {
                       if (!entradaDiarioIA.trim()) { toast.error('Descreva o dia antes de analisar'); return; }
@@ -1144,7 +1133,7 @@ export default function TeacherDashboardPage() {
                         <Sparkles className="h-3 w-3" /> IA
                       </span>
                     </div>
-                    <p className="text-sm text-gray-700 leading-relaxed">{relatorioIA.relatorio}</p>
+                    <p className="text-sm text-[var(--text-primary)] leading-relaxed">{relatorioIA.relatorio}</p>
                   </div>
 
                   <div className="p-4 bg-brand-50 rounded-2xl border border-brand-100">
@@ -1198,7 +1187,7 @@ export default function TeacherDashboardPage() {
                         <BookOpen className="h-5 w-5 text-[var(--text-brand)]" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">Diário de Bordo</p>
+                        <p className="font-medium text-[var(--text-primary)]">Diário de Bordo</p>
                         <p className="text-xs text-gray-500">Esta semana</p>
                       </div>
                     </div>
@@ -1222,7 +1211,7 @@ export default function TeacherDashboardPage() {
                         <Calendar className="h-5 w-5 text-[var(--text-brand)]" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">Planejamentos</p>
+                        <p className="font-medium text-[var(--text-primary)]">Planejamentos</p>
                         <p className="text-xs text-gray-500">Esta semana</p>
                       </div>
                     </div>
@@ -1243,7 +1232,7 @@ export default function TeacherDashboardPage() {
                         <Brain className="h-5 w-5 text-brand-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">Relatório da Criança</p>
+                        <p className="font-medium text-[var(--text-primary)]">Relatório da Criança</p>
                         <p className="text-xs text-gray-500">Registros de desenvolvimento</p>
                       </div>
                     </div>
@@ -1264,7 +1253,7 @@ export default function TeacherDashboardPage() {
                         <Award className="h-5 w-5 text-brand-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-800">{turma?.name}</p>
+                        <p className="font-medium text-[var(--text-primary)]">{turma?.name}</p>
                         <p className="text-xs text-gray-500">{turma?.unit?.name}</p>
                       </div>
                     </div>
@@ -1280,15 +1269,15 @@ export default function TeacherDashboardPage() {
               </div>
 
               {/* Dica pedagógica */}
-              <Card className="border-2 border-yellow-100 bg-gradient-to-r from-brand-50 to-brand-100">
+              <Card className="border border-[var(--border-brand)] bg-[var(--surface-brand)]">
                 <CardContent className="pt-4">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="h-5 w-5 text-yellow-600" />
+                    <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="h-5 w-5 text-brand-600" />
                     </div>
                     <div>
-                      <p className="font-semibold text-yellow-800 mb-1">Dica Pedagógica</p>
-                      <p className="text-sm text-yellow-700">
+                      <p className="font-semibold text-[var(--text-brand)] mb-1">Dica Pedagógica</p>
+                      <p className="text-sm text-[var(--text-secondary)]">
                         "O microgesto mais poderoso é a <strong>escuta ativa</strong>: quando você para, olha nos olhos da criança e genuinamente se interessa pelo que ela está comunicando, você valida sua existência e amplia seu desenvolvimento."
                       </p>
                     </div>
@@ -1310,9 +1299,9 @@ export default function TeacherDashboardPage() {
       {/* Modal de microgesto rápido */}
       {modalCrianca && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setModalCrianca(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--surface-modal)] border border-[var(--border-default)] rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <p className="font-bold text-gray-800">Registrar para {modalCrianca.nome.split(' ')[0]}</p>
+              <p className="font-semibold text-[var(--text-primary)]">Registrar para {modalCrianca.nome.split(' ')[0]}</p>
               <button onClick={() => setModalCrianca(null)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
