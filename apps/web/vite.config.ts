@@ -89,7 +89,22 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('react-router') || id.includes('react-is')) return 'vendor-react'
+            // CORREÇÃO TELA BRANCA (2026-10-19): 'react' (core) e 'scheduler'
+            // PRECISAM ficar no mesmo chunk que 'react-dom'. Separar o pacote
+            // 'react' do 'react-dom' quebra o dispatcher interno de hooks em
+            // runtime (cada chunk carrega uma cópia distinta dos internals do
+            // React), causando tela branca com exceção não capturada no commit
+            // do React (stack trace típico: vendor-C*.js → vendor-react-*.js).
+            // A regra antiga só cobria react-dom/react-router/react-is e
+            // deixava 'react' cair no chunk genérico 'vendor', criando esse
+            // split. Confirmado por análise linha a linha do bundle de produção.
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules/react-router') ||
+              id.includes('node_modules/react-is') ||
+              id.includes('node_modules/scheduler')
+            ) return 'vendor-react'
             if (id.includes('recharts') || id.includes('d3-')) return 'vendor-charts'
             if (id.includes('lucide-react')) return 'vendor-icons'
             if (id.includes('@tanstack')) return 'vendor-query'
