@@ -26,15 +26,57 @@
 -- database "postgres" — não "postgres" o motor, o NOME do banco) estava
 -- lançando exatamente P2022 em "Planning.observacoes_template" e também em
 -- "Child.dados_responsaveis" — este último por causa de mais um erro de
--- casing na mesma migration quebrada (usava "dadosResponsaveis" quando o
+--    casing na mesma migration quebrada (usava "dadosResponsaveis" quando o
 -- campo tem @map("dados_responsaveis") no schema.prisma). Ambos corrigidos
 -- abaixo.
 
 -- ── development_observation (nome real, minúsculas) ─────────────────────────
+-- Backups mais antigos podem não conter a tabela, embora o histórico de
+-- migrations a marque como criada. Criá-la aqui é aditivo e permite que o
+-- reparo prossiga sem apagar dados de uma tabela existente.
+CREATE TABLE IF NOT EXISTS "development_observation" (
+  "id" TEXT NOT NULL,
+  "child_id" TEXT NOT NULL,
+  "classroom_id" TEXT,
+  "created_by" VARCHAR(255) NOT NULL,
+  "category" VARCHAR(100) NOT NULL DEFAULT 'GERAL',
+  "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "behavior_description" TEXT,
+  "social_interaction" TEXT,
+  "emotional_state" TEXT,
+  "motor_skills" TEXT,
+  "cognitive_skills" TEXT,
+  "language_skills" TEXT,
+  "health_notes" TEXT,
+  "dietary_notes" TEXT,
+  "sleep_pattern" TEXT,
+  "learning_progress" TEXT,
+  "planning_participation" TEXT,
+  "interests" TEXT,
+  "challenges" TEXT,
+  "psychological_notes" TEXT,
+  "development_alerts" TEXT,
+  "recommendations" TEXT,
+  "next_steps" TEXT,
+  "atividade_arquivo_url" TEXT,
+  "atividade_arquivo_nome" VARCHAR(255),
+  "tags" JSONB NOT NULL DEFAULT '[]',
+  "indicadores" JSONB NOT NULL DEFAULT '{}',
+  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "DevelopmentObservation_pkey" PRIMARY KEY ("id")
+);
+
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "atividade_arquivo_url" TEXT;
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "atividade_arquivo_nome" VARCHAR(255);
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "tags" JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "indicadores" JSONB NOT NULL DEFAULT '{}';
+
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_childId_idx" ON "development_observation"("child_id");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_classroomId_idx" ON "development_observation"("classroom_id");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_date_idx" ON "development_observation"("date");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_category_idx" ON "development_observation"("category");
+CREATE INDEX IF NOT EXISTS "DevelopmentObservation_createdBy_idx" ON "development_observation"("created_by");
 
 -- ── Child (colunas trazidas pela mesma migration quebrada) ──────────────────
 ALTER TABLE "Child" ADD COLUMN IF NOT EXISTS "endereco" VARCHAR(255);
