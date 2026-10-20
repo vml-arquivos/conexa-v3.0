@@ -31,42 +31,6 @@
 -- abaixo.
 
 -- ── development_observation (nome real, minúsculas) ─────────────────────────
--- Backups mais antigos podem não conter a tabela, embora o histórico de
--- migrations a marque como criada. Criá-la aqui é aditivo e permite que o
--- reparo prossiga sem apagar dados de uma tabela existente.
-CREATE TABLE IF NOT EXISTS "development_observation" (
-  "id" TEXT NOT NULL,
-  "child_id" TEXT NOT NULL,
-  "classroom_id" TEXT,
-  "created_by" VARCHAR(255) NOT NULL,
-  "category" VARCHAR(100) NOT NULL DEFAULT 'GERAL',
-  "date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "behavior_description" TEXT,
-  "social_interaction" TEXT,
-  "emotional_state" TEXT,
-  "motor_skills" TEXT,
-  "cognitive_skills" TEXT,
-  "language_skills" TEXT,
-  "health_notes" TEXT,
-  "dietary_notes" TEXT,
-  "sleep_pattern" TEXT,
-  "learning_progress" TEXT,
-  "planning_participation" TEXT,
-  "interests" TEXT,
-  "challenges" TEXT,
-  "psychological_notes" TEXT,
-  "development_alerts" TEXT,
-  "recommendations" TEXT,
-  "next_steps" TEXT,
-  "atividade_arquivo_url" TEXT,
-  "atividade_arquivo_nome" VARCHAR(255),
-  "tags" JSONB NOT NULL DEFAULT '[]',
-  "indicadores" JSONB NOT NULL DEFAULT '{}',
-  "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP(3) NOT NULL,
-  CONSTRAINT "DevelopmentObservation_pkey" PRIMARY KEY ("id")
-);
-
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "atividade_arquivo_url" TEXT;
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "atividade_arquivo_nome" VARCHAR(255);
 ALTER TABLE "development_observation" ADD COLUMN IF NOT EXISTS "tags" JSONB NOT NULL DEFAULT '[]';
