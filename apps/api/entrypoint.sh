@@ -56,6 +56,8 @@ resolve_explicit_failed_migration() {
   case "$migration_name" in
     20260813010000_add_missing_models_from_zellare)
       ;;
+    20260814120000_repair_development_observation_and_material_item_casing)
+      ;;
     *)
       echo "❌ ERRO: PRISMA_ROLLBACK_MIGRATION não está autorizada para este deploy: $migration_name"
       exit 1
