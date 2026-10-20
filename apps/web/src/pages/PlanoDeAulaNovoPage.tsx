@@ -160,97 +160,72 @@ function inferTipo(numDays: number): string {
 }
 
 // ─── Componente de Objetivo da Matriz (somente leitura) ──────────────────────
+function ObjetivoRow({
+  label,
+  text,
+  empty,
+  emphasis,
+}: {
+  label: string;
+  text?: string | null;
+  empty: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className={`px-4 py-3 ${emphasis ? 'bg-[var(--surface-brand)]' : ''}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] mb-1">
+        {label}
+      </p>
+      {text ? (
+        <p
+          className={`text-sm leading-relaxed ${
+            emphasis ? 'text-[var(--text-brand)] font-medium' : 'text-[var(--text-primary)]'
+          }`}
+        >
+          {text}
+        </p>
+      ) : (
+        <p className="text-xs italic text-[var(--text-tertiary)]">{empty}</p>
+      )}
+    </div>
+  );
+}
+
 function ObjetivoCard({
   objetivo,
-  index,
 }: {
   objetivo: MatrizObjective;
-  index: number;
+  index?: number;
 }) {
-  // Paleta de cores para o cabeçalho do card (rotaciona por índice)
-  const headerPalettes = [
-    { header: 'bg-blue-600',    badge: 'bg-blue-100 text-blue-700' },
-    { header: 'bg-violet-600',  badge: 'bg-violet-100 text-violet-700' },
-    { header: 'bg-teal-600',    badge: 'bg-teal-100 text-teal-700' },
-    { header: 'bg-rose-600',    badge: 'bg-rose-100 text-rose-700' },
-    { header: 'bg-amber-600',   badge: 'bg-amber-100 text-amber-700' },
-    { header: 'bg-cyan-600',    badge: 'bg-cyan-100 text-cyan-700' },
-  ];
-  const palette = headerPalettes[index % headerPalettes.length];
-
   return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      {/* Cabeçalho colorido com campo de experiência e código BNCC */}
-      <div className={`${palette.header} px-4 py-2.5 flex items-center gap-2 flex-wrap`}>
-        <span className="text-xs font-bold uppercase tracking-widest text-white/80">
+    <div className="rounded-ds-xl border border-[var(--border-default)] bg-[var(--surface-card)] overflow-hidden shadow-ds-xs">
+      <div className="px-4 py-3 flex items-center gap-2 flex-wrap bg-[var(--surface-subtle)] border-b border-[var(--border-subtle)]">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
           Campo de Experiência
         </span>
-        <span className="text-sm font-semibold text-white flex-1">
+        <span className="font-display text-sm font-semibold text-[var(--text-primary)] flex-1">
           {objetivo.campoExperiencia.replace(/_/g, ' ')}
         </span>
         {objetivo.codigoBNCC && (
-          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${palette.badge}`}>
-            {objetivo.codigoBNCC}
-          </span>
+          <span className="ds-badge ds-badge-brand font-mono">{objetivo.codigoBNCC}</span>
         )}
       </div>
 
-      <div className="bg-white divide-y divide-gray-100">
-        {/* ── Campo 1: Objetivo da BNCC ── borda lateral azul */}
-        <div className="flex">
-          <div className="w-1 flex-shrink-0 bg-blue-500" />
-          <div className="px-4 py-3 flex-1">
-            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">
-              📘 Objetivo da BNCC
-            </p>
-            {objetivo.objetivoBNCC
-              ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoBNCC}</p>
-              : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
-            }
-          </div>
-        </div>
-
-        {/* ── Campo 2: Objetivo do Currículo em Movimento ── borda lateral verde */}
-        <div className="flex">
-          <div className="w-1 flex-shrink-0 bg-teal-500" />
-          <div className="px-4 py-3 flex-1">
-            <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-1">
-              🏛️ Objetivo do Currículo em Movimento — DF
-            </p>
-            {objetivo.objetivoCurriculoDF
-              ? <p className="text-sm text-gray-800 leading-relaxed">{objetivo.objetivoCurriculoDF}</p>
-              : <p className="text-xs text-gray-400 italic">Não cadastrado</p>
-            }
-          </div>
-        </div>
-
-        {/* ── Campo 3: Intencionalidade Pedagógica ── borda lateral violeta */}
-        <div className="flex bg-violet-50/40">
-          <div className="w-1 flex-shrink-0 bg-violet-500" />
-          <div className="px-4 py-3 flex-1">
-            <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest mb-1">
-              🎯 Intencionalidade Pedagógica
-            </p>
-            {objetivo.intencionalidadePedagogica?.trim()
-              ? <p className="text-sm text-violet-900 leading-relaxed font-medium">{objetivo.intencionalidadePedagogica.trim()}</p>
-              : <p className="text-xs text-violet-400 italic">Aguardando preenchimento pela coordenação</p>}
-          </div>
-        </div>
-
-        {/* ── Campo 4: Exemplo de Atividade ── borda lateral esmeralda (só para coordenação) */}
+      <div className="divide-y divide-[var(--border-subtle)]">
+        <ObjetivoRow label="Objetivo da BNCC" text={objetivo.objetivoBNCC} empty="Não cadastrado" />
+        <ObjetivoRow
+          label="Objetivo do Currículo em Movimento — DF"
+          text={objetivo.objetivoCurriculoDF}
+          empty="Não cadastrado"
+        />
+        <ObjetivoRow
+          label="Intencionalidade Pedagógica"
+          text={objetivo.intencionalidadePedagogica?.trim()}
+          empty="Aguardando preenchimento pela coordenação"
+          emphasis
+        />
         {objetivo.exemploAtividade !== undefined && (
-          <div className="flex bg-emerald-50/40">
-            <div className="w-1 flex-shrink-0 bg-emerald-500" />
-            <div className="px-4 py-3 flex-1">
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">
-                ✨ Exemplo de Atividade
-              </p>
-              {objetivo.exemploAtividade
-                ? <p className="text-sm text-emerald-900 leading-relaxed">{objetivo.exemploAtividade}</p>
-                : <p className="text-xs text-emerald-400 italic">Não cadastrado</p>
-              }
-            </div>
-          </div>
+          <ObjetivoRow label="Exemplo de Atividade" text={objetivo.exemploAtividade} empty="Não cadastrado" />
         )}
       </div>
     </div>

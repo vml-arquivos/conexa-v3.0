@@ -4,6 +4,9 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { Toaster } from '../ui/sonner';
 import { UnitScopeProvider } from '../../contexts/UnitScopeContext';
+import { AgentProvider } from '../agent/AgentContext';
+import { AgentPanel } from '../agent/AgentPanel';
+import { CommandPalette } from '../agent/CommandPalette';
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,13 +15,14 @@ export function AppLayout() {
 
   return (
     <UnitScopeProvider>
+     <AgentProvider>
       {/* Wrapper raiz: sem scroll no body, layout fixo */}
       <div className="flex h-screen overflow-hidden bg-background">
 
         {/* ── Overlay mobile ── */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/60 md:hidden"
+            className="fixed inset-0 z-30 bg-[var(--surface-overlay)] md:hidden"
             onClick={closeSidebar}
             aria-hidden="true"
           />
@@ -48,13 +52,16 @@ export function AppLayout() {
           <Topbar onMenuToggle={toggleSidebar} />
 
           {/* Conteúdo com scroll independente */}
-          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+          <main id="conteudo" className="flex-1 overflow-y-auto overflow-x-hidden">
             <Outlet />
           </main>
 
           <Toaster position="bottom-right" richColors closeButton />
         </div>
       </div>
+     <AgentPanel />
+     <CommandPalette />
+     </AgentProvider>
     </UnitScopeProvider>
   );
 }

@@ -3,6 +3,10 @@
  *
  * Usado em: TeacherDashboard, CoordPedagogica, CoordGeral, Diretor, Nutricionista, Secretaria
  * Cada missão responde: o que, por que, evidência, prioridade, próximo passo, destino.
+ *
+ * Design 2.0: cores 100% por tokens semânticos (funciona nos temas claro e
+ * escuro com contraste AA) e prioridade comunicada por texto + cor, nunca
+ * só por cor.
  */
 
 import { useNavigate } from 'react-router-dom';
@@ -33,13 +37,13 @@ export interface Mission {
   tenantScope: { mantenedoraId?: string; unitId?: string };
 }
 
-const PRIORITY_CONFIG: Record<MissionPriority, {
+export const PRIORITY_CONFIG: Record<MissionPriority, {
   label: string; bg: string; border: string; text: string; dot: string;
 }> = {
-  CRITICAL: { label: 'Crítico', bg: '#fef2f2', border: '#fca5a5', text: '#991b1b', dot: '#dc2626' },
-  HIGH:     { label: 'Alto',    bg: '#fffbeb', border: '#fde68a', text: '#92400e', dot: '#f59e0b' },
-  MEDIUM:   { label: 'Médio',   bg: 'var(--surface-brand)', border: 'var(--brand-200)', text: 'var(--brand-700)', dot: 'var(--brand-500)' },
-  LOW:      { label: 'Baixo',   bg: '#f0fdf4', border: '#bbf7d0', text: '#166534', dot: '#22c55e' },
+  CRITICAL: { label: 'Crítico', bg: 'var(--error-bg)',   border: 'var(--error-border)',   text: 'var(--error)',   dot: 'var(--error)' },
+  HIGH:     { label: 'Alto',    bg: 'var(--warning-bg)', border: 'var(--warning-border)', text: 'var(--warning)', dot: 'var(--warning-solid)' },
+  MEDIUM:   { label: 'Médio',   bg: 'var(--info-bg)',    border: 'var(--info-border)',    text: 'var(--info)',    dot: 'var(--info)' },
+  LOW:      { label: 'Baixo',   bg: 'var(--success-bg)', border: 'var(--success-border)', text: 'var(--success)', dot: 'var(--success)' },
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -56,33 +60,29 @@ export function MissionCard({ mission, compact = false }: { mission: Mission; co
   const cfg = PRIORITY_CONFIG[mission.priority];
 
   return (
-    <div style={{
-      background: cfg.bg,
-      border: `0.5px solid ${cfg.border}`,
-      borderRadius: 14,
-      padding: compact ? '10px 12px' : '14px 16px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot, flexShrink: 0, marginTop: 1 }} />
-          <p style={{ fontSize: 13, fontWeight: 600, color: cfg.text, margin: 0, lineHeight: 1.3 }}>
-            {mission.title}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center' }}>
-          <span style={{
-            fontSize: 10, fontWeight: 700, padding: '2px 7px',
-            background: cfg.dot, color: '#fff', borderRadius: 20,
-          }}>
+    <article
+      className="flex flex-col gap-2.5 rounded-ds-xl border"
+      style={{
+        background: 'var(--surface-card)',
+        borderColor: 'var(--border-default)',
+        borderLeft: `3px solid ${cfg.dot}`,
+        padding: compact ? '10px 12px' : '14px 16px',
+        boxShadow: 'var(--shadow-xs)',
+      }}
+    >
+      {/* Cabeçalho */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="m-0 flex-1 text-[13.5px] font-semibold leading-snug text-[var(--text-primary)]">
+          {mission.title}
+        </p>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <span
+            className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+            style={{ background: cfg.bg, borderColor: cfg.border, color: cfg.text }}
+          >
             {cfg.label}
           </span>
-          <span style={{
-            fontSize: 10, color: cfg.text, padding: '2px 7px',
-            border: `0.5px solid ${cfg.border}`, borderRadius: 20,
-            background: 'rgba(255,255,255,0.6)',
-          }}>
+          <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">
             {TYPE_LABELS[mission.type] ?? mission.type}
           </span>
         </div>
@@ -90,20 +90,19 @@ export function MissionCard({ mission, compact = false }: { mission: Mission; co
 
       {/* Descrição */}
       {!compact && (
-        <p style={{ fontSize: 12, color: cfg.text, margin: 0, opacity: 0.8, lineHeight: 1.5 }}>
+        <p className="m-0 text-[13px] leading-relaxed text-[var(--text-secondary)]">
           {mission.description}
         </p>
       )}
 
       {/* Evidências */}
       {!compact && mission.evidence.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+        <div className="flex flex-wrap gap-1.5">
           {mission.evidence.map((e, i) => (
-            <span key={i} style={{
-              fontSize: 10, padding: '2px 8px', borderRadius: 20,
-              background: 'rgba(255,255,255,0.7)', border: `0.5px solid ${cfg.border}`,
-              color: cfg.text,
-            }}>
+            <span
+              key={i}
+              className="rounded-full border border-[var(--border-default)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]"
+            >
               {e.label}{e.value !== undefined ? `: ${e.value}` : ''}
             </span>
           ))}
@@ -111,20 +110,15 @@ export function MissionCard({ mission, compact = false }: { mission: Mission; co
       )}
 
       {/* Ação sugerida + botão */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <p style={{ fontSize: 11, color: cfg.text, margin: 0, opacity: 0.75, flex: 1, lineHeight: 1.4 }}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="m-0 flex-1 text-xs leading-snug text-[var(--text-secondary)]">
+          <span className="font-semibold text-[var(--text-primary)]">Sugestão: </span>
           {mission.suggestedAction}
         </p>
         {mission.targetRoute && (
           <button
             onClick={() => navigate(mission.targetRoute!)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '5px 10px', borderRadius: 8, border: `0.5px solid ${cfg.border}`,
-              background: 'rgba(255,255,255,0.8)', color: cfg.text,
-              fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-              WebkitTapHighlightColor: 'transparent',
-            }}
+            className="flex flex-shrink-0 items-center gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-base)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-brand)] transition-colors hover:bg-[var(--surface-brand)]"
           >
             Abrir <ArrowRight size={12} />
           </button>
@@ -132,14 +126,14 @@ export function MissionCard({ mission, compact = false }: { mission: Mission; co
       </div>
 
       {/* Rodapé */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.5 }}>
-        <Info size={10} color={cfg.dot} />
-        <span style={{ fontSize: 10, color: cfg.text }}>Revisão humana necessária</span>
-        <span style={{ fontSize: 10, color: cfg.text, marginLeft: 'auto' }}>
+      <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)]">
+        <Info size={11} />
+        <span>Revisão humana necessária</span>
+        <span className="ml-auto tabular-nums">
           {new Date(mission.generatedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -158,26 +152,20 @@ export function MissionPanel({
   const shown = missions.slice(0, maxItems);
   const criticos = missions.filter((m) => m.priority === 'CRITICAL').length;
   const altos = missions.filter((m) => m.priority === 'HIGH').length;
+  const countBg = criticos > 0 ? 'var(--error)' : altos > 0 ? 'var(--warning-solid)' : 'var(--text-tertiary)';
 
   return (
-    <div style={{
-      background: '#fff', border: '0.5px solid #e2e8f0',
-      borderRadius: 16, overflow: 'hidden',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '12px 16px', borderBottom: '0.5px solid #f1f5f9',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Zap size={16} color="#f59e0b" />
-          <p style={{ fontSize: 14, fontWeight: 600, margin: 0, color: '#0f172a' }}>{title}</p>
+    <section className="overflow-hidden rounded-ds-xl border border-[var(--border-default)] bg-[var(--surface-card)] shadow-ds-xs">
+      {/* Cabeçalho */}
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Zap size={16} className="text-[var(--warning-solid)]" />
+          <h3 className="m-0 font-display text-sm font-semibold text-[var(--text-primary)]">{title}</h3>
           {missions.length > 0 && (
-            <span style={{
-              fontSize: 11, fontWeight: 700, padding: '1px 7px',
-              background: criticos > 0 ? '#dc2626' : altos > 0 ? '#f59e0b' : '#64748b',
-              color: '#fff', borderRadius: 20,
-            }}>
+            <span
+              className="rounded-full px-2 py-px text-[11px] font-bold"
+              style={{ background: countBg, color: 'var(--surface-card)' }}
+            >
               {missions.length}
             </span>
           )}
@@ -185,7 +173,7 @@ export function MissionPanel({
         {missions.length > maxItems && (
           <button
             onClick={() => navigate('/app/inteligencia/missoes')}
-            style={{ fontSize: 12, color: 'var(--brand-600)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+            className="border-none bg-transparent text-xs font-semibold text-[var(--text-brand)] hover:underline"
           >
             Ver todas →
           </button>
@@ -193,30 +181,30 @@ export function MissionPanel({
       </div>
 
       {/* Conteúdo */}
-      <div style={{ padding: '12px 16px' }}>
+      <div className="px-4 py-3">
         {loading && (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: 13 }}>
+          <div className="py-5 text-center text-[13px] text-[var(--text-secondary)]">
             Carregando missões...
           </div>
         )}
         {error && (
-          <div style={{ display: 'flex', gap: 8, padding: '10px', background: '#fef2f2', borderRadius: 8, fontSize: 12, color: '#991b1b' }}>
+          <div role="alert" className="flex gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-bg)] p-2.5 text-xs text-[var(--error)]">
             <AlertTriangle size={14} />
             {error}
           </div>
         )}
         {!loading && !error && missions.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>
-            <CheckCircle size={24} color="#10b981" style={{ margin: '0 auto 8px', display: 'block' }} />
-            <p style={{ fontSize: 13, margin: 0 }}>Nenhuma missão pendente</p>
+          <div className="py-5 text-center text-[var(--text-secondary)]">
+            <CheckCircle size={24} className="mx-auto mb-2 block text-[var(--success)]" />
+            <p className="m-0 text-[13px]">Nenhuma missão pendente</p>
           </div>
         )}
         {!loading && !error && shown.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="flex flex-col gap-2">
             {shown.map((m) => <MissionCard key={m.id} mission={m} compact={compact} />)}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
