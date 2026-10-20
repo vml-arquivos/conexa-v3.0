@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BookOpen, ClipboardList, BarChart2, ShoppingCart, GraduationCap,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
+import { publishNav, unpublishNav } from '../agent/navRegistry';
 
 interface MenuItem {
   path: string;
@@ -183,30 +184,38 @@ function isActiveForItem(location: ReturnType<typeof useLocation>, itemPath: str
   return false;
 }
 
+// Selos de atenção usam a cor semântica de aviso; os demais ficam neutros.
+const ATTENTION_BADGES = new Set(['Atenção', 'Importante', 'Essencial', 'Aprovação']);
+
 function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; onClick?: () => void }) {
+  const attention = item.badge ? ATTENTION_BADGES.has(item.badge) : false;
   return (
     <Link
       to={item.path}
       onClick={onClick}
-      className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-100 ${
+      aria-current={active ? 'page' : undefined}
+      className={`group relative flex items-center justify-between gap-2 pl-3 pr-2.5 py-2 rounded-lg text-[13.5px] transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] ${
         active
-          ? 'bg-white/15 text-white shadow-ds-sm ring-1 ring-inset ring-white/20'
-          : 'text-[var(--sidebar-text-muted)] hover:bg-white/10 hover:text-white'
+          ? 'bg-[var(--sb-active-bg)] text-[var(--sb-active-fg)] font-semibold'
+          : 'text-[var(--sb-fg)] font-medium hover:bg-[var(--sb-hover)]'
       }`}
     >
-      <span className="flex items-center gap-2">
+      {active && (
+        <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--sb-active-bar)]" />
+      )}
+      <span className="flex items-center gap-2.5 min-w-0">
         <span className={`flex-shrink-0 transition-colors ${
-          active ? 'text-[var(--text-inverse)]' : 'text-[var(--sidebar-text-muted)] group-hover:text-brand-300'
+          active ? 'text-[var(--sb-active-fg)]' : 'text-[var(--sb-fg-muted)] group-hover:text-[var(--sb-fg)]'
         }`}>
           {item.icon}
         </span>
         <span className="truncate">{item.label}</span>
       </span>
       {item.badge && (
-        <span className={`ml-1 flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
-          active
-            ? 'bg-white/20 text-white'
-            : 'bg-white/15 text-brand-100'
+        <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none ${
+          attention
+            ? 'bg-[var(--warning-bg)] text-[var(--warning)] ring-1 ring-inset ring-[var(--warning-border)]'
+            : 'bg-[var(--sb-badge-bg)] text-[var(--sb-badge-fg)]'
         }`}>
           {item.badge}
         </span>
@@ -218,9 +227,15 @@ function NavItem({ item, active, onClick }: { item: MenuItem; active: boolean; o
 function NavSection({
   titulo, items, location, onItemClick,
 }: { titulo: string; items: MenuItem[]; location: ReturnType<typeof useLocation>; onItemClick?: () => void }) {
+  // Publica os itens exibidos para o Assistente / Paleta de Comandos (sem alterar a navegação).
+  useEffect(() => {
+    publishNav(titulo, items.map((i) => ({ path: i.path, label: i.label, section: titulo, icon: i.icon })));
+    return () => unpublishNav(titulo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titulo, items.map((i) => i.path).join('|')]);
   return (
     <div>
-      <p className="text-[10px] font-medium text-[var(--sidebar-text-muted)] uppercase tracking-[0.09em] px-2.5 mb-1.5">
+      <p className="text-[11px] font-semibold text-[var(--sb-fg-muted)] uppercase tracking-[0.08em] px-3 mb-1.5">
         {titulo}
       </p>
       <div className="space-y-0.5">
@@ -292,38 +307,34 @@ export function Sidebar({ onClose }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-[var(--surface-sidebar)] text-white h-full min-h-screen flex flex-col border-r border-[var(--border-sidebar)]">
-      {/* Logo */}
-      <div className="px-4 py-4 border-b border-[var(--border-sidebar)]">
+    <aside className="w-64 bg-[var(--surface-sidebar)] text-[var(--sb-fg)] h-full min-h-screen flex flex-col border-r border-[var(--border-sidebar)]">
+      {/* Logo + perfil */}
+      <div className="px-4 pt-4 pb-3.5 border-b border-[var(--border-sidebar)]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
               {/* Logo institucional COCRIS */}
-              <img
-                src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
-                alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
-                className="h-9 w-auto object-contain flex-shrink-0"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
-                  if (fb) fb.style.display = 'flex';
-                }}
-              />
-              {/* Fallback: ícone + texto */}
-              <div className="hidden items-center gap-2" aria-hidden="true">
-                <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-ds-sm">
-                  <span className="text-white font-bold text-xs">C</span>
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-sm font-bold leading-tight text-white truncate">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}</h1>
-                  <p className="text-[10px] text-[var(--sidebar-text-muted)] mt-0.5">Sistema Pedagógico</p>
-                </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-ds-xs ring-1 ring-[var(--border-default)] flex-shrink-0 overflow-hidden">
+                <img
+                  src={import.meta.env.VITE_APP_LOGO_URL || '/branding/cocris/logo-cocris.png'}
+                  alt={import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+                  className="h-8 w-8 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </span>
+              <div className="min-w-0">
+                <p className="font-display text-[15px] font-bold leading-tight tracking-tight text-[var(--text-primary)] truncate">
+                  {import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'}
+                </p>
+                <p className="text-[11px] text-[var(--sb-fg-muted)] mt-0.5">Sistema Pedagógico</p>
               </div>
             </div>
             {/* Botão fechar — só aparece em mobile */}
             {onClose && (
               <button
                 onClick={onClose}
-                className="md:hidden p-1.5 rounded-lg text-[var(--sidebar-text-muted)] hover:text-white hover:bg-[var(--surface-sidebar-hover)] transition-colors flex-shrink-0"
+                className="md:hidden p-1.5 rounded-lg text-[var(--sb-fg-muted)] hover:text-[var(--sb-fg)] hover:bg-[var(--sb-hover)] transition-colors flex-shrink-0"
                 aria-label="Fechar menu"
               >
                 <X className="h-4 w-4" />
@@ -331,20 +342,22 @@ export function Sidebar({ onClose }: SidebarProps) {
             )}
           </div>
           {user && (
-            <div className="mt-3 px-2.5 py-2 bg-[var(--surface-sidebar-elevated)] rounded-lg border border-[var(--border-sidebar)]">
-              <p className="text-[10px] font-medium text-[var(--sidebar-text-muted)] uppercase tracking-wide">Perfil ativo</p>
-              <p className="text-sm font-normal text-white truncate mt-0.5">
-                {(user.nome as string) || user.email}
-              </p>
-              <span className="inline-block mt-1.5 text-[10px] font-medium bg-brand-900/80 text-brand-300 px-2 py-0.5 rounded-full tracking-wide">
-                {perfilLabel}
+            <div className="mt-3.5 flex items-center gap-2.5 px-2.5 py-2 bg-[var(--surface-sidebar-elevated)] rounded-xl border border-[var(--border-sidebar)]">
+              <span aria-hidden="true" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--surface-brand)] text-[var(--text-brand)] font-display text-[13px] font-bold">
+                {(((user.nome as string) || user.email || '?') as string).trim().charAt(0).toUpperCase()}
               </span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate leading-tight">
+                  {(user.nome as string) || user.email}
+                </p>
+                <p className="text-[11px] text-[var(--sb-fg-muted)] truncate mt-0.5">{perfilLabel}</p>
+              </div>
             </div>
           )}
       </div>
 
       {/* Navegação */}
-      <nav className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
+      <nav aria-label="Navegação principal" className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
 
         {/* DEVELOPER: vê tudo */}
         {isDeveloper && (
@@ -429,9 +442,9 @@ export function Sidebar({ onClose }: SidebarProps) {
           <button
             type="button"
             onClick={() => setConfigOpen(o => !o)}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-normal text-[var(--sidebar-text-muted)] hover:text-white hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-2 rounded-lg text-[13.5px] font-medium text-[var(--sb-fg)] hover:bg-[var(--sb-hover)] transition-colors"
           >
-            <Settings className="h-4 w-4 flex-shrink-0 text-[var(--sidebar-text-muted)]" />
+            <Settings className="h-4 w-4 flex-shrink-0 text-[var(--sb-fg-muted)]" />
             <span className="flex-1 text-left">Configurações</span>
             <ChevronDown className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${configOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -442,7 +455,7 @@ export function Sidebar({ onClose }: SidebarProps) {
             </div>
           )}
         </div>
-        <p className="text-[10px] text-[var(--sidebar-text-muted)] text-center pt-1 opacity-70">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
+        <p className="text-[11px] text-[var(--sb-fg-muted)] text-center pt-1">{import.meta.env.VITE_APP_NAME || 'COCRIS Pedagógico'} © 2026</p>
       </div>
     </aside>
   );

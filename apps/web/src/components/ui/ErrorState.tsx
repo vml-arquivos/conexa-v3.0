@@ -14,9 +14,9 @@ export function ErrorState({
   onRetry 
 }: ErrorStateProps) {
   return (
-    <Card className="border-destructive/50 bg-destructive/5">
+    <Card className="border-[var(--error-border)] bg-[var(--error-bg)]" role="alert">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-destructive">
+        <CardTitle className="flex items-center gap-2 text-[var(--error)]">
           <AlertTriangle className="h-5 w-5" />
           {title}
         </CardTitle>

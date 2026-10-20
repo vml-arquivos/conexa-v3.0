@@ -1,4 +1,22 @@
 /** @type {import('tailwindcss').Config} */
+
+// Escala neutra (grafite levemente esverdeado) — substitui o cinza frio padrão
+// do Tailwind para que cartões, bordas e textos legados fiquem harmônicos com
+// a marca. O tema escuro é tratado em index.css (camada de compatibilidade).
+const neutral = {
+  50:  '#f7f9f8',
+  100: '#eef2f0',
+  200: '#e2e8e5',
+  300: '#cdd6d1',
+  400: '#98a69e',
+  500: '#62736a',
+  600: '#4b5c53',
+  700: '#3a4a42',
+  800: '#25322c',
+  900: '#14201a',
+  950: '#0b140f',
+};
+
 export default {
   darkMode: 'class',
   content: [
@@ -8,18 +26,23 @@ export default {
   theme: {
     extend: {
       colors: {
+        gray: neutral,
+        slate: neutral,
+        zinc: neutral,
+        neutral,
+        stone: neutral,
         brand: {
-          50:  '#effbf4',
-          100: '#d8f5e4',
-          200: '#b7e9cb',
-          300: '#82d9aa',
-          400: '#45c786',
-          500: '#1fa967',
-          600: '#158354',
-          700: '#0f6844',
-          800: '#0b4e35',
-          900: '#083b2b',
-          950: '#05251c',
+          50:  '#eaf7f0',
+          100: '#d3eee0',
+          200: '#aadcc3',
+          300: '#78c6a0',
+          400: '#3fab7c',
+          500: '#1c9565',
+          600: '#0f7f53',
+          700: '#0b6e47',
+          800: '#0a5639',
+          900: '#083f2b',
+          950: '#04241a',
         },
         surface: {
           page:    'var(--surface-page)',
@@ -65,11 +88,11 @@ export default {
         ring: 'var(--ring)',
       },
       borderRadius: {
-        'ds-sm':  '0.375rem',
-        'ds-md':  '0.5rem',
-        'ds-lg':  '0.75rem',
-        'ds-xl':  '1rem',
-        'ds-2xl': '1.25rem',
+        'ds-sm':  'var(--r-sm)',
+        'ds-md':  'var(--r-md)',
+        'ds-lg':  'var(--r-lg)',
+        'ds-xl':  'var(--r-xl)',
+        'ds-2xl': 'var(--r-2xl)',
       },
       boxShadow: {
         'ds-xs':    'var(--shadow-xs)',
@@ -80,15 +103,24 @@ export default {
         'ds-focus': 'var(--shadow-focus)',
       },
       fontFamily: {
-        sans: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['SFMono-Regular', 'Consolas', 'Liberation Mono', 'monospace'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       transitionDuration: {
         fast:   '100ms',
         base:   '150ms',
         slow:   '250ms',
         slower: '350ms',
+      },
+      keyframes: {
+        'ds-rise':   { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+        'ds-slide-left': { from: { opacity: '0', transform: 'translateX(24px)' }, to: { opacity: '1', transform: 'translateX(0)' } },
+        'ds-shimmer': { '100%': { transform: 'translateX(100%)' } },
+      },
+      animation: {
+        'ds-rise': 'ds-rise 220ms var(--ease-out) both',
+        'ds-slide-left': 'ds-slide-left 260ms var(--ease-out) both',
       },
     },
   },

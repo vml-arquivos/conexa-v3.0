@@ -5,6 +5,9 @@
  *   <PageShell title="Título" subtitle="Descrição" headerActions={<button>...</button>}>
  *     conteúdo
  *   </PageShell>
+ *
+ * Design 2.0: título em fonte de exibição, subtítulo com contraste AA,
+ * mais respiro vertical e entrada suave do conteúdo.
  */
 
 import React from 'react';
@@ -39,28 +42,28 @@ export function PageShell({
 
   return (
     <div className={cn(
-      'flex flex-col w-full max-w-[var(--content-max-w)] mx-auto',
-      flush ? '' : 'px-4 md:px-6 py-5 gap-5',
+      'flex flex-col w-full max-w-[var(--content-max-w)] mx-auto animate-ds-rise',
+      flush ? '' : 'px-4 sm:px-6 lg:px-8 py-6 gap-6',
       className,
     )}>
 
       {/* ── Header ── */}
       {(resolvedTitle || resolvedSubtitle || headerActions) && (
-        <header className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-          <div className="space-y-0.5 min-w-0">
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-6">
+          <div className="space-y-1 min-w-0">
             {resolvedTitle && (
-              <h1 className="text-[1.15rem] font-semibold tracking-tight leading-snug text-[var(--text-primary)] truncate">
+              <h1 className="font-display text-[1.5rem] sm:text-[1.75rem] font-bold tracking-[-0.03em] leading-tight text-[var(--text-primary)]">
                 {resolvedTitle}
               </h1>
             )}
             {resolvedSubtitle && (
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-3xl">
                 {resolvedSubtitle}
               </p>
             )}
           </div>
           {headerActions && (
-            <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               {headerActions}
             </div>
           )}
