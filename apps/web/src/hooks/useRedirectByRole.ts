@@ -17,6 +17,11 @@ import { normalizeRoles, normalizeRoleTypes } from '../app/RoleProtectedRoute';
  * - MANTENEDORA / DEVELOPER                 → /app/dashboard
  * - UNIDADE (genérico sem tipo específico)  → /app/dashboard
  */
+/** Aceita só rotas internas /app/... (mesma regra do backend). */
+export function isValidHomePath(v: unknown): v is string {
+  return typeof v === 'string' && /^\/app\/[A-Za-z0-9/_-]{1,90}$/.test(v);
+}
+
 export function useRedirectByRole() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -24,7 +29,10 @@ export function useRedirectByRole() {
   useEffect(() => {
     if (!user) return;
 
-    const path = getRedirectPathByRoles(normalizeRoles(user), normalizeRoleTypes(user));
+    const custom = (user as any)?.homePath ?? (user as any)?.user?.homePath;
+    const path = isValidHomePath(custom)
+      ? custom
+      : getRedirectPathByRoles(normalizeRoles(user), normalizeRoleTypes(user));
     navigate(path, { replace: true });
   }, [user, navigate]);
 }

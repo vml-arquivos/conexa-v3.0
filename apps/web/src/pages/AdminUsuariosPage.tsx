@@ -1,17 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageShell } from '../components/ui/PageShell';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import http from '../api/http';
 import {
-  Users, Plus, Search, Filter, Edit3, Trash2, UserCheck,
-  UserX, Key, Mail, Phone, Building2, Shield, ChevronDown,
-  RefreshCw, X, Eye, EyeOff, CheckCircle, AlertCircle,
-  Crown, GraduationCap, Stethoscope, Briefcase, User,
-  MoreVertical, Lock, Unlock, Send, Download,
+  Users, Plus, Search, Edit3, Trash2, UserCheck, Key, Mail, Phone, Building2, Shield,
+  RefreshCw, X, Eye, EyeOff, CheckCircle, AlertCircle, Crown, GraduationCap, Stethoscope,
+  Briefcase, User, MoreVertical, Lock, Unlock, Send, Wrench, ChevronDown, ChevronRight,
+  LayoutDashboard, Sparkles,
 } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -26,32 +24,53 @@ interface Usuario {
   emailVerified: boolean;
   lastLogin?: string;
   createdAt: string;
+  homePath?: string | null;
+  classrooms?: Array<{ id: string; name: string }>;
   roles: Array<{ roleType: string; unit?: { name: string; unitCode: string } }>;
   unit?: { name: string; unitCode: string };
-  mantenedora?: { name: string };
 }
+interface Unidade { id: string; name: string; unitCode: string }
+interface Turma { id: string; name: string; unit?: { id: string; name: string; code: string } }
 
-interface Unidade {
-  id: string;
-  name: string;
-  unitCode: string;
-}
-
-// ─── Configurações de papel ───────────────────────────────────────────────────
-const ROLE_CONFIG: Record<string, { label: string; cor: string; icon: React.ReactNode; nivel: number }> = {
-  DEVELOPER: { label: 'Desenvolvedor', cor: 'bg-red-100 text-red-700 border-red-200', icon: <Shield className="h-3 w-3" />, nivel: 1 },
-  MANTENEDORA_ADMIN: { label: 'Mantenedora — Admin', cor: 'bg-purple-100 text-purple-700 border-purple-200', icon: <Crown className="h-3 w-3" />, nivel: 2 },
-  MANTENEDORA_FINANCEIRO: { label: 'Mantenedora — Financeiro', cor: 'bg-purple-100 text-purple-700 border-purple-200', icon: <Briefcase className="h-3 w-3" />, nivel: 2 },
-  STAFF_CENTRAL_PEDAGOGICO: { label: 'Coord. Pedagógica Geral', cor: 'bg-blue-100 text-blue-700 border-blue-200', icon: <GraduationCap className="h-3 w-3" />, nivel: 3 },
-  STAFF_CENTRAL_PSICOLOGIA: { label: 'Psicóloga Central', cor: 'bg-blue-100 text-blue-700 border-blue-200', icon: <Stethoscope className="h-3 w-3" />, nivel: 3 },
-  UNIDADE_DIRETOR: { label: 'Diretor(a) de Unidade', cor: 'bg-green-100 text-green-700 border-green-200', icon: <Building2 className="h-3 w-3" />, nivel: 4 },
-  UNIDADE_COORDENADOR_PEDAGOGICO: { label: 'Coord. Pedagógica', cor: 'bg-green-100 text-green-700 border-green-200', icon: <GraduationCap className="h-3 w-3" />, nivel: 4 },
-  UNIDADE_ADMINISTRATIVO: { label: 'Secretaria / Adm.', cor: 'bg-teal-100 text-teal-700 border-teal-200', icon: <Briefcase className="h-3 w-3" />, nivel: 4 },
-  UNIDADE_NUTRICIONISTA: { label: 'Nutricionista', cor: 'bg-orange-100 text-orange-700 border-orange-200', icon: <Stethoscope className="h-3 w-3" />, nivel: 4 },
-  PROFESSOR: { label: 'Professor(a)', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <GraduationCap className="h-3 w-3" />, nivel: 5 },
-  MANUTENCAO_EXECUTOR: { label: 'Manutenção', cor: 'bg-gray-100 text-gray-700 border-gray-200', icon: <Briefcase className="h-3 w-3" />, nivel: 5 },
-  PROFESSOR_AUXILIAR: { label: 'Professor(a) Auxiliar', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <User className="h-3 w-3" />, nivel: 5 },
+// ─── Cargos ───────────────────────────────────────────────────────────────────
+type Grupo = 'REDE' | 'UNIDADE' | 'PROFESSOR' | 'MANUTENCAO';
+const GRUPOS: Record<Grupo, string> = {
+  REDE: 'Rede (mantenedora e coordenação geral)',
+  UNIDADE: 'Gestão da unidade',
+  PROFESSOR: 'Professores',
+  MANUTENCAO: 'Manutenção',
 };
+
+const ROLE_CONFIG: Record<string, { label: string; cor: string; icon: React.ReactNode; grupo: Grupo; ordem: number; painel: string }> = {
+  DEVELOPER: { label: 'Desenvolvedor', cor: 'bg-red-100 text-red-700 border-red-200', icon: <Shield className="h-3 w-3" />, grupo: 'REDE', ordem: 1, painel: '/app/dashboard' },
+  MANTENEDORA_ADMIN: { label: 'Mantenedora — Admin', cor: 'bg-purple-100 text-purple-700 border-purple-200', icon: <Crown className="h-3 w-3" />, grupo: 'REDE', ordem: 2, painel: '/app/administracao' },
+  MANTENEDORA_FINANCEIRO: { label: 'Mantenedora — Financeiro', cor: 'bg-purple-100 text-purple-700 border-purple-200', icon: <Briefcase className="h-3 w-3" />, grupo: 'REDE', ordem: 3, painel: '/app/administracao' },
+  STAFF_CENTRAL_PEDAGOGICO: { label: 'Coord. Pedagógica Geral', cor: 'bg-blue-100 text-blue-700 border-blue-200', icon: <GraduationCap className="h-3 w-3" />, grupo: 'REDE', ordem: 4, painel: '/app/central' },
+  STAFF_CENTRAL_PSICOLOGIA: { label: 'Psicóloga Central', cor: 'bg-blue-100 text-blue-700 border-blue-200', icon: <Stethoscope className="h-3 w-3" />, grupo: 'REDE', ordem: 5, painel: '/app/psicologo' },
+  UNIDADE_DIRETOR: { label: 'Diretor(a) de Unidade', cor: 'bg-green-100 text-green-700 border-green-200', icon: <Building2 className="h-3 w-3" />, grupo: 'UNIDADE', ordem: 6, painel: '/app/diretor' },
+  UNIDADE_COORDENADOR_PEDAGOGICO: { label: 'Coord. Pedagógica', cor: 'bg-green-100 text-green-700 border-green-200', icon: <GraduationCap className="h-3 w-3" />, grupo: 'UNIDADE', ordem: 7, painel: '/app/coordenacao-pedagogica' },
+  UNIDADE_ADMINISTRATIVO: { label: 'Secretaria / Adm.', cor: 'bg-teal-100 text-teal-700 border-teal-200', icon: <Briefcase className="h-3 w-3" />, grupo: 'UNIDADE', ordem: 8, painel: '/app/secretaria' },
+  UNIDADE_NUTRICIONISTA: { label: 'Nutricionista', cor: 'bg-orange-100 text-orange-700 border-orange-200', icon: <Stethoscope className="h-3 w-3" />, grupo: 'UNIDADE', ordem: 9, painel: '/app/nutricionista' },
+  PROFESSOR: { label: 'Professor(a)', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <GraduationCap className="h-3 w-3" />, grupo: 'PROFESSOR', ordem: 10, painel: '/app/teacher-dashboard' },
+  PROFESSOR_AUXILIAR: { label: 'Professor(a) Auxiliar', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <User className="h-3 w-3" />, grupo: 'PROFESSOR', ordem: 11, painel: '/app/teacher-dashboard' },
+  MANUTENCAO_EXECUTOR: { label: 'Manutenção', cor: 'bg-slate-100 text-slate-700 border-slate-200', icon: <Wrench className="h-3 w-3" />, grupo: 'MANUTENCAO', ordem: 12, painel: '/app/manutencao' },
+};
+
+/** Painéis reais (rotas existentes no router) que podem ser definidos como destino do login. */
+const PAINEIS: Array<{ path: string; label: string }> = [
+  { path: '/app/dashboard', label: 'Painel geral' },
+  { path: '/app/administracao', label: 'Administração (mantenedora)' },
+  { path: '/app/central', label: 'Coordenação geral' },
+  { path: '/app/psicologo', label: 'Psicologia' },
+  { path: '/app/diretor', label: 'Diretor(a) da unidade' },
+  { path: '/app/coordenacao-pedagogica', label: 'Coordenação pedagógica' },
+  { path: '/app/secretaria', label: 'Secretaria' },
+  { path: '/app/nutricionista', label: 'Nutrição' },
+  { path: '/app/teacher-dashboard', label: 'Professor(a)' },
+  { path: '/app/mobile', label: 'Professor — modo celular' },
+  { path: '/app/manutencao', label: 'Manutenção (ordens de serviço)' },
+];
+const nomePainel = (path: string) => PAINEIS.find((p) => p.path === path)?.label ?? path;
 
 const STATUS_CONFIG = {
   ATIVO: { label: 'Ativo', cor: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
@@ -60,196 +79,211 @@ const STATUS_CONFIG = {
   CONVIDADO: { label: 'Convidado', cor: 'bg-blue-100 text-blue-700', dot: 'bg-blue-400' },
 };
 
-// ─── Modal de Criar/Editar Usuário ────────────────────────────────────────────
+const roleDe = (u: Usuario) => u.roles?.[0]?.roleType || '';
+const unidadeDe = (u: Usuario) => u.unit ?? u.roles?.[0]?.unit;
+const nomeCompleto = (u: Usuario) => `${u.firstName} ${u.lastName}`.trim();
+const precisaUnidadeDe = (role: string) => role.startsWith('UNIDADE_') || role.startsWith('PROFESSOR');
+
+const selectCls =
+  'h-9 rounded-lg border border-[var(--border-default)] bg-[var(--surface-base)] px-2.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-brand)]';
+
+function gerarSenha() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let s = '';
+  for (let i = 0; i < 10; i++) s += abc[Math.floor(Math.random() * abc.length)];
+  return `${s}@7`;
+}
+
+// ─── Modal de Criar/Editar ────────────────────────────────────────────────────
 function ModalUsuario({
-  usuario, unidades, onClose, onSave,
+  usuario, presetRole, unidades, turmas, onClose, onSave,
 }: {
   usuario?: Usuario | null;
+  presetRole?: string;
   unidades: Unidade[];
+  turmas: Turma[];
   onClose: () => void;
   onSave: () => void;
 }) {
   const isEdit = !!usuario;
+  const turmaInicial = usuario?.classrooms?.[0]?.id ?? '';
   const [form, setForm] = useState({
     firstName: usuario?.firstName || '',
     lastName: usuario?.lastName || '',
     email: usuario?.email || '',
     phone: usuario?.phone || '',
-    cpf: usuario?.cpf || '',
-    roleType: usuario?.roles?.[0]?.roleType || 'PROFESSOR',
-    unitId: usuario?.unit?.unitCode || '',
+    roleType: usuario ? roleDe(usuario) || 'PROFESSOR' : presetRole || 'PROFESSOR',
+    unitCode: (usuario ? unidadeDe(usuario)?.unitCode : '') || '',
+    classroomId: turmaInicial,
+    homePath: usuario?.homePath || '',
     password: '',
-    confirmarSenha: '',
     status: usuario?.status || 'ATIVO',
   });
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const roleAtual = ROLE_CONFIG[form.roleType];
-  const precisaUnidade = form.roleType.startsWith('UNIDADE_') || form.roleType === 'PROFESSOR' || form.roleType === 'PROFESSOR_AUXILIAR';
+  const cfg = ROLE_CONFIG[form.roleType];
+  const precisaUnidade = precisaUnidadeDe(form.roleType);
+  const ehProfessor = form.roleType === 'PROFESSOR' || form.roleType === 'PROFESSOR_AUXILIAR';
+  const turmasDaUnidade = turmas.filter((t) => !form.unitCode || t.unit?.code === form.unitCode);
 
   async function salvar() {
     if (!form.firstName.trim() || !form.lastName.trim()) { toast.error('Nome e sobrenome são obrigatórios'); return; }
     if (!form.email.trim()) { toast.error('E-mail é obrigatório'); return; }
-    if (!isEdit && !form.password) { toast.error('Senha é obrigatória para novos usuários'); return; }
-    if (form.password && form.password !== form.confirmarSenha) { toast.error('As senhas não coincidem'); return; }
-    if (form.password && form.password.length < 6) { toast.error('Senha deve ter pelo menos 6 caracteres'); return; }
+    if (precisaUnidade && !form.unitCode) { toast.error('Escolha a unidade deste cargo'); return; }
+    if (!isEdit && form.password.length < 6) { toast.error('A senha precisa ter pelo menos 6 caracteres'); return; }
+    if (isEdit && form.password && form.password.length < 6) { toast.error('A senha precisa ter pelo menos 6 caracteres'); return; }
 
     setSaving(true);
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim().toLowerCase(),
         phone: form.phone || undefined,
-        cpf: form.cpf || undefined,
         roleType: form.roleType,
-        unitCode: precisaUnidade ? form.unitId || undefined : undefined,
+        unitCode: precisaUnidade ? form.unitCode || undefined : undefined,
         status: form.status,
       };
       if (form.password) payload.password = form.password;
-
       if (isEdit) {
+        payload.homePath = form.homePath || null;
+        if (ehProfessor && form.classroomId !== turmaInicial) payload.classroomId = form.classroomId || null;
         await http.put(`/admin/users/${usuario!.id}`, payload);
-        toast.success('Usuário atualizado com sucesso!');
+        toast.success('Usuário atualizado');
       } else {
+        if (form.homePath) payload.homePath = form.homePath;
+        if (ehProfessor && form.classroomId) payload.classroomId = form.classroomId;
         await http.post('/admin/users', payload);
-        toast.success('Usuário criado com sucesso!');
+        toast.success(`Usuário criado. Abre em: ${nomePainel(form.homePath || cfg?.painel || '')}`);
       }
       onSave();
       onClose();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || `Erro ao ${isEdit ? 'atualizar' : 'criar'} usuário`);
+      const m = err?.response?.data?.message;
+      toast.error(Array.isArray(m) ? m.join(', ') : m || `Erro ao ${isEdit ? 'atualizar' : 'criar'} usuário`);
     } finally { setSaving(false); }
   }
 
+  const campo = 'mt-1';
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] p-5">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{isEdit ? 'Editar Usuário' : 'Novo Usuário'}</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{isEdit ? `Editando: ${usuario!.firstName} ${usuario!.lastName}` : 'Preencha os dados do novo usuário'}</p>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">{isEdit ? 'Editar usuário' : 'Novo usuário'}</h2>
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
+              {isEdit ? nomeCompleto(usuario!) : 'Cargo, unidade, turma e painel de entrada'}
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="rounded-lg p-2 text-[var(--text-tertiary)] hover:bg-[var(--surface-subtle)]" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Formulário */}
-        <div className="p-6 space-y-5">
-          {/* Nome */}
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-5 p-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div><Label>Nome *</Label><Input className={campo} value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></div>
+            <div><Label>Sobrenome *</Label><Input className={campo} value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></div>
             <div>
-              <Label className="text-sm font-semibold text-gray-700">Nome *</Label>
-              <Input className="mt-1" placeholder="Nome" value={form.firstName} onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))} />
+              <Label>E-mail (será o login) *</Label>
+              <div className="relative mt-1"><Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                <Input className="pl-9" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} /></div>
             </div>
             <div>
-              <Label className="text-sm font-semibold text-gray-700">Sobrenome *</Label>
-              <Input className="mt-1" placeholder="Sobrenome" value={form.lastName} onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))} />
-            </div>
-          </div>
-
-          {/* Email e Telefone */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">E-mail *</Label>
-              <div className="relative mt-1">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input className="pl-9" type="email" placeholder="email@exemplo.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-              </div>
-            </div>
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">Telefone</Label>
-              <div className="relative mt-1">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input className="pl-9" placeholder="(00) 00000-0000" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-              </div>
+              <Label>Telefone</Label>
+              <div className="relative mt-1"><Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                <Input className="pl-9" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} /></div>
             </div>
           </div>
 
-          {/* Perfil de Acesso */}
           <div>
-            <Label className="text-sm font-semibold text-gray-700">Perfil de Acesso *</Label>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              {Object.entries(ROLE_CONFIG).filter(([r]) => r !== 'DEVELOPER').map(([role, cfg]) => (
-                <button key={role} onClick={() => setForm(f => ({ ...f, roleType: role }))}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 text-left transition-all ${form.roleType === role ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-200 bg-white'}`}>
-                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.cor}`}>
-                    {cfg.icon} {cfg.label}
-                  </span>
-                </button>
+            <Label>Cargo (perfil de acesso) *</Label>
+            <select className={`${selectCls} mt-1 w-full`} value={form.roleType}
+              onChange={(e) => setForm((f) => ({ ...f, roleType: e.target.value, classroomId: '' }))}>
+              {(Object.keys(GRUPOS) as Grupo[]).map((g) => (
+                <optgroup key={g} label={GRUPOS[g]}>
+                  {Object.entries(ROLE_CONFIG)
+                    .filter(([r, c]) => c.grupo === g && (r !== 'DEVELOPER' || usuario?.roles?.[0]?.roleType === 'DEVELOPER'))
+                    .map(([r, c]) => <option key={r} value={r}>{c.label}</option>)}
+                </optgroup>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* Unidade (condicional) */}
           {precisaUnidade && (
-            <div>
-              <Label className="text-sm font-semibold text-gray-700">Unidade {precisaUnidade ? '*' : ''}</Label>
-              <div className="relative mt-1">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <select className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={form.unitId} onChange={e => setForm(f => ({ ...f, unitId: e.target.value }))}>
-                  <option value="">Selecione a unidade...</option>
-                  {unidades.map(u => (
-                    <option key={u.id} value={u.unitCode}>{u.name} ({u.unitCode})</option>
-                  ))}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <Label>Unidade *</Label>
+                <select className={`${selectCls} mt-1 w-full`} value={form.unitCode}
+                  onChange={(e) => setForm((f) => ({ ...f, unitCode: e.target.value, classroomId: '' }))}>
+                  <option value="">Selecione…</option>
+                  {unidades.map((u) => <option key={u.id} value={u.unitCode}>{u.name}</option>)}
                 </select>
               </div>
+              {ehProfessor && (
+                <div>
+                  <Label>Turma</Label>
+                  <select className={`${selectCls} mt-1 w-full`} value={form.classroomId}
+                    onChange={(e) => setForm((f) => ({ ...f, classroomId: e.target.value }))} disabled={!form.unitCode}>
+                    <option value="">{form.unitCode ? 'Sem turma por enquanto' : 'Escolha a unidade primeiro'}</option>
+                    {turmasDaUnidade.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Status (apenas edição) */}
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-subtle)] p-3">
+            <Label className="flex items-center gap-1.5"><LayoutDashboard className="h-4 w-4" /> Painel de entrada (ao fazer login)</Label>
+            <select className={`${selectCls} mt-1.5 w-full`} value={form.homePath}
+              onChange={(e) => setForm((f) => ({ ...f, homePath: e.target.value }))}>
+              <option value="">Padrão do cargo — {nomePainel(cfg?.painel ?? '/app/dashboard')}</option>
+              {PAINEIS.map((p) => <option key={p.path} value={p.path}>{p.label}</option>)}
+            </select>
+            <p className="mt-1.5 text-xs text-[var(--text-secondary)]">
+              Só define a primeira tela. O que cada pessoa pode abrir continua sendo controlado pelo cargo.
+            </p>
+          </div>
+
           {isEdit && (
             <div>
-              <Label className="text-sm font-semibold text-gray-700">Status</Label>
-              <div className="mt-1 flex gap-2">
-                {Object.entries(STATUS_CONFIG).map(([status, cfg]) => (
-                  <button key={status} onClick={() => setForm(f => ({ ...f, status: status as any }))}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${form.status === status ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-100 text-gray-600 hover:border-gray-200'}`}>
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} /> {cfg.label}
+              <Label>Status</Label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {Object.entries(STATUS_CONFIG).map(([s, c]) => (
+                  <button key={s} type="button" onClick={() => setForm((f) => ({ ...f, status: s as any }))}
+                    className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-xs font-medium ${form.status === s ? 'border-[var(--border-brand)] bg-[var(--surface-brand)] text-[var(--text-brand)]' : 'border-[var(--border-default)] text-[var(--text-secondary)]'}`}>
+                    <span className={`h-2 w-2 rounded-full ${c.dot}`} /> {c.label}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Senha */}
-          <div className="border-t border-gray-100 pt-4">
-            <p className="text-sm font-semibold text-gray-700 mb-3">{isEdit ? 'Alterar Senha (opcional)' : 'Senha de Acesso *'}</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-gray-500">{isEdit ? 'Nova Senha' : 'Senha'}</Label>
-                <div className="relative mt-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input className="pl-9 pr-9" type={mostrarSenha ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-                  <button onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
+          <div className="border-t border-[var(--border-default)] pt-4">
+            <Label>{isEdit ? 'Nova senha (opcional)' : 'Senha inicial *'}</Label>
+            <div className="mt-1 flex gap-2">
+              <div className="relative flex-1">
+                <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+                <Input className="pl-9 pr-9" type={mostrarSenha ? 'text' : 'password'} placeholder="Mínimo 6 caracteres"
+                  value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+                <button type="button" onClick={() => setMostrarSenha(!mostrarSenha)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" aria-label="Mostrar senha">
+                  {mostrarSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <div>
-                <Label className="text-xs text-gray-500">Confirmar Senha</Label>
-                <div className="relative mt-1">
-                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input className="pl-9" type="password" placeholder="Repita a senha" value={form.confirmarSenha} onChange={e => setForm(f => ({ ...f, confirmarSenha: e.target.value }))} />
-                </div>
-                {form.password && form.confirmarSenha && form.password !== form.confirmarSenha && (
-                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Senhas não coincidem</p>
-                )}
-              </div>
+              <Button type="button" variant="outline" onClick={() => { setForm((f) => ({ ...f, password: gerarSenha() })); setMostrarSenha(true); }}>
+                <Sparkles className="mr-1.5 h-4 w-4" /> Gerar
+              </Button>
             </div>
+            {!isEdit && <p className="mt-1.5 flex items-center gap-1 text-xs text-[var(--text-secondary)]"><AlertCircle className="h-3 w-3" /> Anote a senha antes de salvar; depois ela não aparece mais.</p>}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+        <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-[var(--border-default)] bg-[var(--surface-subtle)] p-4">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={salvar} disabled={saving} className="bg-blue-600 hover:bg-blue-700 min-w-[120px]">
-            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-            {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Criar Usuário'}
+          <Button onClick={salvar} disabled={saving} className="min-w-[130px]">
+            {saving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+            {saving ? 'Salvando…' : isEdit ? 'Salvar' : 'Criar usuário'}
           </Button>
         </div>
       </div>
@@ -257,16 +291,24 @@ function ModalUsuario({
   );
 }
 
-// ─── Componente Principal ─────────────────────────────────────────────────────
+// ─── Página ───────────────────────────────────────────────────────────────────
 export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [busca, setBusca] = useState('');
+  const [filtroGrupo, setFiltroGrupo] = useState<'' | Grupo>('');
   const [filtroRole, setFiltroRole] = useState('');
+  const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
-  const [modalAberto, setModalAberto] = useState(false);
-  const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [agrupar, setAgrupar] = useState<'unidade' | 'cargo' | 'nenhum'>('unidade');
+  const [ordenar, setOrdenar] = useState<'nome' | 'cargo' | 'acesso'>('nome');
+  const [fechados, setFechados] = useState<Set<string>>(new Set());
+
+  const [modal, setModal] = useState<{ usuario?: Usuario | null; preset?: string } | null>(null);
   const [menuAberto, setMenuAberto] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -275,255 +317,251 @@ export default function AdminUsuariosPage() {
   async function loadDados() {
     setLoading(true);
     try {
-      const [usersRes, unitsRes] = await Promise.all([
-        http.get('/admin/users?limit=200'),
+      const [usersRes, unitsRes, turmasRes] = await Promise.all([
+        http.get('/admin/users?limit=500'),
         http.get('/admin/units'),
+        http.get('/classrooms?limit=500').catch(() => null),
       ]);
-      const u = usersRes.data;
-      // Suporta: array direto, { data: [] }, { users: [] }, { items: [] }
-      const userList = Array.isArray(u) ? u : (u?.data ?? u?.users ?? u?.items ?? []);
-      setUsuarios(userList);
-      const un = unitsRes.data;
-      const unitList = Array.isArray(un) ? un : (un?.data ?? un?.units ?? un?.items ?? []);
-      setUnidades(unitList);
+      const pick = (d: any, k: string) => (Array.isArray(d) ? d : (d?.data ?? d?.[k] ?? d?.items ?? []));
+      setUsuarios(pick(usersRes.data, 'users'));
+      setUnidades(pick(unitsRes.data, 'units'));
+      setTurmas(turmasRes ? pick(turmasRes.data, 'classrooms') : []);
     } catch {
-      // Dados de demonstração
-      setUsuarios([
-        { id: '1', firstName: 'Bruna', lastName: 'Vaz', email: 'bruna.vaz@cocris.org', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01', roles: [{ roleType: 'STAFF_CENTRAL_PEDAGOGICO' }] },
-        { id: '2', firstName: 'Carla', lastName: 'Psicóloga', email: 'carla.psicologa@cocris.org', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01', roles: [{ roleType: 'STAFF_CENTRAL_PSICOLOGIA' }] },
-        { id: '3', firstName: 'Ana', lastName: 'Carolina', email: 'ana.carolina@cocris.org', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01', roles: [{ roleType: 'UNIDADE_COORDENADOR_PEDAGOGICO', unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' } }], unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' } },
-        { id: '4', firstName: 'Maria', lastName: 'Professora', email: 'professor1@unidade1.com', status: 'ATIVO', emailVerified: true, createdAt: '2026-01-01', roles: [{ roleType: 'PROFESSOR', unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' } }], unit: { name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' } },
-      ]);
-      setUnidades([
-        { id: '1', name: 'CEPI Arara Canindé', unitCode: 'ARARA-CAN' },
-        { id: '2', name: 'CEPI Beija-Flor', unitCode: 'BEIJA-FLO' },
-        { id: '3', name: 'CEPI Sabiá do Campo', unitCode: 'SABIA-CAM' },
-      ]);
+      toast.error('Não foi possível carregar os usuários');
     } finally { setLoading(false); }
   }
 
   async function alterarStatus(id: string, novoStatus: string) {
     try {
       await http.put(`/admin/users/${id}`, { status: novoStatus });
-      setUsuarios(prev => prev.map(u => u.id === id ? { ...u, status: novoStatus as any } : u));
-      toast.success(`Usuário ${novoStatus === 'ATIVO' ? 'ativado' : novoStatus === 'SUSPENSO' ? 'suspenso' : 'inativado'}`);
+      setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, status: novoStatus as any } : u)));
+      toast.success(novoStatus === 'ATIVO' ? 'Acesso reativado' : 'Acesso suspenso');
     } catch { toast.error('Erro ao alterar status'); }
     setMenuAberto(null);
   }
-
   async function resetarSenha(id: string, email: string) {
-    try {
-      await http.post(`/admin/users/${id}/reset-password`);
-      toast.success(`Link de redefinição enviado para ${email}`);
-    } catch { toast.error('Erro ao enviar link de redefinição'); }
+    try { await http.post(`/admin/users/${id}/reset-password`); toast.success(`Link enviado para ${email}`); }
+    catch { toast.error('Erro ao enviar link de redefinição'); }
     setMenuAberto(null);
   }
-
   async function excluirUsuario(id: string) {
-    try {
-      await http.delete(`/admin/users/${id}`);
-      setUsuarios(prev => prev.filter(u => u.id !== id));
-      toast.success('Usuário excluído');
-    } catch { toast.error('Erro ao excluir usuário'); }
+    try { await http.delete(`/admin/users/${id}`); setUsuarios((p) => p.filter((u) => u.id !== id)); toast.success('Usuário excluído'); }
+    catch { toast.error('Erro ao excluir usuário'); }
     setConfirmDelete(null);
   }
 
-  // Filtros
-  const usuariosFiltrados = usuarios.filter(u => {
-    const nome = `${u.firstName} ${u.lastName}`.toLowerCase();
-    const roleAtual = u.roles?.[0]?.roleType || '';
-    if (busca && !nome.includes(busca.toLowerCase()) && !u.email.toLowerCase().includes(busca.toLowerCase())) return false;
-    if (filtroRole && roleAtual !== filtroRole) return false;
-    if (filtroStatus && u.status !== filtroStatus) return false;
-    return true;
-  });
+  const turmasFiltro = turmas.filter((t) => !filtroUnidade || t.unit?.code === filtroUnidade);
 
-  // Estatísticas
-  const stats = {
-    total: usuarios.length,
-    ativos: usuarios.filter(u => u.status === 'ATIVO').length,
-    professores: usuarios.filter(u => u.roles?.[0]?.roleType?.startsWith('PROFESSOR')).length,
-    gestores: usuarios.filter(u => u.roles?.[0]?.roleType?.startsWith('UNIDADE_') || u.roles?.[0]?.roleType?.startsWith('STAFF_') || u.roles?.[0]?.roleType?.startsWith('MANTENEDORA_')).length,
+  const filtrados = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    const lista = usuarios.filter((u) => {
+      const r = roleDe(u);
+      if (q && !nomeCompleto(u).toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+      if (filtroGrupo && ROLE_CONFIG[r]?.grupo !== filtroGrupo) return false;
+      if (filtroRole && r !== filtroRole) return false;
+      if (filtroUnidade === '__rede__' ? !!unidadeDe(u) : filtroUnidade && unidadeDe(u)?.unitCode !== filtroUnidade) return false;
+      if (filtroTurma && !u.classrooms?.some((c) => c.id === filtroTurma)) return false;
+      if (filtroStatus && u.status !== filtroStatus) return false;
+      return true;
+    });
+    const cmp: Record<string, (a: Usuario, b: Usuario) => number> = {
+      nome: (a, b) => nomeCompleto(a).localeCompare(nomeCompleto(b), 'pt-BR'),
+      cargo: (a, b) => (ROLE_CONFIG[roleDe(a)]?.ordem ?? 99) - (ROLE_CONFIG[roleDe(b)]?.ordem ?? 99) || nomeCompleto(a).localeCompare(nomeCompleto(b), 'pt-BR'),
+      acesso: (a, b) => (b.lastLogin ? Date.parse(b.lastLogin) : 0) - (a.lastLogin ? Date.parse(a.lastLogin) : 0),
+    };
+    return [...lista].sort(cmp[ordenar]);
+  }, [usuarios, busca, filtroGrupo, filtroRole, filtroUnidade, filtroTurma, filtroStatus, ordenar]);
+
+  const grupos = useMemo(() => {
+    if (agrupar === 'nenhum') return [{ key: 'todos', titulo: 'Todos os usuários', itens: filtrados }];
+    const m = new Map<string, { key: string; titulo: string; ordem: number; itens: Usuario[] }>();
+    for (const u of filtrados) {
+      let key: string; let titulo: string; let ordem: number;
+      if (agrupar === 'unidade') {
+        const un = unidadeDe(u);
+        key = un?.unitCode ?? '__rede__'; titulo = un?.name ?? 'Rede — sem unidade (mantenedora, coordenação geral, manutenção)'; ordem = un ? 1 : 0;
+      } else {
+        const r = roleDe(u); key = r || '__sem__'; titulo = ROLE_CONFIG[r]?.label ?? 'Sem cargo'; ordem = ROLE_CONFIG[r]?.ordem ?? 99;
+      }
+      if (!m.has(key)) m.set(key, { key, titulo, ordem, itens: [] });
+      m.get(key)!.itens.push(u);
+    }
+    return [...m.values()].sort((a, b) => a.ordem - b.ordem || a.titulo.localeCompare(b.titulo, 'pt-BR'));
+  }, [filtrados, agrupar]);
+
+  const cont = (fn: (u: Usuario) => boolean) => usuarios.filter(fn).length;
+  const stats = [
+    { label: 'Total', value: usuarios.length, icon: <Users className="h-5 w-5" /> },
+    { label: 'Ativos', value: cont((u) => u.status === 'ATIVO'), icon: <UserCheck className="h-5 w-5" /> },
+    { label: 'Professores', value: cont((u) => ROLE_CONFIG[roleDe(u)]?.grupo === 'PROFESSOR'), icon: <GraduationCap className="h-5 w-5" /> },
+    { label: 'Gestão', value: cont((u) => ['REDE', 'UNIDADE'].includes(ROLE_CONFIG[roleDe(u)]?.grupo)), icon: <Crown className="h-5 w-5" /> },
+    { label: 'Manutenção', value: cont((u) => roleDe(u) === 'MANUTENCAO_EXECUTOR'), icon: <Wrench className="h-5 w-5" /> },
+  ];
+  const temFiltro = !!(busca || filtroGrupo || filtroRole || filtroUnidade || filtroTurma || filtroStatus);
+  const limpar = () => { setBusca(''); setFiltroGrupo(''); setFiltroRole(''); setFiltroUnidade(''); setFiltroTurma(''); setFiltroStatus(''); };
+
+  const linha = (u: Usuario) => {
+    const r = roleDe(u); const rc = ROLE_CONFIG[r]; const st = STATUS_CONFIG[u.status] || STATUS_CONFIG.INATIVO;
+    const un = unidadeDe(u);
+    const destino = u.homePath || rc?.painel;
+    return (
+      <div key={u.id} className={`flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-base)] px-3 py-2.5 ${u.status !== 'ATIVO' ? 'opacity-70' : ''}`}>
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[var(--surface-brand)] text-sm font-bold text-[var(--text-brand)] ring-1 ring-[var(--border-brand)]">
+          {(u.firstName?.[0] ?? '?')}{(u.lastName?.[0] ?? '')}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{nomeCompleto(u)}</p>
+            {rc && <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${rc.cor}`}>{rc.icon}{rc.label}</span>}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${st.cor}`}><span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />{st.label}</span>
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-[var(--text-secondary)]">
+            <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{u.email}</span>
+            {agrupar !== 'unidade' && un && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{un.name}</span>}
+            {!!u.classrooms?.length && <span className="flex items-center gap-1"><GraduationCap className="h-3 w-3" />{u.classrooms.map((c) => c.name).join(', ')}</span>}
+            {destino && <span className="flex items-center gap-1 text-[var(--text-brand)]"><LayoutDashboard className="h-3 w-3" />Abre em: {nomePainel(destino)}{u.homePath ? ' (personalizado)' : ''}</span>}
+            {u.lastLogin && <span>Último acesso: {new Date(u.lastLogin).toLocaleDateString('pt-BR')}</span>}
+          </div>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <button onClick={() => setModal({ usuario: u })} className="rounded-lg p-2 text-[var(--text-brand)] hover:bg-[var(--surface-subtle)]" title="Editar"><Edit3 className="h-4 w-4" /></button>
+          <div className="relative">
+            <button onClick={() => setMenuAberto(menuAberto === u.id ? null : u.id)} className="rounded-lg p-2 text-[var(--text-tertiary)] hover:bg-[var(--surface-subtle)]" aria-label="Mais ações"><MoreVertical className="h-4 w-4" /></button>
+            {menuAberto === u.id && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-52 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-base)] shadow-lg">
+                {u.status === 'ATIVO'
+                  ? <button onClick={() => alterarStatus(u.id, 'SUSPENSO')} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-orange-600 hover:bg-[var(--surface-subtle)]"><Lock className="h-4 w-4" /> Suspender acesso</button>
+                  : <button onClick={() => alterarStatus(u.id, 'ATIVO')} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-green-600 hover:bg-[var(--surface-subtle)]"><Unlock className="h-4 w-4" /> Reativar acesso</button>}
+                <button onClick={() => resetarSenha(u.id, u.email)} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--text-brand)] hover:bg-[var(--surface-subtle)]"><Send className="h-4 w-4" /> Enviar link de senha</button>
+                <div className="border-t border-[var(--border-default)]" />
+                <button onClick={() => { setConfirmDelete(u.id); setMenuAberto(null); }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-[var(--surface-subtle)]"><Trash2 className="h-4 w-4" /> Excluir usuário</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
+  const chip = (ativo: boolean) =>
+    `rounded-full border px-3 py-1 text-xs font-medium transition-colors ${ativo ? 'border-[var(--border-brand)] bg-[var(--surface-brand)] text-[var(--text-brand)]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)]'}`;
+
   return (
-    <PageShell title="Gestão de Usuários" subtitle="Crie, edite e gerencie todos os acessos ao sistema">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Total de Usuários', value: stats.total, cor: 'blue', icon: <Users className="h-5 w-5 text-blue-500" /> },
-          { label: 'Usuários Ativos', value: stats.ativos, cor: 'green', icon: <UserCheck className="h-5 w-5 text-green-500" /> },
-          { label: 'Professores', value: stats.professores, cor: 'yellow', icon: <GraduationCap className="h-5 w-5 text-yellow-500" /> },
-          { label: 'Gestores', value: stats.gestores, cor: 'purple', icon: <Crown className="h-5 w-5 text-purple-500" /> },
-        ].map((s, i) => (
-          <Card key={i} className="border-2 border-gray-100 hover:border-gray-200 transition-all">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-                </div>
-                <div className={`w-10 h-10 bg-${s.cor}-50 rounded-xl flex items-center justify-center`}>{s.icon}</div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Barra de ações */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input className="pl-9" placeholder="Buscar por nome ou e-mail..." value={busca} onChange={e => setBusca(e.target.value)} />
-        </div>
-        <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filtroRole} onChange={e => setFiltroRole(e.target.value)}>
-          <option value="">Todos os perfis</option>
-          {Object.entries(ROLE_CONFIG).map(([role, cfg]) => (
-            <option key={role} value={role}>{cfg.label}</option>
-          ))}
-        </select>
-        <select className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}>
-          <option value="">Todos os status</option>
-          {Object.entries(STATUS_CONFIG).map(([s, cfg]) => (
-            <option key={s} value={s}>{cfg.label}</option>
-          ))}
-        </select>
-        <Button onClick={() => { setUsuarioEditando(null); setModalAberto(true); }} className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Novo Usuário
-        </Button>
-      </div>
-
-      {/* Contagem */}
-      <p className="text-sm text-gray-500 mb-3">
-        Exibindo <span className="font-semibold text-gray-700">{usuariosFiltrados.length}</span> de {usuarios.length} usuários
-      </p>
-
-      {/* Lista de usuários */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {usuariosFiltrados.length === 0 && (
-            <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-              <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500 font-medium">Nenhum usuário encontrado</p>
-              <p className="text-gray-400 text-sm mt-1">Tente ajustar os filtros ou crie um novo usuário</p>
+    <PageShell
+      title="Gestão de Usuários"
+      subtitle="Crie acessos, escolha o cargo, a unidade, a turma e o painel de entrada de cada pessoa"
+      headerActions={
+        <>
+          <Button variant="outline" onClick={() => setModal({ preset: 'MANUTENCAO_EXECUTOR' })}><Wrench className="mr-2 h-4 w-4" /> Novo da Manutenção</Button>
+          <Button onClick={() => setModal({})}><Plus className="mr-2 h-4 w-4" /> Novo usuário</Button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {stats.map((s) => (
+            <div key={s.label} className="flex items-center justify-between rounded-xl border border-[var(--border-default)] bg-[var(--surface-base)] p-3.5">
+              <div><p className="text-2xl font-bold tabular-nums text-[var(--text-primary)]">{s.value}</p><p className="text-xs text-[var(--text-secondary)]">{s.label}</p></div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-tertiary)]">{s.icon}</span>
             </div>
-          )}
-
-          {usuariosFiltrados.map(u => {
-            const roleAtual = u.roles?.[0]?.roleType || '';
-            const roleCfg = ROLE_CONFIG[roleAtual];
-            const statusCfg = STATUS_CONFIG[u.status] || STATUS_CONFIG.INATIVO;
-
-            return (
-              <Card key={u.id} className={`border-2 transition-all hover:shadow-sm ${u.status !== 'ATIVO' ? 'opacity-70 border-gray-100' : 'border-gray-100 hover:border-blue-100'}`}>
-                <CardContent className="pt-3 pb-3">
-                  <div className="flex items-center gap-4">
-                    {/* Avatar */}
-                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-sm">
-                      <span className="text-sm font-bold text-blue-600">
-                        {u.firstName[0]}{u.lastName[0]}
-                      </span>
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-gray-900">{u.firstName} {u.lastName}</p>
-                        {roleCfg && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${roleCfg.cor}`}>
-                            {roleCfg.icon} {roleCfg.label}
-                          </span>
-                        )}
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${statusCfg.cor}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
-                          {statusCfg.label}
-                        </span>
-                        {u.emailVerified && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-600">
-                            <CheckCircle className="h-3 w-3" /> Verificado
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        <p className="text-xs text-gray-400 flex items-center gap-1"><Mail className="h-3 w-3" /> {u.email}</p>
-                        {u.phone && <p className="text-xs text-gray-400 flex items-center gap-1"><Phone className="h-3 w-3" /> {u.phone}</p>}
-                        {u.unit && <p className="text-xs text-gray-400 flex items-center gap-1"><Building2 className="h-3 w-3" /> {u.unit.name}</p>}
-                        {u.lastLogin && <p className="text-xs text-gray-400">Último acesso: {new Date(u.lastLogin).toLocaleDateString('pt-BR')}</p>}
-                      </div>
-                    </div>
-
-                    {/* Ações */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => { setUsuarioEditando(u); setModalAberto(true); }}
-                        className="p-2 rounded-lg text-blue-500 hover:bg-blue-50 transition-all" title="Editar usuário">
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-
-                      {/* Menu de ações */}
-                      <div className="relative">
-                        <button onClick={() => setMenuAberto(menuAberto === u.id ? null : u.id)}
-                          className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 transition-all">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        {menuAberto === u.id && (
-                          <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-gray-100 z-10 overflow-hidden">
-                            {u.status === 'ATIVO' ? (
-                              <button onClick={() => alterarStatus(u.id, 'SUSPENSO')}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50">
-                                <Lock className="h-4 w-4" /> Suspender acesso
-                              </button>
-                            ) : (
-                              <button onClick={() => alterarStatus(u.id, 'ATIVO')}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-green-600 hover:bg-green-50">
-                                <Unlock className="h-4 w-4" /> Reativar acesso
-                              </button>
-                            )}
-                            <button onClick={() => resetarSenha(u.id, u.email)}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-blue-600 hover:bg-blue-50">
-                              <Send className="h-4 w-4" /> Enviar link de senha
-                            </button>
-                            <div className="border-t border-gray-100" />
-                            <button onClick={() => { setConfirmDelete(u.id); setMenuAberto(null); }}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
-                              <Trash2 className="h-4 w-4" /> Excluir usuário
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+          ))}
         </div>
+
+        {/* Grupos de cargo */}
+        <div className="flex flex-wrap gap-2">
+          <button className={chip(filtroGrupo === '')} onClick={() => { setFiltroGrupo(''); setFiltroRole(''); }}>Todos</button>
+          {(Object.keys(GRUPOS) as Grupo[]).map((g) => (
+            <button key={g} className={chip(filtroGrupo === g)} onClick={() => { setFiltroGrupo(g); setFiltroRole(''); }}>
+              {g === 'REDE' ? 'Rede' : g === 'UNIDADE' ? 'Gestão da unidade' : GRUPOS[g]}
+            </button>
+          ))}
+        </div>
+
+        {/* Filtros */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
+            <Input className="pl-9" placeholder="Buscar por nome ou e-mail…" value={busca} onChange={(e) => setBusca(e.target.value)} />
+          </div>
+          <select className={selectCls} value={filtroUnidade} onChange={(e) => { setFiltroUnidade(e.target.value); setFiltroTurma(''); }}>
+            <option value="">Todas as unidades</option>
+            <option value="__rede__">Rede (sem unidade)</option>
+            {unidades.map((u) => <option key={u.id} value={u.unitCode}>{u.name}</option>)}
+          </select>
+          <select className={selectCls} value={filtroRole} onChange={(e) => setFiltroRole(e.target.value)}>
+            <option value="">Todos os cargos</option>
+            {Object.entries(ROLE_CONFIG).filter(([, c]) => !filtroGrupo || c.grupo === filtroGrupo).map(([r, c]) => <option key={r} value={r}>{c.label}</option>)}
+          </select>
+          <select className={selectCls} value={filtroTurma} onChange={(e) => setFiltroTurma(e.target.value)} disabled={turmas.length === 0}>
+            <option value="">Todas as turmas</option>
+            {turmasFiltro.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+          <select className={selectCls} value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)}>
+            <option value="">Todos os status</option>
+            {Object.entries(STATUS_CONFIG).map(([s, c]) => <option key={s} value={s}>{c.label}</option>)}
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-[var(--text-secondary)]">
+          <span>
+            Exibindo <b className="text-[var(--text-primary)]">{filtrados.length}</b> de {usuarios.length}
+            {temFiltro && <button onClick={limpar} className="ml-2 text-[var(--text-brand)] underline">limpar filtros</button>}
+          </span>
+          <span className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5">Agrupar
+              <select className={selectCls} value={agrupar} onChange={(e) => setAgrupar(e.target.value as any)}>
+                <option value="unidade">por unidade</option><option value="cargo">por cargo</option><option value="nenhum">sem grupos</option>
+              </select></label>
+            <label className="flex items-center gap-1.5">Ordenar
+              <select className={selectCls} value={ordenar} onChange={(e) => setOrdenar(e.target.value as any)}>
+                <option value="nome">por nome</option><option value="cargo">por cargo</option><option value="acesso">pelo último acesso</option>
+              </select></label>
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-16"><RefreshCw className="h-8 w-8 animate-spin text-[var(--text-brand)]" /></div>
+        ) : filtrados.length === 0 ? (
+          <div className="rounded-2xl border-2 border-dashed border-[var(--border-default)] py-12 text-center">
+            <Users className="mx-auto mb-3 h-12 w-12 text-[var(--text-tertiary)]" />
+            <p className="font-medium text-[var(--text-secondary)]">Nenhum usuário encontrado</p>
+            <p className="mt-1 text-sm text-[var(--text-tertiary)]">Ajuste os filtros ou crie um novo usuário</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {grupos.map((g) => {
+              const fechado = fechados.has(g.key);
+              return (
+                <section key={g.key}>
+                  {agrupar !== 'nenhum' && (
+                    <button
+                      onClick={() => setFechados((p) => { const n = new Set(p); n.has(g.key) ? n.delete(g.key) : n.add(g.key); return n; })}
+                      className="mb-2 flex w-full items-center gap-2 text-left"
+                    >
+                      {fechado ? <ChevronRight className="h-4 w-4 text-[var(--text-tertiary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-tertiary)]" />}
+                      <h2 className="font-display text-sm font-bold text-[var(--text-primary)]">{g.titulo}</h2>
+                      <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">{g.itens.length}</span>
+                    </button>
+                  )}
+                  {!fechado && <div className="space-y-2">{g.itens.map(linha)}</div>}
+                </section>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {modal && (
+        <ModalUsuario usuario={modal.usuario} presetRole={modal.preset} unidades={unidades} turmas={turmas}
+          onClose={() => setModal(null)} onSave={loadDados} />
       )}
 
-      {/* Modal de criação/edição */}
-      {modalAberto && (
-        <ModalUsuario
-          usuario={usuarioEditando}
-          unidades={unidades}
-          onClose={() => { setModalAberto(false); setUsuarioEditando(null); }}
-          onSave={loadDados}
-        />
-      )}
-
-      {/* Confirmação de exclusão */}
       {confirmDelete && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Trash2 className="h-7 w-7 text-red-500" />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Excluir Usuário</h3>
-            <p className="text-gray-500 text-sm mb-6">Esta ação não pode ser desfeita. O usuário perderá acesso imediatamente.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-[var(--surface-base)] p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100"><Trash2 className="h-7 w-7 text-red-500" /></div>
+            <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">Excluir usuário</h3>
+            <p className="mb-6 text-sm text-[var(--text-secondary)]">Esta ação não pode ser desfeita. A pessoa perde o acesso na hora.</p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
               <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => excluirUsuario(confirmDelete)}>Excluir</Button>
@@ -532,8 +570,7 @@ export default function AdminUsuariosPage() {
         </div>
       )}
 
-      {/* Fechar menu ao clicar fora */}
-      {menuAberto && <div className="fixed inset-0 z-0" onClick={() => setMenuAberto(null)} />}
+      {menuAberto && <div className="fixed inset-0 z-10" onClick={() => setMenuAberto(null)} />}
     </PageShell>
   );
 }

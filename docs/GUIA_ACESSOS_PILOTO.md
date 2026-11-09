@@ -19,6 +19,10 @@ Tudo do piloto fica em uma **Mantenedora própria** ("ASSOCIAÇÃO PILOTO"). Que
 ## Crianças de exemplo (10 por turma, 4 turmas = 40)
 Cada turma repete os cenários: sem particularidade · APLV · alergia a amendoim · intolerância à lactose · doença celíaca · TEA (laudo) · TDAH + medicação · alergia a ovo + asma · Down (laudo) + textura pastosa · sem carne suína + muitas faltas.
 
+## Material e relatórios
+- 5 requisições de material (rascunho, solicitado, aprovado, entregue, rejeitada) + 2 pedidos de compra (um por unidade).
+- 40 relatórios individuais (RDIC), um por criança, em estados variados: publicado, aprovado, em revisão, rascunho e devolvido.
+
 ## Ordens de serviço de exemplo
 7 chamados já cobrem todos os estados: aberta, aceita, em execução (atrasada), aguardando avaliação, encerrada (executada), encerrada (parcial/reaberta) e cancelada.
 

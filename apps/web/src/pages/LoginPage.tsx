@@ -4,6 +4,8 @@ import { useAuth } from '../app/AuthProvider';
 import { getRedirectPathByRoles } from '../hooks/useRedirectByRole';
 import { getErrorMessage } from '../utils/errorMessage';
 import { getAccessToken } from '../api/tokenStorage';
+import http from '../api/http';
+import { isValidHomePath } from '../hooks/useRedirectByRole';
 import { Eye, EyeOff, BookOpen, Sparkles, Smartphone, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -65,6 +67,12 @@ export function LoginPage() {
           redirectPath = getRedirectPathByRoles(levels, types);
         }
       } catch { /* fallback para /app/dashboard */ }
+      // Painel de entrada personalizado (definido pelo administrador). Falha silenciosa = padrão do cargo.
+      try {
+        const me = await http.get('/auth/me');
+        const hp = me?.data?.user?.homePath;
+        if (isValidHomePath(hp)) redirectPath = hp;
+      } catch { /* mantém o padrão do cargo */ }
       navigate(redirectPath);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'E-mail ou senha incorretos. Tente novamente.'));

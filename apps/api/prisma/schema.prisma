@@ -422,6 +422,8 @@ model User {
   updatedAt DateTime @updatedAt
   createdBy String?  @db.VarChar(255)
   updatedBy String?  @db.VarChar(255)
+  /// Painel (rota /app/...) para onde o usuário é levado após o login. Nulo = padrão do papel.
+  homePath  String? @db.VarChar(100)
 
   // Relações
   mantenedora             Mantenedora        @relation(fields: [mantenedoraId], references: [id], onDelete: Cascade)

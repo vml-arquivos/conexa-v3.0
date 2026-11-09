@@ -394,6 +394,54 @@ async function main() {
   }
   console.log(`  ✅ ${oss} ordens de serviço de exemplo`);
 
+  // 11b. Requisições de material (por turma, em vários estados) — professor pede, coordenação/mantenedora aprovam
+  const MATS: { t: string; title: string; type: string; status: string; qty: number; prio: string; itens: [string, number, string][] }[] = [
+    { t: 'A1', title: 'Material pedagógico — tintas e pincéis', type: 'PEDAGOGICO', status: 'SOLICITADO', qty: 30, prio: 'normal', itens: [['Tinta guache 250ml', 12, 'un'], ['Pincel chato nº 12', 18, 'un']] },
+    { t: 'A2', title: 'Higiene — fraldas e lenços umedecidos', type: 'HIGIENE', status: 'APROVADO', qty: 60, prio: 'alta', itens: [['Fralda descartável G', 40, 'pacote'], ['Lenço umedecido', 20, 'pacote']] },
+    { t: 'B1', title: 'Livros infantis para o cantinho de leitura', type: 'PEDAGOGICO', status: 'ENTREGUE', qty: 15, prio: 'baixa', itens: [['Livro de histórias ilustrado', 15, 'un']] },
+    { t: 'B2', title: 'Material de limpeza da sala', type: 'LIMPEZA', status: 'RASCUNHO', qty: 10, prio: 'normal', itens: [['Álcool 70% 1L', 6, 'un'], ['Pano multiuso', 4, 'un']] },
+    { t: 'B2', title: 'Massinha e jogos de encaixe', type: 'PEDAGOGICO', status: 'REJEITADO', qty: 20, prio: 'normal', itens: [['Massinha de modelar', 20, 'caixa']] },
+  ];
+  let mats = 0;
+  for (const [i, m] of MATS.entries()) {
+    const unitIdx = TURMAS.find((x) => x.key === m.t)!.unit;
+    const code = `PIL-REQ-${String(i + 1).padStart(3, '0')}`;
+    if (await prisma.materialRequest.findFirst({ where: { unitId: unitIds[unitIdx], code } })) continue;
+    const r = await prisma.materialRequest.create({
+      data: {
+        mantenedoraId: MANT_ID, unitId: unitIds[unitIdx], classroomId: turmaId[m.t], code, title: m.title,
+        description: 'Requisição de exemplo do piloto', type: m.type as any, quantity: m.qty, estimatedCost: m.qty * 12.5,
+        status: m.status as any, priority: m.prio, requestedDate: addDays(hoje, -6), requiredDate: addDays(hoje, 10),
+        approvedDate: ['APROVADO', 'ENTREGUE'].includes(m.status) ? addDays(hoje, -4) : null,
+        deliveredDate: m.status === 'ENTREGUE' ? addDays(hoje, -1) : null,
+        approvedBy: ['APROVADO', 'ENTREGUE'].includes(m.status) ? userId[`coordenador.${unitIdx === 0 ? 'a' : 'b'}`] : null,
+        createdBy: userId[`professor.${m.t.toLowerCase()}`],
+      } as any,
+    });
+    await prisma.materialRequestItem.createMany({ data: m.itens.map(([productName, quantity, unit]) => ({ materialRequestId: r.id, productName, quantity, unit })) });
+    mats++;
+  }
+  console.log(`  ✅ ${mats} requisições de material`);
+
+  // 11c. Relatórios individuais (RDIC) — 1 por criança, em estados variados
+  const periodo = `${hoje.getUTCFullYear()}-${hoje.getUTCMonth() < 6 ? '1S' : '2S'}`;
+  const ESTADOS = ['PUBLICADO', 'APROVADO', 'EM_REVISAO', 'RASCUNHO', 'DEVOLVIDO'];
+  let rdics = 0;
+  for (const [i, c] of criancas.entries()) {
+    if (await prisma.developmentReport.findFirst({ where: { childId: c.id, period: periodo } })) continue;
+    const st = ESTADOS[i % ESTADOS.length];
+    const laudado = !!c.cen.laudo;
+    await prisma.developmentReport.create({
+      data: {
+        childId: c.id, authorId: userId[`professor.${c.turma.toLowerCase()}`], classroomId: turmaId[c.turma], unitId: unitIds[c.unit], period: periodo,
+        content: `Relatório individual do período. ${laudado ? 'A criança segue com plano de adaptação individual e acompanhamento da coordenação e da psicologia. ' : ''}Participa das propostas com interesse, interage com o grupo e demonstra avanços na comunicação, na coordenação motora e na autonomia nos momentos de alimentação e higiene.${c.cen.allergies ? ` Atenção à alergia: ${c.cen.allergies}.` : ''}`,
+        status: st as any, publishedAt: st === 'PUBLICADO' ? addDays(hoje, -2) : null,
+      } as any,
+    });
+    rdics++;
+  }
+  console.log(`  ✅ ${rdics} relatórios individuais (RDIC)`);
+
   // 12. Resumo de acessos
   console.log('\n📋 LOGINS DO PILOTO  (senha: ' + (process.env.PILOTO_SENHA ? '<PILOTO_SENHA>' : 'Teste@123') + ')');
   for (const u of USUARIOS) console.log(`  ${email(u.key).padEnd(44)} ${u.role}`);
