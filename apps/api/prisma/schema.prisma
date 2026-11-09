@@ -48,6 +48,7 @@ enum RoleLevel {
   STAFF_CENTRAL // Coordenação pedagógica geral e psicologia
   UNIDADE // Direção, coordenação pedagógica local, administrativo, nutrição
   PROFESSOR // Acesso exclusivo às suas turmas
+  MANUTENCAO // Equipe de manutenção: apenas ordens de serviço (sem acesso pedagógico)
 }
 
 /// Papéis específicos dentro de cada nível
@@ -63,6 +64,7 @@ enum RoleType {
   UNIDADE_NUTRICIONISTA
   PROFESSOR
   PROFESSOR_AUXILIAR
+  MANUTENCAO_EXECUTOR
 }
 
 /// Status de usuário
@@ -384,6 +386,7 @@ model Unit {
   developmentReports    DevelopmentReport[]
   iaRequests            IaRequest[] @relation("UnitIaRequests")
   empresasTransporte    EmpresaTransporte[]
+  serviceOrders         ServiceOrder[]
   @@unique([mantenedoraId, code])
   @@index([mantenedoraId])
   @@index([isActive])
@@ -2665,4 +2668,126 @@ model IaFeedback {
   @@index([responseId])
   @@index([userId])
   @@map("ia_feedback")
+}
+
+
+// ============================================================================
+// ORDENS DE SERVIÇO (Manutenção)
+// ============================================================================
+
+enum ServiceOrderStatus {
+  ABERTA // Solicitada pela unidade, aguardando a manutenção
+  ACEITA // Manutenção aceitou e definiu prazo
+  EM_EXECUCAO // Serviço em andamento
+  AGUARDANDO_AVALIACAO // Executada; aguardando avaliação de quem solicitou
+  ENCERRADA // Avaliada e finalizada
+  CANCELADA
+}
+
+enum ServiceOrderPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum ServiceOrderCategory {
+  ELETRICA
+  HIDRAULICA
+  ALVENARIA_PINTURA
+  MOBILIARIO
+  PORTAS_JANELAS
+  AREA_EXTERNA
+  EQUIPAMENTOS
+  TI_REDES
+  LIMPEZA_DEDETIZACAO
+  SEGURANCA
+  OUTRO
+}
+
+enum ServiceOrderResult {
+  EXECUTADO
+  PARCIAL
+  NAO_EXECUTADO
+}
+
+model ServiceOrder {
+  id            String @id @default(cuid())
+  /// Número sequencial amigável (OS #123)
+  number        Int    @unique @default(autoincrement())
+  mantenedoraId String @db.VarChar(255)
+  unitId        String
+
+  title        String               @db.VarChar(200)
+  description  String               @db.Text
+  category     ServiceOrderCategory @default(OUTRO)
+  priority     ServiceOrderPriority @default(MEDIA)
+  /// Onde fazer (sala, pátio, cozinha…)
+  location     String               @db.VarChar(200)
+  status       ServiceOrderStatus   @default(ABERTA)
+
+  requestedById String    @db.VarChar(255)
+  assignedToId  String?   @db.VarChar(255)
+  dueDate       DateTime?
+  acceptedAt    DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  closedAt      DateTime?
+
+  /// Prestação de contas da manutenção
+  executionReport String?             @db.Text
+  executionResult ServiceOrderResult?
+  /// Avaliação de quem solicitou
+  evaluationResult ServiceOrderResult?
+  evaluationNotes  String?             @db.Text
+  evaluatedById    String?             @db.VarChar(255)
+  evaluatedAt      DateTime?
+  reopenCount      Int                 @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit        Unit                     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  events      ServiceOrderEvent[]
+  attachments ServiceOrderAttachment[]
+
+  @@index([mantenedoraId, status])
+  @@index([unitId, status])
+  @@index([assignedToId, status])
+  @@index([requestedById])
+  @@index([dueDate])
+}
+
+model ServiceOrderEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  /// CRIADA, ACEITA, INICIADA, CONCLUIDA, AVALIADA, REABERTA, CANCELADA, COMENTARIO, REATRIBUIDA, PRAZO_ALTERADO
+  type       String   @db.VarChar(40)
+  fromStatus ServiceOrderStatus?
+  toStatus   ServiceOrderStatus?
+  message    String?  @db.Text
+  authorId   String   @db.VarChar(255)
+  createdAt  DateTime @default(now())
+
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+model ServiceOrderAttachment {
+  id           String   @id @default(cuid())
+  orderId      String
+  /// SOLICITACAO (foto do problema) ou EXECUCAO (foto do resultado)
+  kind         String   @db.VarChar(20)
+  originalName String   @db.VarChar(255)
+  /// Caminho relativo a UPLOADS_DIR, servido em /uploads
+  path         String   @db.VarChar(500)
+  mimeType     String   @db.VarChar(100)
+  sizeBytes    Int
+  uploadedById String   @db.VarChar(255)
+  createdAt    DateTime @default(now())
+
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }

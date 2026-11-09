@@ -8,6 +8,7 @@ import {
   Network, Brain, Layers, Settings, Sparkles, UserCircle, Calendar,
   Apple, Utensils, Shield, X, Eye, FileEdit, AlertTriangle, UserPlus, Bell, FolderCheck, Bus, Stethoscope,
   Smartphone,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '../../app/AuthProvider';
 import { normalizeRoles, normalizeRoleTypes } from '../../app/RoleProtectedRoute';
@@ -141,6 +142,7 @@ const CENTRAL_ITEMS: MenuItem[] = [
 
 // MANTENEDORA ──────────────────────────────────────────────────────────────────
 const MANTENEDORA_ITEMS: MenuItem[] = [
+  { path: '/app/administracao',    label: 'Painel da Administração', icon: <Building2 className="h-4 w-4" />, badge: 'Novo' },
   { path: '/app/dashboard',         label: 'Painel Global',       icon: <LayoutDashboard className="h-4 w-4" /> },
   { path: '/app/coordenacao-geral', label: 'Coordenação Geral',   icon: <Network className="h-4 w-4" /> },
   { path: '/app/central',           label: 'Análises Centrais',   icon: <TrendingUp className="h-4 w-4" /> },
@@ -148,6 +150,17 @@ const MANTENEDORA_ITEMS: MenuItem[] = [
   { path: '/app/pedidos-compra',    label: 'Pedidos de Compra',   icon: <ShoppingBag className="h-4 w-4" /> },
   { path: '/app/matriz-pedagogica', label: 'Matriz 2026',         icon: <Layers className="h-4 w-4" /> },
   { path: '/app/reports',           label: 'Relatórios',          icon: <BarChart2 className="h-4 w-4" /> },
+];
+
+// ORDENS DE SERVIÇO (Manutenção) ─────────────────────────────────────────────
+// Solicitantes (professor, unidade, mantenedora) abrem e acompanham pedidos.
+const OS_SOLICITANTE_ITEMS: MenuItem[] = [
+  { path: '/app/ordens-servico', label: 'Ordens de Serviço', icon: <Wrench className="h-4 w-4" />, badge: 'Novo' },
+];
+// Equipe de manutenção: só enxerga ordens de serviço.
+const MANUTENCAO_ITEMS: MenuItem[] = [
+  { path: '/app/manutencao',     label: 'Fila de serviços',  icon: <Wrench className="h-4 w-4" /> },
+  { path: '/app/ordens-servico', label: 'Todas as ordens',   icon: <ClipboardList className="h-4 w-4" /> },
 ];
 
 // DEVELOPER — acesso completo ──────────────────────────────────────────────────
@@ -265,6 +278,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   const isCentral     = userLevels.some((r) => r === 'STAFF_CENTRAL' || r.startsWith('STAFF_CENTRAL_'));
   const isMantenedora = userLevels.some((r) => r === 'MANTENEDORA' || r.startsWith('MANTENEDORA_'));
   const isDeveloper   = userLevels.includes('DEVELOPER');
+  const isManutencao  = userLevels.includes('MANUTENCAO');
 
   // Flags de tipo (sub-papel dentro de UNIDADE)
   const isDiretor         = userTypes.includes('UNIDADE_DIRETOR');
@@ -285,6 +299,7 @@ export function Sidebar({ onClose }: SidebarProps) {
     : isNutricionista                    ? 'Nutricionista'
     : isCoordPedagogico                  ? 'Coord. Pedagógica'
     : isAdministrativo                   ? 'Secretaria'
+    : isManutencao                       ? 'Manutenção'
     : isUnidade                          ? 'Unidade'
     : isProfessor                        ? 'Professor(a)'
     : 'Usuário';
@@ -425,8 +440,18 @@ export function Sidebar({ onClose }: SidebarProps) {
           </>
         )}
 
+        {/* MANUTENÇÃO */}
+        {!isDeveloper && isManutencao && (
+          <NavSection titulo="Manutenção" items={MANUTENCAO_ITEMS} location={location} onItemClick={onClose} />
+        )}
+
+        {/* Ordens de serviço: quem pode pedir reparos (professor, unidade, mantenedora, dev) */}
+        {(isDeveloper || isMantenedora || isUnidade || isProfessor) && !isManutencao && (
+          <NavSection titulo="Manutenção" items={isDeveloper ? [...OS_SOLICITANTE_ITEMS, MANUTENCAO_ITEMS[0]] : OS_SOLICITANTE_ITEMS} location={location} onItemClick={onClose} />
+        )}
+
         {/* Fallback */}
-        {!isDeveloper && !isAdministrativo && !isMantenedora && !isCentral && !isUnidade && !isProfessor && (
+        {!isDeveloper && !isAdministrativo && !isMantenedora && !isCentral && !isUnidade && !isProfessor && !isManutencao && (
           <NavSection titulo="Menu" items={UNIDADE_GESTAO} location={location} onItemClick={onClose} />
         )}
 

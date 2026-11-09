@@ -33,6 +33,7 @@ export default defineConfig({
           { name: 'Chamada', url: '/app/mobile/chamada', description: 'Registrar chamada da turma' },
           { name: 'Diário', url: '/app/mobile/diario', description: 'Escrever no diário da turma' },
           { name: 'Observação', url: '/app/mobile/observacao', description: 'Observação individual de criança' },
+          { name: 'Ordens de serviço', url: '/app/manutencao', description: 'Fila de serviços da manutenção' },
         ],
         categories: ['education', 'productivity'],
       },
