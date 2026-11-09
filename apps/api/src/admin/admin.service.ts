@@ -26,6 +26,7 @@ const ROLE_TYPE_TO_LEVEL: Record<RoleType, RoleLevel> = {
   UNIDADE_NUTRICIONISTA: RoleLevel.UNIDADE,
   PROFESSOR: RoleLevel.PROFESSOR,
   PROFESSOR_AUXILIAR: RoleLevel.PROFESSOR,
+  MANUTENCAO_EXECUTOR: RoleLevel.MANUTENCAO,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { getPedagogicalToday } from '../../utils/pedagogicalDate';
 import http from '../../api/http';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Calendar, LogOut, Users, Building2, Menu, Moon, Search, Sparkles, Sun } from 'lucide-react';
+import { Calendar, LogOut, Users, Building2, Menu, Moon, Search, Sparkles, Sun, Wrench } from 'lucide-react';
 import { useAgent } from '../agent/AgentContext';
 import { useMissions } from '../agent/useMissions';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -68,6 +68,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
 
   const allRoles = [...new Set([...userRoles, ...userRoleTypes])];
   const isCoordRole = allRoles.some((r) => COORD_ROLES.includes(r));
+  const isManutOnly = allRoles.includes('MANUTENCAO') && !allRoles.some((r) => r === 'DEVELOPER' || r === 'MANTENEDORA');
   const usesMissions = allRoles.some((r) => MISSION_ROLES.includes(r) || r.startsWith('UNIDADE_') || r.startsWith('STAFF_CENTRAL_'));
   const missionsUserKey = String(user?.id ?? user?.user?.id ?? user?.email ?? 'anon');
   const { summary } = useMissions(badgeReady && usesMissions, missionsUserKey);
@@ -137,7 +138,12 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
           </div>
 
           {/* Contexto: Unidade ou Turma */}
-          {isCoordRole ? (
+          {isManutOnly ? (
+            <div className="flex min-w-0 items-center gap-1.5 rounded-full bg-[var(--surface-subtle)] px-2.5 py-1">
+              <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-tertiary)]" aria-hidden="true" />
+              <span className="text-xs font-semibold text-[var(--text-primary)]">Manutenção</span>
+            </div>
+          ) : isCoordRole ? (
             <div className="flex min-w-0 items-center gap-1.5 rounded-full bg-[var(--surface-subtle)] px-2.5 py-1">
               <Building2 className="h-3.5 w-3.5 flex-shrink-0 text-[var(--text-tertiary)]" aria-hidden="true" />
               <span className="hidden text-xs text-[var(--text-secondary)] sm:inline">Unidade</span>
@@ -172,8 +178,8 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
             <Search className="h-[18px] w-[18px]" />
           </button>
 
-          {/* Assistente de IA */}
-          <button
+          {/* Assistente de IA (não se aplica à Manutenção) */}
+          {!isManutOnly && (<button
             onClick={togglePanel}
             aria-label={urgentCount > 0 ? `Abrir assistente — ${urgentCount} prioridades` : 'Abrir assistente'}
             title="Assistente Conexa (Ctrl J)"
@@ -188,6 +194,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
               </span>
             )}
           </button>
+          )}
 
           <button
             onClick={toggleTheme}

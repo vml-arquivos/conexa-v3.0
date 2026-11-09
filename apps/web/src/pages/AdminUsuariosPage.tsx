@@ -49,6 +49,7 @@ const ROLE_CONFIG: Record<string, { label: string; cor: string; icon: React.Reac
   UNIDADE_ADMINISTRATIVO: { label: 'Secretaria / Adm.', cor: 'bg-teal-100 text-teal-700 border-teal-200', icon: <Briefcase className="h-3 w-3" />, nivel: 4 },
   UNIDADE_NUTRICIONISTA: { label: 'Nutricionista', cor: 'bg-orange-100 text-orange-700 border-orange-200', icon: <Stethoscope className="h-3 w-3" />, nivel: 4 },
   PROFESSOR: { label: 'Professor(a)', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <GraduationCap className="h-3 w-3" />, nivel: 5 },
+  MANUTENCAO_EXECUTOR: { label: 'Manutenção', cor: 'bg-gray-100 text-gray-700 border-gray-200', icon: <Briefcase className="h-3 w-3" />, nivel: 5 },
   PROFESSOR_AUXILIAR: { label: 'Professor(a) Auxiliar', cor: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: <User className="h-3 w-3" />, nivel: 5 },
 };
 

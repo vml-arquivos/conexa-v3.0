@@ -57,6 +57,11 @@ import ConferenciaPlanejamentoPage from '../pages/ConferenciaPlanejamentoPage';
 import { DashboardDiretorPage } from '../pages/DashboardDiretorPage';
 import { DashboardNutricionistaPage } from '../pages/DashboardNutricionistaPage';
 import DashboardPsicologoPage from '../pages/DashboardPsicologoPage';
+import { DashboardHomeGate } from './DashboardHomeGate';
+import PainelAdministracaoPage from '../pages/PainelAdministracaoPage';
+import OrdensServicoPage from '../pages/manutencao/OrdensServicoPage';
+import OrdemServicoNovaPage from '../pages/manutencao/OrdemServicoNovaPage';
+import OrdemServicoDetalhePage from '../pages/manutencao/OrdemServicoDetalhePage';
 import DesenvolvimentoInfantilPage from '../pages/DesenvolvimentoInfantilPage';
 // Timeline e observações da criança
 import TimelineCriancaPage from '../pages/TimelineCriancaPage';
@@ -106,7 +111,11 @@ export const router = createBrowserRouter([
     children: [
       {
         path: 'dashboard',
-        element: <DashboardPage />,
+        element: (
+          <DashboardHomeGate>
+            <DashboardPage />
+          </DashboardHomeGate>
+        ),
         errorElement: <RouteErrorBoundary />,
       },
       // ─── Rotas legadas (mantidas para compatibilidade, sem exposição no menu) ─
@@ -309,6 +318,53 @@ export const router = createBrowserRouter([
         element: (
           <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'STAFF_CENTRAL', 'MANTENEDORA', 'DEVELOPER']}>
             <MaterialRequestPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Painel da Administração (Mantenedora) — novo, somente leitura ─────
+      {
+        path: 'administracao',
+        element: (
+          <RoleProtectedRoute allowedRoles={['MANTENEDORA', 'DEVELOPER']}>
+            <PainelAdministracaoPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      // ─── Manutenção / Ordens de Serviço (módulo novo, isolado) ────────────
+      {
+        path: 'manutencao',
+        element: (
+          <RoleProtectedRoute allowedRoles={['MANUTENCAO', 'DEVELOPER']}>
+            <OrdensServicoPage variant="manutencao" />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'ordens-servico',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'MANTENEDORA', 'MANUTENCAO', 'DEVELOPER']}>
+            <OrdensServicoPage variant="acompanhamento" />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'ordens-servico/nova',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'MANTENEDORA', 'DEVELOPER']}>
+            <OrdemServicoNovaPage />
+          </RoleProtectedRoute>
+        ),
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'ordens-servico/:id',
+        element: (
+          <RoleProtectedRoute allowedRoles={['PROFESSOR', 'PROFESSOR_AUXILIAR', 'UNIDADE', 'MANTENEDORA', 'MANUTENCAO', 'DEVELOPER']}>
+            <OrdemServicoDetalhePage />
           </RoleProtectedRoute>
         ),
         errorElement: <RouteErrorBoundary />,

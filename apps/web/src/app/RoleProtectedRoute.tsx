@@ -63,7 +63,7 @@ export function getPrimaryRole(user: unknown): string {
     'DEVELOPER', 'MANTENEDORA', 'STAFF_CENTRAL',
     'UNIDADE_DIRETOR', 'UNIDADE_NUTRICIONISTA',
     'UNIDADE_COORDENADOR_PEDAGOGICO', 'UNIDADE_ADMINISTRATIVO',
-    'UNIDADE', 'PROFESSOR',
+    'UNIDADE', 'MANUTENCAO', 'PROFESSOR',
   ];
   // Verificar types primeiro (mais específico)
   for (const p of priority) {

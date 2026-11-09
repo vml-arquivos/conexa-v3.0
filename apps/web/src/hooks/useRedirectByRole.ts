@@ -37,6 +37,14 @@ export function useRedirectByRole() {
  * @param types  - RoleTypes do usuário (ex: ['UNIDADE_ADMINISTRATIVO'])
  */
 export function getRedirectPathByRoles(levels: string[], types: string[] = []): string {
+  // ── Manutenção (acesso exclusivo a ordens de serviço) ──────────────────
+  if (
+    levels.includes('MANUTENCAO') &&
+    !levels.some((l) => l === 'DEVELOPER' || l === 'MANTENEDORA')
+  ) {
+    return '/app/manutencao';
+  }
+
   // ── Nível Professor ────────────────────────────────────────────────────
   if (levels.includes('PROFESSOR') || levels.includes('PROFESSOR_AUXILIAR')) {
     // Se rodando como PWA instalado (standalone/fullscreen), vai direto para o mobile
@@ -79,7 +87,10 @@ export function getRedirectPathByRoles(levels: string[], types: string[] = []): 
   }
 
   // ── Mantenedora / Developer ────────────────────────────────────────────
-  if (levels.includes('MANTENEDORA') || levels.includes('DEVELOPER')) {
+  if (levels.includes('MANTENEDORA')) {
+    return '/app/administracao';
+  }
+  if (levels.includes('DEVELOPER')) {
     return '/app/dashboard';
   }
 

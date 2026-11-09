@@ -1,5 +1,8 @@
 # 🔐 Logins de Teste - Conexa V3.0
 
+> ⚠️ **Desatualizado.** Os logins atuais do piloto estão em `docs/GUIA_ACESSOS_PILOTO.md` (e-mails `@piloto.conexa.test`).
+
+
 **Data**: 19 de Fevereiro de 2026  
 **Senha Padrão**: `Teste@123`  
 **Total de Usuários**: 13

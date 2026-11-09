@@ -1,3 +1,5 @@
+import { useAuth } from '../../app/AuthProvider';
+import { normalizeRoles } from '../../app/RoleProtectedRoute';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 interface AgentContextValue {
@@ -17,6 +19,10 @@ const AgentContext = createContext<AgentContextValue | undefined>(undefined);
  * Atalhos: Ctrl/⌘ + K abre a paleta; Ctrl/⌘ + J abre o assistente.
  */
 export function AgentProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const levels = normalizeRoles(user);
+  // A equipe de Manutenção não usa o assistente pedagógico.
+  const noAssistant = levels.includes('MANUTENCAO') && !levels.some((l) => l === 'DEVELOPER' || l === 'MANTENEDORA');
   const [panelOpen, setPanelOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -31,11 +37,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === 'k') { e.preventDefault(); setPanelOpen(false); setPaletteOpen((v) => !v); }
-      if (key === 'j') { e.preventDefault(); setPaletteOpen(false); setPanelOpen((v) => !v); }
+      if (key === 'j' && !noAssistant) { e.preventDefault(); setPaletteOpen(false); setPanelOpen((v) => !v); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [noAssistant]);
 
   const value = useMemo<AgentContextValue>(() => ({
     panelOpen, paletteOpen, openPanel, closePanel, togglePanel, openPalette, closePalette,

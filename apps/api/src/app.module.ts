@@ -24,6 +24,7 @@ import { LookupModule } from './lookup/lookup.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { AdminModule } from './admin/admin.module';
 import { PedidoCompraModule } from './pedido-compra/pedido-compra.module';
+import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { IaAssistivaModule } from './ia-assistiva/ia-assistiva.module';
 import { ClassroomsModule } from './classrooms/classrooms.module';
 import { AtendimentoPaisModule } from './atendimento-pais/atendimento-pais.module';
@@ -78,6 +79,7 @@ import { IntelligenceCoreModule } from './intelligence-core/intelligence-core.mo
     TeachersModule,
     LookupModule,
     PedidoCompraModule,
+    ServiceOrdersModule,
     IaAssistivaModule,
     ClassroomsModule,
     AtendimentoPaisModule,
