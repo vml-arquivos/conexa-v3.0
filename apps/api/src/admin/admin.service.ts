@@ -92,6 +92,10 @@ export interface CreateUserDto {
   /** unitCode (ex.: "ARARA-CAN") — obrigatório para roles de unidade/professor */
   unitCode?: string;
   status?: UserStatus;
+  /** Turma (professor): vincula como titular. */
+  classroomId?: string;
+  /** Painel de destino após o login (/app/...). */
+  homePath?: string | null;
 }
 
 export interface UpdateUserDto {
@@ -104,6 +108,18 @@ export interface UpdateUserDto {
   roleType?: RoleType;
   unitCode?: string;
   status?: UserStatus;
+  classroomId?: string | null;
+  homePath?: string | null;
+}
+
+/** Aceita apenas rotas internas do app (evita redirecionar para fora). */
+export function sanitizeHomePath(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  if (typeof v !== 'string' || !/^\/app\/[A-Za-z0-9\/_-]{1,90}$/.test(v)) {
+    throw new BadRequestException('homePath inválido: use uma rota interna /app/...');
+  }
+  return v;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -221,7 +237,12 @@ export class AdminService {
         lastLogin: true,
         createdAt: true,
         unitId: true,
+        homePath: true,
         unit: { select: { name: true, code: true } },
+        classroomTeachers: {
+          where: { isActive: true },
+          select: { classroom: { select: { id: true, name: true } } },
+        },
         roles: {
           where: { isActive: true },
           select: {
@@ -250,6 +271,8 @@ export class AdminService {
       lastLogin: u.lastLogin,
       createdAt: u.createdAt,
       unitId: u.unitId,
+      homePath: u.homePath ?? null,
+      classrooms: (u.classroomTeachers ?? []).map((ct) => ct.classroom),
       unit: u.unit ? { name: u.unit.name, unitCode: u.unit.code } : undefined,
       roles: u.roles.map((r) => ({
         roleType: r.role?.type ?? r.scopeLevel,
@@ -340,6 +363,17 @@ export class AdminService {
       unitId = unit.id;
     }
 
+    const homePath = sanitizeHomePath(dto.homePath);
+    let classroomId: string | null = null;
+    if (dto.classroomId) {
+      const cls = await this.prisma.classroom.findFirst({
+        where: { id: dto.classroomId, ...(unitId ? { unitId } : {}), unit: { mantenedoraId: actor.mantenedoraId } },
+        select: { id: true },
+      });
+      if (!cls) throw new BadRequestException('Turma não encontrada nesta unidade');
+      classroomId = cls.id;
+    }
+
     // Verificar e-mail duplicado
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email.trim().toLowerCase() },
@@ -366,6 +400,7 @@ export class AdminService {
           cpf: dto.cpf?.trim() || null,
           status: dto.status ?? UserStatus.ATIVO,
           createdBy: actor.sub,
+          ...(homePath ? { homePath } : {}),
         },
         select: { id: true, email: true, firstName: true, lastName: true, unitId: true, status: true },
       });
@@ -401,6 +436,10 @@ export class AdminService {
             data: { userRoleId: userRole.id, unitId: u.id },
           });
         }
+      }
+
+      if (classroomId && (role.level === RoleLevel.PROFESSOR)) {
+        await tx.classroomTeacher.create({ data: { classroomId, teacherId: newUser.id, role: 'MAIN', isActive: true } });
       }
 
       return newUser;
@@ -493,6 +532,8 @@ export class AdminService {
       if (dto.cpf !== undefined) updateData.cpf = dto.cpf?.trim() || null;
       if (dto.status) updateData.status = dto.status;
       if (unitId !== undefined) updateData.unitId = unitId;
+      const hp = sanitizeHomePath(dto.homePath);
+      if (hp !== undefined) updateData.homePath = hp;
 
       const u = await tx.user.update({
         where: { id: userId },
@@ -546,6 +587,25 @@ export class AdminService {
               data: allUnits.map((unit) => ({ userRoleId: userRole.id, unitId: unit.id })),
             });
           }
+        }
+      }
+
+      // 3. Vincular/desvincular turma (somente quando enviado)
+      if (dto.classroomId !== undefined) {
+        if (dto.classroomId === null || dto.classroomId === '') {
+          await tx.classroomTeacher.updateMany({ where: { teacherId: userId }, data: { isActive: false } });
+        } else {
+          const cls = await tx.classroom.findFirst({
+            where: { id: dto.classroomId, unit: { mantenedoraId: actor.mantenedoraId } },
+            select: { id: true },
+          });
+          if (!cls) throw new BadRequestException('Turma não encontrada');
+          await tx.classroomTeacher.updateMany({ where: { teacherId: userId, classroomId: { not: cls.id } }, data: { isActive: false } });
+          await tx.classroomTeacher.upsert({
+            where: { classroomId_teacherId: { classroomId: cls.id, teacherId: userId } },
+            create: { classroomId: cls.id, teacherId: userId, role: 'MAIN', isActive: true },
+            update: { isActive: true },
+          });
         }
       }
 

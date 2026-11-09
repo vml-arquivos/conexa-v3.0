@@ -237,6 +237,7 @@ export class AuthService {
         createdAt: true,
         mantenedoraId: true,
         unitId: true,
+        homePath: true,
         unit: { select: { id: true, name: true, code: true } },
       },
     });
@@ -276,6 +277,7 @@ export class AuthService {
         createdAt: user.createdAt.toISOString(),
         mantenedoraId: user.mantenedoraId,
         unitId: user.unitId,
+        homePath: user.homePath ?? null,
         unit: user.unit ? { id: user.unit.id, name: user.unit.name, unitCode: user.unit.code } : null,
         roles: rolesRich,
       },
